@@ -1,16 +1,23 @@
+<!-- src/lib/components/Datagrid.svelte -->
 <script lang="ts" context="module">
   // This "module" script block runs once and is used to export types.
 </script>
 
 <script lang="ts">
-  // This "instance" script runs for every component instance.
-  // The logic for props, sorting, etc. remains unchanged.
-  
   import type { ColumnDefinition } from "$lib/clientAndBack/columnDefinitions";
   
   export let rows: Record<string, any>[] = [];
   export let columns: ColumnDefinition[] = [];
   export let height = '500px';
+  
+  // NEW: Optional delete functionality
+  export let showDelete = false;
+  export let deleteDisabled: (row: Record<string, any>) => boolean = () => false;
+  export let deleteTooltip: (row: Record<string, any>) => string = () => 'Delete this item';
+
+  // Svelte 5: Event callbacks instead of createEventDispatcher
+  export let ondelete: ((event: { row: Record<string, any> }) => void) | undefined = undefined;
+  export let onsort: ((event: { key: string }) => void) | undefined = undefined;
 
   let sortKey: string | null = null;
   let sortDirection: 1 | -1 = 1;
@@ -38,12 +45,23 @@
       sortKey = key;
       sortDirection = 1;
     }
+    
+    // Notify parent component about the sort change
+    onsort?.({ key });
   }
 
-  $: gridTemplateColumns = columns.map(c => c.width || '1fr').join(' ');
+  // Include delete column in grid template if needed
+  $: gridTemplateColumns = [
+    ...columns.map(c => c.width || '1fr'),
+    ...(showDelete ? ['auto'] : [])
+  ].join(' ');
+
+  // Handle delete action - Svelte 5 style with callback
+  function handleDelete(row: Record<string, any>) {
+    ondelete?.({ row });
+  }
 </script>
 
-<!-- The HTML structure is unchanged -->
 <div class="datagrid-container" style="height: {height};">
   
   <div class="datagrid-header" style="--grid-template-columns: {gridTemplateColumns};">
@@ -60,6 +78,11 @@
         {/if}
       </button>
     {/each}
+    
+    <!-- Delete column header -->
+    {#if showDelete}
+      <div class="header-cell">Action</div>
+    {/if}
   </div>
 
   <div class="datagrid-body">
@@ -73,6 +96,23 @@
               </slot>
             </div>
           {/each}
+          
+          <!-- Delete button cell -->
+          {#if showDelete}
+            <div class="body-cell delete-cell">
+              <slot name="delete" {row}>
+                <button
+                  class="delete-button"
+                  class:disabled={deleteDisabled(row)}
+                  disabled={deleteDisabled(row)}
+                  title={deleteTooltip(row)}
+                  on:click={() => handleDelete(row)}
+                >
+                  🗑️
+                </button>
+              </slot>
+            </div>
+          {/if}
         </div>
       {/each}
     {:else}
@@ -81,28 +121,22 @@
   </div>
 </div>
 
-
-<!-- The CSS has been updated for a more robust layout -->
 <style>
   /* --- NEW LAYOUT: CSS GRID for fixed header --- */
   .datagrid-container {
-    /* We define the container as a grid with two rows */
     display: grid; 
-    /* Header gets its natural height, body takes all remaining space (1 fraction) */
     grid-template-rows: auto 1fr; 
     border: 1px solid var(--color-border, #e2e8f0);
     border-radius: 8px;
-    overflow: hidden; /* Crucial for containing the grid layout */
+    overflow: hidden;
     background-color: var(--color-background, #fff);
   }
 
   .datagrid-body {
-    /* This is now the ONLY element that scrolls */
     overflow-y: auto; 
   }
 
-  /* --- Column Alignment (Unchanged) --- */
-  /* This CSS still controls the layout INSIDE the header and rows */
+  /* --- Column Alignment --- */
   .datagrid-header, .datagrid-row {
     display: grid;
     grid-template-columns: var(--grid-template-columns);
@@ -111,11 +145,11 @@
   
   .datagrid-header {
     background-color: #f8fafc;
-    position: relative; /* For z-index to work reliably */
-    z-index: 1; /* Ensures header is above body content during scroll */
+    position: relative;
+    z-index: 1;
   }
 
-  /* --- Cell Styling (Largely Unchanged) --- */
+  /* --- Cell Styling --- */
   .header-cell {
     padding: 0.75rem 1rem;
     text-align: left;
@@ -158,6 +192,35 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  /* --- Delete Button Styling --- */
+  .delete-cell {
+    justify-content: center;
+    padding: 0.5rem;
+  }
+
+  .delete-button {
+    background: none;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    padding: 0.4rem 0.6rem;
+    cursor: pointer;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+    color: #dc3545;
+  }
+
+  .delete-button:hover:not(.disabled) {
+    background-color: #fee2e2;
+    border-color: #fecaca;
+    color: #b91c1c;
+  }
+
+  .delete-button.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    color: #9ca3af;
   }
 
   .empty-message {

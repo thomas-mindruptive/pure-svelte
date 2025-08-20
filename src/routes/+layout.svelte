@@ -1,6 +1,7 @@
 <script lang="ts">
 	import favicon from "$lib/assets/favicon.svg";
 	import Snackbar from "$lib/components/Snackbar.svelte";
+	import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
 	import "../styles/app.css";
 
 	let { children } = $props();
@@ -11,4 +12,5 @@
 </svelte:head>
 
 <Snackbar />
+<ConfirmDialog />
 {@render children?.()}

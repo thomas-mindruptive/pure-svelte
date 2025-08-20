@@ -1,15 +1,12 @@
+// src/routes/suppliers/+page.server.ts - FIXED für korrekte Serialisierung
+
 import { db } from '$lib/server/db';
 import { error, fail } from '@sveltejs/kit';
 import type { Actions } from './$types';
 
-/**
- * Helper function to check all dependencies for a wholesaler
- * Based on the actual database schema provided
- */
 async function checkWholesalerDependencies(wholesalerId: number) {
   const dependencies = [];
 
-  // 1. Check wholesaler_categories (direct dependency)
   const categoriesCheck = await db.request()
     .input('wholesalerId', wholesalerId)
     .query`
@@ -22,7 +19,6 @@ async function checkWholesalerDependencies(wholesalerId: number) {
     dependencies.push(`${categoriesCheck.recordset[0].count} assigned categories`);
   }
 
-  // 2. Check wholesaler_item_offerings (depends on wholesaler_categories)
   const offeringsCheck = await db.request()
     .input('wholesalerId', wholesalerId)
     .query`
@@ -35,7 +31,6 @@ async function checkWholesalerDependencies(wholesalerId: number) {
     dependencies.push(`${offeringsCheck.recordset[0].count} product offerings`);
   }
 
-  // 3. Check wholesaler_offering_links (depends on offerings)
   const linksCheck = await db.request()
     .input('wholesalerId', wholesalerId)
     .query`
@@ -49,7 +44,6 @@ async function checkWholesalerDependencies(wholesalerId: number) {
     dependencies.push(`${linksCheck.recordset[0].count} offering links`);
   }
 
-  // 4. Check wholesaler_offering_attributes (depends on offerings)
   const attributesCheck = await db.request()
     .input('wholesalerId', wholesalerId)
     .query`
@@ -66,14 +60,7 @@ async function checkWholesalerDependencies(wholesalerId: number) {
   return dependencies;
 }
 
-/**
- * Cascading delete function that removes all dependent records
- * in the correct order based on foreign key constraints
- */
 async function cascadeDeleteWholesaler(wholesalerId: number, transaction: any) {
-  // Delete in reverse dependency order:
-
-  // 1. Delete wholesaler_offering_attributes first
   await transaction.request()
     .input('wholesalerId', wholesalerId)
     .query`
@@ -83,7 +70,6 @@ async function cascadeDeleteWholesaler(wholesalerId: number, transaction: any) {
       WHERE wio.wholesaler_id = @wholesalerId
     `;
 
-  // 2. Delete wholesaler_offering_links
   await transaction.request()
     .input('wholesalerId', wholesalerId)
     .query`
@@ -93,7 +79,6 @@ async function cascadeDeleteWholesaler(wholesalerId: number, transaction: any) {
       WHERE wio.wholesaler_id = @wholesalerId
     `;
 
-  // 3. Delete wholesaler_item_offerings
   await transaction.request()
     .input('wholesalerId', wholesalerId)
     .query`
@@ -101,7 +86,6 @@ async function cascadeDeleteWholesaler(wholesalerId: number, transaction: any) {
       WHERE wholesaler_id = @wholesalerId
     `;
 
-  // 4. Delete wholesaler_categories
   await transaction.request()
     .input('wholesalerId', wholesalerId)
     .query`
@@ -109,7 +93,6 @@ async function cascadeDeleteWholesaler(wholesalerId: number, transaction: any) {
       WHERE wholesaler_id = @wholesalerId
     `;
 
-  // 5. Finally delete the wholesaler
   const result = await transaction.request()
     .input('wholesalerId', wholesalerId)
     .query`
@@ -121,14 +104,10 @@ async function cascadeDeleteWholesaler(wholesalerId: number, transaction: any) {
 }
 
 export const actions: Actions = {
-  /**
-   * Action for DELETING a wholesaler with all dependencies
-   * Based on the actual database schema
-   */
   delete: async ({ request }) => {
     const formData = await request.formData();
     const supplierIdStr = formData.get('supplierId') as string;
-    const cascade = formData.get('cascade') === 'true'; // Option for cascade delete
+    const cascade = formData.get('cascade') === 'true';
     
     if (!supplierIdStr) {
       return fail(400, { 
@@ -145,13 +124,11 @@ export const actions: Actions = {
       });
     }
 
-    // Start transaction for consistency
     const transaction = db.transaction();
     
     try {
       await transaction.begin();
 
-      // 1. Check if wholesaler exists
       const supplierCheck = await transaction.request()
         .input('supplierId', supplierId)
         .query`
@@ -170,29 +147,33 @@ export const actions: Actions = {
 
       const supplier = supplierCheck.recordset[0];
 
-      // 2. Check for dependencies
       const dependencies = await checkWholesalerDependencies(supplierId);
 
       if (dependencies.length > 0 && !cascade) {
         await transaction.rollback();
         const dependencyList = dependencies.join(', ');
+        
+        // ✅ FIX: Create a clean object without circular references
+        const cleanSupplier = {
+          wholesaler_id: supplier.wholesaler_id,
+          name: supplier.name,
+          status: supplier.status
+        };
+        
         return fail(400, { 
           action: 'delete', 
           error: `Cannot delete supplier: The following dependencies exist: ${dependencyList}. Use cascade delete to remove all related data.`,
           dependencies: dependencies,
-          supplier: supplier,
+          supplier: cleanSupplier,
           showCascadeOption: true
         });
       }
 
-      // 3. Perform the delete
       let deletedRows = 0;
       
       if (dependencies.length > 0 && cascade) {
-        // Cascade delete all dependencies
         deletedRows = await cascadeDeleteWholesaler(supplierId, transaction);
       } else {
-        // Simple delete (no dependencies)
         const result = await transaction.request()
           .input('supplierId', supplierId)
           .query`
@@ -210,9 +191,9 @@ export const actions: Actions = {
         });
       }
 
-      // 4. Commit transaction
       await transaction.commit();
 
+      // ✅ FIX: Return clean success object
       return { 
         action: 'delete', 
         success: cascade 
@@ -226,20 +207,19 @@ export const actions: Actions = {
       await transaction.rollback();
       console.error("Error deleting supplier:", err);
       
-      // Enhanced error handling based on SQL Server error numbers
       if (err.number) {
         switch (err.number) {
-          case 547: // Foreign key constraint violation
+          case 547:
             return fail(400, { 
               action: 'delete', 
               error: 'Cannot delete supplier: Foreign key constraint violation. Some dependencies may still exist.' 
             });
-          case 2: // Timeout
+          case 2:
             return fail(408, { 
               action: 'delete', 
               error: 'Database timeout. The supplier has many dependencies. Please try again.' 
             });
-          case 1205: // Deadlock
+          case 1205:
             return fail(409, { 
               action: 'delete', 
               error: 'Database deadlock occurred. Please try again.' 

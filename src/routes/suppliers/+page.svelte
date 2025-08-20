@@ -1,9 +1,13 @@
 <!--
   src/routes/suppliers/+page.svelte
-  
+
   This component displays a list of suppliers in a data grid.
   It supports client-side filtering (debounced), sorting, and a robust,
   non-blocking delete functionality with cascade support.
+  It includes several key patterns:
+  - State management for concurrent async operations (deletingSupplierIds Set).
+  - Manual `fetch` calls to SvelteKit actions.
+  - Robust handling of SvelteKit's `devalue` serialization for error responses.
 -->
 <script lang="ts">
   import { goto, invalidateAll } from "$app/navigation";
@@ -11,6 +15,7 @@
   import Datagrid from "$lib/components/Datagrid.svelte";
   import { addNotification } from "$lib/stores/notifications";
   import { requestConfirmation } from '$lib/stores/confirmation';
+  import { log } from '$lib/utils/logger';
   import type { PageData } from "./$types";
 
   export let data: PageData;
@@ -72,30 +77,28 @@
    */
   async function handleDelete(event: { row: any }) {
     const supplier = event.row;
-    // Prevent re-triggering a delete action for an item that is already being deleted.
     if (deletingSupplierIds.has(supplier.wholesaler_id)) return;
-
     await attemptDelete(supplier, false);
   }
 
   /**
-   * Manages the logic for deleting a supplier, including showing confirmations and handling cascade deletes.
+   * Manages the logic for deleting a supplier. It handles user confirmation,
+   * API communication, and robustly interprets the server's response,
+   * including the special serialization format from SvelteKit's `devalue`.
    * @param supplier - The supplier object to be deleted.
    * @param cascade - A boolean flag to indicate if a cascade delete should be performed.
    */
   async function attemptDelete(supplier: any, cascade: boolean = false) {
     const supplierId = supplier.wholesaler_id;
 
-    // Use the custom, non-blocking confirmation dialog.
     const message = cascade
-      ? `CASCADE DELETE: Are you sure you want to permanently delete "${supplier.name}" AND ALL of its related data (offerings, categories, etc.)? This action cannot be undone.`
+      ? `CASCADE DELETE: Are you sure you want to permanently delete "${supplier.name}" AND ALL of its related data? This action cannot be undone.`
       : `Are you sure you want to delete the supplier "${supplier.name}"?`;
     const title = cascade ? 'Confirm Final Deletion' : 'Confirm Deletion';
 
     const confirmed = await requestConfirmation(message, title);
     if (!confirmed) return;
 
-    // Add the ID to the set to show a loading state and trigger reactivity.
     deletingSupplierIds.add(supplierId);
     deletingSupplierIds = deletingSupplierIds;
 
@@ -109,67 +112,65 @@
         body: formData,
       });
 
-      const responseText = await response.text();
-      // NOTE: It's crucial to handle cases where the response might not be JSON.
-      let result;
-      try {
-        result = JSON.parse(responseText);
-      } catch {
-        addNotification("Received an invalid response from the server.", "error");
-        return;
-      }
+      const result = await response.json();
 
-      if (response.ok && result.type === "success") {
-        addNotification(result.data?.success ?? `Supplier "${supplier.name}" deleted successfully!`, "success");
-        
-        // Invalidate data to get the fresh list from the server.
-        // Includes a timeout as a fallback in case invalidateAll() hangs.
-        try {
-          await Promise.race([
-            invalidateAll(),
-            new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 3000)),
-          ]);
-        } catch {
-          // Fallback: Manually remove the item from the local list if invalidation fails.
-          data.wholesalers = data.wholesalers.filter((w:any) => w.wholesaler_id !== supplierId);
-        }
+      // SvelteKit form actions called via manual `fetch` return a `{ type: 'failure' }`
+      // object upon `fail()`, but still with a 200 OK status.
+      // Therefore, we must inspect the response body, not `response.ok`.
+      if (result.type === 'failure') {
+        // --- FAILURE CASE ---
 
-      } else if (result.type === "failure") {
-        const hasDependencies = result.data?.showCascadeOption === true;
-
-        if (hasDependencies && !cascade) {
-          // Remove the loading state before showing the next dialog.
-          deletingSupplierIds.delete(supplierId);
-          deletingSupplierIds = deletingSupplierIds;
-          
-          // The server found dependencies, so we ask the user if they want to cascade.
-          const cascadeMessage = `Cannot delete "${supplier.name}": ${result.data?.error}\n\nDo you want to perform a cascade delete to remove the supplier and all its dependencies?`;
-          const cascadeConfirmed = await requestConfirmation(cascadeMessage, 'Dependencies Found');
-          
-          if (cascadeConfirmed) {
-            // Recursively call this function to perform the cascade delete.
-            await attemptDelete(supplier, true);
+        // ANTI-SERIALIZATION PATCH:
+        // SvelteKit's `devalue` can serialize complex fail() objects into a stringified array.
+        // We must defensively parse this string to get the actual error object.
+        let errorData;
+        if (typeof result.data === 'string') {
+          try {
+            const parsedArray = JSON.parse(result.data);
+            // The actual data object is usually the first element in the devalued array.
+            errorData = parsedArray[0];
+          } catch (e) {
+            log.error("Failed to parse the serialized error data string:", result.data);
+            errorData = { error: "An unreadable error occurred on the server." };
           }
         } else {
-          addNotification(result.data?.error ?? "Failed to delete supplier.", "error");
+          // If it's already an object, use it directly.
+          errorData = result.data;
         }
+
+        // Now, with the clean errorData object, check if we need to offer cascade delete.
+        if (errorData?.showCascadeOption && !cascade) {
+          deletingSupplierIds.delete(supplierId);
+          deletingSupplierIds = deletingSupplierIds;
+
+          const cascadeMessage = `Cannot delete "${supplier.name}": ${errorData.error}\n\nDo you want to perform a cascade delete?`;
+          const cascadeConfirmed = await requestConfirmation(cascadeMessage, 'Dependencies Found');
+
+          if (cascadeConfirmed) {
+            await attemptDelete(supplier, true); // Recursive call to perform the cascade
+          }
+        } else {
+          // Handle all other types of failures.
+          addNotification(errorData?.error || "An unknown error occurred.", "error");
+        }
+
       } else {
-        addNotification("An unexpected response was received from the server.", "error");
+        // --- SUCCESS CASE ---
+        addNotification(result.success, "success");
+        await invalidateAll(); // Refresh the data on the page
       }
     } catch (error) {
-      console.error("Error during delete operation:", error);
-      addNotification("A network or server error occurred.", "error");
+      log.error("Critical error during delete operation:", error, { supplierId });
+      addNotification("A critical network or server error occurred.", "error");
     } finally {
-      // ALWAYS remove the ID from the set to clean up the UI state, regardless of outcome.
+      // ALWAYS remove the ID from the set to clean up the UI state.
       deletingSupplierIds.delete(supplierId);
       deletingSupplierIds = deletingSupplierIds;
     }
   }
 
   /**
-   * Checks if a specific supplier is currently in the process of being deleted.
-   * @param supplier - The supplier object to check.
-   * @returns True if the delete button should be disabled.
+   * Checks if a specific supplier is currently being deleted. Used to disable the button.
    */
   function isDeleteDisabled(supplier: any): boolean {
     return deletingSupplierIds.has(supplier.wholesaler_id);
@@ -177,8 +178,6 @@
 
   /**
    * Provides a dynamic tooltip for the delete button based on its state.
-   * @param supplier - The supplier object for the tooltip.
-   * @returns The appropriate tooltip text.
    */
   function getDeleteTooltip(supplier: any): string {
     if (deletingSupplierIds.has(supplier.wholesaler_id)) {
@@ -217,7 +216,6 @@
     deleteTooltip={getDeleteTooltip}
     height="70vh"
   >
-    <!-- Custom cell rendering -->
     <div slot="cell" let:row let:column let:value>
       {#if column.key === "name"}
         <a href="/suppliers/{row.wholesaler_id}">{value}</a>
@@ -228,7 +226,6 @@
       {/if}
     </div>
 
-    <!-- Custom delete button with per-row loading state -->
     <div slot="delete" let:row>
       <button
         class="custom-delete-button"

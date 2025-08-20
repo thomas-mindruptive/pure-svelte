@@ -217,14 +217,13 @@
     display: block;
   }
 
-  .master-data-form input,
-  /* .master-data-form select {
+  .master-data-form input {
     width: 100%;
     padding: 0.5rem 0.75rem;
     border: 1px solid #cbd5e1;
     border-radius: 6px;
     font-size: 1rem;
-  } */
+  } 
 
   .master-data-form button {
     grid-column: span 2;

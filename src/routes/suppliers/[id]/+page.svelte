@@ -1,20 +1,22 @@
 <script lang="ts">
   import { addNotification } from '$lib/stores/notifications';
+  // ===================================================================
+  // THE FIX IS HERE: Import `ActionData` and use it for the `form` prop.
+  // ===================================================================
+  import type { PageData, ActionData } from './$types';
 
-  // The 'form' prop is automatically populated by SvelteKit with the
-  // return value of the most recently submitted form action.
-  export let form;
+  // The `data` prop gets the type from the `load` function.
+  export let data: PageData;
   
-  // The 'data' prop is populated by the `load` function on the server.
-  export let data;
+  // The `form` prop gets the type from the `actions` object.
+  export let form: ActionData;
 
-  // $: is a "reactive statement". It re-runs whenever a variable inside it changes.
-  // In this case, it watches for changes to the `form` prop.
+  // Reactive statement to show snackbar notifications
+  // TypeScript is now happy because it knows `form` can have `success` and `error`.
   $: {
     if (form?.success) {
       addNotification(form.success, 'success');
     } else if (form?.error) {
-      // Show error messages for a longer duration
       addNotification(form.error, 'error', 5000);
     }
   }
@@ -27,12 +29,10 @@
 <div class="page-container">
   <h1>Edit: {data.wholesaler.name}</h1>
 
-  <!-- ======================================================= -->
-  <!-- FORM 1: Edit Wholesaler Master Data                     -->
-  <!-- ======================================================= -->
+  <!-- Master Data Form -->
   <form class="master-data-form" method="POST" action="?/updateProperties">
     <h3>Master Data</h3>
-    <!-- Display a form-specific error message if the server action returns one -->
+    <!-- TypeScript is now happy with these checks -->
     {#if form?.action === 'updateProperties' && form?.error}
       <p class="form-error">{form.error}</p>
     {/if}
@@ -62,13 +62,10 @@
 
   <hr class="section-divider">
 
-  <!-- ======================================================= -->
-  <!-- SECTION 2: Manage Categories (n:m relationship)         -->
-  <!-- ======================================================= -->
+  <!-- Category Management Section -->
   <div class="category-section">
     <h2>Categories</h2>
 
-    <!-- Form to add a new category to this wholesaler -->
     <form class="add-category-form" method="POST" action="?/assignCategory">
       <select name="categoryId" required>
         <option value="" disabled selected>Add a category...</option>
@@ -79,7 +76,6 @@
       <button type="submit">Add</button>
     </form>
 
-    <!-- Table of currently assigned categories -->
     {#if data.assignedCategories.length > 0}
       <table class="assigned-categories-table">
         <thead>
@@ -96,13 +92,18 @@
               <td class="category-comment">{category.comment || '-'}</td>
               <td>
                 {#if category.offering_count === 0}
-                  <!-- Each row gets its own small form for the remove action -->
                   <form method="POST" action="?/removeCategory">
                     <input type="hidden" name="categoryId" value={category.category_id}>
                     <button class="remove-button" type="submit" aria-label="Remove {category.name}">Remove</button>
                   </form>
                 {:else}
-                  <button class="disabled-button" disabled title="Cannot remove: Offerings still exist for this category.">Remove</button>
+                  <button 
+                    class="disabled-button" 
+                    disabled 
+                    title="Cannot remove: Offerings still exist for this category. Please remove them first."
+                  >
+                    Remove
+                  </button>
                 {/if}
               </td>
             </tr>

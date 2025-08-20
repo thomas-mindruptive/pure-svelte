@@ -23,8 +23,8 @@
     params.set("dir", data.sort.direction);
 
     goto(`?${params.toString()}`, {
-      keepFocus: true, // Correct camelCase
-      noScroll: true,  // Correct camelCase
+      keepFocus: true, 
+      noScroll: true,  
       replaceState: true, // Avoids polluting browser history for simple filter changes
     });
   }
@@ -60,10 +60,6 @@
 </svelte:head>
 
 <div class="container">
-  <!-- 
-    The page header now correctly uses the `.page-header` class,
-    and the link correctly uses the `.primary-button` class.
-  -->
   <div class="page-header">
     <h1>Suppliers</h1>
     <a href="/suppliers/new" class="primary-button">+ New Supplier</a>

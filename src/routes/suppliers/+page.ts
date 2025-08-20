@@ -51,7 +51,7 @@ export const load: PageLoad = async ({ url, fetch }) => {
     });
 
     if (!response.ok) {
-      throw new Error('Failed to fetch suppliers.');
+      throw new Error('suppliers/page.ts: Failed to fetch suppliers.');
     }
 
     const result = await response.json();

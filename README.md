@@ -25,7 +25,7 @@ The goal is to build a web application for managing business data, specifically 
 1.  **Generic Query API (`/api/query`):** Instead of creating dedicated API endpoints for every data request, we have a single, powerful, and secure generic endpoint. It accepts a JSON `QueryPayload` object that describes the desired query (`select`, `from`, `where`, `orderBy`). This keeps the backend DRY (Don't Repeat Yourself) and flexible.
 2.  **Universal `load` Function (`+page.ts`):** The main supplier list page (`/suppliers`) uses a universal `load` function. This function runs on the server for the initial page load (SSR) and in the browser for subsequent client-side navigation. This is the central point for defining the data requirements of the page.
 3.  **URL-Driven State:** The state of the supplier list (filtering, sorting, pagination) is stored directly in the URL's search parameters (e.g., `/suppliers?filter=ACME&sort=name`). This makes the application state bookmarkable, shareable, and robust.
-4.  **"Create, Redirect, and Hydrate" Pattern:** To create new suppliers without re-fetching the entire list from the database, we use a dedicated `/suppliers/new` page.
+4.  **"Create, Redirect, and Hydrate" Pattern:** To create new suppliers without re-fetching the entire list from the database, we use the dedicated `/suppliers/[i]]` page.
     *   The `create` action on this page saves the new supplier to the DB.
     *   It then stores the newly created record in a short-lived, unique cookie.
     *   It redirects the user back to the `/suppliers` list page with a unique key in the URL.
@@ -62,9 +62,7 @@ src/
         │   ├── +page.server.ts  # SERVER-ONLY logic for the detail page (load/edit/create actions)
         │   └── +page.svelte     # The unified UI for EDITING an existing supplier
         │
-        └── new/
-            ├── +page.server.ts  # SERVER-ONLY logic for the NEW page (create action)
-            └── +page.svelte     # The UI form for CREATING a new supplier
+
 ```
 
 #### **5. Current Status & Functionality**

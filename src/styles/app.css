@@ -1,0 +1,78 @@
+/* src/app.css */
+
+/* 1. Import einer Schriftart (z.B. von Google Fonts) */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+/* 2. Definition von globalen CSS-Variablen im :root */
+:root {
+  /* Fonts */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
+  --font-serif: Georgia, Cambria, 'Times New Roman', Times, serif;
+
+  /* Colors */
+  --color-text: #1e293b;         /* Dunkles Grau-Blau für Text */
+  --color-heading: #0f172a;      /* Fast Schwarz für Überschriften */
+  --color-background: #ffffff;   /* Weißer Hintergrund */
+  --color-primary: #4f46e5;      /* Primärfarbe (Indigo) */
+  --color-muted: #64748b;        /* Gedämpftes Grau für Untertexte */
+  --color-border: #e2e8f0;       /* Helles Grau für Ränder */
+
+  /* Spacing */
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+}
+
+/* 3. Ein einfacher CSS-Reset und globale Body-Stile */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background-color: var(--color-background);
+  color: var(--color-text);
+  line-height: 1.6;
+}
+
+/* 4. Globale Stile für Überschriften (Headings) */
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 700;
+  color: var(--color-heading);
+  line-height: 1.2;
+  margin-top: var(--spacing-lg);
+  margin-bottom: var(--spacing-md);
+}
+
+h1 { font-size: 2.25rem; } /* 36px */
+h2 { font-size: 1.875rem; } /* 30px */
+h3 { font-size: 1.5rem; } /* 24px */
+h4 { font-size: 1.25rem; } /* 20px */
+
+/* 5. Globale Stile für Paragraphen und Links */
+p {
+  margin-top: 0;
+  margin-bottom: var(--spacing-md);
+}
+
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+  transition: text-decoration 0.2s ease;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* 6. (Optional) Eine nützliche Container-Klasse */
+.container {
+  width: 100%;
+  max-width: 1100px; /* Oder eine andere Breite, die Ihnen gefällt */
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: var(--spacing-md);
+  padding-right: var(--spacing-md);
+}

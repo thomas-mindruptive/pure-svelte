@@ -9,20 +9,11 @@ export const load: PageServerLoad = async ({ params }) => {
 
   // --- CREATE MODE ---
   if (id === 'new') {
-    // We are creating a new supplier. Return a blank object structure
-    // so the form has something to bind to.
     try {
       const allCategories = (await db.query`SELECT category_id, name FROM dbo.product_categories ORDER BY name`).recordset;
       return {
         isNew: true,
-        wholesaler: {
-          name: '',
-          region: '',
-          b2b_notes: '',
-          status: 'new',
-          dropship: false,
-          website: ''
-        },
+        wholesaler: { name: '', region: '', b2b_notes: '', status: 'new', dropship: false, website: '' },
         assignedCategories: [],
         availableCategories: allCategories
       };
@@ -33,17 +24,14 @@ export const load: PageServerLoad = async ({ params }) => {
   }
 
   // --- EDIT MODE ---
-  // If id is not 'new', we assume it's a numeric ID and load existing data.
   const wholesalerId = parseInt(id);
   if (isNaN(wholesalerId)) {
     throw error(400, 'Invalid Supplier ID format.');
   }
 
   try {
-    const wholesalerResult = await db.request().input('id', wholesalerId).query`
-      SELECT * FROM dbo.wholesalers WHERE wholesaler_id = @id`;
+    const wholesalerResult = await db.request().input('id', wholesalerId).query`SELECT * FROM dbo.wholesalers WHERE wholesaler_id = @id`;
     const wholesaler = wholesalerResult.recordset[0];
-
     if (!wholesaler) throw error(404, `Wholesaler with ID ${wholesalerId} not found.`);
 
     const assignedCategoriesResult = await db.request().input('id', wholesalerId).query`
@@ -118,6 +106,7 @@ export const actions: Actions = {
 
     let result;
     try {
+      // YOUR CONSOLE.LOG STATEMENTS ARE PRESERVED
       console.log("!!!!!!!!!! Before creating new wholesaler:", { name, region, website, dropship });
       result = await db.request()
         .input('name', name).input('region', region)
@@ -127,16 +116,87 @@ export const actions: Actions = {
       console.error("Error creating wholesaler:", err);
       return fail(500, { error: 'Database error while creating supplier.', name, region, website, dropship });
     }
+
+    // YOUR CONSOLE.LOG STATEMENTS ARE PRESERVED
     console.log("!!!!!!!!!! After creating new wholesaler:", { name, region, website, dropship });
     const newWholesaler = result.recordset[0];
     const pendingKey = uuidv4();
     const pendingData = { key: pendingKey, data: newWholesaler };
     cookies.set('pendingData', JSON.stringify(pendingData), { path: '/', httpOnly: false, maxAge: 60, sameSite: 'lax' });
-    // After successful creation, redirect to the LIST page to hydrate it
+    
     throw redirect(303, `/suppliers?pendingKey=${pendingKey}`);
   },
 
-  // The assignCategory and removeCategory actions are only relevant for an existing record
-  assignCategory: async ({ request, params }) => { /* ... as before ... */ },
-  removeCategory: async ({ request, params }) => { /* ... as before ... */ }
+  /**
+   * Action for ASSIGNING a category to an existing wholesaler (FULLY IMPLEMENTED)
+   */
+  assignCategory: async ({ request, params }) => {
+    const wholesalerId = parseInt(params.id);
+    if (isNaN(wholesalerId)) {
+      return fail(400, { action: 'assignCategory', error: 'Invalid wholesaler ID.' });
+    }
+
+    const formData = await request.formData();
+    const categoryId = formData.get('categoryId');
+
+    if (!categoryId) {
+      return fail(400, { action: 'assignCategory', error: 'Category ID is required.' });
+    }
+
+    try {
+      await db.request()
+        .input('wholesalerId', wholesalerId)
+        .input('categoryId', categoryId)
+        .query`
+          IF NOT EXISTS (SELECT 1 FROM dbo.wholesaler_categories WHERE wholesaler_id = @wholesalerId AND category_id = @categoryId)
+          BEGIN
+            INSERT INTO dbo.wholesaler_categories (wholesaler_id, category_id)
+            VALUES (@wholesalerId, @categoryId);
+          END
+        `;
+    } catch (err: any) {
+      console.error("Error assigning category:", err);
+      return fail(500, { action: 'assignCategory', error: 'Database error while assigning category.' });
+    }
+
+    return { action: 'assignCategory', success: 'Category assigned successfully.' };
+  },
+
+  /**
+   * Action for REMOVING a category from an existing wholesaler (FULLY IMPLEMENTED)
+   */
+  removeCategory: async ({ request, params }) => {
+    const wholesalerId = parseInt(params.id);
+    if (isNaN(wholesalerId)) {
+      return fail(400, { action: 'removeCategory', error: 'Invalid wholesaler ID.' });
+    }
+
+    const formData = await request.formData();
+    const categoryId = formData.get('categoryId');
+
+    if (!categoryId) {
+      return fail(400, { action: 'removeCategory', error: 'Category ID is required.' });
+    }
+
+    try {
+      await db.request()
+        .input('wholesalerId', wholesalerId)
+        .input('categoryId', categoryId)
+        .query`
+          DELETE FROM dbo.wholesaler_categories
+          WHERE wholesaler_id = @wholesalerId AND category_id = @categoryId;
+        `;
+    } catch (err: any) {
+      if (err.number === 547) { // Foreign Key constraint violation
+        return fail(409, {
+          action: 'removeCategory',
+          error: 'Cannot remove: Offerings still exist for this category.'
+        });
+      }
+      console.error("Error removing category:", err);
+      return fail(500, { action: 'removeCategory', error: 'A database error occurred.' });
+    }
+
+    return { action: 'removeCategory', success: 'Category removed successfully.' };
+  }
 };

@@ -1,4 +1,5 @@
-  export interface ColumnDefinition {
+// src/lib/clientAndBack/columnDefinitions.ts
+export interface ColumnDefinition {
     key: string;
     title: string;
     sortable?: boolean;
@@ -8,6 +9,9 @@
   };
 
   export interface ColumnDefinitionInclDB extends ColumnDefinition {
-    databaseCol: string;
+    databaseCol?: string;
   }
 
+  export function extractDbCols(columns: ColumnDefinitionInclDB[]): string[] {
+    return columns.map(col => col.databaseCol || col.key);
+  }

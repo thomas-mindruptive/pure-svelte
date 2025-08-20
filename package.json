@@ -15,6 +15,7 @@
 		"@sveltejs/adapter-auto": "^6.0.0",
 		"@sveltejs/kit": "^2.22.0",
 		"@sveltejs/vite-plugin-svelte": "^6.0.0",
+		"@types/lodash-es": "^4.17.12",
 		"@types/mssql": "^9.1.7",
 		"@types/uuid": "^10.0.0",
 		"svelte": "^5.0.0",
@@ -23,6 +24,7 @@
 		"vite": "^7.0.4"
 	},
 	"dependencies": {
+		"lodash-es": "^4.17.21",
 		"mssql": "^11.0.1",
 		"uuid": "^11.1.0"
 	}

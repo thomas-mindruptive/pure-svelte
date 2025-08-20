@@ -1,10 +1,10 @@
 import { db } from '$lib/server/db';
-import { type QueryPayload, type ConditionGroup, type Condition, LogicalOperator } from '../../routes/api/queryGrammar'; // Correctly import types
+import { type QueryPayload, type ConditionGroup, type Condition, LogicalOperator } from '../../routes/api/query/queryGrammar'; // Correctly import types
 
 
 // SECURITY: Define whitelists for tables and columns to prevent injection.
 const ALLOWED_TABLES: { [key: string]: string[] } = {
-  'dbo.wholesalers': ['wholesaler_id', 'name', 'region', 'status', 'dropship', 'created_at'],
+  'dbo.wholesalers': ['wholesaler_id', 'name', 'region', 'status', 'dropship', 'created_at', 'website'],
   'dbo.product_categories': ['category_id', 'name', 'description']
   // Add other tables and their queryable columns here
 };

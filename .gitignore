@@ -1,4 +1,5 @@
 node_modules
+generate_files/generated
 
 # Output
 .output

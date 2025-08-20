@@ -1,18 +1,11 @@
 <script lang="ts">
   import { addNotification } from '$lib/stores/notifications';
-  // ===================================================================
-  // THE FIX IS HERE: Import `ActionData` and use it for the `form` prop.
-  // ===================================================================
   import type { PageData, ActionData } from './$types';
 
-  // The `data` prop gets the type from the `load` function.
   export let data: PageData;
-  
-  // The `form` prop gets the type from the `actions` object.
   export let form: ActionData;
 
-  // Reactive statement to show snackbar notifications
-  // TypeScript is now happy because it knows `form` can have `success` and `error`.
+  // Reactive logic for showing snackbar notifications based on form action results
   $: {
     if (form?.success) {
       addNotification(form.success, 'success');
@@ -23,17 +16,22 @@
 </script>
 
 <svelte:head>
-  <title>Edit: {data.wholesaler.name}</title>
+  <title>{data.isNew ? 'New' : 'Edit'}: {data.wholesaler.name || 'Supplier'}</title>
 </svelte:head>
 
 <div class="page-container">
-  <h1>Edit: {data.wholesaler.name}</h1>
+  <div class="page-header">
+    <h1>{data.isNew ? 'New Supplier' : `Edit: ${data.wholesaler.name}`}</h1>
+    <a href="/suppliers" class="secondary-button">← Back to List</a>
+  </div>
 
-  <!-- Master Data Form -->
-  <form class="master-data-form" method="POST" action="?/updateProperties">
+  <!-- 
+    The form's `action` attribute is dynamic. It posts to the appropriate
+    server action based on whether we are in "create" or "edit" mode.
+  -->
+  <form class="master-data-form" method="POST" action={data.isNew ? '?/create' : '?/update'}>
     <h3>Master Data</h3>
-    <!-- TypeScript is now happy with these checks -->
-    {#if form?.action === 'updateProperties' && form?.error}
+    {#if form?.error && (form.action === 'update' || !form.action)}
       <p class="form-error">{form.error}</p>
     {/if}
     
@@ -57,82 +55,104 @@
       <label for="dropship">Offers Dropshipping</label>
     </div>
     
-    <button class="primary-button" type="submit">Save Master Data</button>
+    <button class="primary-button" type="submit">
+      {data.isNew ? 'Create Supplier' : 'Save Changes'}
+    </button>
   </form>
 
-  <hr class="section-divider">
+  <!--
+    The category management section is hidden when creating a new supplier,
+    as categories can only be assigned to an existing record.
+  -->
+  {#if !data.isNew}
+    <hr class="section-divider">
+    <div class="category-section">
+      <h2>Categories</h2>
 
-  <!-- Category Management Section -->
-  <div class="category-section">
-    <h2>Categories</h2>
-
-    <form class="add-category-form" method="POST" action="?/assignCategory">
-      <select name="categoryId" required>
-        <option value="" disabled selected>Add a category...</option>
-        {#each data.availableCategories as category}
-          <option value={category.category_id}>{category.name}</option>
-        {/each}
-      </select>
-      <button type="submit">Add</button>
-    </form>
-
-    {#if data.assignedCategories.length > 0}
-      <table class="assigned-categories-table">
-        <thead>
-          <tr>
-            <th>Category</th>
-            <th>Comment</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each data.assignedCategories as category}
-            <tr>
-              <td class="category-name">{category.name} ({category.offering_count} offerings)</td>
-              <td class="category-comment">{category.comment || '-'}</td>
-              <td>
-                {#if category.offering_count === 0}
-                  <form method="POST" action="?/removeCategory">
-                    <input type="hidden" name="categoryId" value={category.category_id}>
-                    <button class="remove-button" type="submit" aria-label="Remove {category.name}">Remove</button>
-                  </form>
-                {:else}
-                  <button 
-                    class="disabled-button" 
-                    disabled 
-                    title="Cannot remove: Offerings still exist for this category. Please remove them first."
-                  >
-                    Remove
-                  </button>
-                {/if}
-              </td>
-            </tr>
+      <form class="add-category-form" method="POST" action="?/assignCategory">
+        <select name="categoryId" required>
+          <option value="" disabled selected>Add a category...</option>
+          {#each data.availableCategories as category}
+            <option value={category.category_id}>{category.name}</option>
           {/each}
-        </tbody>
-      </table>
-    {:else}
-      <p class="no-categories-message">No categories assigned yet.</p>
-    {/if}
-  </div>
+        </select>
+        <button type="submit">Add</button>
+      </form>
+
+      {#if data.assignedCategories.length > 0}
+        <table class="assigned-categories-table">
+          <thead>
+            <tr>
+              <th>Category</th>
+              <th>Comment</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each data.assignedCategories as category}
+              <tr>
+                <td class="category-name">{category.name} ({category.offering_count} offerings)</td>
+                <td class="category-comment">{category.comment || '-'}</td>
+                <td>
+                  {#if category.offering_count === 0}
+                    <form method="POST" action="?/removeCategory">
+                      <input type="hidden" name="categoryId" value={category.category_id}>
+                      <button class="remove-button" type="submit" aria-label="Remove {category.name}">Remove</button>
+                    </form>
+                  {:else}
+                    <button 
+                      class="disabled-button" 
+                      disabled 
+                      title="Cannot remove: Offerings still exist for this category. Please remove them first."
+                    >
+                      Remove
+                    </button>
+                  {/if}
+                </td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      {:else}
+        <p class="no-categories-message">No categories assigned yet.</p>
+      {/if}
+    </div>
+  {/if}
+
 </div>
 
-
-<!-- ======================================================= -->
-<!-- STYLES                                                  -->
-<!-- ======================================================= -->
 <style>
   /* --- General Layout & Forms --- */
   .page-container {
     max-width: 900px;
     margin: 2rem auto;
-    padding: 2rem;
+    padding: 0 2rem 4rem 2rem;
+  }
+
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+  }
+  
+  .page-header h1 {
+    margin-bottom: 0;
   }
 
   .master-data-form {
     display: flex;
     flex-direction: column;
     gap: 1rem;
-    margin-bottom: 2rem;
+    padding: 1.5rem;
+    border: 1px solid var(--color-border, #e2e8f0);
+    border-radius: 8px;
+    background-color: #fdfdff;
+  }
+  
+  .master-data-form h3 {
+    margin-top: 0;
+    margin-bottom: 0.5rem;
   }
   
   .master-data-form div {
@@ -160,20 +180,39 @@
     font-size: 1rem;
   }
 
-  .primary-button {
-    align-self: flex-start;
-    padding: 0.6rem 1.5rem;
-    background-color: #4f46e5; /* Indigo */
-    color: white;
-    border: none;
+  .primary-button,
+  .secondary-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.6rem 1.25rem;
     border-radius: 6px;
     font-weight: 500;
+    text-decoration: none;
     cursor: pointer;
-    transition: background-color 0.2s ease;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+  }
+
+  .primary-button {
+    align-self: flex-start;
+    background-color: var(--color-primary, #4f46e5);
+    color: white;
   }
 
   .primary-button:hover {
     background-color: #4338ca;
+  }
+
+  .secondary-button {
+    background-color: #f1f5f9;
+    color: #334155;
+    border-color: #e2e8f0;
+  }
+
+  .secondary-button:hover {
+    background-color: #e2e8f0;
+    border-color: #cbd5e1;
   }
 
   .section-divider {
@@ -190,9 +229,7 @@
     border-radius: 6px;
   }
 
-  /* ============================================= */
-  /*          CATEGORY MANAGEMENT SECTION          */
-  /* ============================================= */
+  /* --- Category Management Section --- */
   .category-section {
     padding: 1.5rem;
     border: 1px solid #e2e8f0;

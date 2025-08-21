@@ -44,7 +44,7 @@
     event.preventDefault();
     
     // Validation
-    if (!formData.name.trim()) {
+    if (!formData.name || !formData.name.trim()) {
       alert('Name is required');
       return;
     }

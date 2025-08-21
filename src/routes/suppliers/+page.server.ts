@@ -4,62 +4,8 @@ import { db } from '$lib/server/db';
 import { error, fail } from '@sveltejs/kit';
 import type { Actions } from './$types';
 import { log } from '$lib/utils/logger';
+import { checkWholesalerDependencies } from '$lib/dataModel/dependencyChecks';
 
-async function checkWholesalerDependencies(wholesalerId: number) {
-    const dependencies = [];
-
-    const categoriesCheck = await db.request()
-        .input('wholesalerId', wholesalerId)
-        .query`
-      SELECT COUNT(*) as count 
-      FROM dbo.wholesaler_categories 
-      WHERE wholesaler_id = @wholesalerId
-    `;
-
-    if (categoriesCheck.recordset[0].count > 0) {
-        dependencies.push(`${categoriesCheck.recordset[0].count} assigned categories`);
-    }
-
-    const offeringsCheck = await db.request()
-        .input('wholesalerId', wholesalerId)
-        .query`
-      SELECT COUNT(*) as count 
-      FROM dbo.wholesaler_item_offerings 
-      WHERE wholesaler_id = @wholesalerId
-    `;
-
-    if (offeringsCheck.recordset[0].count > 0) {
-        dependencies.push(`${offeringsCheck.recordset[0].count} product offerings`);
-    }
-
-    const linksCheck = await db.request()
-        .input('wholesalerId', wholesalerId)
-        .query`
-      SELECT COUNT(*) as count 
-      FROM dbo.wholesaler_offering_links wol
-      INNER JOIN dbo.wholesaler_item_offerings wio ON wol.offering_id = wio.offering_id
-      WHERE wio.wholesaler_id = @wholesalerId
-    `;
-
-    if (linksCheck.recordset[0].count > 0) {
-        dependencies.push(`${linksCheck.recordset[0].count} offering links`);
-    }
-
-    const attributesCheck = await db.request()
-        .input('wholesalerId', wholesalerId)
-        .query`
-      SELECT COUNT(*) as count 
-      FROM dbo.wholesaler_offering_attributes woa
-      INNER JOIN dbo.wholesaler_item_offerings wio ON woa.offering_id = wio.offering_id
-      WHERE wio.wholesaler_id = @wholesalerId
-    `;
-
-    if (attributesCheck.recordset[0].count > 0) {
-        dependencies.push(`${attributesCheck.recordset[0].count} offering attributes`);
-    }
-
-    return dependencies;
-}
 
 async function cascadeDeleteWholesaler(wholesalerId: number, transaction: any) {
     await transaction.request()

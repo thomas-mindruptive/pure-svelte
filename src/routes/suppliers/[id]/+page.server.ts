@@ -2,12 +2,55 @@ import { db } from '$lib/server/db';
 import { error, fail } from '@sveltejs/kit';
 import type { PageServerLoad, Actions } from './$types';
 import { v4 as uuidv4 } from 'uuid';
+import { log } from '$lib/utils/logger';
+import {checkCategoryDependencies} from '$lib/dataModel/dependencyChecks';
+
+
+
+/**
+ * Führt ein Kaskaden-Löschen für alle Daten durch, die von einer
+ * Lieferant-Kategorie-Beziehung abhängen.
+ * @param wholesalerId Die ID des Lieferanten.
+ * @param categoryId Die ID der Kategorie.
+ * @param transaction Das Transaktionsobjekt der Datenbank.
+ */
+async function cascadeDeleteCategory(wholesalerId: number, categoryId: number, transaction: any) {
+  const offeringIdsResult = await transaction.request()
+    .input('wholesalerId', wholesalerId)
+    .input('categoryId', categoryId)
+    .query`SELECT offering_id FROM dbo.wholesaler_item_offerings WHERE wholesaler_id = @wholesalerId AND category_id = @categoryId`;
+
+  const offeringIds = offeringIdsResult.recordset.map((r: any) => r.offering_id);
+
+  if (offeringIds.length > 0) {
+    // Sicherstellen, dass die offeringIds-Liste nicht leer ist, um SQL-Fehler zu vermeiden
+    const offeringIdList = offeringIds.join(',');
+
+    // Schritt 1: Untergeordnete Links und Attribute löschen
+    await transaction.request()
+      .query(`DELETE FROM dbo.wholesaler_offering_attributes WHERE offering_id IN (${offeringIdList})`);
+    await transaction.request()
+      .query(`DELETE FROM dbo.wholesaler_offering_links WHERE offering_id IN (${offeringIdList})`);
+    
+    // Schritt 2: Die Offerings selbst löschen
+    await transaction.request()
+      .input('wholesalerId', wholesalerId)
+      .input('categoryId', categoryId)
+      .query`DELETE FROM dbo.wholesaler_item_offerings WHERE wholesaler_id = @wholesalerId AND category_id = @categoryId`;
+  }
+
+  // Schritt 3: Die eigentliche Kategorie-Zuweisung löschen
+  await transaction.request()
+    .input('wholesalerId', wholesalerId)
+    .input('categoryId', categoryId)
+    .query`DELETE FROM dbo.wholesaler_categories WHERE wholesaler_id = @wholesalerId AND category_id = @categoryId`;
+}
+
 
 export const load: PageServerLoad = async ({ params }) => {
   const { id } = params;
-  console.log("supplier/page.server: Loading supplier data for ID:", id);
+  log.info({ supplierId: id }, "Loading supplier data");
 
-  // --- CREATE MODE ---
   if (id === 'new') {
     try {
       const allCategories = (await db.query`
@@ -21,12 +64,11 @@ export const load: PageServerLoad = async ({ params }) => {
         availableCategories: Array.from(allCategories)
       };
     } catch (err: any) {
-      console.error("Failed to load available categories for new supplier:", err);
+      log.error(err, "Failed to load available categories for new supplier");
       throw error(500, "Database error while preparing new supplier page.");
     }
   }
 
-  // --- EDIT MODE ---
   const wholesalerId = parseInt(id);
   if (isNaN(wholesalerId)) {
     throw error(400, 'Invalid Supplier ID format.');
@@ -67,7 +109,7 @@ export const load: PageServerLoad = async ({ params }) => {
       availableCategories: Array.from(availableCategoriesResult.recordset)
     };
   } catch (err: any) {
-    console.error(`Failed to load data for supplier ${wholesalerId}:`, err);
+    log.error(err, `Failed to load data for supplier ${wholesalerId}`);
     throw error(500, "A database error occurred while loading supplier data.");
   }
 };
@@ -92,14 +134,14 @@ export const actions: Actions = {
                SET name = @name, region = @region, website = @website, dropship = @dropship
                WHERE wholesaler_id = @id;`;
     } catch (err: any) {
-      console.error("Error updating wholesaler:", err);
+      log.error("Error updating wholesaler:", err);
       return fail(500, { action: 'update', error: 'Database error while saving.' });
     }
 
     return { action: 'update', success: 'Supplier updated successfully.' };
   },
 
-  create: async ({ request, cookies }) => {
+  create: async ({ request }) => {
     const formData = await request.formData();
     const name = formData.get('name') as string;
     const region = formData.get('region') as string;
@@ -112,28 +154,17 @@ export const actions: Actions = {
 
     let result;
     try {
-      console.log("Before creating new wholesaler:", { name, region, website, dropship });
       result = await db.request()
         .input('name', name).input('region', region)
         .input('website', website).input('dropship', dropship)
         .query`INSERT INTO dbo.wholesalers (name, region, website, dropship, status)
                OUTPUT inserted.* VALUES (@name, @region, @website, @dropship, 'new');`;
     } catch (err: any) {
-      console.error("Error creating wholesaler:", err);
+      log.error("Error creating wholesaler:", err);
       return fail(500, { error: 'Database error while creating supplier.', name, region, website, dropship });
     }
 
     const newWholesaler = result.recordset[0];
-    console.log("After creating new wholesaler:", newWholesaler);
-
-    // Keep cookie if you still need "pendingKey" logic, otherwise remove
-    // We currently do NOT use the cookie. The supplier page reloads all suppliers.
-    // const pendingKey = uuidv4();
-    // cookies.set('pendingData', JSON.stringify({ key: pendingKey, data: newWholesaler }), {
-    //   path: '/', httpOnly: false, maxAge: 60, sameSite: 'lax'
-    // });
-
-    // No redirect anymore – just return data
     return { action: 'create', success: 'Supplier created successfully.', created: newWholesaler };
   },
 
@@ -160,7 +191,6 @@ export const actions: Actions = {
         `;
 
       const addedCategoryId = result.recordset[0].category_id;
-      // Load category name for client
       const category = await db.request().input('id', addedCategoryId).query`
         SELECT category_id, name FROM dbo.product_categories WHERE category_id = @id
       `;
@@ -171,43 +201,73 @@ export const actions: Actions = {
         addedCategory: category.recordset[0]
       };
     } catch (err: any) {
-      console.error("Error assigning category:", err);
+      log.error("Error assigning category:", err);
       return fail(500, { action: 'assignCategory', error: 'Database error while assigning category.' });
     }
   },
 
   removeCategory: async ({ request, params }) => {
+    log.info({ params, action: 'removeCategory' }, 'ACTION START: removeCategory');
+  
     const wholesalerId = parseInt(params.id);
     if (isNaN(wholesalerId)) {
       return fail(400, { action: 'removeCategory', error: 'Invalid wholesaler ID.' });
     }
-
+  
     const formData = await request.formData();
-    const categoryId = formData.get('categoryId');
-    if (!categoryId) {
+    const categoryIdStr = formData.get('categoryId') as string;
+    const cascade = formData.get('cascade') === 'true';
+  
+    log.info({ categoryId: categoryIdStr, cascade }, 'Received form data');
+  
+    if (!categoryIdStr) {
       return fail(400, { action: 'removeCategory', error: 'Category ID is required.' });
     }
-
+    const categoryId = parseInt(categoryIdStr);
+  
+    const transaction = db.transaction();
     try {
-      await db.request()
-        .input('wholesalerId', wholesalerId)
-        .input('categoryId', categoryId)
-        .query`DELETE FROM dbo.wholesaler_categories
-               WHERE wholesaler_id = @wholesalerId AND category_id = @categoryId;`;
-
-      return {
-        action: 'removeCategory',
-        success: 'Category removed successfully.',
-        removedCategoryId: Number(categoryId)
-      };
-    } catch (err: any) {
-      if (err.number === 547) {
+      await transaction.begin();
+      log.info({ wholesalerId, categoryId }, 'Database transaction started');
+  
+      log.info('Checking for category dependencies...');
+      const dependencyCount = await checkCategoryDependencies(wholesalerId, categoryId, transaction);
+  
+      log.info({ dependencyCount }, 'Dependency check complete');
+  
+      if (dependencyCount > 0 && !cascade) {
+        log.warn({ dependencyCount }, 'Dependencies found, but cascade is false. Rolling back and sending fail(409).');
+        await transaction.rollback();
         return fail(409, {
           action: 'removeCategory',
-          error: 'Cannot remove: Offerings still exist for this category.'
+          error: `Cannot remove: ${dependencyCount} offerings still exist in this category.`,
+          showCascadeOption: true,
+          categoryId: categoryId 
         });
       }
-      console.error("Error removing category:", err);
+  
+      if (dependencyCount > 0 && cascade) {
+        log.info({ dependencyCount }, 'Dependencies found and cascade is true. Proceeding with cascade delete.');
+        await cascadeDeleteCategory(wholesalerId, categoryId, transaction);
+      } else {
+        log.info('No dependencies found. Proceeding with simple delete.');
+        await transaction.request()
+          .input('wholesalerId', wholesalerId)
+          .input('categoryId', categoryId)
+          .query`DELETE FROM dbo.wholesaler_categories WHERE wholesaler_id = @wholesalerId AND category_id = @categoryId;`;
+      }
+  
+      await transaction.commit();
+      log.info('Transaction committed successfully.');
+      return {
+        action: 'removeCategory',
+        success: 'Category and all related data removed successfully.',
+        removedCategoryId: categoryId
+      };
+  
+    } catch (err: any) {
+      await transaction.rollback();
+      log.error(err, "CRITICAL ERROR in removeCategory action. Transaction rolled back.");
       return fail(500, { action: 'removeCategory', error: 'A database error occurred.' });
     }
   }

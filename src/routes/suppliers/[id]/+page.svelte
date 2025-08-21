@@ -1,92 +1,222 @@
 <script lang="ts">
-  import { enhance } from '$app/forms';
-  import { goto } from '$app/navigation';
-  import { addNotification } from '$lib/stores/notifications';
-  import type { PageData } from './$types';
+  import { enhance } from "$app/forms";
+  import { goto } from "$app/navigation";
+  import { addNotification } from "$lib/stores/notifications";
+  import { requestConfirmation } from "$lib/stores/confirmation";
+  import { parse } from "devalue";
+  import Datagrid from "$lib/components/Datagrid.svelte";
+  import type { ColumnDefinition } from "$lib/clientAndBack/columnDefinitions";
+  import type { PageData } from "./$types";
+  import { log } from "$lib/utils/logger";
 
   export let data: PageData;
 
-  // Local arrays so we can update the UI without full reload
+  // Lokaler Zustand, um die UI ohne vollständiges Neuladen zu aktualisieren
   let assignedCategories = [...data.assignedCategories];
   let availableCategories = [...data.availableCategories];
+  let selectedCategoryId = "";
 
-  // Controlled select for "Add Category"
-  let selectedCategoryId = '';
+  // ✅ NEU: Zustand für laufende Löschvorgänge bei Kategorien
+  let deletingCategoryIds = new Set<number>();
 
-  function applyAddedCategory(added: { category_id: number; name: string; offering_count?: number; comment?: string; link?: string }) {
-    assignedCategories = [...assignedCategories, { ...added, offering_count: added.offering_count ?? 0 }]
-      .sort((a, b) => a.name.localeCompare(b.name));
-    availableCategories = availableCategories.filter(c => c.category_id !== added.category_id);
+  // ✅ NEU: Spaltendefinitionen für das wiederverwendbare Kategorien-Grid
+  const categoryColumns: ColumnDefinition[] = [
+    { key: "name", title: "Category", sortable: true, width: "3fr" },
+    {
+      key: "offering_count",
+      title: "Offerings",
+      sortable: true,
+      type: "number",
+      width: "1fr",
+    },
+    { key: "comment", title: "Comment", sortable: false, width: "2fr" },
+  ];
+
+  // Hilfsfunktionen zur UI-Aktualisierung
+  function applyAddedCategory(added: {
+    category_id: number;
+    name: string;
+    offering_count?: number;
+    comment?: string;
+    link?: string;
+  }) {
+    assignedCategories = [
+      ...assignedCategories,
+      { ...added, offering_count: added.offering_count ?? 0 },
+    ].sort((a, b) => a.name.localeCompare(b.name));
+    availableCategories = availableCategories.filter(
+      (c) => c.category_id !== added.category_id,
+    );
   }
 
   function applyRemovedCategory(id: number) {
-    const removed = assignedCategories.find(c => c.category_id === id);
-    assignedCategories = assignedCategories.filter(c => c.category_id !== id);
+    const removed = assignedCategories.find((c) => c.category_id === id);
+    assignedCategories = assignedCategories.filter((c) => c.category_id !== id);
     if (removed) {
-      availableCategories = [...availableCategories, { category_id: removed.category_id, name: removed.name }]
-        .sort((a, b) => a.name.localeCompare(b.name));
+      availableCategories = [
+        ...availableCategories,
+        { category_id: removed.category_id, name: removed.name },
+      ].sort((a, b) => a.name.localeCompare(b.name));
+    }
+  }
+
+  async function handleRemoveCategory(category: any, cascade = false) {
+    const categoryId = category.category_id;
+    const categoryName = category.name;
+
+    // Wir fragen nur beim ersten Klick, nicht bei der Kaskadierungs-Bestätigung.
+    if (!cascade) {
+      const confirmed = await requestConfirmation(
+        `Are you sure you want to remove the category "${categoryName}"? The system will check for dependencies.`,
+        "Confirm Removal",
+      );
+      if (!confirmed) return;
+    }
+
+    deletingCategoryIds.add(categoryId);
+    deletingCategoryIds = deletingCategoryIds; // Reaktivität auslösen
+
+    const formData = new FormData();
+    formData.append("categoryId", categoryId.toString());
+    if (cascade) {
+      formData.append("cascade", "true");
+    }
+
+    try {
+      const response = await fetch("?/removeCategory", {
+        method: "POST",
+        body: formData,
+      });
+
+      const responseText = await response.text();
+      const outerResponse = JSON.parse(responseText);
+
+      log.info("*****\nouterResponse: %O\n*****", outerResponse);
+
+      const result = parse(outerResponse.data);
+      log.info("*****parsed outerResponse, 'result': %O\n*****", result);
+
+      if (outerResponse.type === "failure") {
+        log.info("*****\nCLIENT DEBUG - errorData: %O\n*****", result.error);
+
+        if (result?.showCascadeOption) {
+          log.info(
+            "*****\nCLIENT DEBUG - result?.showCascadeOption == true\n*****",
+          );
+          const cascadeConfirmed = await requestConfirmation(
+            `❌ Cannot remove "${categoryName}": ${result.error}\n\nDo you want to perform a CASCADE DELETE to remove the category and all its offerings?`,
+            "Dependencies Found",
+          );
+          if (cascadeConfirmed) {
+            log.info("*****\nCLIENT DEBUG - cascadeConfirmed == true\n*****");
+            await handleRemoveCategory(category, true); // Rekursiver Aufruf
+          }
+        } else {
+          addNotification(result.error || "Failed to remove category", "error");
+        }
+      } else if (outerResponse.type === "success") {
+        const successData = result; // Bei Erfolg ist es das direkte Objekt
+        const removedId = successData?.removedCategoryId;
+        if (removedId) {
+          applyRemovedCategory(removedId);
+          addNotification("Category removed successfully", "success");
+        }
+      }
+    } catch (err) {
+      addNotification(
+        "A critical error occurred while removing the category.",
+        "error",
+      );
+      console.error("Error in handleRemoveCategory:", err);
+    } finally {
+      deletingCategoryIds.delete(categoryId);
+      deletingCategoryIds = deletingCategoryIds; // Reaktivität auslösen
     }
   }
 </script>
 
 <svelte:head>
-  <title>{data.isNew ? 'New' : 'Edit'}: {data.wholesaler.name || 'Supplier'}</title>
+  <title
+    >{data.isNew ? "New" : "Edit"}: {data.wholesaler.name || "Supplier"}</title
+  >
 </svelte:head>
 
 <div class="page-container">
   <div class="page-header">
-    <h1>{data.isNew ? 'New Supplier' : `Edit: ${data.wholesaler.name}`}</h1>
+    <h1>{data.isNew ? "New Supplier" : `Edit: ${data.wholesaler.name}`}</h1>
     <a href="/suppliers" class="secondary-button">← Back to List</a>
   </div>
 
-  <!-- Master data -->
+  <!-- Master data form -->
   <form
     class="master-data-form"
     method="POST"
-    action={data.isNew ? '?/create' : '?/update'}
+    action={data.isNew ? "?/create" : "?/update"}
     use:enhance={() => {
       return async ({ result }) => {
-        if (result.type === 'failure') {
-          addNotification((result.data as any)?.error ?? 'Save failed.', 'error', 5000);
+        if (result.type === "failure") {
+          addNotification(
+            (result.data as any)?.error ?? "Save failed.",
+            "error",
+            5000,
+          );
           return;
         }
-        if (result.type === 'success') {
+        if (result.type === "success") {
           const d = result.data as any;
           if (d?.created?.wholesaler_id) {
-            // After CREATE: navigate to the new detail page (SPA), no server redirect needed
-            addNotification('Supplier created successfully.', 'success');
+            addNotification("Supplier created successfully.", "success");
             await goto(`/suppliers/${d.created.wholesaler_id}`);
           } else {
-            addNotification(d?.success ?? 'Supplier updated successfully.', 'success');
+            addNotification(
+              d?.success ?? "Supplier updated successfully.",
+              "success",
+            );
           }
         }
       };
     }}
   >
     <h3>Master Data</h3>
-
     <div>
       <label for="name">Name</label>
-      <input id="name" name="name" type="text" bind:value={data.wholesaler.name} required />
+      <input
+        id="name"
+        name="name"
+        type="text"
+        bind:value={data.wholesaler.name}
+        required
+      />
     </div>
-
     <div>
       <label for="region">Region</label>
-      <input id="region" name="region" type="text" bind:value={data.wholesaler.region} />
+      <input
+        id="region"
+        name="region"
+        type="text"
+        bind:value={data.wholesaler.region}
+      />
     </div>
-
     <div>
       <label for="website">Website</label>
-      <input id="website" name="website" type="url" bind:value={data.wholesaler.website} />
+      <input
+        id="website"
+        name="website"
+        type="url"
+        bind:value={data.wholesaler.website}
+      />
     </div>
-
     <div class="checkbox-group">
-      <input id="dropship" name="dropship" type="checkbox" bind:checked={data.wholesaler.dropship} />
+      <input
+        id="dropship"
+        name="dropship"
+        type="checkbox"
+        bind:checked={data.wholesaler.dropship}
+      />
       <label for="dropship">Offers Dropshipping</label>
     </div>
-
     <button class="primary-button" type="submit">
-      {data.isNew ? 'Create Supplier' : 'Save Changes'}
+      {data.isNew ? "Create Supplier" : "Save Changes"}
     </button>
   </form>
 
@@ -103,16 +233,20 @@
         action="?/assignCategory"
         use:enhance={(initial) => {
           return async ({ result }) => {
-            if (result.type === 'failure') {
-              addNotification((result.data as any)?.error ?? 'Failed to add category', 'error', 5000);
+            if (result.type === "failure") {
+              addNotification(
+                (result.data as any)?.error ?? "Failed to add category",
+                "error",
+                5000,
+              );
               return;
             }
-            if (result.type === 'success') {
+            if (result.type === "success") {
               const added = (result.data as any)?.addedCategory;
               if (added) {
                 applyAddedCategory(added);
-                selectedCategoryId = '';
-                addNotification('Category added', 'success');
+                selectedCategoryId = "";
+                addNotification("Category added", "success");
               }
             }
           };
@@ -127,52 +261,23 @@
         <button type="submit">Add</button>
       </form>
 
+      <!-- ✅ NEU: Wiederverwendbares Datagrid statt manueller Tabelle -->
       {#if assignedCategories.length > 0}
-        <table class="assigned-categories-table">
-          <thead>
-            <tr>
-              <th>Category</th>
-              <th>Comment</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {#each assignedCategories as category (category.category_id)}
-              <tr>
-                <td class="category-name">{category.name} ({category.offering_count} offerings)</td>
-                <td class="category-comment">{category.comment || '-'}</td>
-                <td>
-                  {#if category.offering_count === 0}
-                    <form
-                      method="POST"
-                      action="?/removeCategory"
-                      use:enhance={() => {
-                        return async ({ result }) => {
-                          if (result.type === 'failure') {
-                            addNotification((result.data as any)?.error ?? 'Failed to remove category', 'error', 5000);
-                            return;
-                          }
-                          if (result.type === 'success') {
-                            const id = Number((result.data as any)?.removedCategoryId);
-                            applyRemovedCategory(id);
-                            addNotification('Category removed', 'success');
-                          }
-                        };
-                      }}
-                    >
-                      <input type="hidden" name="categoryId" value={category.category_id} />
-                      <button class="remove-button" type="submit" aria-label={`Remove ${category.name}`}>Remove</button>
-                    </form>
-                  {:else}
-                    <button class="disabled-button" disabled title="Cannot remove: Offerings still exist">
-                      Remove
-                    </button>
-                  {/if}
-                </td>
-              </tr>
-            {/each}
-          </tbody>
-        </table>
+        <Datagrid
+          rows={assignedCategories}
+          columns={categoryColumns}
+          onsort={() => {
+            /* Lokale Sortierung wird vom Datagrid gehandhabt, keine Aktion nötig */
+          }}
+          ondelete={(event) => handleRemoveCategory(event.row)}
+          showDelete={true}
+          deleteDisabled={(row) => deletingCategoryIds.has(row.category_id)}
+          deleteTooltip={(row) =>
+            deletingCategoryIds.has(row.category_id)
+              ? "Removing..."
+              : `Remove category "${row.name}"`}
+          height="auto"
+        />
       {:else}
         <p class="no-categories-message">No categories assigned yet.</p>
       {/if}
@@ -223,11 +328,14 @@
     border: 1px solid #cbd5e1;
     border-radius: 6px;
     font-size: 1rem;
-  } 
+  }
 
   .master-data-form button {
     grid-column: span 2;
     justify-self: start;
+  }
+
+  .primary-button {
     padding: 0.5rem 1.25rem;
     background-color: #3b82f6;
     color: white;
@@ -238,9 +346,13 @@
     transition: background-color 0.2s ease;
   }
 
-  .master-data-form button:hover {
+  .primary-button:hover {
     background-color: #2563eb;
   }
+
+  /* .secondary-button {
+   
+  } */
 
   /* Category section */
   .category-section {
@@ -289,51 +401,7 @@
     background-color: #2563eb;
   }
 
-  /* Assigned categories table */
-  .assigned-categories-table {
-    width: 100%;
-    border-collapse: collapse;
-  }
-
-  .assigned-categories-table th,
-  .assigned-categories-table td {
-    padding: 0.75rem;
-    border-bottom: 1px solid #e2e8f0;
-    text-align: left;
-  }
-
-  .assigned-categories-table th {
-    background-color: #f1f5f9;
-    font-weight: 600;
-  }
-
-  .remove-button {
-    padding: 0.25rem 0.75rem;
-    background-color: #ef4444;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    font-size: 0.875rem;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-  }
-
-  .remove-button:hover {
-    background-color: #dc2626;
-  }
-
-  .disabled-button {
-    padding: 0.25rem 0.75rem;
-    background-color: #cbd5e1;
-    color: #475569;
-    border: none;
-    border-radius: 4px;
-    font-size: 0.875rem;
-    cursor: not-allowed;
-  }
-
-  /* No categories message */
-  .no-categories-message  {
+  .no-categories-message {
     font-style: italic;
     color: #64748b;
   }

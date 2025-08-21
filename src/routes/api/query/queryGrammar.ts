@@ -1,3 +1,4 @@
+
 // --- Operators ---
 export enum LogicalOperator {
   AND = 'AND',
@@ -19,11 +20,19 @@ export enum ComparisonOperator {
   IS_NOT_NULL = 'IS NOT NULL'
 }
 
-// --- Building blocks for the WHERE clause (your structure, slightly renamed) ---
+// NEU: JOIN-Support
+export enum JoinType {
+  INNER = 'INNER JOIN',
+  LEFT = 'LEFT JOIN', 
+  RIGHT = 'RIGHT JOIN',
+  FULL = 'FULL OUTER JOIN'
+}
+
+// --- Building blocks for the WHERE clause ---
 export interface Condition {
-  key: string;            // The column name, e.g., 'name' or 'region'
+  key: string;            // Can include alias, e.g., 'w.region'
   op: ComparisonOperator;
-  val?: any | any[];      // Value or array of values for 'IN'. Optional for IS NULL/IS NOT NULL.
+  val?: any | any[];
 }
 
 export interface ConditionGroup {
@@ -31,18 +40,26 @@ export interface ConditionGroup {
   conditions: (Condition | ConditionGroup)[];
 }
 
-// --- Building blocks for the ORDER BY clause ---
+// NEU: JOIN-Definition
+export interface JoinClause {
+  type: JoinType;
+  table: string;          // e.g., 'dbo.product_categories'
+  alias?: string;         // e.g., 'pc'
+  on: string;             // e.g., 'wc.category_id = pc.category_id'
+}
+
+// --- ORDER BY ---
 export interface SortDescriptor {
-  key: string;
+  key: string;            // Can include alias, e.g., 'pc.name'
   direction: 'asc' | 'desc';
 }
 
-// --- The Top-Level Object: The Complete Query Payload ---
 export interface QueryPayload {
-  select: string[];             // The columns we want to fetch, e.g., ['wholesaler_id', 'name']
-  from: string;                 // The base table to query from, e.g., 'dbo.wholesalers'
-  where?: ConditionGroup;       // The (optional) WHERE clause
-  orderBy?: SortDescriptor[];   // The (optional) sorting
-  limit?: number;               // For pagination: How many rows?
-  offset?: number;              // For pagination: How many rows to skip?
+  select: string[];             // e.g., ['w.name', 'pc.name AS category_name']
+  from: string;                 // e.g., 'dbo.wholesalers w' or virtual view name
+  joins?: JoinClause[];         // NEU: Optional JOIN clauses
+  where?: ConditionGroup;
+  orderBy?: SortDescriptor[];
+  limit?: number;
+  offset?: number;
 }

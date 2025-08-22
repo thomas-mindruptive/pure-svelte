@@ -10,13 +10,14 @@ Das SupplierBrowser System ist eine **5-Ebenen hierarchische Navigation** durch 
 - **SupplierGrid.svelte** - Wrapper um Datagrid für Wholesaler[]
 - **SupplierForm.svelte** - Wrapper um FormShell für Wholesaler create/edit **✅ VOLLSTÄNDIG GESTYLT**
 - **CategoryGrid.svelte** - Wrapper um Datagrid für WholesalerCategory[]
+- **CategoryAssignment.svelte** - Einfaches n:m Assignment UI für Category-Supplier Relationships **✅ VOLLSTÄNDIG IMPLEMENTIERT**
 - **URL-driven State** - Level, supplierId, categoryId via URL-Parameter
 - **Svelte 5 + Runes** - Alle Komponenten nutzen neue Syntax
 - **CSS-System Integration** - Form.css, Sidebar.css, Grid.css vollständig integriert
 - **Farbkonsistenz** - Einheitliches Violett (#4f46e5) durch alle UI-Komponenten
 
 ### 🔄 **IN PROGRESS:**
-- **CategoryForm.svelte** - Für Category Assignment (NUR RELATIONSHIP)
+- **API-Integration** - Übergang von Mock-Daten zu echten API-Calls
 
 ### ⌘ **NOCH ZU IMPLEMENTIEREN:**
 - **OfferingGrid.svelte** + **OfferingForm.svelte** (Ebene 3)
@@ -31,6 +32,79 @@ Das SupplierBrowser System ist eine **5-Ebenen hierarchische Navigation** durch 
 - **HierarchySidebar.svelte**: Ausgelagerte CSS nach sidebar.css, Svelte 5 callback props
 - **CSS-System**: form.css erweitert um select-Styles, Farbvariablen harmonisiert
 - **Design-Konsistenz**: --color-primary (#4f46e5) als zentrale Brand-Color
+
+---
+
+## 🔧 **TECHNISCHE HERAUSFORDERUNGEN & LEARNINGS**
+
+### **🔥 Mock-Daten Reaktivität (Development):**
+
+**Problem:** Mock-Daten sind standardmäßig nicht reaktiv
+```typescript
+// ❌ NICHT reaktiv
+const mockData = { assignedCategories: {...} };
+mockData.assignedCategories[id].push(newItem); // Svelte sieht das nicht
+
+// ✅ REAKTIV für Development
+let mockData = $state({ assignedCategories: {...} });
+mockData.assignedCategories[id].push(newItem); // Triggers Svelte reactivity
+```
+
+### **⚠️ StructuredClone Problem (FormShell + $state):**
+
+**Problem:** FormShell's `structuredClone()` kann keine $state Proxies klonen
+```typescript
+let mockData = $state({...});
+const selectedSupplier = mockData.wholesalers[0]; // ← Proxy-Objekt
+<SupplierForm initial={selectedSupplier} />       // ← CRASH beim structuredClone
+```
+
+**Fix:** Entproxy beim Prop-Passing
+```typescript
+<SupplierForm 
+  initial={selectedSupplier ? {...selectedSupplier} : undefined} 
+/>
+```
+
+### **🚀 Production API-Patterns (echte API-Calls):**
+
+**Option 1: Reload nach Assignment**
+```typescript
+async function handleCategoryAssigned(category) {
+  await fetch('/api/supplier-categories', {...});
+  await invalidate('supplier:categories'); // SvelteKit reload
+}
+```
+
+**Option 2: Optimistic Updates + Rollback**
+```typescript
+// Separater $state für lokale Updates
+let categoriesForSupplier = $state([]);
+
+// Initial load
+$effect(() => {
+  if (selectedSupplier?.wholesaler_id) {
+    loadCategoriesFromAPI(selectedSupplier.wholesaler_id);
+  } else {
+    categoriesForSupplier = [];
+  }
+});
+
+// Optimistic update
+async function handleCategoryAssigned(category) {
+  const backup = [...categoriesForSupplier];
+  categoriesForSupplier = [...categoriesForSupplier, newAssignment]; // Sofort anzeigen
+  
+  try {
+    await fetch('/api/supplier-categories', {...});
+    // Success: keep optimistic update
+  } catch (error) {
+    categoriesForSupplier = backup; // Rollback bei Fehler
+  }
+}
+```
+
+**Note:** `$state mockData` nur für Development - Production verwendet separaten $state + API-Calls
 
 ---
 
@@ -123,9 +197,9 @@ Ebene 3: Add Offering   → Navigation zu Ebene 4 + OfferingForm (create)  ⌘ T
 Ebene 4: Row-Click      → Navigation zu Ebene 5 + AttributeForm/LinkForm ⌘ TODO
 ```
 
-### **NUR RELATIONSHIPS (Dropdown, keine Navigation):** 🔄 **IN PROGRESS**
+### **NUR RELATIONSHIPS (Dropdown, keine Navigation):** ✅ **IMPLEMENTIERT**
 ```
-Ebene 2: Assign Category → Dropdown von existing categories, bleibt auf Ebene 2
+Ebene 2: Assign Category → CategoryAssignment.svelte → bleibt auf Ebene 2 ✅
 ```
 
 ---
@@ -156,8 +230,8 @@ Suppliers (3)                  ← Ebene 1 ✅
 1. **Ebene 1** → "Add Supplier" button
 2. **→ Ebene 2:** `SupplierForm` (create mode) + leeres `CategoryGrid`
 3. Supplier speichern → Form wird zu edit mode
-4. **"Assign Category"** dropdown → Category auswählen → **bleibt auf Ebene 2** 🔄 TODO
-5. `CategoryGrid` zeigt jetzt assigned category
+4. **"Assign Category"** → `CategoryAssignment` Dropdown → Category auswählen → **bleibt auf Ebene 2** ✅ FUNKTIONIERT
+5. `CategoryGrid` zeigt jetzt assigned category ✅ REAKTIV
 
 ### **⌘ Neues Offering mit Attributen erstellen (TODO):**
 1. **Ebene 1** → Supplier row click 
@@ -230,7 +304,7 @@ onselect={handleSidebarNavigation}
 - ✅ Disabled states in Sidebar
 - ✅ Forms vollständig gestylt und funktional
 - ✅ Farbkonsistenz durch alle Komponenten
-- 🔄 Category Assignment (noch nicht testbar)
+- ✅ Category Assignment funktional (Mock-Daten)
 - ⌘ Ebene 3-5 (noch nicht implementiert)
 
 ---
@@ -241,23 +315,23 @@ onselect={handleSidebarNavigation}
 src/lib/components/
 ├── browser/
 │   └── HierarchySidebar.svelte           ✅ IMPLEMENTIERT + CSS ausgelagert
-├── entities/suppliers/
+├── suppliers/
 │   ├── SupplierGrid.svelte               ✅ IMPLEMENTIERT
 │   └── SupplierForm.svelte               ✅ VOLLSTÄNDIG GESTYLT
-├── entities/categories/
+├── categories/
 │   ├── CategoryGrid.svelte               ✅ IMPLEMENTIERT
-│   └── CategoryForm.svelte               🔄 IN PROGRESS
+│   └── CategoryAssignment.svelte         ✅ VOLLSTÄNDIG IMPLEMENTIERT
 ├── styles/                               ✅ CSS-SYSTEM
 │   ├── grid.css                          ✅ BASIS-KOMPONENTE + Farbharmonisierung
 │   ├── form.css                          ✅ ERWEITERT (select-styles)
 │   └── sidebar.css                       ✅ NEU ERSTELLT
-├── entities/offerings/                            ⌘ TODO
+├── offerings/                            ⌘ TODO
 │   ├── OfferingGrid.svelte
 │   └── OfferingForm.svelte
-├── entities/attributes/                           ⌘ TODO
+├── attributes/                           ⌘ TODO
 │   ├── AttributeGrid.svelte
 │   └── AttributeForm.svelte
-├── entities/links/                                ⌘ TODO
+├── links/                                ⌘ TODO
 │   ├── LinkGrid.svelte
 │   └── LinkForm.svelte
 ├── Datagrid.svelte                       ✅ BASIS-KOMPONENTE + Dokumentation
@@ -322,4 +396,4 @@ src/routes/
 
 **🎯 Ziel: Vollständig funktionsfähiges 5-Ebenen SupplierBrowser System mit URL-driven Navigation und konsistenter Architektur.**
 
-**📊 Fortschritt: ~60% implementiert** (Ebene 1-2 vollständig, Ebene 3-5 ausstehend)
+**📊 Fortschritt: ~70% implementiert** (Ebene 1-2 vollständig + Category Assignment funktional)

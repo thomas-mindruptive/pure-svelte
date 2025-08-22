@@ -36,9 +36,6 @@
     onselect?: (event: CustomEvent<{ key: string }>) => void;
   }>();
 
-  let rootEl: HTMLElement;
-
-
   function emitSelect(key: string) {
     log.info("🚀 HierarchySidebar: emitSelect called with key:", key);
     try {
@@ -53,7 +50,7 @@
   }
 </script>
 
-<nav class="hb" aria-label={ariaLabel} bind:this={rootEl}>
+<nav class="hb" aria-label={ariaLabel}>
   <ul class="hb__list">
     {#each items as it}
       <li class="hb__li">

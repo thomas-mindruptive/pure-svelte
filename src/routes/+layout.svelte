@@ -1,7 +1,7 @@
 <script lang="ts">
 	import favicon from "$lib/assets/favicon.svg";
-	import Snackbar from "$lib/components/Snackbar.svelte";
-	import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
+	import Snackbar from "$lib/components/client/Snackbar.svelte";
+	import ConfirmDialog from "$lib/components/client/ConfirmDialog.svelte";
 	import "../styles/app.css";
 
 	let { children } = $props();

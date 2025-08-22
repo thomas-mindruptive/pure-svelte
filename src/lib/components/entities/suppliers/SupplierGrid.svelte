@@ -4,7 +4,7 @@
     type ColumnDef,
     type DeleteStrategy,
     type RowActionStrategy,
-  } from "$lib/components/Datagrid.svelte";
+  } from "$lib/components/client/Datagrid.svelte";
   import type { Wholesaler } from "$lib/domain/types";
 
   type ID = string | number;

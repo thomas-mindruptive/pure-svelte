@@ -6,24 +6,31 @@ Das SupplierBrowser System ist eine **5-Ebenen hierarchische Navigation** durch 
 ## 🚀 **AKTUELLER IMPLEMENTIERUNGSSTATUS**
 
 ### ✅ **IMPLEMENTIERT:**
-- **HierarchySidebar.svelte** - Navigation mit disabled states & counts
+- **HierarchySidebar.svelte** - Navigation mit disabled states & counts (Svelte 5 + ausgelagerte CSS)
 - **SupplierGrid.svelte** - Wrapper um Datagrid für Wholesaler[]
-- **SupplierForm.svelte** - Wrapper um FormShell für Wholesaler create/edit
+- **SupplierForm.svelte** - Wrapper um FormShell für Wholesaler create/edit **✅ VOLLSTÄNDIG GESTYLT**
 - **CategoryGrid.svelte** - Wrapper um Datagrid für WholesalerCategory[]
 - **URL-driven State** - Level, supplierId, categoryId via URL-Parameter
 - **Svelte 5 + Runes** - Alle Komponenten nutzen neue Syntax
+- **CSS-System Integration** - Form.css, Sidebar.css, Grid.css vollständig integriert
+- **Farbkonsistenz** - Einheitliches Violett (#4f46e5) durch alle UI-Komponenten
 
 ### 🔄 **IN PROGRESS:**
 - **CategoryForm.svelte** - Für Category Assignment (NUR RELATIONSHIP)
 
-### ❌ **NOCH ZU IMPLEMENTIEREN:**
+### ⌘ **NOCH ZU IMPLEMENTIEREN:**
 - **OfferingGrid.svelte** + **OfferingForm.svelte** (Ebene 3)
 - **AttributeGrid.svelte** + **AttributeForm.svelte** (Ebene 5)
 - **LinkGrid.svelte** + **LinkForm.svelte** (Ebene 5)
 - **Echte API-Integration** (derzeit Mock-Daten)
 - **Delete-Strategien** mit Dependency-Checks
 - **Ebene 4-5 Navigation** (Attributes/Links Toggle)
-- **supplierbrowser/+page.svelte** - Testseite für Ebene 1-2 mit Mock-Daten
+
+### 🎨 **STYLING UPDATES:**
+- **SupplierForm.svelte**: Vollständig responsive Form mit .form-grid, .form-group, Error-Styling
+- **HierarchySidebar.svelte**: Ausgelagerte CSS nach sidebar.css, Svelte 5 callback props
+- **CSS-System**: form.css erweitert um select-Styles, Farbvariablen harmonisiert
+- **Design-Konsistenz**: --color-primary (#4f46e5) als zentrale Brand-Color
 
 ---
 
@@ -41,8 +48,10 @@ Das SupplierBrowser System ist eine **5-Ebenen hierarchische Navigation** durch 
 ### **Ebene 2: Categories** ✅ **IMPLEMENTIERT**  
 - **Layout:** `SupplierForm` oben + `CategoryGrid` unten
 - **SupplierForm:** 
+  - ✅ **VOLLSTÄNDIG GESTYLT** mit form.css Integration
   - Zeigt/editiert Supplier (create wenn von Add-Button, edit wenn von Row-Click)
   - Wrapper um `FormShell` mit `Wholesaler` Type
+  - Responsive 4-Spalten Layout, Validation, Error-Handling
 - **CategoryGrid:**
   - **Datenquelle:** Assigned categories für diesen Supplier
   - **Type:** `WholesalerCategoryWithCount[]` (erweitert um offering_count)
@@ -54,7 +63,7 @@ Das SupplierBrowser System ist eine **5-Ebenen hierarchische Navigation** durch 
 - **Row-Click:** Navigiert zu Ebene 3 mit gewählter Category
 - **URL:** `?level=categories&supplierId=1`
 
-### **Ebene 3: Offerings** ❌ **NOCH ZU IMPLEMENTIEREN**
+### **Ebene 3: Offerings** ⌘ **NOCH ZU IMPLEMENTIEREN**
 - **Layout:** Kategoriename als Header + `OfferingGrid`
 - **Header:** "Category: [Name]" (readonly Info)
 - **OfferingGrid:**
@@ -66,7 +75,7 @@ Das SupplierBrowser System ist eine **5-Ebenen hierarchische Navigation** durch 
 - **Row-Click:** Navigiert zu Ebene 4 mit gewähltem Offering (edit mode)
 - **URL:** `?level=offerings&supplierId=1&categoryId=2`
 
-### **Ebene 4: Attributes ODER Links (umschaltbar)** ❌ **NOCH ZU IMPLEMENTIEREN**
+### **Ebene 4: Attributes ODER Links (umschaltbar)** ⌘ **NOCH ZU IMPLEMENTIEREN**
 - **Layout:** `OfferingForm` oben + **umschaltbares Grid** unten
 - **OfferingForm:**
   - Zeigt/editiert Offering (create wenn von Add-Button, edit wenn von Row-Click)
@@ -87,7 +96,7 @@ Das SupplierBrowser System ist eine **5-Ebenen hierarchische Navigation** durch 
 - **Datenquelle:** `WholesalerOfferingLink[]` für dieses Offering
 - **Row-Click:** Navigiert zu Ebene 5 mit `LinkForm`
 
-### **Ebene 5: Detail Forms** ❌ **NOCH ZU IMPLEMENTIEREN**
+### **Ebene 5: Detail Forms** ⌘ **NOCH ZU IMPLEMENTIEREN**
 - **Kein Grid** - nur Form
 - **Zwei mögliche Forms:**
 
@@ -109,9 +118,9 @@ Das SupplierBrowser System ist eine **5-Ebenen hierarchische Navigation** durch 
 
 ### **ECHTE OBJEKTE (Navigation + Form):** ✅ **IMPLEMENTIERT für Ebene 1-2**
 ```
-Ebene 1: Add Supplier   → Navigation zu Ebene 2 + SupplierForm (create)
-Ebene 3: Add Offering   → Navigation zu Ebene 4 + OfferingForm (create)  ❌ TODO
-Ebene 4: Row-Click      → Navigation zu Ebene 5 + AttributeForm/LinkForm ❌ TODO
+Ebene 1: Add Supplier   → Navigation zu Ebene 2 + SupplierForm (create)  ✅
+Ebene 3: Add Offering   → Navigation zu Ebene 4 + OfferingForm (create)  ⌘ TODO
+Ebene 4: Row-Click      → Navigation zu Ebene 5 + AttributeForm/LinkForm ⌘ TODO
 ```
 
 ### **NUR RELATIONSHIPS (Dropdown, keine Navigation):** 🔄 **IN PROGRESS**
@@ -126,16 +135,18 @@ Ebene 2: Assign Category → Dropdown von existing categories, bleibt auf Ebene 
 ```
 Suppliers (3)                  ← Ebene 1 ✅
 ├─ Categories (2)              ← Ebene 2 ✅ (disabled bis Supplier gewählt)
-   ├─ Product Offerings (0)    ← Ebene 3 ❌ (disabled bis Category gewählt)
-      ├─ Attributes (0)        ← Ebene 4a ❌ (disabled bis Offering gewählt)  
-      └─ Links (0)             ← Ebene 4b ❌ (disabled bis Offering gewählt)
+   ├─ Product Offerings (0)    ← Ebene 3 ⌘ (disabled bis Category gewählt)
+      ├─ Attributes (0)        ← Ebene 4a ⌘ (disabled bis Offering gewählt)  
+      └─ Links (0)             ← Ebene 4b ⌘ (disabled bis Offering gewählt)
 ```
 
-**Implementiert:**
+**✅ Implementiert:**
 - `HierarchySidebar.svelte` mit dynamischen Counts
 - Disabled states basierend auf Selection
 - Click-Handler für Navigation zwischen Ebenen
 - Live-Update der Counts basierend auf aktueller Selection
+- **Svelte 5 Callback Props** statt DOM Events
+- **Ausgelagerte CSS** nach sidebar.css
 
 ---
 
@@ -148,7 +159,7 @@ Suppliers (3)                  ← Ebene 1 ✅
 4. **"Assign Category"** dropdown → Category auswählen → **bleibt auf Ebene 2** 🔄 TODO
 5. `CategoryGrid` zeigt jetzt assigned category
 
-### **❌ Neues Offering mit Attributen erstellen (TODO):**
+### **⌘ Neues Offering mit Attributen erstellen (TODO):**
 1. **Ebene 1** → Supplier row click 
 2. **→ Ebene 2** → Category row click
 3. **→ Ebene 3** → "Add Offering" button
@@ -191,6 +202,15 @@ if (level === 'categories') {
 - Keine inline Type-Definitionen in Komponenten
 - Saubere Generics in allen Grid-Wrappern
 
+### **✅ Event System (SVELTE 5 UPGRADE):**
+```typescript
+// ALT (Svelte 4)
+on:select={handleSidebarNavigation}
+
+// NEU (Svelte 5)  
+onselect={handleSidebarNavigation}
+```
+
 ---
 
 ## 🧪 **TESTING STATUS**
@@ -198,18 +218,20 @@ if (level === 'categories') {
 ### **✅ Implementierte Test-Umgebung:**
 - **Route:** `/supplierbrowser` 
 - **Mock-Daten:** 3 Suppliers, Categories für jeden Supplier
-- **Navigation:** Ebene 1 ↔ Ebene 2 funktioniert
+- **Navigation:** Ebene 1 ↔ Ebene 2 funktioniert vollständig
 - **URL-State:** Bookmarkable, alle Parameter in URL
 - **Components:** SupplierGrid, SupplierForm, CategoryGrid funktionieren
+- **Styling:** Vollständig responsive, konsistente Farben
 
 ### **📋 Test-Checklist:**
 - ✅ Supplier row click → Category-Ebene
-- ✅ Sidebar Navigation funktioniert  
+- ✅ Sidebar Navigation funktioniert vollständig
 - ✅ URL-Parameter korrekt
 - ✅ Disabled states in Sidebar
-- ✅ Forms sind readonly (für Testing)
+- ✅ Forms vollständig gestylt und funktional
+- ✅ Farbkonsistenz durch alle Komponenten
 - 🔄 Category Assignment (noch nicht testbar)
-- ❌ Ebene 3-5 (noch nicht implementiert)
+- ⌘ Ebene 3-5 (noch nicht implementiert)
 
 ---
 
@@ -218,36 +240,37 @@ if (level === 'categories') {
 ```
 src/lib/components/
 ├── browser/
-│   └── HierarchySidebar.svelte           ✅ IMPLEMENTIERT
-├── suppliers/
+│   └── HierarchySidebar.svelte           ✅ IMPLEMENTIERT + CSS ausgelagert
+├── entities/suppliers/
 │   ├── SupplierGrid.svelte               ✅ IMPLEMENTIERT
-│   └── SupplierForm.svelte               ✅ IMPLEMENTIERT ABER STYLING fehlt!!!!
-├── categories/
+│   └── SupplierForm.svelte               ✅ VOLLSTÄNDIG GESTYLT
+├── entities/categories/
 │   ├── CategoryGrid.svelte               ✅ IMPLEMENTIERT
 │   └── CategoryForm.svelte               🔄 IN PROGRESS
-├── offerings/                            ❌ TODO
+├── styles/                               ✅ CSS-SYSTEM
+│   ├── grid.css                          ✅ BASIS-KOMPONENTE + Farbharmonisierung
+│   ├── form.css                          ✅ ERWEITERT (select-styles)
+│   └── sidebar.css                       ✅ NEU ERSTELLT
+├── entities/offerings/                            ⌘ TODO
 │   ├── OfferingGrid.svelte
 │   └── OfferingForm.svelte
-├── attributes/                           ❌ TODO
+├── entities/attributes/                           ⌘ TODO
 │   ├── AttributeGrid.svelte
 │   └── AttributeForm.svelte
-├── links/                                ❌ TODO
+├── entities/links/                                ⌘ TODO
 │   ├── LinkGrid.svelte
 │   └── LinkForm.svelte
-├── Datagrid.svelte                       ✅ BASIS-KOMPONENTE
+├── Datagrid.svelte                       ✅ BASIS-KOMPONENTE + Dokumentation
 └── forms/FormShell.svelte                ✅ BASIS-KOMPONENTE
 
 src/routes/
 └── supplierbrowser/
-    └── +page.svelte                      ✅ TEST-SEITE (Ebene 1-2)
+    └── +page.svelte                      ✅ TEST-SEITE (Ebene 1-2 vollständig)
 ```
 
 ---
 
 ## 🎯 **NEXT STEPS**
-
-### **1. Sofort (SupplierForm):**
-Styling des forms, aktuell nur normale divs.
 
 ### **1. Sofort (CategoryForm):**
 - CategoryForm.svelte für Assignment-Dropdown
@@ -280,6 +303,8 @@ Styling des forms, aktuell nur normale divs.
 - **URL-driven State** - bookmarkable
 - **Thin Grid-Wrapper** - Datagrid as Basis
 - **FormShell-Wrapper** - für alle Forms
+- **CSS-Design-System** - Modulare, wiederverwendbare Styles
+- **Callback Props** statt DOM Events (Svelte 5 Pattern)
 
 ### 📋 **Zu beachten:**
 - Mock-Daten durch echte API ersetzen
@@ -287,6 +312,14 @@ Styling des forms, aktuell nur normale divs.
 - Loading-States & Error-Handling
 - Performance-Optimierung für große Datensets
 
+### 🎨 **Styling-Standards etabliert:**
+- **Farbkonsistenz:** Einheitliches --color-primary (#4f46e5)
+- **CSS-Modularität:** Getrennte .css Dateien pro Komponententyp
+- **Form-Standards:** .form-grid, .form-group, konsistente Error-Behandlung
+- **Responsive Design:** Mobile-first, flexible Layouts
+
 ---
 
 **🎯 Ziel: Vollständig funktionsfähiges 5-Ebenen SupplierBrowser System mit URL-driven Navigation und konsistenter Architektur.**
+
+**📊 Fortschritt: ~60% implementiert** (Ebene 1-2 vollständig, Ebene 3-5 ausstehend)

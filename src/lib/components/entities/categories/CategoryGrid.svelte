@@ -1,6 +1,6 @@
 <script lang="ts">
   // Thin wrapper around Datagrid for categories
-  import Datagrid, { type ColumnDef, type DeleteStrategy } from '$lib/components/Datagrid.svelte';
+  import Datagrid, { type ColumnDef, type DeleteStrategy } from '$lib/components/client/Datagrid.svelte';
   import type { WholesalerCategory } from '$lib/domain/types';
 
   type ID = string | number;

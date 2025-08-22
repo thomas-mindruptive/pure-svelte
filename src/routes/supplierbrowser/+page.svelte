@@ -1,20 +1,27 @@
 <script lang="ts">
-  import { page } from '$app/stores';
-  import { goto } from '$app/navigation';
-  import { log } from '$lib/utils/logger';
-  
+  import { page } from "$app/stores";
+  import { goto } from "$app/navigation";
+  import { log } from "$lib/utils/logger";
+
   // Import CSS styles
-  import '$lib/components/styles/grid.css';
-  import '$lib/components/styles/form.css';
-  
+  import "$lib/components/styles/grid.css";
+  import "$lib/components/styles/form.css";
+
   // Import components
-  import HierarchySidebar from '$lib/components/browser/HierarchySidebar.svelte';
-  import SupplierGrid from '$lib/components/suppliers/SupplierGrid.svelte';
-  import SupplierForm from '$lib/components/suppliers/SupplierForm.svelte';
-  import CategoryGrid from '$lib/components/categories/CategoryGrid.svelte';
-  
+  import HierarchySidebar from "$lib/components/browser/HierarchySidebar.svelte";
+  import SupplierGrid from "$lib/components/entities/suppliers/SupplierGrid.svelte";
+  import SupplierForm from "$lib/components/entities/suppliers/SupplierForm.svelte";
+  import CategoryGrid from "$lib/components/entities/categories/CategoryGrid.svelte";
+
   // Import types
-  import type { Level, Wholesaler, WholesalerCategory } from '$lib/domain/types';
+  import type {
+    Level,
+    ProductCategory,
+    Wholesaler,
+    WholesalerCategory,
+  } from "$lib/domain/types";
+  import CategoryAssignment from "$lib/components/entities/suppliers/CategoryAssignment.svelte";
+  import { addNotification } from "$lib/stores/notifications";
 
   // ===== EXTENDED TYPES FOR MOCK DATA =====
   type WholesalerCategoryWithCount = WholesalerCategory & {
@@ -24,107 +31,134 @@
   // ===== MOCK DATA =====
   const mockData: {
     wholesalers: Wholesaler[];
-    categories: { [key: number]: WholesalerCategoryWithCount[] };
-  } = {
+    assignedCategories: { [key: number]: WholesalerCategoryWithCount[] };
+    allCategories: ProductCategory[];
+  } = $state({
     wholesalers: [
-      { 
-        wholesaler_id: 1, 
-        name: 'Global Tech Supply', 
-        region: 'USA', 
-        status: 'active', 
-        dropship: true, 
-        website: 'https://globaltech.example',
-        created_at: '2024-01-15T10:00:00Z'
+      {
+        wholesaler_id: 1,
+        name: "Global Tech Supply",
+        region: "USA",
+        status: "active",
+        dropship: true,
+        website: "https://globaltech.example",
+        created_at: "2024-01-15T10:00:00Z",
       },
-      { 
-        wholesaler_id: 2, 
-        name: 'Euro Electronics', 
-        region: 'Germany', 
-        status: 'new', 
-        dropship: false, 
-        website: 'https://euroelec.example',
-        created_at: '2024-02-20T14:30:00Z'
+      {
+        wholesaler_id: 2,
+        name: "Euro Electronics",
+        region: "Germany",
+        status: "new",
+        dropship: false,
+        website: "https://euroelec.example",
+        created_at: "2024-02-20T14:30:00Z",
       },
-      { 
-        wholesaler_id: 3, 
-        name: 'Asia Components Ltd', 
-        region: 'China', 
-        status: 'inactive', 
-        dropship: true, 
-        website: 'https://asiacomp.example',
-        created_at: '2024-01-05T08:15:00Z'
-      }
+      {
+        wholesaler_id: 3,
+        name: "Asia Components Ltd",
+        region: "China",
+        status: "inactive",
+        dropship: true,
+        website: "https://asiacomp.example",
+        created_at: "2024-01-05T08:15:00Z",
+      },
     ],
-    
-    categories: {
+
+    assignedCategories: {
       1: [
-        { 
-          wholesaler_id: 1, 
-          category_id: 1, 
-          name: 'Laptops', 
-          comment: 'High demand products',
-          link: 'https://example.com/laptops',
-          created_at: '2024-01-16T10:00:00Z',
-          offering_count: 15
+        {
+          wholesaler_id: 1,
+          category_id: 1,
+          name: "Laptops",
+          comment: "High demand products",
+          link: "https://example.com/laptops",
+          created_at: "2024-01-16T10:00:00Z",
+          offering_count: 15,
         },
-        { 
-          wholesaler_id: 1, 
-          category_id: 2, 
-          name: 'Smartphones', 
-          comment: 'Fast moving inventory',
-          created_at: '2024-01-17T10:00:00Z',
-          offering_count: 25
-        }
+        {
+          wholesaler_id: 1,
+          category_id: 2,
+          name: "Smartphones",
+          comment: "Fast moving inventory",
+          created_at: "2024-01-17T10:00:00Z",
+          offering_count: 25,
+        },
       ],
       2: [
-        { 
-          wholesaler_id: 2, 
-          category_id: 4, 
-          name: 'Tablets', 
-          comment: 'European market focus',
-          created_at: '2024-02-21T14:30:00Z',
-          offering_count: 8
+        {
+          wholesaler_id: 2,
+          category_id: 4,
+          name: "Tablets",
+          comment: "European market focus",
+          created_at: "2024-02-21T14:30:00Z",
+          offering_count: 8,
         },
-        { 
-          wholesaler_id: 2, 
-          category_id: 5, 
-          name: 'Gaming Equipment', 
-          comment: 'Growing segment',
-          link: 'https://example.com/gaming',
-          created_at: '2024-02-22T14:30:00Z',
-          offering_count: 12
-        }
+        {
+          wholesaler_id: 2,
+          category_id: 5,
+          name: "Gaming Equipment",
+          comment: "Growing segment",
+          link: "https://example.com/gaming",
+          created_at: "2024-02-22T14:30:00Z",
+          offering_count: 12,
+        },
       ],
       3: [
-        { 
-          wholesaler_id: 3, 
-          category_id: 3, 
-          name: 'Accessories', 
-          comment: 'Various tech accessories',
-          created_at: '2024-01-06T08:15:00Z',
-          offering_count: 45
-        }
-      ]
-    }
-  };
+        {
+          wholesaler_id: 3,
+          category_id: 3,
+          name: "Accessories",
+          comment: "Various tech accessories",
+          created_at: "2024-01-06T08:15:00Z",
+          offering_count: 45,
+        },
+      ],
+    },
+
+    // 🆕 ALL available categories in the system
+    allCategories: [
+      { category_id: 1, name: "Laptops", description: "Portable computers" },
+      { category_id: 2, name: "Smartphones", description: "Mobile phones" },
+      { category_id: 3, name: "Accessories", description: "Tech accessories" },
+      { category_id: 4, name: "Tablets", description: "Tablet computers" },
+      { category_id: 5, name: "Gaming Equipment", description: "Gaming gear" },
+      { category_id: 6, name: "Audio", description: "Headphones and speakers" },
+    ],
+  })
 
   // ===== URL-DRIVEN STATE (Svelte 5 Runes) =====
-  const currentLevel = $derived(($page.url.searchParams.get('level') as Level) || 'wholesalers');
-  const selectedSupplierId = $derived(Number($page.url.searchParams.get('supplierId')) || null);
-  const selectedCategoryId = $derived(Number($page.url.searchParams.get('categoryId')) || null);
+  const currentLevel = $derived(
+    ($page.url.searchParams.get("level") as Level) || "wholesalers",
+  );
+  const selectedSupplierId = $derived(
+    Number($page.url.searchParams.get("supplierId")) || null,
+  );
+  const selectedCategoryId = $derived(
+    Number($page.url.searchParams.get("categoryId")) || null,
+  );
 
   // ===== DERIVED STATE =====
   const selectedSupplier = $derived(
-    selectedSupplierId ? mockData.wholesalers.find(s => s.wholesaler_id === selectedSupplierId) || null : null
+    selectedSupplierId
+      ? mockData.wholesalers.find(
+          (s) => s.wholesaler_id === selectedSupplierId,
+        ) || null
+      : null,
   );
-  
+
   const selectedCategory = $derived(
-    selectedCategoryId && selectedSupplier && selectedSupplier.wholesaler_id ? 
-    (mockData.categories[selectedSupplier.wholesaler_id] || []).find((c: WholesalerCategoryWithCount) => c.category_id === selectedCategoryId) || null : null
+    selectedCategoryId && selectedSupplier && selectedSupplier.wholesaler_id
+      ? (mockData.assignedCategories[selectedSupplier.wholesaler_id] || []).find(
+          (c: WholesalerCategoryWithCount) =>
+            c.category_id === selectedCategoryId,
+        ) || null
+      : null,
   );
-  
+
   const categoriesForSupplier = $derived(
-    selectedSupplier && selectedSupplier.wholesaler_id ? mockData.categories[selectedSupplier.wholesaler_id] ?? [] : []
+    selectedSupplier && selectedSupplier.wholesaler_id
+      ? (mockData.assignedCategories[selectedSupplier.wholesaler_id] ?? [])
+      : [],
   );
 
   // Sidebar data
@@ -133,63 +167,63 @@
     categories: categoriesForSupplier.length,
     offerings: 0, // Not implemented yet
     attributes: 0, // Not implemented yet
-    links: 0 // Not implemented yet
+    links: 0, // Not implemented yet
   });
 
   const sidebarItems = $derived([
     {
-      key: 'wholesalers',
+      key: "wholesalers",
       label: `Suppliers (${counts.wholesalers})`,
       disabled: false,
-      level: 0
+      level: 0,
     },
     {
-      key: 'categories',
+      key: "categories",
       label: `Categories (${counts.categories})`,
       disabled: !selectedSupplier,
-      level: 1
+      level: 1,
     },
     {
-      key: 'offerings',
-      label: 'Product Offerings (0)',
+      key: "offerings",
+      label: "Product Offerings (0)",
       disabled: !selectedCategory,
-      level: 2
+      level: 2,
     },
     {
-      key: 'attributes',
-      label: 'Attributes (0)',
+      key: "attributes",
+      label: "Attributes (0)",
       disabled: true, // Not implemented yet
-      level: 3
+      level: 3,
     },
     {
-      key: 'links',
-      label: 'Links (0)',
+      key: "links",
+      label: "Links (0)",
       disabled: true, // Not implemented yet
-      level: 3
-    }
+      level: 3,
+    },
   ]);
 
   // ===== URL UPDATE FUNCTION =====
-  function updateURL(params: { 
-    level?: Level, 
-    supplierId?: number | null | undefined, 
-    categoryId?: number | null | undefined
+  function updateURL(params: {
+    level?: Level;
+    supplierId?: number | null | undefined;
+    categoryId?: number | null | undefined;
   }) {
     const searchParams = new URLSearchParams($page.url.searchParams);
-    
-    if (params.level !== undefined) searchParams.set('level', params.level);
+
+    if (params.level !== undefined) searchParams.set("level", params.level);
     if (params.supplierId !== undefined) {
       if (params.supplierId) {
-        searchParams.set('supplierId', params.supplierId.toString());
+        searchParams.set("supplierId", params.supplierId.toString());
       } else {
-        searchParams.delete('supplierId');
+        searchParams.delete("supplierId");
       }
     }
     if (params.categoryId !== undefined) {
       if (params.categoryId) {
-        searchParams.set('categoryId', params.categoryId.toString());
+        searchParams.set("categoryId", params.categoryId.toString());
       } else {
-        searchParams.delete('categoryId');
+        searchParams.delete("categoryId");
       }
     }
 
@@ -199,17 +233,17 @@
   // ===== NAVIGATION HANDLERS =====
   function handleSidebarNavigation(event: CustomEvent<{ key: string }>) {
     const level = event.detail.key as Level;
-    log.info('Sidebar navigation', { from: currentLevel, to: level });
-    
+    log.info("Sidebar navigation", { from: currentLevel, to: level });
+
     switch (level) {
-      case 'wholesalers':
+      case "wholesalers":
         updateURL({ level, supplierId: null, categoryId: null });
         break;
-      case 'categories':
+      case "categories":
         if (!selectedSupplier) return;
         updateURL({ level, categoryId: null });
         break;
-      case 'offerings':
+      case "offerings":
         if (!selectedCategory) return;
         updateURL({ level });
         break;
@@ -218,34 +252,43 @@
 
   // ===== ROW SELECTION HANDLERS =====
   function handleSupplierSelect(supplier: Wholesaler) {
-    log.info('Supplier selected', { supplierId: supplier.wholesaler_id, name: supplier.name });
+    log.info("Supplier selected", {
+      supplierId: supplier.wholesaler_id,
+      name: supplier.name,
+    });
     updateURL({
-      level: 'categories',
+      level: "categories",
       supplierId: supplier.wholesaler_id ?? null,
-      categoryId: null
+      categoryId: null,
     });
   }
 
   function handleCategorySelect(category: WholesalerCategoryWithCount) {
-    log.info('Category selected', { categoryId: category.category_id, name: category.name });
+    log.info("Category selected", {
+      categoryId: category.category_id,
+      name: category.name,
+    });
     updateURL({
-      level: 'offerings',
-      categoryId: category.category_id
+      level: "offerings",
+      categoryId: category.category_id,
     });
   }
 
   // Silence unused warnings (handlers will be used when Grid components support rowclick)
-  void handleSupplierSelect; void handleCategorySelect;
+  void handleSupplierSelect;
+  void handleCategorySelect;
 
   // ===== DELETE HANDLERS =====
   async function handleSupplierDelete(ids: (string | number)[]) {
-    log.info('Mock: Delete suppliers', { ids });
-    alert(`MOCK: Would delete suppliers with IDs: ${ids.join(', ')}`);
+    log.info("Mock: Delete suppliers", { ids });
+    alert(`MOCK: Would delete suppliers with IDs: ${ids.join(", ")}`);
   }
 
   async function handleCategoryDelete(ids: (string | number)[]) {
-    log.info('Mock: Remove categories', { ids });
-    alert(`MOCK: Would remove category assignments with IDs: ${ids.join(', ')}`);
+    log.info("Mock: Remove categories", { ids });
+    alert(
+      `MOCK: Would remove category assignments with IDs: ${ids.join(", ")}`,
+    );
   }
 
   // // ===== FORM HANDLERS =====
@@ -260,11 +303,55 @@
 
   // ===== COMPUTED PROPS =====
   const pageTitle = $derived(() => {
-    if (currentLevel === 'wholesalers') return 'Suppliers';
-    if (currentLevel === 'categories' && selectedSupplier) return `Categories for ${selectedSupplier.name}`;
-    if (currentLevel === 'offerings' && selectedCategory) return `Offerings in ${selectedCategory.name}`;
-    return 'Supplier Browser';
+    if (currentLevel === "wholesalers") return "Suppliers";
+    if (currentLevel === "categories" && selectedSupplier)
+      return `Categories for ${selectedSupplier.name}`;
+    if (currentLevel === "offerings" && selectedCategory)
+      return `Offerings in ${selectedCategory.name}`;
+    return "Supplier Browser";
   });
+
+  // ===== CALLBACKS =====
+  const availableCategoriesForSupplier = $derived(
+    // Mock: Alle Categories minus bereits assigned
+    mockData.allCategories.filter(
+      (cat) =>
+        !categoriesForSupplier.some(
+          (assigned) => assigned.category_id === cat.category_id,
+        ),
+    ),
+  );
+
+  function handleCategoryAssigned(category: ProductCategory) {
+    // Update Mock-Daten + Snackbar
+
+    if (!selectedSupplier?.wholesaler_id) return;
+
+    // Optimistic update: Add to assigned categories list
+    const newAssignment = {
+      wholesaler_id: selectedSupplier.wholesaler_id,
+      category_id: category.category_id,
+      name: category.name,
+      comment: "",
+      created_at: new Date().toISOString(),
+      offering_count: 0,
+    };
+
+    // Update mock data (triggers reactive update)
+    if (!mockData.assignedCategories[selectedSupplier.wholesaler_id]) {
+      mockData.assignedCategories[selectedSupplier.wholesaler_id] = [];
+    }
+    mockData.assignedCategories[selectedSupplier.wholesaler_id].push(newAssignment);
+
+    addNotification(
+      `Category "${category.name}" assigned successfully`,
+      "success",
+    );
+  }
+
+  function handleCategoryError(error: string) {
+    addNotification(error, "error", 5000);
+  }
 
   // Loading state (mock)
   let loading = $state(false);
@@ -298,37 +385,38 @@
         {/if}
       </div>
     </div>
-    
+
     <div class="content-body">
       <!-- EBENE 2: SupplierForm oben + CategoryGrid unten -->
-      {#if currentLevel === 'categories' && selectedSupplier}
+      {#if currentLevel === "categories" && selectedSupplier}
         <div class="master-form-section">
-          <SupplierForm 
-            initial={selectedSupplier}
-            disabled={false}
-          />
+          <SupplierForm initial={selectedSupplier ? {...selectedSupplier} : {} as Wholesaler}  disabled={false} />
         </div>
+        <CategoryAssignment
+          supplierId={selectedSupplier.wholesaler_id}
+          availableCategories={availableCategoriesForSupplier}
+          onAssigned={handleCategoryAssigned}
+          onError={handleCategoryError}
+        />
       {/if}
 
       <!-- GRIDS -->
       <div class="grid-section">
-        {#if currentLevel === 'wholesalers'}
-          <SupplierGrid 
-            rows={mockData.wholesalers} 
+        {#if currentLevel === "wholesalers"}
+          <SupplierGrid
+            rows={mockData.wholesalers}
             {loading}
             executeDelete={handleSupplierDelete}
             onRowClick={handleSupplierSelect}
           />
-          
-        {:else if currentLevel === 'categories'}
-          <CategoryGrid 
-            rows={categoriesForSupplier} 
+        {:else if currentLevel === "categories"}
+          <CategoryGrid
+            rows={categoriesForSupplier}
             {loading}
             showOfferingCount={true}
             executeDelete={handleCategoryDelete}
           />
-          
-        {:else if currentLevel === 'offerings'}
+        {:else if currentLevel === "offerings"}
           <div class="empty-state">
             <h3>Offerings Grid</h3>
             <p>Not implemented yet - coming in next phase!</p>
@@ -345,7 +433,14 @@
     height: 100vh;
     width: 100vw;
     overflow: hidden;
-    font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+    font-family: var(
+      --font-sans,
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      Roboto,
+      sans-serif
+    );
   }
 
   .sidebar {
@@ -353,6 +448,7 @@
     width: 300px;
     background: var(--pc-grid-header-bg, #f8fafc);
     border-right: 1px solid var(--pc-grid-border, #e2e8f0);
+    padding: 0;
   }
 
   .main-content {
@@ -409,7 +505,7 @@
     border-radius: 8px;
     border: 1px solid var(--pc-grid-border, #e2e8f0);
     flex-shrink: 0;
-    box-shadow: var(--pc-grid-shadow, 0 1px 2px rgba(0,0,0,.05));
+    box-shadow: var(--pc-grid-shadow, 0 1px 2px rgba(0, 0, 0, 0.05));
   }
 
   .grid-section {
@@ -418,7 +514,7 @@
     background: var(--pc-grid-bg, #fff);
     border-radius: 8px;
     border: 1px solid var(--pc-grid-border, #e2e8f0);
-    box-shadow: var(--pc-grid-shadow, 0 1px 2px rgba(0,0,0,.05));
+    box-shadow: var(--pc-grid-shadow, 0 1px 2px rgba(0, 0, 0, 0.05));
     overflow: hidden;
   }
 

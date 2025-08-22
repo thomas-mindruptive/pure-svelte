@@ -4,7 +4,7 @@ export type Level = 'wholesalers' | 'categories' | 'offerings' | 'attributes' | 
 
 // ===== WHOLESALER (dbo.wholesalers) =====
 export type Wholesaler = {
-  wholesaler_id?: number;      // autoIncrement primaryKey
+  wholesaler_id: number;      // autoIncrement primaryKey
   name: string;                // required, unique, maxLength: 200
   region?: string;             // nullable, maxLength: 200
   b2b_notes?: string;          // nullable, maxLength: 1000

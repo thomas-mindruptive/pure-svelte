@@ -3,59 +3,91 @@
 ## Überblick
 Das SupplierBrowser System ist eine **5-Ebenen hierarchische Navigation** durch Supplier-Daten. Unterscheidung zwischen **"echte Objekte erstellen"** (→ Navigation + Form) vs **"nur Relationships herstellen"** (→ Dropdown).
 
+## 🚀 **AKTUELLER IMPLEMENTIERUNGSSTATUS**
+
+### ✅ **IMPLEMENTIERT:**
+- **HierarchySidebar.svelte** - Navigation mit disabled states & counts
+- **SupplierGrid.svelte** - Wrapper um Datagrid für Wholesaler[]
+- **SupplierForm.svelte** - Wrapper um FormShell für Wholesaler create/edit
+- **CategoryGrid.svelte** - Wrapper um Datagrid für WholesalerCategory[]
+- **URL-driven State** - Level, supplierId, categoryId via URL-Parameter
+- **Svelte 5 + Runes** - Alle Komponenten nutzen neue Syntax
+
+### 🔄 **IN PROGRESS:**
+- **CategoryForm.svelte** - Für Category Assignment (NUR RELATIONSHIP)
+
+### ❌ **NOCH ZU IMPLEMENTIEREN:**
+- **OfferingGrid.svelte** + **OfferingForm.svelte** (Ebene 3)
+- **AttributeGrid.svelte** + **AttributeForm.svelte** (Ebene 5)
+- **LinkGrid.svelte** + **LinkForm.svelte** (Ebene 5)
+- **Echte API-Integration** (derzeit Mock-Daten)
+- **Delete-Strategien** mit Dependency-Checks
+- **Ebene 4-5 Navigation** (Attributes/Links Toggle)
+- **supplierbrowser/+page.svelte** - Testseite für Ebene 1-2 mit Mock-Daten
+
+---
+
 ## Ebenen-Struktur
 
-### **Ebene 1: Suppliers**
-- **Grid:** `SupplierGrid`
-- **Datenquelle:** `dbo.wholesalers` Tabelle
+### **Ebene 1: Suppliers** ✅ **IMPLEMENTIERT**
+- **Grid:** `SupplierGrid` (um `Datagrid` wrapper)
+- **Datenquelle:** `Wholesaler[]` aus Mock-Daten
 - **Add-Button:** "Add Supplier" 
   - **Typ:** ECHTES OBJEKT erstellen
   - **Aktion:** Navigiert zu Ebene 2 UND zeigt `SupplierForm` oben (create mode)
 - **Row-Click:** Navigiert zu Ebene 2 mit gewähltem Supplier (edit mode)
+- **URL:** `?level=wholesalers`
 
-### **Ebene 2: Categories**  
+### **Ebene 2: Categories** ✅ **IMPLEMENTIERT**  
 - **Layout:** `SupplierForm` oben + `CategoryGrid` unten
 - **SupplierForm:** 
   - Zeigt/editiert Supplier (create wenn von Add-Button, edit wenn von Row-Click)
+  - Wrapper um `FormShell` mit `Wholesaler` Type
 - **CategoryGrid:**
   - **Datenquelle:** Assigned categories für diesen Supplier
-  - **Query:** `wholesaler_categories` JOIN `product_categories`
-- **Add-Button:** "Assign Category"
+  - **Type:** `WholesalerCategoryWithCount[]` (erweitert um offering_count)
+  - **Query:** Mock-Daten, später `wholesaler_categories` JOIN `product_categories`
+- **Add-Button:** "Assign Category" 🔄 **NOCH ZU IMPLEMENTIEREN**
   - **Typ:** NUR RELATIONSHIP herstellen
   - **UI:** Dropdown mit verfügbaren `product_categories` 
   - **Aktion:** Erstellt n:m Eintrag in `wholesaler_categories` - **KEINE Navigation!**
 - **Row-Click:** Navigiert zu Ebene 3 mit gewählter Category
+- **URL:** `?level=categories&supplierId=1`
 
-### **Ebene 3: Offerings**
+### **Ebene 3: Offerings** ❌ **NOCH ZU IMPLEMENTIEREN**
 - **Layout:** Kategoriename als Header + `OfferingGrid`
 - **Header:** "Category: [Name]" (readonly Info)
 - **OfferingGrid:**
-  - **Datenquelle:** `wholesaler_item_offerings` für diese Category + Supplier
+  - **Datenquelle:** `WholesalerItemOffering[]` für diese Category + Supplier
+  - **Type:** `WholesalerItemOffering` from types.ts
 - **Add-Button:** "Add Offering"
   - **Typ:** ECHTES OBJEKT erstellen
   - **Aktion:** Navigiert zu Ebene 4 UND zeigt `OfferingForm` oben (create mode)
 - **Row-Click:** Navigiert zu Ebene 4 mit gewähltem Offering (edit mode)
+- **URL:** `?level=offerings&supplierId=1&categoryId=2`
 
-### **Ebene 4: Attributes ODER Links (umschaltbar)**
+### **Ebene 4: Attributes ODER Links (umschaltbar)** ❌ **NOCH ZU IMPLEMENTIEREN**
 - **Layout:** `OfferingForm` oben + **umschaltbares Grid** unten
 - **OfferingForm:**
   - Zeigt/editiert Offering (create wenn von Add-Button, edit wenn von Row-Click)
+  - Wrapper um `FormShell` mit `WholesalerItemOffering` Type
 - **Sidebar Toggle:** 
   - **"Attributes" Button** → Zeigt `AttributeGrid`
   - **"Links" Button** → Zeigt `LinkGrid`
   - **Wichtig:** Nur EIN Grid sichtbar zur Zeit!
+- **URL:** `?level=attributes&supplierId=1&categoryId=2&offeringId=3&mode=attributes`
 
 #### **Attributes Modus:**
 - **Grid:** `AttributeGrid`
-- **Datenquelle:** `wholesaler_offering_attributes` für dieses Offering
+- **Datenquelle:** `WholesalerOfferingAttribute[]` für dieses Offering
 - **Row-Click:** Navigiert zu Ebene 5 mit `AttributeForm`
 
 #### **Links Modus:**
 - **Grid:** `LinkGrid` 
-- **Datenquelle:** `wholesaler_offering_links` für dieses Offering
+- **Datenquelle:** `WholesalerOfferingLink[]` für dieses Offering
 - **Row-Click:** Navigiert zu Ebene 5 mit `LinkForm`
 
-### **Ebene 5: Detail Forms**
+### **Ebene 5: Detail Forms** ❌ **NOCH ZU IMPLEMENTIEREN**
 - **Kein Grid** - nur Form
 - **Zwei mögliche Forms:**
 
@@ -71,40 +103,52 @@ Das SupplierBrowser System ist eine **5-Ebenen hierarchische Navigation** durch 
 - **Notes Input:** Beschreibung
 - **Speichern:** Erstellt `wholesaler_offering_links` Eintrag
 
+---
+
 ## Add-Button Verhalten
 
-### **ECHTE OBJEKTE (Navigation + Form):**
+### **ECHTE OBJEKTE (Navigation + Form):** ✅ **IMPLEMENTIERT für Ebene 1-2**
 ```
 Ebene 1: Add Supplier   → Navigation zu Ebene 2 + SupplierForm (create)
-Ebene 3: Add Offering   → Navigation zu Ebene 4 + OfferingForm (create)  
-Ebene 4: Row-Click      → Navigation zu Ebene 5 + AttributeForm/LinkForm
+Ebene 3: Add Offering   → Navigation zu Ebene 4 + OfferingForm (create)  ❌ TODO
+Ebene 4: Row-Click      → Navigation zu Ebene 5 + AttributeForm/LinkForm ❌ TODO
 ```
 
-### **NUR RELATIONSHIPS (Dropdown, keine Navigation):**
+### **NUR RELATIONSHIPS (Dropdown, keine Navigation):** 🔄 **IN PROGRESS**
 ```
 Ebene 2: Assign Category → Dropdown von existing categories, bleibt auf Ebene 2
 ```
 
-## Sidebar Navigation
+---
+
+## Sidebar Navigation ✅ **IMPLEMENTIERT**
 
 ```
-Suppliers (5)                  ← Ebene 1
-├─ Categories (3)              ← Ebene 2 (disabled bis Supplier gewählt)
-   ├─ Product Offerings (0)    ← Ebene 3 (disabled bis Category gewählt)
-      ├─ Attributes (0)        ← Ebene 4a (disabled bis Offering gewählt)  
-      └─ Links (0)             ← Ebene 4b (disabled bis Offering gewählt)
+Suppliers (3)                  ← Ebene 1 ✅
+├─ Categories (2)              ← Ebene 2 ✅ (disabled bis Supplier gewählt)
+   ├─ Product Offerings (0)    ← Ebene 3 ❌ (disabled bis Category gewählt)
+      ├─ Attributes (0)        ← Ebene 4a ❌ (disabled bis Offering gewählt)  
+      └─ Links (0)             ← Ebene 4b ❌ (disabled bis Offering gewählt)
 ```
+
+**Implementiert:**
+- `HierarchySidebar.svelte` mit dynamischen Counts
+- Disabled states basierend auf Selection
+- Click-Handler für Navigation zwischen Ebenen
+- Live-Update der Counts basierend auf aktueller Selection
+
+---
 
 ## Navigation Flow Beispiele
 
-### **Neuen Supplier mit Categories erstellen:**
+### **✅ Neuen Supplier mit Categories erstellen (IMPLEMENTIERT):**
 1. **Ebene 1** → "Add Supplier" button
 2. **→ Ebene 2:** `SupplierForm` (create mode) + leeres `CategoryGrid`
 3. Supplier speichern → Form wird zu edit mode
-4. **"Assign Category"** dropdown → Category auswählen → **bleibt auf Ebene 2**
+4. **"Assign Category"** dropdown → Category auswählen → **bleibt auf Ebene 2** 🔄 TODO
 5. `CategoryGrid` zeigt jetzt assigned category
 
-### **Neues Offering mit Attributen erstellen:**
+### **❌ Neues Offering mit Attributen erstellen (TODO):**
 1. **Ebene 1** → Supplier row click 
 2. **→ Ebene 2** → Category row click
 3. **→ Ebene 3** → "Add Offering" button
@@ -113,32 +157,133 @@ Suppliers (5)                  ← Ebene 1
 6. Sidebar "Attributes" click → `AttributeGrid` anzeigen  
 7. Attribute row click → **Ebene 5:** `AttributeForm`
 
+---
+
 ## Technische Implementation
 
-### **State Management:**
+### **✅ State Management (IMPLEMENTIERT):**
 ```typescript
-currentLevel: 'suppliers' | 'categories' | 'offerings' | 'attributes' | 'links'
-selectedSupplier: Supplier | null  
-selectedCategory: Category | null
-selectedOffering: Offering | null
+// URL-driven state via Svelte 5 runes
+const currentLevel = $derived(($page.url.searchParams.get('level') as Level) || 'wholesalers');
+const selectedSupplierId = $derived(Number($page.url.searchParams.get('supplierId')) || null);
+const selectedCategoryId = $derived(Number($page.url.searchParams.get('categoryId')) || null);
+const selectedOfferingId = $derived(Number($page.url.searchParams.get('offeringId')) || null);
 ```
 
-### **Add-Button Logik:**
+### **✅ Add-Button Logik (TEILWEISE IMPLEMENTIERT):**
 ```typescript
-// ECHTE OBJEKTE → Navigation
+// ECHTE OBJEKTE → Navigation ✅ (Suppliers)
 if (level === 'suppliers' || level === 'offerings') {
   navigateToNextLevel();
   showFormInCreateMode();
 }
 
-// NUR RELATIONSHIPS → Dropdown  
+// NUR RELATIONSHIPS → Dropdown 🔄 (Categories TODO)
 if (level === 'categories') {
   showAssignmentDropdown();
   // KEINE Navigation!
 }
 ```
 
-Diese Unterscheidung ist kritisch für das korrekte Verhalten des Systems.
+### **✅ Typisierung (IMPLEMENTIERT):**
+- Alle Types aus `$lib/domain/types.ts` importiert
+- Extended Types für Mock-Daten: `WholesalerCategoryWithCount`
+- Keine inline Type-Definitionen in Komponenten
+- Saubere Generics in allen Grid-Wrappern
 
-# Clientseitige Navigation
-* Die einzelnen Ebenen sollen bookmarkable sein.
+---
+
+## 🧪 **TESTING STATUS**
+
+### **✅ Implementierte Test-Umgebung:**
+- **Route:** `/supplierbrowser` 
+- **Mock-Daten:** 3 Suppliers, Categories für jeden Supplier
+- **Navigation:** Ebene 1 ↔ Ebene 2 funktioniert
+- **URL-State:** Bookmarkable, alle Parameter in URL
+- **Components:** SupplierGrid, SupplierForm, CategoryGrid funktionieren
+
+### **📋 Test-Checklist:**
+- ✅ Supplier row click → Category-Ebene
+- ✅ Sidebar Navigation funktioniert  
+- ✅ URL-Parameter korrekt
+- ✅ Disabled states in Sidebar
+- ✅ Forms sind readonly (für Testing)
+- 🔄 Category Assignment (noch nicht testbar)
+- ❌ Ebene 3-5 (noch nicht implementiert)
+
+---
+
+## 📦 **DATEI-STRUKTUR (AKTUELL)**
+
+```
+src/lib/components/
+├── browser/
+│   └── HierarchySidebar.svelte           ✅ IMPLEMENTIERT
+├── suppliers/
+│   ├── SupplierGrid.svelte               ✅ IMPLEMENTIERT
+│   └── SupplierForm.svelte               ✅ IMPLEMENTIERT
+├── categories/
+│   ├── CategoryGrid.svelte               ✅ IMPLEMENTIERT
+│   └── CategoryForm.svelte               🔄 IN PROGRESS
+├── offerings/                            ❌ TODO
+│   ├── OfferingGrid.svelte
+│   └── OfferingForm.svelte
+├── attributes/                           ❌ TODO
+│   ├── AttributeGrid.svelte
+│   └── AttributeForm.svelte
+├── links/                                ❌ TODO
+│   ├── LinkGrid.svelte
+│   └── LinkForm.svelte
+├── Datagrid.svelte                       ✅ BASIS-KOMPONENTE
+└── forms/FormShell.svelte                ✅ BASIS-KOMPONENTE
+
+src/routes/
+└── supplierbrowser/
+    └── +page.svelte                      ✅ TEST-SEITE (Ebene 1-2)
+```
+
+---
+
+## 🎯 **NEXT STEPS**
+
+### **1. Sofort (CategoryForm):**
+- CategoryForm.svelte für Assignment-Dropdown
+- Integration in supplier-browser/+page.svelte
+- Test: Category Assignment funktioniert
+
+### **2. Phase 2 (Offerings):**
+- OfferingGrid.svelte + OfferingForm.svelte
+- Ebene 3 Navigation
+- Mock-Daten für Offerings erweitern
+
+### **3. Phase 3 (Details):**
+- AttributeGrid + AttributeForm + LinkGrid + LinkForm
+- Ebene 4-5 Navigation mit Mode-Toggle
+- Mock-Daten für Attributes/Links
+
+### **4. Phase 4 (API-Integration):**
+- Echte API-Calls statt Mock-Daten
+- Delete-Strategien mit Dependency-Checks
+- Error-Handling & Loading-States
+
+---
+
+## 🔧 **ARCHITEKTUR-COMPLIANCE**
+
+### ✅ **Eingehalten:**
+- **Svelte 5 + Runes** überall
+- **KEINE eigenen Forms/Grids** in Pages - nur Komponenten-Orchestrierung
+- **KEINE lokalen Types** - alles aus `types.ts`
+- **URL-driven State** - bookmarkable
+- **Thin Grid-Wrapper** - Datagrid as Basis
+- **FormShell-Wrapper** - für alle Forms
+
+### 📋 **Zu beachten:**
+- Mock-Daten durch echte API ersetzen
+- Delete-Handler implementieren  
+- Loading-States & Error-Handling
+- Performance-Optimierung für große Datensets
+
+---
+
+**🎯 Ziel: Vollständig funktionsfähiges 5-Ebenen SupplierBrowser System mit URL-driven Navigation und konsistenter Architektur.**

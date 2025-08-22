@@ -1,6 +1,9 @@
+// src/routes/api/query/+server.ts
 import { json, error, type RequestEvent, type RequestHandler } from '@sveltejs/kit';
-import { executeGenericQuery } from '$lib/server/queryBuilder'; // Import the new module
+import { executeGenericQuery } from '$lib/server/queryBuilder';
 import type { QueryPayload } from './queryGrammar';
+// KORREKTUR: Die Konfiguration für die Abfragesicherheit muss importiert werden.
+import { supplierQueryConfig } from '$lib/server/supplierQueryConfig';
 
 
 /**
@@ -13,8 +16,8 @@ export const POST: RequestHandler = async ({ request }: RequestEvent) => {
     // 1. Get the payload from the client request
     const payload: QueryPayload = await request.json();
     
-    // 2. Delegate all the complex logic and database work to the query builder
-    const data = await executeGenericQuery(payload);
+    // KORREKTUR: Das 'config'-Objekt wurde als zweites Argument übergeben.
+    const data = await executeGenericQuery(payload, supplierQueryConfig);
 
     // 3. Return the data successfully
     return json({ data });

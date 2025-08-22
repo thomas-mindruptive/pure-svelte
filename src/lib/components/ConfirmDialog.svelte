@@ -1,6 +1,6 @@
 
 <script lang="ts">
-  import { default as confirmationStore, requestConfirmation } from '$lib/stores/confirmation';
+  import { default as confirmationStore } from '$lib/stores/confirmation';
   import { fade } from 'svelte/transition';
 
   let dialog: HTMLDialogElement;
@@ -34,14 +34,14 @@
 </script>
 
 <!-- Das 'bind:this' ist entscheidend, um eine Referenz auf das DOM-Element zu erhalten -->
-<dialog bind:this={dialog} on:cancel={onCancel} class="confirm-dialog">
+<dialog bind:this={dialog} oncancel={onCancel} class="confirm-dialog">
   {#if $confirmationStore.isOpen}
     <div class="dialog-content" transition:fade={{ duration: 150 }}>
       <h3>{$confirmationStore.title}</h3>
       <p>{$confirmationStore.message}</p>
       <div class="dialog-actions">
-        <button class="secondary-button" on:click={handleCancel}>Abbrechen</button>
-        <button class="confirm-button" on:click={handleConfirm}>Bestätigen</button>
+        <button class="secondary-button" onclick={handleCancel}>Abbrechen</button>
+        <button class="confirm-button" onclick={handleConfirm}>Bestätigen</button>
       </div>
     </div>
   {/if}

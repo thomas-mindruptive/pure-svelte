@@ -6,7 +6,7 @@ export interface EnhanceOptions {
   createdMessage: string;       // 'Supplier created successfully.'
   updatedMessage: string;       // 'Supplier updated successfully.'
   redirectPattern?: string;     // '/suppliers/{id}' - {id} wird ersetzt
-  onSuccess?: (data: any) => void | Promise<void>;  // Custom success callback
+  onSuccess?: (data: unknown) => void | Promise<void>;  // Custom success callback
   onError?: (error: string) => void;                // Custom error callback
 }
 
@@ -86,8 +86,9 @@ export const attributeEnhance = (redirectPattern?: string) => createGenericEnhan
   entityType: 'attribute',
   createdMessage: 'Attribute created successfully.',
   updatedMessage: 'Attribute updated successfully.',
-  redirectPattern: redirectPattern
+  redirectPattern: redirectPattern ?? '/attributes/{id}'
 });
+
 
 // BEISPIEL FÜR CUSTOM ENHANCE
 export const customSupplierEnhance = createGenericEnhance({

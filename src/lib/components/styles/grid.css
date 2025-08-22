@@ -1,0 +1,310 @@
+/* ==========================================================================
+   Grid Styles
+   File: src/lib/styles/grid.css
+   Purpose:
+     - Consistent, polished table/grid styling across DataGrid and any
+       occasional "special" grids.
+     - Themeable via CSS variables.
+   Notes:
+     - Keep selectors scoped to `.pc-grid` to avoid leaking styles.
+     - Works alongside Tailwind; these are baseline styles & states.
+   ========================================================================== */
+
+/* ----------------------------- Theme Tokens ------------------------------ */
+:root {
+  /* Color system (light) */
+  --pc-grid-bg: #ffffff;
+  --pc-grid-fg: #0f172a;              /* slate-900 */
+  --pc-grid-muted: #475569;           /* slate-600 */
+  --pc-grid-border: #e2e8f0;          /* slate-200 */
+  --pc-grid-border-strong: #cbd5e1;   /* slate-300 */
+  --pc-grid-header-bg: #f8fafc;       /* slate-50 */
+  --pc-grid-row-hover: #f1f5f9;       /* slate-100 */
+  --pc-grid-row-selected: #e0f2fe;    /* sky-100 */
+  --pc-grid-danger: #dc2626;          /* red-600 */
+  --pc-grid-warning: #d97706;         /* amber-600 */
+  --pc-grid-success: #16a34a;         /* green-600 */
+  --pc-grid-accent: #0ea5e9;          /* sky-500 */
+
+  /* Typography & metrics */
+  --pc-grid-font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI,
+    Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  --pc-grid-font-size: 0.925rem;
+  --pc-grid-line-height: 1.5;
+
+  /* Spacing & radius */
+  --pc-grid-cell-px: 12px;
+  --pc-grid-cell-py: 8px;
+  --pc-grid-cell-py-dense: 6px;
+  --pc-grid-radius: 12px;
+
+  /* Effects */
+  --pc-grid-shadow: 0 1px 2px rgba(0,0,0,.05), 0 1px 1px rgba(0,0,0,.04);
+
+  /* Misc */
+  --pc-grid-checkbox-accent: var(--pc-grid-accent);
+}
+
+/* Dark mode defaults */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --pc-grid-bg: #0b1220;              /* slate-950-ish */
+    --pc-grid-fg: #e5e7eb;              /* slate-200 */
+    --pc-grid-muted: #94a3b8;           /* slate-400 */
+    --pc-grid-border: #1f2937;          /* slate-800 */
+    --pc-grid-border-strong: #334155;   /* slate-700 */
+    --pc-grid-header-bg: #0f172a;       /* slate-900 */
+    --pc-grid-row-hover: #111827;       /* slate-900/950 */
+    --pc-grid-row-selected: #0b3a4b;    /* sky-900-ish */
+    --pc-grid-shadow: 0 1px 2px rgba(0,0,0,.4), 0 1px 1px rgba(0,0,0,.3);
+  }
+}
+
+/* ------------------------------ Container -------------------------------- */
+.pc-grid {
+  --_radius: var(--pc-grid-radius);
+  background: var(--pc-grid-bg);
+  color: var(--pc-grid-fg);
+  border: 1px solid var(--pc-grid-border);
+  border-radius: var(--_radius);
+  box-shadow: var(--pc-grid-shadow);
+  overflow: hidden;
+}
+
+/* Toolbar area (use as wrapper above the table) */
+.pc-grid__toolbar {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--pc-grid-border);
+  background: var(--pc-grid-header-bg);
+}
+
+/* ------------------------------- Table ----------------------------------- */
+.pc-grid__table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-family: var(--pc-grid-font-family);
+  font-size: var(--pc-grid-font-size);
+  line-height: var(--pc-grid-line-height);
+}
+
+.pc-grid__thead th {
+  position: sticky;
+  top: 0;
+  background: var(--pc-grid-header-bg);
+  color: var(--pc-grid-muted);
+  text-align: left;
+  font-weight: 600;
+  padding: calc(var(--pc-grid-cell-py) + 2px) var(--pc-grid-cell-px);
+  border-bottom: 1px solid var(--pc-grid-border-strong);
+  z-index: 1; /* ensure above body rows when scrolling */
+}
+
+.pc-grid__tbody td {
+  padding: var(--pc-grid-cell-py) var(--pc-grid-cell-px);
+  border-bottom: 1px solid var(--pc-grid-border);
+  vertical-align: middle;
+  background: var(--pc-grid-bg);
+}
+
+/* Dense mode (apply on container: .pc-grid--dense) */
+.pc-grid--dense .pc-grid__thead th,
+.pc-grid--dense .pc-grid__tbody td {
+  padding-top: var(--pc-grid-cell-py-dense);
+  padding-bottom: var(--pc-grid-cell-py-dense);
+}
+
+/* Zebra striping (optional; toggle with `.pc-grid--zebra`) */
+.pc-grid--zebra .pc-grid__tbody tr:nth-child(even) td {
+  background: color-mix(in srgb, var(--pc-grid-row-hover) 35%, transparent);
+}
+
+/* Hover highlight */
+@media (hover: hover) {
+  .pc-grid__tbody tr:hover td {
+    background: var(--pc-grid-row-hover);
+  }
+}
+
+/* Selected row (set aria-selected="true" on <tr>) */
+.pc-grid__tbody tr[aria-selected="true"] td {
+  background: var(--pc-grid-row-selected);
+}
+
+/* Actions column helper */
+.pc-grid__actions {
+  white-space: nowrap;
+  text-align: right;
+}
+
+/* Truncate helper for narrow columns */
+.pc-grid__cell--truncate {
+  max-width: 1px;        /* enforce shrinkable cell */
+  width: 0;              /* allow flex/table to shrink */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Sortable headers */
+.pc-grid__th--sortable {
+  cursor: pointer;
+  user-select: none;
+}
+.pc-grid__th--sortable:focus-visible {
+  outline: 2px solid var(--pc-grid-accent);
+  outline-offset: 2px;
+}
+
+/* --------------------------- State & Feedback ----------------------------- */
+/* Row is being deleted (apply `.is-deleting` on <tr> or `[data-deleting="true"]`) */
+.pc-grid__tbody tr.is-deleting td,
+.pc-grid__tbody tr[data-deleting="true"] td {
+  opacity: 0.6;
+  filter: saturate(0.6);
+  pointer-events: none;
+}
+
+/* Any element marked busy will show progress cursor */
+[aria-busy="true"] {
+  cursor: progress;
+}
+
+/* Button "ghost" style for row actions */
+.pc-grid__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid var(--pc-grid-border);
+  background: transparent;
+  border-radius: 10px;
+  font-size: 0.9em;
+}
+.pc-grid__btn:hover { background: var(--pc-grid-row-hover); }
+.pc-grid__btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Destructive button variant */
+.pc-grid__btn--danger {
+  border-color: color-mix(in srgb, var(--pc-grid-danger) 40%, var(--pc-grid-border));
+  color: var(--pc-grid-danger);
+}
+.pc-grid__btn--danger:hover {
+  background: color-mix(in srgb, var(--pc-grid-danger) 10%, transparent);
+}
+
+/* Minimal icon button */
+.pc-grid__iconbtn {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--pc-grid-border);
+  background: transparent;
+  border-radius: 8px;
+}
+.pc-grid__iconbtn:hover { background: var(--pc-grid-row-hover); }
+
+/* Checkbox accent (for native <input type="checkbox">) */
+.pc-grid input[type="checkbox"],
+.pc-grid input[type="radio"] {
+  accent-color: var(--pc-grid-checkbox-accent);
+}
+
+/* "Empty" placeholder row (use on a <td> spanning all columns) */
+.pc-grid__empty {
+  text-align: center;
+  color: var(--pc-grid-muted);
+  padding: 2.5rem 1rem !important;
+}
+
+/* Focus ring for interactive elements inside grid */
+.pc-grid :where(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid var(--pc-grid-accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* ----------------------------- Utilities --------------------------------- */
+/* Visually hidden but accessible text */
+.pc-grid .visually-hidden {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0);
+  white-space: nowrap; border: 0;
+}
+
+/* Soft scroll container for wide tables */
+.pc-grid__scroller {
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Optional subtle top/bottom scroll shadows inside the scroller */
+.pc-grid__scroller:is(.has-shadow) {
+  box-shadow:
+    inset 0 8px 8px -8px rgba(0,0,0,.08),
+    inset 0 -8px 8px -8px rgba(0,0,0,.08);
+}
+
+/* ----------------------------- Spinner ----------------------------------- */
+/* Use by placing an element with `.pc-grid__spinner` inside a button or cell
+   and toggling the parent's `[aria-busy="true"]` */
+.pc-grid__spinner {
+  display: inline-block;
+  width: 1em; height: 1em;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  vertical-align: -0.2em;
+  animation: pc-grid-spin 0.7s linear infinite;
+}
+@keyframes pc-grid-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* -------------------------- Compact Variants ------------------------------ */
+/* Comfortable (default), Dense, Extra-Dense */
+.pc-grid--comfortable .pc-grid__thead th,
+.pc-grid--comfortable .pc-grid__tbody td {
+  padding-top: calc(var(--pc-grid-cell-py) + 2px);
+  padding-bottom: calc(var(--pc-grid-cell-py) + 2px);
+}
+
+.pc-grid--dense .pc-grid__thead th,
+.pc-grid--dense .pc-grid__tbody td {
+  padding-top: var(--pc-grid-cell-py-dense);
+  padding-bottom: var(--pc-grid-cell-py-dense);
+}
+
+.pc-grid--xdense .pc-grid__thead th,
+.pc-grid--xdense .pc-grid__tbody td {
+  padding-top: 4px;
+  padding-bottom: 4px;
+  font-size: 0.875rem;
+}
+
+/* ------------------------------ Helpers ---------------------------------- */
+/* Right/center text alignment helpers for cells/headers */
+.pc-grid__td--right, .pc-grid__th--right { text-align: right; }
+.pc-grid__td--center, .pc-grid__th--center { text-align: center; }
+
+/* Soft badge (useful for statuses) */
+.pc-grid__badge {
+  display: inline-block;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.8em;
+  border: 1px solid var(--pc-grid-border);
+  background: color-mix(in srgb, var(--pc-grid-row-hover) 60%, transparent);
+}
+.pc-grid__badge--ok { color: var(--pc-grid-success); }
+.pc-grid__badge--warn { color: var(--pc-grid-warning); }
+.pc-grid__badge--danger { color: var(--pc-grid-danger); }

@@ -1,7 +1,6 @@
 /* src/app.css */
 
-/* 1. Import einer Schriftart (z.B. von Google Fonts) */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+/* 1. Import einer Schriftart (z.B. von Google Fonts) erfolgt im svelte:head */
 
 /* 2. Definition von globalen CSS-Variablen im :root */
 :root {
@@ -75,4 +74,33 @@ a:hover {
   margin-right: auto;
   padding-left: var(--spacing-md);
   padding-right: var(--spacing-md);
+}
+
+/* Layout-Basis für volle Höhe (falls Seiten volle Höhe nutzen) */
+html, body { height: 100%; }
+
+/* Besser sichtbarer Tastaturfokus */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Text-Selektion in Primärfarbe (nettes Detail) */
+::selection {
+  background: color-mix(in oklab, var(--color-primary) 20%, white);
+}
+
+/* Reduzierte Animationen respektieren (Barrierefreiheit) */
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+
+/* Optional: Dark-Mode via Datenattribut */
+html[data-theme="dark"] {
+  --color-text: #e5e7eb;
+  --color-heading: #ffffff;
+  --color-background: #0b1020;
+  --color-primary: #818cf8;
+  --color-muted: #94a3b8;
+  --color-border: #1f2937;
 }

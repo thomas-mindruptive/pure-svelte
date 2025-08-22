@@ -19,7 +19,7 @@ const initialState: ConfirmationState = {
 const confirmationStore = writable<ConfirmationState>(initialState);
 
 // Funktion zum Zurücksetzen des Stores
-function reset() {
+export function reset() {
   confirmationStore.set(initialState);
 }
 

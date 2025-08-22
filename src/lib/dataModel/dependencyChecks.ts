@@ -1,5 +1,6 @@
 import { db } from '$lib/server/db';
 import { log } from '$lib/utils/logger';
+import type { Transaction } from 'mssql';
 
 /**
  * Prüft, ob für eine bestimmte Lieferant-Kategorie-Beziehung noch Abhängigkeiten bestehen.
@@ -8,7 +9,8 @@ import { log } from '$lib/utils/logger';
  * @param transaction Das Transaktionsobjekt der Datenbank.
  * @returns Die Anzahl der gefundenen Abhängigkeiten (Offerings).
  */
-export async function checkCategoryDependencies(wholesalerId: number, categoryId: number, transaction: any): Promise<number> {
+export async function checkCategoryDependencies(wholesalerId: number, categoryId: number, transaction: Transaction): Promise<number> {
+    log.info("checkCategoryDependencies %O", { wholesalerId, categoryId });
     const result = await transaction.request()
         .input('wholesalerId', wholesalerId)
         .input('categoryId', categoryId)

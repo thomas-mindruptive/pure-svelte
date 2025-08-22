@@ -1,7 +1,7 @@
 # Detailinfo SupplierBrowser
 Siehe README-Supplier-Browser.md!!!!!!
 
-
+# **Achte besonders auf: Svelte VERSION 5 - RUNES!!!!!**
 
 # Project Summary: A Data Management Web Application
 
@@ -11,7 +11,7 @@ The goal is to build a web application for managing business data, specifically 
 
 ## **2. Technology Stack & Key Libraries**
 
-*   **Framework:** SvelteKit (SSR Enabled), **Achte besonders auf: Svelte VERSION 5!!!!**
+*   **Framework:** SvelteKit (SSR Enabled), **Achte besonders auf: Svelte VERSION 5 - RUNES!!!!!**
 *   **Language:** TypeScript
 *   **Database:** Microsoft SQL Server (MSSQL)
 *   **Styling:** Global CSS with CSS Variables (`src/app.css`) and component-scoped styles.

@@ -1,389 +1,246 @@
 <script lang="ts">
-  import { supplierEnhance } from '$lib/utils/formEnhance';
+  // SupplierForm built on FormShell (Svelte 5 + Runes)
+  // - English comments
+  // - Uses domain type Wholesaler (no component-local entity types)
+  // - Wide validator/submit signatures to satisfy FormShell's ValidateFn/SubmitFn
 
-  // Props - API der Komponente
-  export let supplier: {
-    wholesaler_id?: number;
-    name: string;
-    region: string;
-    status: 'active' | 'inactive';
-    dropship: boolean;
-    website?: string;
-  };
-  
-  export let isEditing: boolean = false;
-  export let showHeader: boolean = true;
-  export let showActions: boolean = true;
-  
-  // Hybrid Mode Support
-  export let mode: 'client' | 'server' = 'client';
-  export let action: string = '';
-  export let enhance: any = undefined;
-  export let redirectAfterCreate: string = '/suppliers/{id}';
+  import FormShell, {
+    type ValidateResult,
+  } from "$lib/components/forms/FormShell.svelte";
+  import { log } from "$lib/utils/logger";
+  import type { Wholesaler } from "$lib/domain/types";
+  import "$lib/components/styles/form.css";
+    import "$lib/components/styles/grid.css";
 
-  // Events - Svelte 5 Style (für client mode)
-  export let onsubmit: ((event: { supplier: typeof supplier }) => void) | undefined = undefined;
-  export let oncancel: (() => void) | undefined = undefined;
+  // Provide a Wholesaler-conform default (dropship is required)
+  const {
+    initial = { name: "", dropship: false } as Wholesaler,
+    disabled = false,
+    onSubmitted,
+    onCancelled,
+  } = $props<{
+    initial?: Wholesaler;
+    disabled?: boolean;
+    onSubmitted?: (p: any) => void;
+    onCancelled?: (p: any) => void;
+  }>();
 
-  // Lokale Kopie der Daten für Bearbeitung
-  let formData = { ...supplier };
+  onSubmitted;
+  onCancelled;
 
-  // Reaktive Updates when supplier prop changes
-  $: formData = { ...supplier };
+  // Adapter validator: wide input (FormData) → check required + optional UI fields
+  function validateWholesaler(raw: Record<string, any>): ValidateResult {
+    const data = raw as Partial<Wholesaler> & Record<string, any>;
+    const errors: Record<string, string[]> = {};
 
-  // Default enhance function (wird verwendet wenn keine custom enhance übergeben wird)
-  function defaultEnhance() {
-    return supplierEnhance(redirectAfterCreate);
+    // required by Wholesaler
+    if (!String(data.name ?? "").trim()) errors.name = ["Name is required"];
+    if (typeof data.dropship !== "boolean")
+      errors.dropship = ["Dropship must be true/false"];
+
+    // optional UI fields (not necessarily part of Wholesaler type)
+    if (data.email && !/^\S+@\S+\.\S+$/.test(String(data.email)))
+      errors.email = ["Invalid email address"];
+    if (data.country == null || String(data.country).trim() === "")
+      errors.country = ["Country is required"];
+
+    return { valid: Object.keys(errors).length === 0, errors };
   }
 
-  // Final enhance function - custom oder default
-  $: finalEnhance = enhance || defaultEnhance();
+  // Adapter submit: wide input (FormData) → cast minimally for API
+  async function submitWholesaler(raw: Record<string, any>) {
+    const data = raw as Partial<Wholesaler> & Record<string, any>;
+    const id = data.id as string | undefined; // may be undefined
+    const isUpdate = Boolean(id);
 
-  // Form Handlers (für client mode)
-  function handleSubmit(event: Event) {
-    event.preventDefault();
-    
-    // Validation
-    if (!formData.name || !formData.name.trim()) {
-      alert('Name is required');
-      return;
+    const url = isUpdate ? `/api/wholesalers/${id}` : "/api/wholesalers";
+    const method = isUpdate ? "PUT" : "POST";
+
+    try {
+      log.info({ component: "SupplierForm", method, url }, "SUBMIT_START");
+      const res = await fetch(url, {
+        method,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error(await res.text().catch(() => "Save failed"));
+      const json = await res.json().catch(() => ({}));
+      log.info({ component: "SupplierForm", ok: true }, "SUBMIT_OK");
+      return json;
+    } catch (e) {
+      log.error(
+        { component: "SupplierForm", error: String(e) },
+        "SUBMIT_FAILED",
+      );
+      throw e;
     }
-
-    // Event mit den Form-Daten feuern
-    onsubmit?.({ supplier: formData });
   }
 
-  function handleCancel() {
-    // Reset form to original data
-    formData = { ...supplier };
-    oncancel?.();
+  // Component-callback handlers (NOT CustomEvent)
+  function handleSubmitted(p: { data: Record<string, any>; result: unknown }) {
+    log.info({ component: "SupplierForm", event: "submitted" }, "FORM_EVENT");
   }
-
-  // Computed properties
-  $: isValid = formData.name.trim().length > 0;
-  $: formTitle = isEditing ? 'Edit Supplier' : 'Create New Supplier';
-  $: submitButtonText = isEditing ? 'Update Supplier' : 'Create Supplier';
+  function handleSubmitError(p: { data: Record<string, any>; error: unknown }) {
+    log.warn(
+      {
+        component: "SupplierForm",
+        event: "submitError",
+        error: String(p.error),
+      },
+      "FORM_EVENT",
+    );
+  }
+  function handleCancelled(p: { data: Record<string, any>; reason?: string }) {
+    log.info(
+      { component: "SupplierForm", event: "cancelled", reason: p.reason },
+      "FORM_EVENT",
+    );
+  }
 </script>
 
-{#if showHeader}
-  <div class="form-header">
-    <h3>{formTitle}</h3>
-    {#if showActions}
-      <button class="close-button" type="button" on:click={handleCancel}>×</button>
-    {/if}
-  </div>
-{/if}
+<FormShell
+  entity="Wholesaler"
+  {initial}
+  validate={validateWholesaler}
+  submit={submitWholesaler}
+  {disabled}
+  onSubmitted={handleSubmitted}
+  onSubmitError={handleSubmitError}
+  onCancelled={handleCancelled}
+>
+  {#snippet header({ data, dirty })}
+    <div style="display:flex;gap:.5rem;align-items:center">
+      <h2 style="margin:0">Wholesaler</h2>
+      {#if dirty}<span class="pc-grid__badge">unsaved</span>{/if}
+      {#if (data as any)?.id}
+        <span class="pc-grid__badge">ID: {(data as any).id}</span>
+      {/if}
+    </div>
+  {/snippet}
 
-<!-- Hybrid Form: Server Mode mit SvelteKit Actions oder Client Mode mit Events -->
-{#if mode === 'server'}
-  <form class="supplier-form" method="POST" {action} use:enhance={finalEnhance}>
-    <!-- Hidden fields für bessere Server-Kompatibilität -->
-    {#if supplier.wholesaler_id}
-      <input type="hidden" name="wholesaler_id" value={supplier.wholesaler_id} />
-    {/if}
-    
-    <div class="form-grid">
-      <!-- Name -->
-      <div class="form-group">
-        <label for="supplier_name">Name *</label>
-        <input 
-          id="supplier_name" 
-          name="name"
-          bind:value={formData.name} 
-          type="text" 
-          required 
-          placeholder="Enter supplier name..."
-          class:error={!formData.name.trim()}
+  {#snippet fields({ get, set, errors, markTouched })}
+    <div
+      style="display:grid;grid-template-columns:200px 1fr;gap:.75rem;align-items:center"
+    >
+      <!-- name (required by Wholesaler) -->
+      <label for="wh-name">Name</label>
+      <div>
+        <input
+          id="wh-name"
+          value={get("name") ?? ""}
+          oninput={(e: Event) =>
+            set("name", (e.currentTarget as HTMLInputElement).value)}
+          onblur={() => markTouched("name")}
+          required
+          aria-invalid={errors.name ? "true" : "false"}
+          aria-describedby={errors.name ? "err-name" : undefined}
         />
+        {#if errors.name}<div
+            id="err-name"
+            class="pc-grid__badge pc-grid__badge--warn"
+          >
+            {errors.name[0]}
+          </div>{/if}
       </div>
 
-      <!-- Region -->
-      <div class="form-group">
-        <label for="supplier_region">Region</label>
-        <input 
-          id="supplier_region" 
-          name="region"
-          bind:value={formData.region} 
-          type="text" 
-          placeholder="e.g., USA, Europe..."
+      <!-- dropship (required by Wholesaler) -->
+      <label for="wh-dropship">Dropship</label>
+      <div>
+        <input
+          id="wh-dropship"
+          type="checkbox"
+          checked={Boolean(get("dropship"))}
+          onchange={(e: Event) =>
+            set("dropship", (e.currentTarget as HTMLInputElement).checked)}
+          required
+          aria-invalid={errors.dropship ? "true" : "false"}
+          aria-describedby={errors.dropship ? "err-dropship" : undefined}
         />
+        {#if errors.dropship}<div
+            id="err-dropship"
+            class="pc-grid__badge pc-grid__badge--warn"
+          >
+            {errors.dropship[0]}
+          </div>{/if}
       </div>
 
-      <!-- Website -->
-      <div class="form-group">
-        <label for="supplier_website">Website</label>
-        <input 
-          id="supplier_website" 
-          name="website"
-          bind:value={formData.website} 
-          type="url" 
-          placeholder="https://..."
-        />
-      </div>
-
-      <!-- Status -->
-      <div class="form-group">
-        <label for="supplier_status">Status</label>
-        <select id="supplier_status" name="status" bind:value={formData.status}>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
+      <!-- optional UI fields -->
+      <label for="wh-country">Country</label>
+      <div>
+        <select
+          id="wh-country"
+          value={get("country") ?? ""}
+          onchange={(e: Event) =>
+            set("country", (e.currentTarget as HTMLSelectElement).value)}
+          aria-invalid={errors.country ? "true" : "false"}
+          aria-describedby={errors.country ? "err-country" : undefined}
+        >
+          <option value="">Select…</option>
+          <option value="AT">Austria</option>
+          <option value="DE">Germany</option>
+          <option value="CH">Switzerland</option>
         </select>
+        {#if errors.country}<div
+            id="err-country"
+            class="pc-grid__badge pc-grid__badge--warn"
+          >
+            {errors.country[0]}
+          </div>{/if}
       </div>
 
-      <!-- Dropshipping -->
-      <div class="form-group checkbox-group">
-        <input 
-          id="supplier_dropship" 
-          name="dropship"
-          bind:checked={formData.dropship} 
-          type="checkbox" 
+      <label for="wh-email">Email</label>
+      <div>
+        <input
+          id="wh-email"
+          type="email"
+          inputmode="email"
+          value={get("email") ?? ""}
+          oninput={(e: Event) =>
+            set("email", (e.currentTarget as HTMLInputElement).value)}
+          onblur={() => markTouched("email")}
+          aria-invalid={errors.email ? "true" : "false"}
+          aria-describedby={errors.email ? "err-email" : undefined}
         />
-        <label for="supplier_dropship">Offers Dropshipping</label>
+        {#if errors.email}<div
+            id="err-email"
+            class="pc-grid__badge pc-grid__badge--warn"
+          >
+            {errors.email[0]}
+          </div>{/if}
+      </div>
+
+      <label for="wh-notes" style="align-self:start">Notes</label>
+      <div>
+        <textarea
+          id="wh-notes"
+          rows="4"
+          oninput={(e: Event) =>
+            set("notes", (e.currentTarget as HTMLTextAreaElement).value)}
+          >{get("notes") ?? ""}</textarea
+        >
       </div>
     </div>
+  {/snippet}
 
-    {#if showActions}
-      <div class="form-actions">
-        <button type="button" class="secondary-button" on:click={handleCancel}>
-          Cancel
-        </button>
-        <button type="submit" class="primary-button" disabled={!isValid}>
-          {submitButtonText}
-        </button>
-      </div>
-    {/if}
-  </form>
-
-{:else}
-  <!-- Client Mode -->
-  <form class="supplier-form" on:submit={handleSubmit}>
-    <div class="form-grid">
-      <!-- Name -->
-      <div class="form-group">
-        <label for="supplier_name">Name *</label>
-        <input 
-          id="supplier_name" 
-          bind:value={formData.name} 
-          type="text" 
-          required 
-          placeholder="Enter supplier name..."
-          class:error={!formData.name.trim()}
-        />
-      </div>
-
-      <!-- Region -->
-      <div class="form-group">
-        <label for="supplier_region">Region</label>
-        <input 
-          id="supplier_region" 
-          bind:value={formData.region} 
-          type="text" 
-          placeholder="e.g., USA, Europe..."
-        />
-      </div>
-
-      <!-- Website -->
-      <div class="form-group">
-        <label for="supplier_website">Website</label>
-        <input 
-          id="supplier_website" 
-          bind:value={formData.website} 
-          type="url" 
-          placeholder="https://..."
-        />
-      </div>
-
-      <!-- Status -->
-      <div class="form-group">
-        <label for="supplier_status">Status</label>
-        <select id="supplier_status" bind:value={formData.status}>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-        </select>
-      </div>
-
-      <!-- Dropshipping -->
-      <div class="form-group checkbox-group">
-        <input 
-          id="supplier_dropship" 
-          bind:checked={formData.dropship} 
-          type="checkbox" 
-        />
-        <label for="supplier_dropship">Offers Dropshipping</label>
-      </div>
-    </div>
-
-    {#if showActions}
-      <div class="form-actions">
-        <button type="button" class="secondary-button" on:click={handleCancel}>
-          Cancel
-        </button>
-        <button type="submit" class="primary-button" disabled={!isValid}>
-          {submitButtonText}
-        </button>
-      </div>
-    {/if}
-  </form>
-{/if}
-
-<style>
-  .form-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem 2rem;
-    border-bottom: 1px solid var(--color-border, #e2e8f0);
-    background: white;
-  }
-
-  .form-header h3 {
-    margin: 0;
-    font-size: 1.125rem;
-    color: var(--color-heading, #0f172a);
-  }
-
-  .close-button {
-    background: transparent;
-    border: none;
-    font-size: 1.5rem;
-    cursor: pointer;
-    padding: 0.25rem;
-    color: var(--color-muted, #64748b);
-    border-radius: 4px;
-    transition: all 0.2s ease;
-  }
-
-  .close-button:hover {
-    background: #e2e8f0;
-    color: var(--color-text, #1e293b);
-  }
-
-  .supplier-form {
-    padding: 1.5rem 2rem;
-    background: inherit;
-  }
-
-  .form-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr 1fr;
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-  }
-
-  .form-group {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .form-group.checkbox-group {
-    flex-direction: row;
-    align-items: center;
-    gap: 0.5rem;
-    grid-column: span 2;
-  }
-
-  .form-group.checkbox-group input {
-    width: auto;
-  }
-
-  .form-group label {
-    font-weight: 500;
-    margin-bottom: 0.25rem;
-    color: var(--color-heading, #0f172a);
-    font-size: 0.875rem;
-  }
-
-  .form-group input,
-  .form-group select {
-    padding: 0.5rem 0.75rem;
-    border: 1px solid #cbd5e1;
-    border-radius: 6px;
-    font-size: 0.875rem;
-    transition: all 0.2s ease;
-    background: white;
-  }
-
-  .form-group input:focus,
-  .form-group select:focus {
-    outline: none;
-    border-color: var(--color-primary, #4f46e5);
-    box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.1);
-  }
-
-  .form-group input.error {
-    border-color: #dc3545;
-    box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.1);
-  }
-
-  .form-group input::placeholder {
-    color: var(--color-muted, #64748b);
-  }
-
-  .form-actions {
-    display: flex;
-    gap: 0.75rem;
-    justify-content: flex-end;
-    padding-top: 1rem;
-    border-top: 1px solid var(--color-border, #e2e8f0);
-  }
-
-  /* Buttons */
-  .primary-button {
-    padding: 0.5rem 1.25rem;
-    background-color: var(--color-primary, #4f46e5);
-    color: white;
-    border: none;
-    border-radius: 6px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    font-size: 0.875rem;
-  }
-
-  .primary-button:hover:not(:disabled) {
-    background-color: #4338ca;
-    transform: translateY(-1px);
-  }
-
-  .primary-button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    transform: none;
-  }
-
-  .secondary-button {
-    padding: 0.5rem 1rem;
-    background: var(--color-background, #fff);
-    color: var(--color-text, #1e293b);
-    border: 1px solid var(--color-border, #e2e8f0);
-    border-radius: 6px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    font-size: 0.875rem;
-  }
-
-  .secondary-button:hover {
-    background: #f8fafc;
-    border-color: #cbd5e1;
-  }
-
-  /* Responsive */
-  @media (max-width: 768px) {
-    .form-grid {
-      grid-template-columns: 1fr;
-    }
-
-    .form-group.checkbox-group {
-      grid-column: span 1;
-    }
-
-    .supplier-form {
-      padding: 1rem;
-    }
-
-    .form-header {
-      padding: 1rem;
-    }
-  }
-</style>
+  {#snippet actions({ submit, cancel, submitting, dirty })}
+    <button
+      class="pc-grid__btn"
+      type="button"
+      onclick={cancel}
+      disabled={submitting}
+    >
+      Cancel
+    </button>
+    <button
+      class="pc-grid__btn pc-grid__btn--danger"
+      type="button"
+      onclick={() => submit()}
+      disabled={!dirty || submitting}
+      aria-busy={submitting}
+    >
+      {#if submitting}<span class="pc-grid__spinner" aria-hidden="true"
+        ></span>{/if}
+      Save
+    </button>
+  {/snippet}
+</FormShell>

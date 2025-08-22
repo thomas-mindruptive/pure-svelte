@@ -1,561 +1,447 @@
 <script lang="ts">
-  type Level = 'wholesalers' | 'categories' | 'offerings' | 'attributes' | 'links';
-  type Status = 'active' | 'inactive' | 'new';
+  import { page } from '$app/stores';
+  import { goto } from '$app/navigation';
+  import { log } from '$lib/utils/logger';
+  
+  // Import CSS styles
+  import '$lib/components/styles/grid.css';
+  import '$lib/components/styles/form.css';
+  
+  // Import components
+  import HierarchySidebar from '$lib/components/browser/HierarchySidebar.svelte';
+  import SupplierGrid from '$lib/components/suppliers/SupplierGrid.svelte';
+  import SupplierForm from '$lib/components/suppliers/SupplierForm.svelte';
+  import CategoryGrid from '$lib/components/categories/CategoryGrid.svelte';
+  
+  // Import types
+  import type { Level, Wholesaler, WholesalerCategory } from '$lib/domain/types';
 
-  type Supplier = {
-    id: number;
-    name: string;
-    region: string;
-    status: Status;
-    dropship: boolean;
+  // ===== EXTENDED TYPES FOR MOCK DATA =====
+  type WholesalerCategoryWithCount = WholesalerCategory & {
+    offering_count?: number;
   };
 
-  type Category = {
-    id: number;
-    name: string;
-    description: string;
-    offerings: number;
-    comment: string;
-  };
-
-  type Offering = {
-    id: number;
-    name: string;
-    price: number;
-    stock: number;
-    status: Status;
-    sku: string;
-    product_def_id: number;
-    size: string;
-    dimensions: string;
-    currency: string;
-  };
-
-  type Attribute = {
-    id: number;
-    name: string;
-    value: string;
-    category: string;
-    type: string;
-  };
-
-  type Link = {
-    id: number;
-    type: string;
-    url: string;
-    description: string;
-    status: Status | 'active';
-  };
-
+  // ===== MOCK DATA =====
   const mockData: {
-    wholesalers: Supplier[];
-    categories: Record<number, Category[]>;
-    offerings: Record<number, Offering[]>;
-    attributes: Record<number, Attribute[]>;
-    links: Record<number, Link[]>;
+    wholesalers: Wholesaler[];
+    categories: { [key: number]: WholesalerCategoryWithCount[] };
   } = {
     wholesalers: [
-      { id: 1, name: 'Global Tech Supply', region: 'USA', status: 'active', dropship: true },
-      { id: 2, name: 'Euro Electronics', region: 'Germany', status: 'active', dropship: false },
-      { id: 3, name: 'Asia Components Ltd', region: 'China', status: 'inactive', dropship: true },
-      { id: 4, name: 'Nordic Supplies', region: 'Sweden', status: 'active', dropship: true },
-      { id: 5, name: 'Tech Direct USA', region: 'USA', status: 'new', dropship: false }
+      { 
+        wholesaler_id: 1, 
+        name: 'Global Tech Supply', 
+        region: 'USA', 
+        status: 'active', 
+        dropship: true, 
+        website: 'https://globaltech.example',
+        created_at: '2024-01-15T10:00:00Z'
+      },
+      { 
+        wholesaler_id: 2, 
+        name: 'Euro Electronics', 
+        region: 'Germany', 
+        status: 'new', 
+        dropship: false, 
+        website: 'https://euroelec.example',
+        created_at: '2024-02-20T14:30:00Z'
+      },
+      { 
+        wholesaler_id: 3, 
+        name: 'Asia Components Ltd', 
+        region: 'China', 
+        status: 'inactive', 
+        dropship: true, 
+        website: 'https://asiacomp.example',
+        created_at: '2024-01-05T08:15:00Z'
+      }
     ],
+    
     categories: {
       1: [
-        { id: 1, name: 'Laptops', description: 'Portable computers', offerings: 15, comment: 'High demand' },
-        { id: 2, name: 'Smartphones', description: 'Mobile phones', offerings: 25, comment: 'Fast moving' },
-        { id: 3, name: 'Accessories', description: 'Tech accessories', offerings: 45, comment: '' }
+        { 
+          wholesaler_id: 1, 
+          category_id: 1, 
+          name: 'Laptops', 
+          comment: 'High demand products',
+          link: 'https://example.com/laptops',
+          created_at: '2024-01-16T10:00:00Z',
+          offering_count: 15
+        },
+        { 
+          wholesaler_id: 1, 
+          category_id: 2, 
+          name: 'Smartphones', 
+          comment: 'Fast moving inventory',
+          created_at: '2024-01-17T10:00:00Z',
+          offering_count: 25
+        }
       ],
       2: [
-        { id: 4, name: 'Tablets', description: 'Tablet computers', offerings: 8, comment: 'European focus' },
-        { id: 5, name: 'Gaming', description: 'Gaming equipment', offerings: 12, comment: 'Growing market' },
-        { id: 6, name: 'Audio', description: 'Headphones and speakers', offerings: 18, comment: 'Premium brands' }
-      ]
-    },
-    offerings: {
-      1: [
-        { id: 1, name: 'MacBook Pro 14"', price: 1999.99, stock: 25, status: 'active', sku: 'MBP14-001', product_def_id: 1, size: '14 inch', dimensions: '31x22x1.5 cm', currency: 'EUR' },
-        { id: 2, name: 'Dell XPS 13', price: 1299.99, stock: 15, status: 'active', sku: 'XPS13-002', product_def_id: 2, size: '13 inch', dimensions: '30x20x1.5 cm', currency: 'EUR' },
-        { id: 3, name: 'ThinkPad X1 Carbon', price: 1599.99, stock: 8, status: 'active', sku: 'TP-X1C-003', product_def_id: 3, size: '14 inch', dimensions: '32x21x1.6 cm', currency: 'EUR' }
+        { 
+          wholesaler_id: 2, 
+          category_id: 4, 
+          name: 'Tablets', 
+          comment: 'European market focus',
+          created_at: '2024-02-21T14:30:00Z',
+          offering_count: 8
+        },
+        { 
+          wholesaler_id: 2, 
+          category_id: 5, 
+          name: 'Gaming Equipment', 
+          comment: 'Growing segment',
+          link: 'https://example.com/gaming',
+          created_at: '2024-02-22T14:30:00Z',
+          offering_count: 12
+        }
       ],
-      2: [
-        { id: 4, name: 'iPhone 15 Pro', price: 999.99, stock: 50, status: 'active', sku: 'IP15P-004', product_def_id: 4, size: '6.1 inch', dimensions: '15x7x0.8 cm', currency: 'EUR' },
-        { id: 5, name: 'Samsung Galaxy S24', price: 899.99, stock: 0, status: 'active', sku: 'SGS24-005', product_def_id: 5, size: '6.2 inch', dimensions: '15x7x0.8 cm', currency: 'EUR' }
-      ]
-    },
-    attributes: {
-      1: [
-        { id: 1, name: 'Color', value: 'Space Gray', category: 'Physical', type: 'text' },
-        { id: 2, name: 'RAM', value: '16 GB', category: 'Technical', type: 'text' },
-        { id: 3, name: 'Storage', value: '512 GB', category: 'Technical', type: 'text' },
-        { id: 4, name: 'Processor', value: 'M3 Pro', category: 'Technical', type: 'text' },
-        { id: 5, name: 'Weight', value: '1.6 kg', category: 'Physical', type: 'text' }
-      ]
-    },
-    links: {
-      1: [
-        { id: 1, type: 'Product Page', url: 'https://apple.com/macbook-pro', description: 'Official Apple product page', status: 'active' },
-        { id: 2, type: 'Support', url: 'https://support.apple.com/macbook-pro', description: 'Apple support documentation', status: 'active' },
-        { id: 3, type: 'Specifications', url: 'https://apple.com/macbook-pro/specs', description: 'Technical specifications', status: 'active' }
+      3: [
+        { 
+          wholesaler_id: 3, 
+          category_id: 3, 
+          name: 'Accessories', 
+          comment: 'Various tech accessories',
+          created_at: '2024-01-06T08:15:00Z',
+          offering_count: 45
+        }
       ]
     }
   };
 
-  // State
-  let currentLevel: Level = 'wholesalers';
-  let selectedSupplier: Supplier | null = null;
-  let selectedCategory: Category | null = null;
-  let selectedOffering: Offering | null = null;
+  // ===== URL-DRIVEN STATE (Svelte 5 Runes) =====
+  const currentLevel = $derived(($page.url.searchParams.get('level') as Level) || 'wholesalers');
+  const selectedSupplierId = $derived(Number($page.url.searchParams.get('supplierId')) || null);
+  const selectedCategoryId = $derived(Number($page.url.searchParams.get('categoryId')) || null);
 
-  // Derived data
-  $: categoriesForSupplier = selectedSupplier ? (mockData.categories[selectedSupplier.id] ?? []) : [];
-  $: offeringsForCategory = selectedCategory ? (mockData.offerings[selectedCategory.id] ?? []) : [];
-  $: attributesForOffering = selectedOffering ? (mockData.attributes[selectedOffering.id] ?? []) : [];
-  $: linksForOffering = selectedOffering ? (mockData.links[selectedOffering.id] ?? []) : [];
+  // ===== DERIVED STATE =====
+  const selectedSupplier = $derived(
+    selectedSupplierId ? mockData.wholesalers.find(s => s.wholesaler_id === selectedSupplierId) || null : null
+  );
+  
+  const selectedCategory = $derived(
+    selectedCategoryId && selectedSupplier && selectedSupplier.wholesaler_id ? 
+    (mockData.categories[selectedSupplier.wholesaler_id] || []).find((c: WholesalerCategoryWithCount) => c.category_id === selectedCategoryId) || null : null
+  );
+  
+  const categoriesForSupplier = $derived(
+    selectedSupplier && selectedSupplier.wholesaler_id ? mockData.categories[selectedSupplier.wholesaler_id] ?? [] : []
+  );
 
-  // Sidebar counts & disabled flags
-  $: counts = {
+  // Sidebar data
+  const counts = $derived({
     wholesalers: mockData.wholesalers.length,
     categories: categoriesForSupplier.length,
-    offerings: offeringsForCategory.length,
-    attributes: attributesForOffering.length,
-    links: linksForOffering.length
-  };
+    offerings: 0, // Not implemented yet
+    attributes: 0, // Not implemented yet
+    links: 0 // Not implemented yet
+  });
 
-  $: categoriesDisabled = !selectedSupplier;
-  $: offeringsDisabled = !selectedCategory;
-  $: attributesDisabled = !selectedOffering;
-  $: linksDisabled = !selectedOffering;
+  const sidebarItems = $derived([
+    {
+      key: 'wholesalers',
+      label: `Suppliers (${counts.wholesalers})`,
+      disabled: false,
+      level: 0
+    },
+    {
+      key: 'categories',
+      label: `Categories (${counts.categories})`,
+      disabled: !selectedSupplier,
+      level: 1
+    },
+    {
+      key: 'offerings',
+      label: 'Product Offerings (0)',
+      disabled: !selectedCategory,
+      level: 2
+    },
+    {
+      key: 'attributes',
+      label: 'Attributes (0)',
+      disabled: true, // Not implemented yet
+      level: 3
+    },
+    {
+      key: 'links',
+      label: 'Links (0)',
+      disabled: true, // Not implemented yet
+      level: 3
+    }
+  ]);
 
-  function navigateToLevel(level: Level) {
-    currentLevel = level;
+  // ===== URL UPDATE FUNCTION =====
+  function updateURL(params: { 
+    level?: Level, 
+    supplierId?: number | null | undefined, 
+    categoryId?: number | null | undefined
+  }) {
+    const searchParams = new URLSearchParams($page.url.searchParams);
+    
+    if (params.level !== undefined) searchParams.set('level', params.level);
+    if (params.supplierId !== undefined) {
+      if (params.supplierId) {
+        searchParams.set('supplierId', params.supplierId.toString());
+      } else {
+        searchParams.delete('supplierId');
+      }
+    }
+    if (params.categoryId !== undefined) {
+      if (params.categoryId) {
+        searchParams.set('categoryId', params.categoryId.toString());
+      } else {
+        searchParams.delete('categoryId');
+      }
+    }
+
+    goto(`?${searchParams.toString()}`, { replaceState: true, noScroll: true });
   }
 
-  function selectSupplierRow(supplier: Supplier) {
-    selectedSupplier = supplier;
-    selectedCategory = null;
-    selectedOffering = null;
-    navigateToLevel('categories');
+  // ===== NAVIGATION HANDLERS =====
+  function handleSidebarNavigation(event: CustomEvent<{ key: string }>) {
+    const level = event.detail.key as Level;
+    log.info('Sidebar navigation', { from: currentLevel, to: level });
+    
+    switch (level) {
+      case 'wholesalers':
+        updateURL({ level, supplierId: null, categoryId: null });
+        break;
+      case 'categories':
+        if (!selectedSupplier) return;
+        updateURL({ level, categoryId: null });
+        break;
+      case 'offerings':
+        if (!selectedCategory) return;
+        updateURL({ level });
+        break;
+    }
   }
 
-  function selectCategoryRow(category: Category) {
-    selectedCategory = category;
-    selectedOffering = null;
-    navigateToLevel('offerings');
+  // ===== ROW SELECTION HANDLERS =====
+  function handleSupplierSelect(supplier: Wholesaler) {
+    log.info('Supplier selected', { supplierId: supplier.wholesaler_id, name: supplier.name });
+    updateURL({
+      level: 'categories',
+      supplierId: supplier.wholesaler_id ?? null,
+      categoryId: null
+    });
   }
 
-  function selectOfferingRow(offering: Offering) {
-    selectedOffering = offering;
-    // direkt zu Attributes wie im Kommentar gewünscht
-    navigateToLevel('attributes');
+  function handleCategorySelect(category: WholesalerCategoryWithCount) {
+    log.info('Category selected', { categoryId: category.category_id, name: category.name });
+    updateURL({
+      level: 'offerings',
+      categoryId: category.category_id
+    });
   }
 
-  // Header title & main count
-  $: pageTitle =
-    currentLevel === 'wholesalers' ? 'Suppliers' :
-    currentLevel === 'categories' ? 'Categories' :
-    currentLevel === 'offerings' ? 'Product Offerings' :
-    currentLevel === 'attributes' ? 'Attributes' : 'Links';
+  // Silence unused warnings (handlers will be used when Grid components support rowclick)
+  void handleSupplierSelect; void handleCategorySelect;
 
-  $: mainCount =
-    currentLevel === 'wholesalers' ? `${counts.wholesalers} items` :
-    currentLevel === 'categories' ? `${counts.categories} items` :
-    currentLevel === 'offerings' ? `${counts.offerings} items` :
-    currentLevel === 'attributes' ? `${counts.attributes} items` : `${counts.links} items`;
-
-  function statusClass(status: Status | string) {
-    // mappe "new" auf active-Stil, sonst inactive explizit
-    return status === 'inactive' ? 'status-inactive' : 'status-active';
+  // ===== DELETE HANDLERS =====
+  async function handleSupplierDelete(ids: (string | number)[]) {
+    log.info('Mock: Delete suppliers', { ids });
+    alert(`MOCK: Would delete suppliers with IDs: ${ids.join(', ')}`);
   }
+
+  async function handleCategoryDelete(ids: (string | number)[]) {
+    log.info('Mock: Remove categories', { ids });
+    alert(`MOCK: Would remove category assignments with IDs: ${ids.join(', ')}`);
+  }
+
+  // // ===== FORM HANDLERS =====
+  // function handleSupplierSubmit(p: { data: Record<string, any>; result: unknown }) {
+  //   log.info('Mock: Supplier form submitted', p);
+  //   alert('MOCK: Supplier saved successfully!');
+  // }
+
+  // function handleSupplierCancel(p: { data: Record<string, any>; reason?: string }) {
+  //   log.info('Mock: Supplier form cancelled', p);
+  // }
+
+  // ===== COMPUTED PROPS =====
+  const pageTitle = $derived(() => {
+    if (currentLevel === 'wholesalers') return 'Suppliers';
+    if (currentLevel === 'categories' && selectedSupplier) return `Categories for ${selectedSupplier.name}`;
+    if (currentLevel === 'offerings' && selectedCategory) return `Offerings in ${selectedCategory.name}`;
+    return 'Supplier Browser';
+  });
+
+  // Loading state (mock)
+  let loading = $state(false);
 </script>
 
-<div class="browser-container">
+<svelte:head>
+  <title>Supplier Browser - {pageTitle()}</title>
+</svelte:head>
+
+<div class="browser-layout">
   <!-- Sidebar -->
-  <div class="sidebar">
-    <div class="sidebar-header">
-      <h2>Hierarchy Browser</h2>
-    </div>
-
-    <div class="sidebar-content">
-      <button
-        type="button"
-        class="sidebar-item"
-        class:active={currentLevel === 'wholesalers'}
-        on:click={() => navigateToLevel('wholesalers')}
-      >
-        <span>Suppliers</span>
-        <span class="item-count">{counts.wholesalers}</span>
-      </button>
-
-      <button
-        id="categories-btn"
-        type="button"
-        class="sidebar-item depth-1"
-        class:disabled={categoriesDisabled}
-        class:active={currentLevel === 'categories'}
-        disabled={categoriesDisabled}
-        on:click={() => navigateToLevel('categories')}
-      >
-        <span>Categories</span>
-        <span class="item-count" id="categories-count">{counts.categories}</span>
-      </button>
-
-      <button
-        id="offerings-btn"
-        type="button"
-        class="sidebar-item depth-2"
-        class:disabled={offeringsDisabled}
-        class:active={currentLevel === 'offerings'}
-        disabled={offeringsDisabled}
-        on:click={() => navigateToLevel('offerings')}
-      >
-        <span>Product Offerings</span>
-        <span class="item-count" id="offerings-count">{counts.offerings}</span>
-      </button>
-
-      <button
-        id="attributes-btn"
-        type="button"
-        class="sidebar-item depth-3"
-        class:disabled={attributesDisabled}
-        class:active={currentLevel === 'attributes'}
-        disabled={attributesDisabled}
-        on:click={() => navigateToLevel('attributes')}
-      >
-        <span>Attributes</span>
-        <span class="item-count" id="attributes-count">{counts.attributes}</span>
-      </button>
-
-      <button
-        id="links-btn"
-        type="button"
-        class="sidebar-item depth-3"
-        class:disabled={linksDisabled}
-        class:active={currentLevel === 'links'}
-        disabled={linksDisabled}
-        on:click={() => navigateToLevel('links')}
-      >
-        <span>Links</span>
-        <span class="item-count" id="links-count">{counts.links}</span>
-      </button>
-    </div>
-  </div>
+  <aside class="sidebar">
+    <HierarchySidebar
+      items={sidebarItems}
+      active={currentLevel}
+      ariaLabel="Supplier Browser Navigation"
+      on:select={handleSidebarNavigation}
+    />
+  </aside>
 
   <!-- Main Content -->
-  <div class="main-content">
+  <main class="main-content">
     <div class="content-header">
-      <div>
-        <h1 id="page-title">{pageTitle}</h1>
-        <span class="count-badge" id="main-count">{mainCount}</span>
+      <h1>{pageTitle()}</h1>
+      <div class="header-badges">
+        {#if selectedSupplier}
+          <span class="badge">Supplier: {selectedSupplier.name}</span>
+        {/if}
+        {#if selectedCategory}
+          <span class="badge">Category: {selectedCategory.name}</span>
+        {/if}
       </div>
     </div>
-
-    <div class="content-layout">
-      <!-- Master Form Section -->
-      {#if (currentLevel === 'categories' && selectedSupplier) ||
-            (currentLevel === 'offerings' && selectedCategory) ||
-            ((currentLevel === 'attributes' || currentLevel === 'links') && selectedOffering)}
-        <div class="master-form-section" id="master-section">
-          {#if currentLevel === 'categories' && selectedSupplier}
-            <h3 id="master-title">Supplier: {selectedSupplier.name}</h3>
-            <div id="master-content">
-              <div class="offering-form">
-                <div class="form-grid">
-                  <div class="form-group">
-                    <label>Name</label>
-                    <input type="text" value={selectedSupplier.name} readonly />
-                  </div>
-                  <div class="form-group">
-                    <label>Region</label>
-                    <input type="text" value={selectedSupplier.region} readonly />
-                  </div>
-                  <div class="form-group">
-                    <label>Status</label>
-                    <select disabled>
-                      <option selected={selectedSupplier.status === 'active'}>Active</option>
-                      <option selected={selectedSupplier.status === 'inactive'}>Inactive</option>
-                    </select>
-                  </div>
-                  <div class="form-group">
-                    <label>Website</label>
-                    <input type="url" value="https://example.com" />
-                  </div>
-                </div>
-                <button class="primary-button" type="button">Update Supplier</button>
-              </div>
-            </div>
-          {/if}
-
-          {#if currentLevel === 'offerings' && selectedCategory}
-            <h3 id="master-title">Category: {selectedCategory.name}</h3>
-            <div id="master-content">
-              <p>{selectedCategory.description}</p>
-            </div>
-          {/if}
-
-          {#if (currentLevel === 'attributes' || currentLevel === 'links') && selectedOffering}
-            <h3 id="master-title">Product Offering: {selectedOffering.name}</h3>
-            <div id="master-content">
-              <div class="offering-form">
-                <div class="form-grid">
-                  <div class="form-group">
-                    <label>Product Name</label>
-                    <input type="text" value={selectedOffering.name} />
-                  </div>
-                  <div class="form-group">
-                    <label>Price</label>
-                    <input type="number" value={selectedOffering.price} step="0.01" />
-                  </div>
-                  <div class="form-group">
-                    <label>Currency</label>
-                    <select>
-                      <option selected={selectedOffering.currency === 'EUR'}>EUR</option>
-                      <option selected={selectedOffering.currency === 'USD'}>USD</option>
-                      <option selected={selectedOffering.currency === 'GBP'}>GBP</option>
-                    </select>
-                  </div>
-                  <div class="form-group">
-                    <label>Size</label>
-                    <input type="text" value={selectedOffering.size} />
-                  </div>
-                  <div class="form-group">
-                    <label>Dimensions</label>
-                    <input type="text" value={selectedOffering.dimensions} />
-                  </div>
-                  <div class="form-group">
-                    <label>Stock</label>
-                    <input type="number" value={selectedOffering.stock} />
-                  </div>
-                </div>
-                <button class="primary-button" type="button">Update Offering</button>
-              </div>
-            </div>
-          {/if}
+    
+    <div class="content-body">
+      <!-- EBENE 2: SupplierForm oben + CategoryGrid unten -->
+      {#if currentLevel === 'categories' && selectedSupplier}
+        <div class="master-form-section">
+          <SupplierForm 
+            initial={selectedSupplier}
+            disabled={false}
+          />
         </div>
       {/if}
 
-      <!-- Grid Section -->
+      <!-- GRIDS -->
       <div class="grid-section">
-        <div id="grid-content">
-          <!-- Suppliers Grid -->
-          {#if currentLevel === 'wholesalers'}
-            <div class="grid" id="suppliers-grid">
-              <div class="grid-header">
-                <div class="grid-cell">Supplier Name</div>
-                <div class="grid-cell">Region</div>
-                <div class="grid-cell">Status</div>
-                <div class="grid-cell">Dropship</div>
-              </div>
-
-              {#each mockData.wholesalers as s (s.id)}
-                <div class="grid-row" role="button" tabindex="0" on:click={() => selectSupplierRow(s)}>
-                  <div class="grid-cell">
-                    <span class="supplier-name-link">{s.name}</span>
-                  </div>
-                  <div class="grid-cell">{s.region}</div>
-                  <div class="grid-cell">
-                    <span class="status-badge {statusClass(s.status)}">{s.status}</span>
-                  </div>
-                  <div class="grid-cell">{s.dropship ? '✅' : '❌'}</div>
-                </div>
-              {/each}
-            </div>
-          {/if}
-
-          <!-- Categories Grid -->
-          {#if currentLevel === 'categories'}
-            {#if selectedSupplier}
-              <div class="grid" id="categories-grid">
-                <div class="grid-header">
-                  <div class="grid-cell">Category Name</div>
-                  <div class="grid-cell">Description</div>
-                  <div class="grid-cell">Offerings</div>
-                  <div class="grid-cell">Comment</div>
-                </div>
-
-                {#each categoriesForSupplier as c (c.id)}
-                  <div class="grid-row" role="button" tabindex="0" on:click={() => selectCategoryRow(c)}>
-                    <div class="grid-cell">
-                      <span class="supplier-name-link">{c.name}</span>
-                    </div>
-                    <div class="grid-cell">{c.description}</div>
-                    <div class="grid-cell">{c.offerings}</div>
-                    <div class="grid-cell">{c.comment}</div>
-                  </div>
-                {/each}
-              </div>
-            {:else}
-              <div class="empty-state" id="empty-state">
-                <h3>No data found</h3>
-                <p>Please make a selection to see data.</p>
-              </div>
-            {/if}
-          {/if}
-
-          <!-- Offerings Grid -->
-          {#if currentLevel === 'offerings'}
-            {#if selectedCategory}
-              <div class="grid" id="offerings-grid">
-                <div class="grid-header offering-header">
-                  <div class="grid-cell">Product Name</div>
-                  <div class="grid-cell">Price</div>
-                  <div class="grid-cell">Stock</div>
-                  <div class="grid-cell">Status</div>
-                  <div class="grid-cell">SKU</div>
-                </div>
-
-                {#each offeringsForCategory as o (o.id)}
-                  <div class="grid-row offering-row" role="button" tabindex="0" on:click={() => selectOfferingRow(o)}>
-                    <div class="grid-cell">
-                      <span class="supplier-name-link">{o.name}</span>
-                    </div>
-                    <div class="grid-cell">€{o.price}</div>
-                    <div class="grid-cell">{o.stock}</div>
-                    <div class="grid-cell">
-                      <span class="status-badge {statusClass(o.status)}">{o.status}</span>
-                    </div>
-                    <div class="grid-cell">{o.sku}</div>
-                  </div>
-                {/each}
-              </div>
-            {:else}
-              <div class="empty-state" id="empty-state">
-                <h3>No data found</h3>
-                <p>Please make a selection to see data.</p>
-              </div>
-            {/if}
-          {/if}
-
-          <!-- Attributes Grid -->
-          {#if currentLevel === 'attributes'}
-            {#if selectedOffering}
-              <div class="grid" id="attributes-grid">
-                <div class="grid-header attribute-header">
-                  <div class="grid-cell">Attribute Name</div>
-                  <div class="grid-cell">Value</div>
-                  <div class="grid-cell">Category</div>
-                  <div class="grid-cell">Type</div>
-                </div>
-
-                {#each attributesForOffering as a (a.id)}
-                  <div class="grid-row attribute-row">
-                    <div class="grid-cell">{a.name}</div>
-                    <div class="grid-cell">{a.value}</div>
-                    <div class="grid-cell">{a.category}</div>
-                    <div class="grid-cell">{a.type}</div>
-                  </div>
-                {/each}
-              </div>
-            {:else}
-              <div class="empty-state" id="empty-state">
-                <h3>No data found</h3>
-                <p>Please make a selection to see data.</p>
-              </div>
-            {/if}
-          {/if}
-
-          <!-- Links Grid -->
-          {#if currentLevel === 'links'}
-            {#if selectedOffering}
-              <div class="grid" id="links-grid">
-                <div class="grid-header link-header">
-                  <div class="grid-cell">Type</div>
-                  <div class="grid-cell">URL</div>
-                  <div class="grid-cell">Description</div>
-                  <div class="grid-cell">Status</div>
-                </div>
-
-                {#each linksForOffering as l (l.id)}
-                  <div class="grid-row link-row">
-                    <div class="grid-cell">{l.type}</div>
-                    <div class="grid-cell">
-                      <a href={l.url} target="_blank" class="supplier-name-link">{l.url}</a>
-                    </div>
-                    <div class="grid-cell">{l.description}</div>
-                    <div class="grid-cell">
-                      <span class="status-badge {statusClass(l.status)}">{l.status}</span>
-                    </div>
-                  </div>
-                {/each}
-              </div>
-            {:else}
-              <div class="empty-state" id="empty-state">
-                <h3>No data found</h3>
-                <p>Please make a selection to see data.</p>
-              </div>
-            {/if}
-          {/if}
-        </div>
+        {#if currentLevel === 'wholesalers'}
+          <SupplierGrid 
+            rows={mockData.wholesalers} 
+            {loading}
+            executeDelete={handleSupplierDelete}
+            onRowClick={handleSupplierSelect}
+          />
+          
+        {:else if currentLevel === 'categories'}
+          <CategoryGrid 
+            rows={categoriesForSupplier} 
+            {loading}
+            showOfferingCount={true}
+            executeDelete={handleCategoryDelete}
+          />
+          
+        {:else if currentLevel === 'offerings'}
+          <div class="empty-state">
+            <h3>Offerings Grid</h3>
+            <p>Not implemented yet - coming in next phase!</p>
+          </div>
+        {/if}
       </div>
     </div>
-  </div>
+  </main>
 </div>
 
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  :global(body) {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: #fff; height: 100vh; overflow: hidden;
+  .browser-layout {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+    font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
   }
 
-  .browser-container { display: flex; height: 100vh; }
-  .sidebar { width: 300px; background: #f8fafc; border-right: 1px solid #e2e8f0; display: flex; flex-direction: column; }
-  .sidebar-header { padding: 1.5rem; border-bottom: 1px solid #e2e8f0; }
-  .sidebar-header h2 { font-size: 1.25rem; color: #0f172a; }
-  .sidebar-content { flex: 1; padding: 1rem 0; }
-
-  .sidebar-item {
-    width: 100%; padding: 0.75rem 1.5rem; border: none; background: transparent; text-align: left;
-    cursor: pointer; transition: all 0.2s ease; display: flex; justify-content: space-between; align-items: center; color: #1e293b;
+  .sidebar {
+    flex-shrink: 0;
+    width: 300px;
+    background: var(--pc-grid-header-bg, #f8fafc);
+    border-right: 1px solid var(--pc-grid-border, #e2e8f0);
   }
-  .sidebar-item.depth-1 { padding-left: 2.5rem; }
-  .sidebar-item.depth-2 { padding-left: 3.5rem; }
-  .sidebar-item.depth-3 { padding-left: 4.5rem; }
-  .sidebar-item:hover:not(.disabled) { background: #e2e8f0; }
-  .sidebar-item.active { background: #4f46e5; color: white; }
-  .sidebar-item.disabled { opacity: 0.5; cursor: not-allowed; color: #64748b; }
 
-  .item-count { background: rgba(0,0,0,0.1); padding: 0.25rem 0.5rem; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
-  .sidebar-item.active .item-count { background: rgba(255,255,255,0.2); }
+  .main-content {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--pc-grid-bg, #ffffff);
+  }
 
-  .main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-  .content-header { display: flex; justify-content: space-between; align-items: center; padding: 1.5rem 2rem; border-bottom: 1px solid #e2e8f0; background: white; }
-  .content-header h1 { font-size: 1.75rem; color: #0f172a; }
-  .count-badge { background: #4f46e5; color: white; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.875rem; font-weight: 500; margin-left: 1rem; }
+  .content-header {
+    padding: 1.5rem 2rem;
+    border-bottom: 1px solid var(--pc-grid-border, #e2e8f0);
+    background: var(--pc-grid-bg, #fff);
+    flex-shrink: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
 
-  .content-layout { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-  .master-form-section { background: #f8fafc; border-bottom: 1px solid #e2e8f0; padding: 1.5rem 2rem; flex-shrink: 0; }
-  .master-form-section h3 { margin-bottom: 1rem; color: #0f172a; }
+  .content-header h1 {
+    font-size: 1.75rem;
+    margin: 0;
+    color: var(--pc-grid-fg, #0f172a);
+    font-weight: 700;
+  }
 
-  .grid-section { flex: 1; overflow-y: auto; padding: 2rem; }
-  .grid { background: white; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
-  .grid-header { background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: grid; grid-template-columns: 3fr 2fr 1fr 1fr; font-weight: 600; color: #0f172a; }
-  .grid-header.offering-header { grid-template-columns: 3fr 1.5fr 1fr 1fr 1.5fr; }
-  .grid-header.attribute-header { grid-template-columns: 2.5fr 3fr 1.5fr 1fr; }
-  .grid-header.link-header { grid-template-columns: 1.5fr 4fr 3fr 1fr; }
-  .grid-cell { padding: 0.75rem 1rem; border-right: 1px solid #e2e8f0; }
-  .grid-cell:last-child { border-right: none; }
+  .header-badges {
+    display: flex;
+    gap: 0.5rem;
+  }
 
-  .grid-row { display: grid; grid-template-columns: 3fr 2fr 1fr 1fr; border-bottom: 1px solid #e2e8f0; cursor: pointer; transition: background 0.2s ease; }
-  .grid-row.offering-row { grid-template-columns: 3fr 1.5fr 1fr 1fr 1.5fr; }
-  .grid-row.attribute-row { grid-template-columns: 2.5fr 3fr 1.5fr 1fr; }
-  .grid-row.link-row { grid-template-columns: 1.5fr 4fr 3fr 1fr; }
-  .grid-row:hover { background: #f8fafc; }
+  .badge {
+    background: var(--pc-grid-accent, #0ea5e9);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
 
-  .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 300px; color: #64748b; text-align: center; }
-  .supplier-name-link { color: #4f46e5; text-decoration: none; font-weight: 500; }
-  .supplier-name-link:hover { text-decoration: underline; }
+  .content-body {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    background: var(--pc-grid-header-bg, #f8fafc);
+  }
 
-  .status-badge { display: inline-block; padding: 0.25rem 0.5rem; border-radius: 12px; font-size: 0.75rem; font-weight: 500; text-transform: uppercase; }
-  .status-active { background: #dcfce7; color: #166534; }
-  .status-inactive { background: #fee2e2; color: #dc2626; }
+  .master-form-section {
+    background: var(--pc-grid-bg, #fff);
+    border-radius: 8px;
+    border: 1px solid var(--pc-grid-border, #e2e8f0);
+    flex-shrink: 0;
+    box-shadow: var(--pc-grid-shadow, 0 1px 2px rgba(0,0,0,.05));
+  }
 
-  .offering-form { background: white; padding: 1.5rem; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 1rem; }
-  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
-  .form-group { display: flex; flex-direction: column; }
-  .form-group label { font-weight: 500; margin-bottom: 0.25rem; color: #0f172a; }
-  .form-group input, .form-group select { padding: 0.5rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.875rem; }
-  .primary-button { background: #4f46e5; color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; }
-  .primary-button:hover { background: #4338ca; }
+  .grid-section {
+    flex-grow: 1;
+    min-height: 300px;
+    background: var(--pc-grid-bg, #fff);
+    border-radius: 8px;
+    border: 1px solid var(--pc-grid-border, #e2e8f0);
+    box-shadow: var(--pc-grid-shadow, 0 1px 2px rgba(0,0,0,.05));
+    overflow: hidden;
+  }
+
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 300px;
+    background: var(--pc-grid-header-bg, #f8fafc);
+    border: 1px solid var(--pc-grid-border, #e2e8f0);
+    border-radius: 8px;
+    color: var(--pc-grid-muted, #64748b);
+    text-align: center;
+  }
+
+  .empty-state h3 {
+    margin: 0 0 0.5rem 0;
+    color: var(--pc-grid-fg, #0f172a);
+  }
+
+  .empty-state p {
+    margin: 0;
+    font-size: 0.875rem;
+  }
 </style>

@@ -24,7 +24,7 @@
   --pc-grid-danger: #dc2626;          /* red-600 */
   --pc-grid-warning: #d97706;         /* amber-600 */
   --pc-grid-success: #16a34a;         /* green-600 */
-  --pc-grid-accent: #0ea5e9;          /* sky-500 */
+  --pc-grid-accent: var(--color-primary);       
 
   /* Typography & metrics */
   --pc-grid-font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI,

@@ -2,7 +2,7 @@
 import { browser, dev } from '$app/environment';
 
 // ✅ STRIKTE TYPES statt any
-type LogValue = string | number | boolean | null | undefined | Record<string, unknown> | unknown[];
+type LogValue = string | number | boolean | null | undefined | Record<string, unknown> | unknown[] | Error | unknown;
 type LogArgs = LogValue[];
 
 interface Logger {

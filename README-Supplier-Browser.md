@@ -221,7 +221,7 @@ src/lib/components/
 │   └── HierarchySidebar.svelte           ✅ IMPLEMENTIERT
 ├── suppliers/
 │   ├── SupplierGrid.svelte               ✅ IMPLEMENTIERT
-│   └── SupplierForm.svelte               ✅ IMPLEMENTIERT
+│   └── SupplierForm.svelte               ✅ IMPLEMENTIERT ABER STYLING fehlt!!!!
 ├── categories/
 │   ├── CategoryGrid.svelte               ✅ IMPLEMENTIERT
 │   └── CategoryForm.svelte               🔄 IN PROGRESS
@@ -245,6 +245,9 @@ src/routes/
 ---
 
 ## 🎯 **NEXT STEPS**
+
+### **1. Sofort (SupplierForm):**
+Styling des forms, aktuell nur normale divs.
 
 ### **1. Sofort (CategoryForm):**
 - CategoryForm.svelte für Assignment-Dropdown

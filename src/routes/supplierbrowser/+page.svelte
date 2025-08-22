@@ -281,7 +281,7 @@
       items={sidebarItems}
       active={currentLevel}
       ariaLabel="Supplier Browser Navigation"
-      on:select={handleSidebarNavigation}
+      onselect={handleSidebarNavigation}
     />
   </aside>
 

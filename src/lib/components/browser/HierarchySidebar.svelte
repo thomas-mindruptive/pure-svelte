@@ -3,34 +3,51 @@
   // Props-only, no slots. Emits a single "select" event.
   // Use onselect={e => handle(e.detail.key)} in parent.
 
+  import "$lib/components/styles/sidebar.css";
+  import { log } from "$lib/utils/logger";
+
   export interface $$Events {
     select: CustomEvent<{ key: string }>;
   }
 
   export type HierarchyItem = {
-    key: 'suppliers' | 'categories' | 'offerings' | 'attributes' | 'links' | (string & {});
-    label: string;           // already includes counts if you want (e.g. "Suppliers (5)")
-    count?: number | null;   // optional separate count, shows as a badge if provided
+    key:
+      | "suppliers"
+      | "categories"
+      | "offerings"
+      | "attributes"
+      | "links"
+      | (string & {});
+    label: string; // already includes counts if you want (e.g. "Suppliers (5)")
+    count?: number | null; // optional separate count, shows as a badge if provided
     disabled?: boolean;
-    level?: number;          // 0..3 for indentation
+    level?: number; // 0..3 for indentation
   };
 
   const {
     items = [] as HierarchyItem[],
     active = null as string | null,
-    ariaLabel = 'Navigation'
+    ariaLabel = "Navigation",
+    onselect,
   } = $props<{
     items?: HierarchyItem[];
     active?: string | null;
     ariaLabel?: string;
+    onselect?: (event: CustomEvent<{ key: string }>) => void;
   }>();
 
   let rootEl: HTMLElement;
 
+
   function emitSelect(key: string) {
+    log.info("🚀 HierarchySidebar: emitSelect called with key:", key);
     try {
-      rootEl?.dispatchEvent(new CustomEvent('select', { detail: { key } }));
-    } catch {
+      const event = new CustomEvent("select", { detail: { key } });
+      // Svelte 5 callback prop
+      onselect?.(event);
+      log.info(`🚀 HierarchySidebar: ✅ Event dispatched successfully`);
+    } catch (error: unknown) {
+      log.error("❌ Event dispatch failed:", error);
       /* no-throw */
     }
   }
@@ -44,8 +61,8 @@
           type="button"
           class="hb__item {active === it.key ? 'is-active' : ''}"
           disabled={!!it.disabled}
-          aria-current={active === it.key ? 'page' : undefined}
-          style={"padding-left:" + ((it.level ?? 0) * 14) + "px"}
+          aria-current={active === it.key ? "page" : undefined}
+          style={"padding-left:" + (it.level ?? 0) * 14 + "px"}
           onclick={() => !it.disabled && emitSelect(it.key)}
         >
           <span class="hb__label">{it.label}</span>
@@ -57,34 +74,3 @@
     {/each}
   </ul>
 </nav>
-
-<style>
-  .hb { display: block; border-right: 1px solid var(--pc-grid-border, #e5e7eb); }
-  .hb__list { list-style: none; margin: 0; padding: .25rem 0; }
-  .hb__li { margin: 0; }
-  .hb__item {
-    width: 100%;
-    text-align: left;
-    display: flex;
-    align-items: center;
-    gap: .5rem;
-    padding: .5rem .75rem;
-    background: none;
-    border: 0;
-    cursor: pointer;
-    font: inherit;
-    color: inherit;
-  }
-  .hb__item[disabled] { opacity: .5; cursor: not-allowed; }
-  .hb__item:hover:not([disabled]) { background: rgba(0,0,0,.03); }
-  .hb__item.is-active { background: rgba(0,0,0,.06); font-weight: 600; }
-  .hb__label { flex: 1 1 auto; }
-  .hb__count {
-    flex: 0 0 auto;
-    font-size: .75rem;
-    line-height: 1;
-    padding: .2rem .4rem;
-    border-radius: .5rem;
-    background: var(--pc-grid-badge, #eef2ff);
-  }
-</style>

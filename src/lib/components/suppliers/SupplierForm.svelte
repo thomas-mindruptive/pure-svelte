@@ -3,6 +3,7 @@
   // - English comments
   // - Uses domain type Wholesaler (no component-local entity types)
   // - Wide validator/submit signatures to satisfy FormShell's ValidateFn/SubmitFn
+  // - UPDATED: Now uses proper CSS classes from form.css instead of inline styles
 
   import FormShell, {
     type ValidateResult,
@@ -10,7 +11,7 @@
   import { log } from "$lib/utils/logger";
   import type { Wholesaler } from "$lib/domain/types";
   import "$lib/components/styles/form.css";
-    import "$lib/components/styles/grid.css";
+  import "$lib/components/styles/grid.css";
 
   // Provide a Wholesaler-conform default (dropship is required)
   const {
@@ -109,138 +110,213 @@
   onCancelled={handleCancelled}
 >
   {#snippet header({ data, dirty })}
-    <div style="display:flex;gap:.5rem;align-items:center">
-      <h2 style="margin:0">Wholesaler</h2>
-      {#if dirty}<span class="pc-grid__badge">unsaved</span>{/if}
-      {#if (data as any)?.id}
-        <span class="pc-grid__badge">ID: {(data as any).id}</span>
-      {/if}
+    <div class="form-header">
+      <div>
+        <h3>Wholesaler Details</h3>
+        {#if (data as any)?.id}
+          <span class="field-hint">ID: {(data as any).id}</span>
+        {/if}
+      </div>
+      <div>
+        {#if dirty}
+          <span class="pc-grid__badge pc-grid__badge--warn">Unsaved changes</span>
+        {/if}
+      </div>
     </div>
   {/snippet}
 
   {#snippet fields({ get, set, errors, markTouched })}
-    <div
-      style="display:grid;grid-template-columns:200px 1fr;gap:.75rem;align-items:center"
-    >
-      <!-- name (required by Wholesaler) -->
-      <label for="wh-name">Name</label>
-      <div>
-        <input
-          id="wh-name"
-          value={get("name") ?? ""}
-          oninput={(e: Event) =>
-            set("name", (e.currentTarget as HTMLInputElement).value)}
-          onblur={() => markTouched("name")}
-          required
-          aria-invalid={errors.name ? "true" : "false"}
-          aria-describedby={errors.name ? "err-name" : undefined}
-        />
-        {#if errors.name}<div
-            id="err-name"
-            class="pc-grid__badge pc-grid__badge--warn"
+    <div class="category-form">
+      <!-- Main supplier information -->
+      <div class="form-grid">
+        <!-- Name (required, spans 2 columns) -->
+        <div class="form-group span-2">
+          <label for="wh-name">Supplier Name *</label>
+          <input
+            id="wh-name"
+            type="text"
+            value={get("name") ?? ""}
+            class={errors.name ? 'error' : ''}
+            placeholder="Enter supplier name"
+            oninput={(e: Event) =>
+              set("name", (e.currentTarget as HTMLInputElement).value)}
+            onblur={() => markTouched("name")}
+            required
+            aria-invalid={errors.name ? "true" : "false"}
+            aria-describedby={errors.name ? "err-name" : undefined}
+          />
+          {#if errors.name}
+            <div id="err-name" class="error-text">
+              {errors.name[0]}
+            </div>
+          {/if}
+        </div>
+
+        <!-- Region -->
+        <div class="form-group">
+          <label for="wh-region">Region</label>
+          <input
+            id="wh-region"
+            type="text"
+            value={get("region") ?? ""}
+            placeholder="e.g. Europe, Asia"
+            oninput={(e: Event) =>
+              set("region", (e.currentTarget as HTMLInputElement).value)}
+            onblur={() => markTouched("region")}
+          />
+        </div>
+
+        <!-- Status -->
+        <div class="form-group">
+          <label for="wh-status">Status</label>
+          <select
+            id="wh-status"
+            value={get("status") ?? ""}
+            onchange={(e: Event) =>
+              set("status", (e.currentTarget as HTMLSelectElement).value)}
           >
-            {errors.name[0]}
-          </div>{/if}
+            <option value="">Select status…</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+            <option value="new">New</option>
+          </select>
+        </div>
+
+        <!-- Country (required) -->
+        <div class="form-group">
+          <label for="wh-country">Country *</label>
+          <select
+            id="wh-country"
+            value={get("country") ?? ""}
+            class={errors.country ? 'error' : ''}
+            onchange={(e: Event) =>
+              set("country", (e.currentTarget as HTMLSelectElement).value)}
+            required
+            aria-invalid={errors.country ? "true" : "false"}
+            aria-describedby={errors.country ? "err-country" : undefined}
+          >
+            <option value="">Select country…</option>
+            <option value="AT">Austria</option>
+            <option value="DE">Germany</option>
+            <option value="CH">Switzerland</option>
+            <option value="US">United States</option>
+            <option value="CN">China</option>
+            <option value="JP">Japan</option>
+          </select>
+          {#if errors.country}
+            <div id="err-country" class="error-text">
+              {errors.country[0]}
+            </div>
+          {/if}
+        </div>
+
+        <!-- Dropship (checkbox) -->
+        <div class="form-group">
+          <label for="wh-dropship">
+            <input
+              id="wh-dropship"
+              type="checkbox"
+              checked={Boolean(get("dropship"))}
+              onchange={(e: Event) =>
+                set("dropship", (e.currentTarget as HTMLInputElement).checked)}
+              required
+              aria-invalid={errors.dropship ? "true" : "false"}
+              aria-describedby={errors.dropship ? "err-dropship" : undefined}
+            />
+            Offers Dropshipping
+          </label>
+          {#if errors.dropship}
+            <div id="err-dropship" class="error-text">
+              {errors.dropship[0]}
+            </div>
+          {/if}
+          <div class="field-hint">
+            Check if this supplier offers dropshipping services
+          </div>
+        </div>
       </div>
 
-      <!-- dropship (required by Wholesaler) -->
-      <label for="wh-dropship">Dropship</label>
-      <div>
-        <input
-          id="wh-dropship"
-          type="checkbox"
-          checked={Boolean(get("dropship"))}
-          onchange={(e: Event) =>
-            set("dropship", (e.currentTarget as HTMLInputElement).checked)}
-          required
-          aria-invalid={errors.dropship ? "true" : "false"}
-          aria-describedby={errors.dropship ? "err-dropship" : undefined}
-        />
-        {#if errors.dropship}<div
-            id="err-dropship"
-            class="pc-grid__badge pc-grid__badge--warn"
-          >
-            {errors.dropship[0]}
-          </div>{/if}
+      <!-- Contact information section -->
+      <div class="form-grid">
+        <!-- Email -->
+        <div class="form-group span-2">
+          <label for="wh-email">Email Address</label>
+          <input
+            id="wh-email"
+            type="email"
+            inputmode="email"
+            value={get("email") ?? ""}
+            class={errors.email ? 'error' : ''}
+            placeholder="contact@supplier.com"
+            oninput={(e: Event) =>
+              set("email", (e.currentTarget as HTMLInputElement).value)}
+            onblur={() => markTouched("email")}
+            aria-invalid={errors.email ? "true" : "false"}
+            aria-describedby={errors.email ? "err-email" : undefined}
+          />
+          {#if errors.email}
+            <div id="err-email" class="error-text">
+              {errors.email[0]}
+            </div>
+          {/if}
+        </div>
+
+        <!-- Website -->
+        <div class="form-group span-2">
+          <label for="wh-website">Website</label>
+          <input
+            id="wh-website"
+            type="url"
+            value={get("website") ?? ""}
+            placeholder="https://www.supplier.com"
+            oninput={(e: Event) =>
+              set("website", (e.currentTarget as HTMLInputElement).value)}
+            onblur={() => markTouched("website")}
+          />
+        </div>
       </div>
 
-      <!-- optional UI fields -->
-      <label for="wh-country">Country</label>
-      <div>
-        <select
-          id="wh-country"
-          value={get("country") ?? ""}
-          onchange={(e: Event) =>
-            set("country", (e.currentTarget as HTMLSelectElement).value)}
-          aria-invalid={errors.country ? "true" : "false"}
-          aria-describedby={errors.country ? "err-country" : undefined}
-        >
-          <option value="">Select…</option>
-          <option value="AT">Austria</option>
-          <option value="DE">Germany</option>
-          <option value="CH">Switzerland</option>
-        </select>
-        {#if errors.country}<div
-            id="err-country"
-            class="pc-grid__badge pc-grid__badge--warn"
-          >
-            {errors.country[0]}
-          </div>{/if}
-      </div>
-
-      <label for="wh-email">Email</label>
-      <div>
-        <input
-          id="wh-email"
-          type="email"
-          inputmode="email"
-          value={get("email") ?? ""}
-          oninput={(e: Event) =>
-            set("email", (e.currentTarget as HTMLInputElement).value)}
-          onblur={() => markTouched("email")}
-          aria-invalid={errors.email ? "true" : "false"}
-          aria-describedby={errors.email ? "err-email" : undefined}
-        />
-        {#if errors.email}<div
-            id="err-email"
-            class="pc-grid__badge pc-grid__badge--warn"
-          >
-            {errors.email[0]}
-          </div>{/if}
-      </div>
-
-      <label for="wh-notes" style="align-self:start">Notes</label>
-      <div>
-        <textarea
-          id="wh-notes"
-          rows="4"
-          oninput={(e: Event) =>
-            set("notes", (e.currentTarget as HTMLTextAreaElement).value)}
-          >{get("notes") ?? ""}</textarea
-        >
+      <!-- Notes section -->
+      <div class="form-grid">
+        <div class="form-group span-4">
+          <label for="wh-notes">Business Notes</label>
+          <textarea
+            id="wh-notes"
+            rows="4"
+            placeholder="Additional notes about this supplier, business terms, contact persons, etc."
+            oninput={(e: Event) =>
+              set("b2b_notes", (e.currentTarget as HTMLTextAreaElement).value)}
+            >{get("b2b_notes") ?? ""}</textarea>
+          <div class="char-count">
+            {(get("b2b_notes") ?? "").length} / 1000 characters
+          </div>
+        </div>
       </div>
     </div>
   {/snippet}
 
   {#snippet actions({ submit, cancel, submitting, dirty })}
-    <button
-      class="pc-grid__btn"
-      type="button"
-      onclick={cancel}
-      disabled={submitting}
-    >
-      Cancel
-    </button>
-    <button
-      class="pc-grid__btn pc-grid__btn--danger"
-      type="button"
-      onclick={() => submit()}
-      disabled={!dirty || submitting}
-      aria-busy={submitting}
-    >
-      {#if submitting}<span class="pc-grid__spinner" aria-hidden="true"
-        ></span>{/if}
-      Save
-    </button>
+    <div class="form-actions">
+      <button
+        class="secondary-button"
+        type="button"
+        onclick={cancel}
+        disabled={submitting}
+      >
+        Cancel
+      </button>
+      <button
+        class="primary-button"
+        type="button"
+        onclick={() => submit()}
+        disabled={!dirty || submitting}
+        aria-busy={submitting}
+      >
+        {#if submitting}
+          <span class="pc-grid__spinner" aria-hidden="true"></span>
+        {/if}
+        Save Supplier
+      </button>
+    </div>
   {/snippet}
 </FormShell>

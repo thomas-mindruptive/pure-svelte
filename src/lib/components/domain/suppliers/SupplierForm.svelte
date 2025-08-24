@@ -81,6 +81,7 @@
   function handleSubmitted(p: { data: Record<string, any>; result: unknown }) {
     log.info({ component: "SupplierForm", event: "submitted" }, "FORM_EVENT");
   }
+  
   function handleSubmitError(p: { data: Record<string, any>; error: unknown }) {
     log.warn(
       {

@@ -315,53 +315,49 @@ onselect={handleSidebarNavigation}
 src/lib/components/
 ├── browser/
 │   └── HierarchySidebar.svelte           ✅ IMPLEMENTIERT + CSS ausgelagert
-├── suppliers/
+├── domain/suppliers/
 │   ├── SupplierGrid.svelte               ✅ IMPLEMENTIERT
 │   └── SupplierForm.svelte               ✅ VOLLSTÄNDIG GESTYLT
-├── categories/
+├── domain/categories/
 │   ├── CategoryGrid.svelte               ✅ IMPLEMENTIERT
 │   └── CategoryAssignment.svelte         ✅ VOLLSTÄNDIG IMPLEMENTIERT
 ├── styles/                               ✅ CSS-SYSTEM
 │   ├── grid.css                          ✅ BASIS-KOMPONENTE + Farbharmonisierung
 │   ├── form.css                          ✅ ERWEITERT (select-styles)
 │   └── sidebar.css                       ✅ NEU ERSTELLT
-├── offerings/                            ⌘ TODO
-│   ├── OfferingGrid.svelte
-│   └── OfferingForm.svelte
-├── attributes/                           ⌘ TODO
-│   ├── AttributeGrid.svelte
-│   └── AttributeForm.svelte
-├── links/                                ⌘ TODO
-│   ├── LinkGrid.svelte
-│   └── LinkForm.svelte
+├── domain/offerings/                            ⌘ TODO
+│   ├── OfferingGrid.svelte ✅ IMPLEMENTIERT
+│   └── OfferingForm.svelte     ⌘ TODO
+├── domain/attributes/                           ⌘ TODO
+│   ├── AttributeGrid.svelte ✅ IMPLEMENTIERT
+│   └── AttributeForm.svelte      ⌘ TODO
+├── domain/links/                                ⌘ TODO
+│   ├── LinkGrid.svelte ✅ IMPLEMENTIERT
+│   └── LinkForm.svelte     ⌘ TODO
 ├── Datagrid.svelte                       ✅ BASIS-KOMPONENTE + Dokumentation
 └── forms/FormShell.svelte                ✅ BASIS-KOMPONENTE
 
 src/routes/
 └── supplierbrowser/
-    └── +page.svelte                      ✅ TEST-SEITE (Ebene 1-2 vollständig)
+    └── +page.svelte                    ✅ TEST-SEITE (Ebene 1-2 vollständig)
+    └── mocdkData.ts                
 ```
 
 ---
 
 ## 🎯 **NEXT STEPS**
 
-### **1. Sofort (CategoryForm):**
-- CategoryForm.svelte für Assignment-Dropdown
-- Integration in supplier-browser/+page.svelte
-- Test: Category Assignment funktioniert
-
-### **2. Phase 2 (Offerings):**
-- OfferingGrid.svelte + OfferingForm.svelte
+### ** (Offerings):**
+- OfferingForm.svelte
 - Ebene 3 Navigation
 - Mock-Daten für Offerings erweitern
 
-### **3. Phase 3 (Details):**
-- AttributeGrid + AttributeForm + LinkGrid + LinkForm
+### **(Details):**
+- AttributeForm + LinkForm
 - Ebene 4-5 Navigation mit Mode-Toggle
 - Mock-Daten für Attributes/Links
 
-### **4. Phase 4 (API-Integration):**
+### **(API-Integration):**
 - Echte API-Calls statt Mock-Daten
 - Delete-Strategien mit Dependency-Checks
 - Error-Handling & Loading-States

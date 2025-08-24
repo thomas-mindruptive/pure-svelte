@@ -14,65 +14,11 @@ export type Wholesaler = {
   created_at?: string;         // required, default: SYSUTCDATETIME()
 };
 
-// Alias für Kompatibilität
-export type Supplier = Wholesaler;
-
 // ===== PRODUCT CATEGORY (dbo.product_categories) =====
 export type ProductCategory = {
   category_id: number;         // primaryKey, autoIncrement
   name: string;                // required, unique, maxLength: 200
   description?: string;        // nullable, maxLength: 500
-};
-
-// Alias für Kompatibilität
-export type Category = ProductCategory;
-
-// ===== WHOLESALER CATEGORY (dbo.wholesaler_categories) =====
-export type WholesalerCategory = {
-  name: string;                // comes from join to ProductCategory 
-  wholesaler_id: number;       // primaryKey
-  category_id: number;         // primaryKey
-  comment?: string;            // nullable, maxLength: 1000
-  link?: string;               // nullable, format: uri, maxLength: 2048
-  created_at?: string;         // required, default: SYSUTCDATETIME()
-};
-
-
-// ===== WHOLESALER ITEM OFFERING (dbo.wholesaler_item_offerings) =====
-export type WholesalerItemOffering = {
-  title: string;               // comes from join to product_definition!
-  offering_id: number;         // primaryKey, autoIncrement
-  wholesaler_id: number;       // required
-  category_id: number;         // required
-  product_def_id: number;      // required
-  size?: string;               // nullable, maxLength: 50
-  dimensions?: string;         // nullable, maxLength: 100
-  price?: number;              // nullable, precision: [18,2]
-  currency?: string;           // nullable, maxLength: 3
-  comment?: string;            // nullable, maxLength: 1000
-  created_at?: string;         // required, default: SYSUTCDATETIME()
-};
-
-// Alias für Kompatibilität
-export type Offering = WholesalerItemOffering;
-
-// ===== WHOLESALER OFFERING LINK (dbo.wholesaler_offering_links) =====
-export type WholesalerOfferingLink = {
-  link_id: number;             // primaryKey, autoIncrement
-  offering_id: number;         // required
-  url: string;                 // required, format: uri, maxLength: 2048
-  notes?: string;              // nullable, maxLength: 500
-  created_at?: string;         // required, default: SYSUTCDATETIME()
-};
-
-// Alias für Kompatibilität
-export type Link = WholesalerOfferingLink;
-
-// ===== WHOLESALER OFFERING ATTRIBUTE (dbo.wholesaler_offering_attributes) =====
-export type WholesalerOfferingAttribute = {
-  offering_id: number;         // primaryKey
-  attribute_id: number;        // primaryKey
-  value?: string;              // nullable, maxLength: 200
 };
 
 // ===== ATTRIBUTE (dbo.attributes) =====
@@ -93,6 +39,74 @@ export type ProductDefinition = {
   created_at?: string;         // required, default: SYSUTCDATETIME()
 };
 
+
+// ===== WHOLESALER CATEGORY (dbo.wholesaler_categories) =====
+export type WholesalerCategory = {
+  wholesaler_id: number;              // primaryKey
+  category_id: number;                // primaryKey
+  comment?: string;                   // nullable, maxLength: 1000
+  link?: string;                     // nullable, format: uri, maxLength: 2048
+  created_at?: string;               // required, default: SYSUTCDATETIME()
+};
+
+// ===== WHOLESALER CATEGORY including joins (dbo.wholesaler_categories) =====
+export type WholesalerCategory_Category = WholesalerCategory & {
+  category_name: string;               
+  category_description?: string;       
+};
+
+// ===== EXTENDED TYPES FOR MOCK DATA =====
+export type WholesalerCategoryWithCount = WholesalerCategory_Category & {
+    offering_count?: number;
+};
+
+// ===== WHOLESALER ITEM OFFERING (dbo.wholesaler_item_offerings) =====
+export type WholesalerItemOffering = {
+  offering_id: number;         // primaryKey, autoIncrement
+  wholesaler_id: number;       // required
+  category_id: number;         // required
+  product_def_id: number;      // required
+  size?: string;               // nullable, maxLength: 50
+  dimensions?: string;         // nullable, maxLength: 100
+  price?: number;              // nullable, precision: [18,2]
+  currency?: string;           // nullable, maxLength: 3
+  comment?: string;            // nullable, maxLength: 1000
+  created_at?: string;         // required, default: SYSUTCDATETIME()
+};
+
+// ===== WHOLESALER ITEM OFFERING including joins (dbo.wholesaler_item_offerings) =====
+export type WholesalerItemOffering_ProductDef_Category = WholesalerItemOffering & {
+  product_def_title?: string;
+  product_def_description?: string;
+  category_name?: string;
+  category_description?: string;
+};
+
+// ===== WHOLESALER OFFERING LINK (dbo.wholesaler_offering_links) =====
+export type WholesalerOfferingLink = {
+  link_id: number;             // primaryKey, autoIncrement
+  offering_id: number;         // required
+  url: string;                 // required, format: uri, maxLength: 2048
+  notes?: string;              // nullable, maxLength: 500
+  created_at?: string;         // required, default: SYSUTCDATETIME()
+};
+
+// Alias für Kompatibilität
+export type Link = WholesalerOfferingLink;
+
+// ===== WHOLESALER OFFERING ATTRIBUTE (dbo.wholesaler_offering_attributes) =====
+export type WholesalerOfferingAttribute = {
+  offering_id: number;         // primaryKey
+  attribute_id: number;        // primaryKey
+  value?: string;              // nullable, maxLength: 200
+};
+
+// ===== WHOLESALER OFFERING ATTRIBUTE invluding joins (dbo.wholesaler_offering_attributes) =====
+export type WholesalerOfferingAttribute_Attribute = WholesalerOfferingAttribute & {
+  attribute_name?: string;
+  attribute_description?: string;
+};
+
 // ===== MATERIAL (dbo.materials) =====
 export type Material = {
   material_id: number;         // primaryKey, autoIncrement
@@ -109,7 +123,7 @@ export type Form = {
 // Diese ergeben sich aus JOINs der Base-Tables
 
 export type WholesalerWithCategories = Wholesaler & {
-  categories?: (WholesalerCategory & { category_name?: string })[];
+  categories?: (WholesalerCategory_Category & { category_name?: string })[];
 };
 
 export type CategoryWithOfferingsCount = ProductCategory & {

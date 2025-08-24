@@ -9,122 +9,26 @@
 
   // Import components
   import HierarchySidebar from "$lib/components/browser/HierarchySidebar.svelte";
-  import SupplierGrid from "$lib/components/entities/suppliers/SupplierGrid.svelte";
-  import SupplierForm from "$lib/components/entities/suppliers/SupplierForm.svelte";
-  import CategoryGrid from "$lib/components/entities/categories/CategoryGrid.svelte";
+  import SupplierGrid from "$lib/components/domain/suppliers/SupplierGrid.svelte";
+  import SupplierForm from "$lib/components/domain/suppliers/SupplierForm.svelte";
+  import CategoryGrid from "$lib/components/domain/categories/CategoryGrid.svelte";
 
   // Import types
   import type {
     Level,
     ProductCategory,
     Wholesaler,
-    WholesalerCategory,
+    WholesalerCategoryWithCount,
+    WholesalerItemOffering_ProductDef_Category,
   } from "$lib/domain/types";
-  import CategoryAssignment from "$lib/components/entities/suppliers/CategoryAssignment.svelte";
+  import CategoryAssignment from "$lib/components/domain/suppliers/CategoryAssignment.svelte";
   import { addNotification } from "$lib/stores/notifications";
 
-  // ===== EXTENDED TYPES FOR MOCK DATA =====
-  type WholesalerCategoryWithCount = WholesalerCategory & {
-    offering_count?: number;
-  };
+  import { mockData as constMockData, type MockData } from "./mockData";
+  import OfferingGrid from "$lib/components/domain/offerings/OfferingGrid.svelte";
 
   // ===== MOCK DATA =====
-  const mockData: {
-    wholesalers: Wholesaler[];
-    assignedCategories: { [key: number]: WholesalerCategoryWithCount[] };
-    allCategories: ProductCategory[];
-  } = $state({
-    wholesalers: [
-      {
-        wholesaler_id: 1,
-        name: "Global Tech Supply",
-        region: "USA",
-        status: "active",
-        dropship: true,
-        website: "https://globaltech.example",
-        created_at: "2024-01-15T10:00:00Z",
-      },
-      {
-        wholesaler_id: 2,
-        name: "Euro Electronics",
-        region: "Germany",
-        status: "new",
-        dropship: false,
-        website: "https://euroelec.example",
-        created_at: "2024-02-20T14:30:00Z",
-      },
-      {
-        wholesaler_id: 3,
-        name: "Asia Components Ltd",
-        region: "China",
-        status: "inactive",
-        dropship: true,
-        website: "https://asiacomp.example",
-        created_at: "2024-01-05T08:15:00Z",
-      },
-    ],
-
-    assignedCategories: {
-      1: [
-        {
-          wholesaler_id: 1,
-          category_id: 1,
-          name: "Laptops",
-          comment: "High demand products",
-          link: "https://example.com/laptops",
-          created_at: "2024-01-16T10:00:00Z",
-          offering_count: 15,
-        },
-        {
-          wholesaler_id: 1,
-          category_id: 2,
-          name: "Smartphones",
-          comment: "Fast moving inventory",
-          created_at: "2024-01-17T10:00:00Z",
-          offering_count: 25,
-        },
-      ],
-      2: [
-        {
-          wholesaler_id: 2,
-          category_id: 4,
-          name: "Tablets",
-          comment: "European market focus",
-          created_at: "2024-02-21T14:30:00Z",
-          offering_count: 8,
-        },
-        {
-          wholesaler_id: 2,
-          category_id: 5,
-          name: "Gaming Equipment",
-          comment: "Growing segment",
-          link: "https://example.com/gaming",
-          created_at: "2024-02-22T14:30:00Z",
-          offering_count: 12,
-        },
-      ],
-      3: [
-        {
-          wholesaler_id: 3,
-          category_id: 3,
-          name: "Accessories",
-          comment: "Various tech accessories",
-          created_at: "2024-01-06T08:15:00Z",
-          offering_count: 45,
-        },
-      ],
-    },
-
-    // 🆕 ALL available categories in the system
-    allCategories: [
-      { category_id: 1, name: "Laptops", description: "Portable computers" },
-      { category_id: 2, name: "Smartphones", description: "Mobile phones" },
-      { category_id: 3, name: "Accessories", description: "Tech accessories" },
-      { category_id: 4, name: "Tablets", description: "Tablet computers" },
-      { category_id: 5, name: "Gaming Equipment", description: "Gaming gear" },
-      { category_id: 6, name: "Audio", description: "Headphones and speakers" },
-    ],
-  })
+  const mockData: MockData = $state(constMockData);
 
   // ===== URL-DRIVEN STATE (Svelte 5 Runes) =====
   const currentLevel = $derived(
@@ -148,7 +52,9 @@
 
   const selectedCategory = $derived(
     selectedCategoryId && selectedSupplier && selectedSupplier.wholesaler_id
-      ? (mockData.assignedCategories[selectedSupplier.wholesaler_id] || []).find(
+      ? (
+          mockData.assignedCategories[selectedSupplier.wholesaler_id] || []
+        ).find(
           (c: WholesalerCategoryWithCount) =>
             c.category_id === selectedCategoryId,
         ) || null
@@ -161,11 +67,21 @@
       : [],
   );
 
+  const offeringsForSupplierAndCategory = $derived(
+    selectedSupplier && selectedSupplier.wholesaler_id
+      ? (mockData.wholesalerItemOfferings.filter(
+          (o: WholesalerItemOffering_ProductDef_Category) =>
+            o.wholesaler_id === selectedSupplier.wholesaler_id &&
+            o.category_id === selectedCategoryId,
+        ) ?? [])
+      : [],
+  );
+
   // Sidebar data
   const counts = $derived({
     wholesalers: mockData.wholesalers.length,
     categories: categoriesForSupplier.length,
-    offerings: 0, // Not implemented yet
+    offerings: offeringsForSupplierAndCategory.length,
     attributes: 0, // Not implemented yet
     links: 0, // Not implemented yet
   });
@@ -185,7 +101,7 @@
     },
     {
       key: "offerings",
-      label: "Product Offerings (0)",
+      label: `Product Offerings (${counts.offerings})`,
       disabled: !selectedCategory,
       level: 2,
     },
@@ -208,6 +124,7 @@
     level?: Level;
     supplierId?: number | null | undefined;
     categoryId?: number | null | undefined;
+    offeringId?: number | null | undefined;
   }) {
     const searchParams = new URLSearchParams($page.url.searchParams);
 
@@ -224,6 +141,13 @@
         searchParams.set("categoryId", params.categoryId.toString());
       } else {
         searchParams.delete("categoryId");
+      }
+    }
+    if (params.offeringId !== undefined) {
+      if (params.offeringId) {
+        searchParams.set("offeringId", params.offeringId.toString());
+      } else {
+        searchParams.delete("offeringId");
       }
     }
 
@@ -266,11 +190,24 @@
   function handleCategorySelect(category: WholesalerCategoryWithCount) {
     log.info("Category selected", {
       categoryId: category.category_id,
-      name: category.name,
+      category_name: category.category_name,
     });
     updateURL({
       level: "offerings",
       categoryId: category.category_id,
+    });
+  }
+
+  function handleOfferingSelect(
+    offering: WholesalerItemOffering_ProductDef_Category,
+  ) {
+    log.info("Offering selected", {
+      offeringId: offering.offering_id,
+      offering_name: offering.product_def_title,
+    });
+    updateURL({
+      level: "attributes",
+      offeringId: offering.offering_id,
     });
   }
 
@@ -291,6 +228,11 @@
     );
   }
 
+  async function handleOfferingDelete(ids: (string | number)[]) {
+    log.info("Mock: Remove offerings", { ids });
+    alert(`MOCK: Would remove offerings with IDs: ${ids.join(", ")}`);
+  }
+
   // // ===== FORM HANDLERS =====
   // function handleSupplierSubmit(p: { data: Record<string, any>; result: unknown }) {
   //   log.info('Mock: Supplier form submitted', p);
@@ -307,7 +249,7 @@
     if (currentLevel === "categories" && selectedSupplier)
       return `Categories for ${selectedSupplier.name}`;
     if (currentLevel === "offerings" && selectedCategory)
-      return `Offerings in ${selectedCategory.name}`;
+      return `Offerings in ${selectedCategory.category_name}`;
     return "Supplier Browser";
   });
 
@@ -328,10 +270,10 @@
     if (!selectedSupplier?.wholesaler_id) return;
 
     // Optimistic update: Add to assigned categories list
-    const newAssignment = {
+    const newAssignment: WholesalerCategoryWithCount = {
       wholesaler_id: selectedSupplier.wholesaler_id,
       category_id: category.category_id,
-      name: category.name,
+      category_name: category.name,
       comment: "",
       created_at: new Date().toISOString(),
       offering_count: 0,
@@ -341,7 +283,9 @@
     if (!mockData.assignedCategories[selectedSupplier.wholesaler_id]) {
       mockData.assignedCategories[selectedSupplier.wholesaler_id] = [];
     }
-    mockData.assignedCategories[selectedSupplier.wholesaler_id].push(newAssignment);
+    mockData.assignedCategories[selectedSupplier.wholesaler_id].push(
+      newAssignment,
+    );
 
     addNotification(
       `Category "${category.name}" assigned successfully`,
@@ -381,7 +325,7 @@
           <span class="badge">Supplier: {selectedSupplier.name}</span>
         {/if}
         {#if selectedCategory}
-          <span class="badge">Category: {selectedCategory.name}</span>
+          <span class="badge">Category: {selectedCategory.category_name}</span>
         {/if}
       </div>
     </div>
@@ -390,7 +334,12 @@
       <!-- EBENE 2: SupplierForm oben + CategoryGrid unten -->
       {#if currentLevel === "categories" && selectedSupplier}
         <div class="master-form-section">
-          <SupplierForm initial={selectedSupplier ? {...selectedSupplier} : {} as Wholesaler}  disabled={false} />
+          <SupplierForm
+            initial={selectedSupplier
+              ? { ...selectedSupplier }
+              : ({} as Wholesaler)}
+            disabled={false}
+          />
         </div>
         <CategoryAssignment
           supplierId={selectedSupplier.wholesaler_id}
@@ -415,11 +364,17 @@
             {loading}
             showOfferingCount={true}
             executeDelete={handleCategoryDelete}
+            onRowClick={handleCategorySelect}
           />
         {:else if currentLevel === "offerings"}
           <div class="empty-state">
             <h3>Offerings Grid</h3>
-            <p>Not implemented yet - coming in next phase!</p>
+            <OfferingGrid
+              rows={offeringsForSupplierAndCategory}
+              {loading}
+              executeDelete={handleOfferingDelete}
+              onRowClick={handleOfferingSelect}
+            />
           </div>
         {/if}
       </div>

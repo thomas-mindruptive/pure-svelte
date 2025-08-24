@@ -1,6 +1,10 @@
 # Detailinfo SupplierBrowser
 Siehe README-Supplier-Browser.md!!!!!!
 
+# Claude instructions
+geniere nie ohne mein ok.
+generiere nur ein artefakt zu einer zeit, sonst zerstörst du selber deinen code, da du fehler machst und in die bestehenden artefakte reinschreibst.
+
 # **Achte besonders auf: Svelte VERSION 5 - RUNES!!!!!**
 
 # Project Summary: A Data Management Web Application

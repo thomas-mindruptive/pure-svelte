@@ -1,19 +1,21 @@
 <script lang="ts">
   // Thin wrapper around Datagrid for wholesalers
-  import Datagrid, {
-    type ColumnDef,
-    type DeleteStrategy,
-    type RowActionStrategy,
-  } from "$lib/components/client/Datagrid.svelte";
+  import Datagrid from "$lib/components/client/Datagrid.svelte";
+  import type {
+    ID,
+    ColumnDef,
+    DeleteStrategy,
+    RowActionStrategy,
+  } from "$lib/components/client/Datagrid.types";
   import type { Wholesaler } from "$lib/domain/types";
 
-  type ID = string | number;
+  const DUMMY_ACCESSOR = (r: any) => "DUMYY*************";
 
   const {
     rows = [] as Wholesaler[],
     loading = false,
     executeDelete, // (ids) => Promise<void>
-    onRowClick
+    onRowClick,
   } = $props<{
     rows?: Wholesaler[];
     loading?: boolean;
@@ -28,8 +30,8 @@
       header: "Dropship",
       accessor: (r) => (r.dropship ? "Yes" : "No"),
     },
-    { key: "email", header: "Email" },
-    { key: "country", header: "Country" },
+    { key: "email", header: "Email", accessor: DUMMY_ACCESSOR },
+    { key: "country", header: "Country", accessor: DUMMY_ACCESSOR },
   ];
 
   const getId = (r: Wholesaler): ID => (r as any).id as ID;
@@ -52,7 +54,7 @@
   void deleteStrategy;
 </script>
 
-<Datagrid 
+<Datagrid
   {rows}
   {columns}
   {getId}

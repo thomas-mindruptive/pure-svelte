@@ -17,14 +17,13 @@
   import type { Snippet } from "svelte";
   import { log } from "$lib/utils/logger";
   import { requestConfirmation } from "$lib/stores/confirmation";
-    import type { ColumnDef, DeleteStrategy, RowActionStrategy, DryRunResult, ConfirmResult, ID } from "./Datagrid.types";
 
   export const HUGO = "hugo";
  
 
   // ===== TYPE DEFINITIONS =====
 
-
+  type ID = string | number; // Universal ID type for row identification
 
   // // Column definition - describes how to display and interact with a data column
   // export type ColumnDef<T = any> = {
@@ -38,7 +37,68 @@
 
   // Type-safe ColumnDef - nur gültige Properties oder mit accessor
 
+  // Wenn accessor vorhanden: key kann beliebig sein (da accessor die Logik übernimmt)
+  export type ColumnDefWithAccessor<T> = {
+    key: string; // beliebig, da accessor die Daten extrahiert
+    header: string;
+    accessor: (row: T) => any; // required
+    sortable?: boolean;
+    width?: string;
+    class?: string;
+  };
 
+  // Wenn kein accessor: key muss gültiges Property sein
+  export type ColumnDefDirect<T> = {
+    key: keyof T; // NUR gültige Property-Namen
+    header: string;
+    accessor?: never; // kein accessor erlaubt
+    sortable?: boolean;
+    width?: string;
+    class?: string;
+  };
+
+  // Union: entweder direct access ODER accessor
+  export type ColumnDef<T = any> =
+    | ColumnDefWithAccessor<T>
+    | ColumnDefDirect<T>;
+
+  // Result from a delete dry-run - provides impact analysis before actual deletion
+  export type DryRunResult = {
+    total: number; // Number of related records that would be affected
+    details?: Record<string, number>; // Breakdown by category (e.g., {"orders": 5, "invoices": 2})
+    recommendsCascade?: boolean; // Whether system recommends cascade delete
+    [k: string]: any; // Extensible for domain-specific data
+  };
+
+  // Context passed to delete confirmation handlers
+  export type ConfirmContext<T = any> = {
+    ids: ID[]; // IDs of items being deleted
+    rows: T[]; // Full row objects being deleted
+    dryRun?: DryRunResult; // Results from dry-run analysis
+    gridId?: string; // Grid identifier for logging
+    entity?: string; // Entity type for user messages
+  };
+
+  // Result from delete confirmation - controls whether deletion proceeds
+  export type ConfirmResult = {
+    ok: boolean; // Whether user confirmed the deletion
+    options?: Record<string, any>; // Additional options (e.g., {cascade: true})
+    reason?: string; // Why confirmation failed (for logging)
+  };
+
+  // Strategy pattern for handling row interactions
+  export type RowActionStrategy<T = any> = {
+    click?: (row: T) => void; // Primary click action (usually navigation)
+    doubleClick?: (row: T) => void; // Double-click action
+    hover?: (row: T) => void; // Hover action (e.g., preview)
+  };
+
+  // Strategy pattern for delete operations - allows customization of the entire delete flow
+  export type DeleteStrategy<T = any> = {
+    dryRun?: (ids: ID[], rows: T[]) => Promise<DryRunResult>; // Optional: analyze impact before deletion
+    confirm?: (ctx: ConfirmContext<T>) => Promise<ConfirmResult>; // Optional: custom confirmation dialog
+    execute: (ids: ID[], options?: Record<string, any>) => Promise<void>; // Required: perform the actual deletion
+  };
 
   // ===== SNIPPET PROP TYPES =====
   // These define the data passed to customizable snippets
@@ -196,10 +256,17 @@
       let colInfo = `col name: ${colName}`;
 
       // Use custom accessor function if provided, otherwise direct property access
-      if (col.accessor) {
-        if (typeof col.accessor !== "function") {
-          throw new Error(`Column accessor for ${colName} is not a function`);
+      let isDummyAccessor = false;
+      if (col.accessor && typeof col.accessor === "function") {
+        const result = col.accessor({ [col.key]: "test" });
+        if ("XXXXXXXXXXXXXXXXXXX" === result) {
+          isDummyAccessor = true;
+          log.debug(
+            `safeAccessor: Got dummy cell accessor for ${col.key} => Will use direct access.`,
+          );
         }
+      }
+      if (col.accessor && !isDummyAccessor) {
         const val = col.accessor!(row);
         log.debug(
           `safeAccessor: Cell accessor for ${colName} returned: ${val}`,

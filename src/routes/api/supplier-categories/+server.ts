@@ -1,7 +1,7 @@
 // src/routes/api/supplier-categories/+server.ts
 
 /**
- * Supplier Categories Assignment API
+ * Supplier Categories Assignment API - FIXED with Type Enforcement
  * 
  * @description Category Assignment Operations for Suppliers
  * 
@@ -14,6 +14,7 @@
  * - Dependency checking for category removal
  * - Full validation and error handling
  * - Transaction safety for cascade operations
+ * ✅ FIXED: Now uses proper type enforcement for all responses
  */
 
 import { json, error, type RequestHandler } from '@sveltejs/kit';
@@ -22,6 +23,12 @@ import { log } from '$lib/utils/logger';
 import { mssqlErrorMapper } from '$lib/server/errors/mssqlErrorMapper';
 import { checkCategoryDependencies } from '$lib/dataModel/dependencyChecks';
 import type { WholesalerCategory } from '$lib/domain/types';
+
+// ✅ CRITICAL: Import response types for type enforcement
+import type { 
+    AssignCategoryResponse, 
+    RemoveCategoryResponse 
+} from '$lib/api/types/category';
 
 /**
  * Request body for category assignment
@@ -47,6 +54,7 @@ interface RemoveCategoryRequest {
  * 
  * @description Assign a category to a supplier
  * Creates entry in dbo.wholesaler_categories table
+ * ✅ FIXED: Now uses AssignCategoryResponse type
  */
 export const POST: RequestHandler = async (event) => {
     try {
@@ -147,16 +155,20 @@ export const POST: RequestHandler = async (event) => {
             categoryName: category.name
         });
 
-        return json({
+        // ✅ FIXED: Use proper type enforcement
+        const response: AssignCategoryResponse = {
             success: true,
             message: `Category "${category.name}" assigned to supplier "${supplier.name}" successfully`,
             assignment,
             meta: {
+                timestamp: new Date().toISOString(),
                 assigned_at: new Date().toISOString(),
                 supplier_name: supplier.name,
                 category_name: category.name
             }
-        });
+        };
+
+        return json(response);
 
     } catch (err: unknown) {
         // Handle SvelteKit errors (400, 404, 409, etc.)
@@ -182,6 +194,7 @@ export const POST: RequestHandler = async (event) => {
  * @description Remove a category assignment from a supplier
  * Removes entry from dbo.wholesaler_categories table
  * Supports cascade delete of related offerings
+ * ✅ FIXED: Now uses RemoveCategoryResponse type
  */
 export const DELETE: RequestHandler = async (event) => {
     try {
@@ -243,14 +256,21 @@ export const DELETE: RequestHandler = async (event) => {
                     dependencyCount
                 });
 
-                return json({
+                // ✅ FIXED: Use proper type enforcement for conflict response
+                const response: RemoveCategoryResponse = {
                     success: false,
                     message: `Cannot remove category "${assignment.category_name}": has ${dependencyCount} product offerings`,
                     dependencies: {
-                        offering_count: dependencyCount
+                        offering_count: dependencyCount,
+                        cascade_recommended: true
                     },
-                    cascade_available: true
-                }, { status: 409 });
+                    cascade_available: true,
+                    meta: {
+                        timestamp: new Date().toISOString()
+                    }
+                };
+
+                return json(response, { status: 409 });
             }
 
             if (cascade && dependencyCount > 0) {
@@ -295,18 +315,15 @@ export const DELETE: RequestHandler = async (event) => {
             }
 
             // Finally, delete the category assignment
-            /*const deleteResult =*/ await transaction.request()
+            await transaction.request()
                 .input('supplierId', supplierId)
                 .input('categoryId', categoryId)
                 .query(`
                     DELETE FROM dbo.wholesaler_categories
-                    OUTPUT DELETED.wholesaler_id, DELETED.category_id, DELETED.comment, DELETED.link
                     WHERE wholesaler_id = @supplierId AND category_id = @categoryId
                 `);
 
             await transaction.commit();
-
-            // const deletedAssignment = deleteResult.recordset[0];
 
             log.info("API: Category assignment removed successfully", {
                 supplierId,
@@ -317,7 +334,8 @@ export const DELETE: RequestHandler = async (event) => {
                 offeringsRemoved: cascade ? dependencyCount : 0
             });
 
-            return json({
+            // ✅ FIXED: Use proper type enforcement for success response
+            const response: RemoveCategoryResponse = {
                 success: true,
                 message: cascade
                     ? `Category "${assignment.category_name}" and ${dependencyCount} related offerings removed from supplier "${assignment.supplier_name}"`
@@ -331,9 +349,12 @@ export const DELETE: RequestHandler = async (event) => {
                 cascade_performed: cascade,
                 offerings_removed: cascade ? dependencyCount : 0,
                 meta: {
+                    timestamp: new Date().toISOString(),
                     removed_at: new Date().toISOString()
                 }
-            });
+            };
+
+            return json(response);
 
         } catch (transactionError) {
             await transaction.rollback();

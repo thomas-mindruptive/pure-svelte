@@ -42,7 +42,7 @@ import {
   isRemoveConflict,
   hasCategoryValidationErrors
 } from '$lib/api/types/category';
-import type { ProductCategory, WholesalerCategory_Category } from '$lib/domain/types';
+import type { ProductCategory, WholesalerCategory, WholesalerCategory_Category } from '$lib/domain/types';
 
 // ===== LOADING STATE MANAGER =====
 
@@ -159,7 +159,7 @@ export async function loadAllCategories(): Promise<ProductCategory[]> {
  */
 export async function assignCategoryToSupplier(
   request: AssignCategoryRequest
-): Promise<WholesalerCategory_Category> {
+): Promise<WholesalerCategory> {
   if (!request.supplierId || request.supplierId <= 0) {
     throw new Error('Invalid supplier ID provided');
   }

@@ -22,6 +22,7 @@ import { mssqlErrorMapper } from '$lib/server/errors/mssqlErrorMapper';
 import { checkWholesalerDependencies } from '$lib/dataModel/dependencyChecks';
 import { LogicalOperator, ComparisonOperator, type QueryPayload } from '$lib/clientAndBack/queryGrammar';
 import type { Wholesaler } from '$lib/domain/types';
+import type { SupplierQueryResponse } from '$lib/api/types';
 
 /**
  * POST /api/suppliers/[id]
@@ -85,7 +86,7 @@ export const POST: RequestHandler = async (event) => {
             hasJoins: metadata.hasJoins
         });
 
-        return json({
+        const response: SupplierQueryResponse = {
             results,
             meta: {
                 retrieved_at: new Date().toISOString(),
@@ -97,7 +98,9 @@ export const POST: RequestHandler = async (event) => {
                 table_fixed: 'dbo.wholesalers', // Route determines table
                 sql_generated: sql.replace(/\s+/g, ' ').trim()
             }
-        });
+        };
+
+        return json(response);
 
     } catch (err: unknown) {
         if (err && typeof err === 'object' && 'status' in err) {

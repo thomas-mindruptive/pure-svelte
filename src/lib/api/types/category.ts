@@ -21,6 +21,7 @@
 
 import type { 
   ProductCategory, 
+  WholesalerCategory, 
   WholesalerCategory_Category,
   WholesalerCategoryWithCount 
 } from '$lib/domain/types';
@@ -119,7 +120,7 @@ export interface AssignCategoryRequest extends Record<string, unknown> {
  */
 export interface AssignCategorySuccess extends Record<string, unknown> {
   /** The created assignment record */
-  assignment: WholesalerCategory_Category;
+  assignment: WholesalerCategory;
   /** Assignment metadata */
   meta: {
     assigned_at: string;

@@ -1,16 +1,10 @@
 // src/routes/api/suppliers/+server.ts
 
 /**
- * Suppliers List API Endpoint
+ * Suppliers List API Endpoint - FIXED with proper Type Enforcement
  * 
- * @description GET /api/suppliers - Flexible supplier list queries via QueryBuilder
- * 
- * @features
- * - Client defines SELECT, WHERE, ORDER BY via QueryPayload (NO 'from' for security)
- * - Server fixes table to 'dbo.wholesalers'
- * - Supports filtering, sorting, pagination
- * - Full integration with supplierQueryConfig for security
- * - POST request to allow complex query payloads in body
+ * @description POST /api/suppliers - Type-safe supplier list queries via QueryBuilder
+ * ✅ FIXED: Now properly uses SupplierQueryResponse type from api/types
  */
 
 import { json, error, type RequestHandler } from '@sveltejs/kit';
@@ -21,19 +15,17 @@ import { mssqlErrorMapper } from '$lib/server/errors/mssqlErrorMapper';
 import { LogicalOperator, type QueryPayload } from '$lib/clientAndBack/queryGrammar';
 import type { Wholesaler } from '$lib/domain/types';
 
+// ✅ CRITICAL: Import the actual response type
+import type { SupplierQueryResponse } from '$lib/api/types/supplier';
+
 /**
  * POST /api/suppliers
- * 
- * @description Flexible supplier list query via QueryBuilder
- * Client sends QueryPayload (WITHOUT 'from' - server sets table to dbo.wholesalers)
- * Supports complex filtering, sorting, pagination
+ * ✅ FIXED: Now uses proper SupplierQueryResponse type
  */
 export const POST: RequestHandler = async (event) => {
     try {
-        // Client defines what they want (columns, sorting, filters) - but NOT the table
         const clientPayload = await event.request.json() as QueryPayload;
 
-        // Validate required fields from client
         if (!clientPayload.select || clientPayload.select.length === 0) {
             throw error(400, 'select field is required and cannot be empty');
         }
@@ -45,21 +37,17 @@ export const POST: RequestHandler = async (event) => {
             limit: clientPayload.limit
         });
 
-        // SECURITY: Force table to dbo.wholesalers (no user input for table name)
         const securePayload: QueryPayload = {
             ...clientPayload,
-            from: 'dbo.wholesalers', // FIXED: Route determines table
-            // Keep client's WHERE conditions as-is (no additional filtering for list view)
+            from: 'dbo.wholesalers',
             where: clientPayload.where || {
                 op: LogicalOperator.AND,
-                conditions: [] // Empty = no filtering
+                conditions: []
             },
-            // Security: Cap limit to prevent abuse, set reasonable default
             limit: Math.min(clientPayload.limit || 50, 1000),
             offset: Math.max(clientPayload.offset || 0, 0)
         };
 
-        // Use QueryBuilder with supplierQueryConfig for security
         const { sql, parameters, metadata } = buildQuery(securePayload, supplierQueryConfig);
         const results = await executeQuery(sql, parameters);
 
@@ -70,8 +58,9 @@ export const POST: RequestHandler = async (event) => {
             hasWhere: metadata.hasWhere
         });
 
-        return json({
-            suppliers: results as Partial<Wholesaler>[],
+        // ✅ FIXED: Use the actual SupplierQueryResponse type
+        const response: SupplierQueryResponse = {
+            results: results as Partial<Wholesaler>[],  // ✅ 'results' field required by type
             meta: {
                 retrieved_at: new Date().toISOString(),
                 result_count: results.length,
@@ -80,14 +69,14 @@ export const POST: RequestHandler = async (event) => {
                 has_where: metadata.hasWhere,
                 parameter_count: metadata.parameterCount,
                 table_fixed: 'dbo.wholesalers',
-                limit: securePayload.limit,
-                offset: securePayload.offset,
                 sql_generated: sql.replace(/\s+/g, ' ').trim()
             }
-        });
+        };
+
+        // ✅ TypeScript now ENFORCES the correct structure
+        return json(response);
 
     } catch (err: unknown) {
-        // Handle SvelteKit errors (400, etc.)
         if (err && typeof err === 'object' && 'status' in err) {
             throw err;
         }
@@ -102,6 +91,3 @@ export const POST: RequestHandler = async (event) => {
         throw error(status, message);
     }
 };
-
-// Only POST endpoint - consistent with suppliers/[id] pattern
-// Client defines QueryPayload, server sets table for security

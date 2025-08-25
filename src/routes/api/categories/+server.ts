@@ -19,6 +19,7 @@ import { supplierQueryConfig } from '$lib/clientAndBack/queryConfig';
 import { mssqlErrorMapper } from '$lib/server/errors/mssqlErrorMapper';
 import type { QueryPayload } from '$lib/clientAndBack/queryGrammar';
 import type { ProductCategory } from '$lib/domain/types';
+import type { ListCategoriesResponse } from '$lib/api/types';
 
 /**
  * POST /api/categories
@@ -62,20 +63,21 @@ export const POST: RequestHandler = async (event) => {
             hasWhere: metadata.hasWhere
         });
 
-        return json({
+        const response: ListCategoriesResponse = {
+            success: true,
+            message: 'Categories retrieved successfully',
             categories: results as ProductCategory[],
             meta: {
-                retrieved_at: new Date().toISOString(),
-                result_count: results.length,
-                columns_selected: metadata.selectColumns,
-                has_where: metadata.hasWhere,
-                parameter_count: metadata.parameterCount,
-                table_fixed: 'dbo.product_categories',
-                limit: securePayload.limit,
-                offset: securePayload.offset,
-                sql_generated: sql.replace(/\s+/g, ' ').trim()
+                timestamp: new Date().toISOString(),
+                total: results.length,
+                returned: results.length,
+                limit: securePayload.limit || 100,
+                offset: securePayload.offset || 0,
+                has_more: false
             }
-        });
+        };
+
+        return json(response);
 
     } catch (err: unknown) {
         if (err && typeof err === 'object' && 'status' in err) {

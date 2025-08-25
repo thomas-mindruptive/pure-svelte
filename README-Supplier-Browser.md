@@ -10,7 +10,7 @@ Ein **5-Ebenen hierarchisches Navigationssystem** für Supplier/Wholesaler-Daten
 
 **Domain**: B2B-Beschaffung, Wholesale-Management, Produktkataloge
 
-## 🏗️ System Architecture
+## 🗗️ System Architecture
 
 ### Database Schema (MSSQL)
 ```sql
@@ -45,45 +45,63 @@ dbo.wholesaler_offering_links     -- URLs/Links pro Offering
 
 ## 📊 Implementation Status
 
-### ✅ Level 1-2 (Production Ready)
+### ✅ Level 1-2 (API Integration In Progress)
 - **HierarchySidebar.svelte** - Navigation mit counts & disabled states
 - **SupplierGrid/Form.svelte** - CRUD operations, validation, responsive design
 - **CategoryGrid.svelte** - Category assignments per supplier  
-- **CategoryAssignment.svelte** - n:m relationship management mit Mock-API
-- **API Types** - Complete type safety für Supplier & Category domains
-- **QueryBuilder** - Client-flexible, server-secure SQL generation
+- **CategoryAssignment.svelte** - n:m relationship management
+- **API Client Structure** - Type-safe client functions in `$lib/api/client/`
+- **API Types System** - Shared request/response types in `$lib/api/types/`
 - **Suppliers API** - `/api/suppliers/[id]` GET/POST/PUT/DELETE vollständig
+- **Categories API** - `/api/categories` & `/api/supplier-categories` vollständig
+
+### 🔄 Current Focus: API Integration
+- **API Client Common** - `$lib/api/client/common.ts` ✅ Ready
+- **Supplier API Client** - `$lib/api/client/supplier.ts` 🔄 In Progress
+- **Category API Client** - `$lib/api/client/category.ts` ⏳ Next
+- **Page Integration** - Replace mockData with API calls ⏳ Planned
 
 ### Test level 1-2
-Test supplier browser level 1-2 mit echten DB-daten - ❌ TODO
+Test supplier browser level 1-2 mit echten DB-daten - ⌛ TODO
 
-### 🔄 Level 3 (In Progress)  
-- **OfferingForm.svelte** - ❌ TODO
-- **Offerings API** - ❌ TODO (`/api/offerings/[id]`)
+### 🔄 Level 3 (Planned After API Integration)  
+- **OfferingForm.svelte** - ⌛ TODO
+- **Offerings API** - ⌛ TODO (`/api/offerings/[id]`)
 
 ### ⏳ Level 4-5 (Planned)
-- **AttributeGrid/Form.svelte** - ❌ Stubs vorhanden, Forms TODO  
-- **LinkGrid/Form.svelte** - ❌ Stubs vorhanden, Forms TODO
-- **Toggle zwischen Attributes/Links** - ❌ UI-Logic TODO
-- **APIs für Attributes/Links** - ❌ Komplett TODO
+- **AttributeGrid/Form.svelte** - ⌛ Stubs vorhanden, Forms TODO  
+- **LinkGrid/Form.svelte** - ⌛ Stubs vorhanden, Forms TODO
+- **Toggle zwischen Attributes/Links** - ⌛ UI-Logic TODO
+- **APIs für Attributes/Links** - ⌛ Komplett TODO
 
-
-
-
-### Production Transition Pattern
+### Production Transition Pattern (Updated)
 ```typescript
-// Mock (Development)
+// OLD: Mock (Development)
 let mockData = $state({ suppliers: [...] });
 
-// Production (später)
+// NEW: API Integration (Current)
+import { loadSuppliers, updateSupplier } from '$lib/api/client/supplier';
+
 let suppliers = $state<Supplier[]>([]);
-onMount(async () => {
-  const response = await fetch('/api/suppliers');
-  suppliers = await response.json();
+let loading = $state(false);
+
+// Reactive API loading
+$effect(async () => {
+  loading = true;
+  try {
+    suppliers = await loadSuppliers({
+      select: ['name', 'region', 'status', 'dropship'],
+      orderBy: [{ key: 'name', direction: 'asc' }]
+    });
+  } catch (error) {
+    console.error('Failed to load suppliers:', error);
+  } finally {
+    loading = false;
+  }
 });
 ```
 
-### Mock-Daten Struktur
+### Mock-Daten Struktur (Being Replaced)
 - **3 Suppliers** mit unterschiedlichen Regionen/Status
 - **6 Categories** global verfügbar  
 - **Assigned Categories** pro Supplier mit `offering_count`
@@ -95,6 +113,14 @@ onMount(async () => {
 - **SvelteKit** mit Svelte 5 + Runes
 - **TypeScript** mit strict compiler options
 - **MSSQL** Database mit connection pooling
+
+### API Architecture (NEW)
+- **Type-Safe API Clients** in `$lib/api/client/`
+- **Shared API Types** in `$lib/api/types/`
+- **Client-Server Type Consistency** end-to-end
+- **Structured Error Handling** mit ApiError class
+- **Loading State Management** mit LoadingState class
+- **Retry Logic** für failed requests
 
 ## 🔧 Core Implementation Patterns
 
@@ -116,7 +142,7 @@ function updateURL(params: { level?: Level; supplierId?: number }) {
 const clientPayload: SupplierQueryRequest = {
   select: ["name", "region", "status"],
   where: { op: LogicalOperator.AND, conditions: [...] }
-  // ❌ KEIN 'from' field!
+  // ⌛ KEIN 'from' field!
 };
 
 // Server fügt Security hinzu in /api/suppliers/[id]/+server.ts:
@@ -127,7 +153,34 @@ const securePayload: QueryPayload = {
 };
 ```
 
-### 3. Component Wrapper Pattern
+### 3. API Client Pattern (NEW)
+```typescript
+// Type-safe API client usage
+import { loadSuppliers, updateSupplier } from '$lib/api/client/supplier';
+import { assignCategory } from '$lib/api/client/category';
+
+// Load suppliers with flexible query
+const suppliers = await loadSuppliers({
+  select: ['name', 'region', 'status'],
+  where: { 
+    op: LogicalOperator.AND, 
+    conditions: [{ key: 'status', op: ComparisonOperator.EQUALS, val: 'active' }] 
+  },
+  limit: 50
+});
+
+// Update supplier with validation
+try {
+  const updated = await updateSupplier(123, { name: 'New Name', status: 'active' });
+  console.log('Updated:', updated.supplier.name);
+} catch (error) {
+  if (error.errors?.name) {
+    console.error('Name validation failed:', error.errors.name);
+  }
+}
+```
+
+### 4. Component Wrapper Pattern
 Alle Domain-Components sind dünne Wrapper um generische Basis-Components:
 
 ```typescript
@@ -141,29 +194,27 @@ Alle Domain-Components sind dünne Wrapper um generische Basis-Components:
 />
 ```
 
-### 4. End-to-End Type Safety
+### 5. End-to-End Type Safety (Enhanced)
 ```typescript
-// Shared types in /lib/api/types/supplier.ts
+// Shared types in $lib/api/types/supplier.ts
 export interface UpdateSupplierRequest {
   name?: string;
   status?: 'active' | 'inactive';
 }
 
-// Client (type-safe)
-const data: UpdateSupplierRequest = { name: "New Name" };
-const response: UpdateSupplierResponse = await fetch('/api/suppliers/123', {
-  method: 'PUT',
-  body: JSON.stringify(data satisfies UpdateSupplierRequest)
-}).then(r => r.json());
+// Client (type-safe via API client)
+import { updateSupplier } from '$lib/api/client/supplier';
+const result = await updateSupplier(123, { name: "New Name" });
 
 // Server (same types)
 const request: UpdateSupplierRequest = await event.request.json();
 return json({ success: true } satisfies UpdateSupplierResponse);
 ```
+
 - **QueryBuilder Pattern**: Client definiert Query, Server setzt Security (siehe `src/lib/server/queryBuilder.ts`)
 - **Domain Validation**: Type-safe validation per entity (siehe `src/lib/server/validation/domainValidator.ts`)
 - **Error Mapping**: MSSQL Constraints → HTTP Status (siehe `src/lib/server/errors/mssqlErrorMapper.ts`)
-- **End-to-End Types**: Shared API types zwischen Client/Server (siehe `src/lib/api/types/`)
+- **End-to-End Types**: Shared API types zwischen Client/Server (siehe `$lib/api/types/`)
 
 ### UI Components
 - **Datagrid.svelte** - Generic enterprise-grade grid mit delete workflows
@@ -177,16 +228,27 @@ return json({ success: true } satisfies UpdateSupplierResponse);
 npm install
 npm run dev
 ```
-Navigate to `/supplierbrowser` für die Test-Umgebung mit Mock-Daten.
+Navigate to `/supplierbrowser` für die Test-Umgebung mit Mock-Daten (being transitioned to API calls).
 
 ### Database Setup
 MSSQL connection config in `src/lib/server/db.ts`.
 
 ### API Testing
 - Supplier APIs verfügbar unter `/api/suppliers/[id]`
-- Category Assignment API unter `/api/supplier-categories` (Server TODO)
+- Category Assignment API unter `/api/supplier-categories`
+- Category List API unter `/api/categories`
 
-## 📁 Key File Locations
+## 🔍 Key File Locations (Updated)
+
+### API Layer (NEW)
+- `$lib/api/types/` - Shared API type definitions (client + server)
+  - `common.ts` - BaseApiResponse, HTTP_STATUS, type guards
+  - `supplier.ts` - Supplier request/response types  
+  - `category.ts` - Category operation types
+- `$lib/api/client/` - Client-side API functions (browser only)
+  - `common.ts` - apiFetch wrapper, LoadingState, retry logic
+  - `supplier.ts` - Type-safe supplier API functions
+  - `category.ts` - Type-safe category API functions
 
 ### Components
 - `/src/lib/components/domain/suppliers/` - Supplier-specific UI
@@ -194,9 +256,10 @@ MSSQL connection config in `src/lib/server/db.ts`.
 - `/src/lib/components/client/` - Reusable UI components (Datagrid, etc.)
 - `/src/lib/components/browser/` - Navigation components
 
-### API & Types
-- `/src/lib/api/types/` - End-to-End API type definitions
+### Server Layer
 - `/src/routes/api/suppliers/` - Supplier REST endpoints
+- `/src/routes/api/categories/` - Category REST endpoints
+- `/src/routes/api/supplier-categories/` - Category assignment endpoints
 - `/src/lib/server/` - Server utilities (QueryBuilder, validation, errors)
 
 ### Domain Logic  
@@ -204,8 +267,8 @@ MSSQL connection config in `src/lib/server/db.ts`.
 - `/src/lib/server/supplierQueryConfig.ts` - Security whitelists für QueryBuilder
 
 ### Test Environment
-- `/src/routes/supplierbrowser/` - Test page mit Mock-Daten
-- `/src/routes/supplierbrowser/mockData.ts` - Development data
+- `/src/routes/supplierbrowser/` - Test page (transitioning from mock to API)
+- `/src/routes/supplierbrowser/mockData.ts` - Development data (being phased out)
 
 ## 🎛️ Configuration
 
@@ -219,12 +282,12 @@ Strikte TypeScript compliance ohne "unexpected any" - siehe `eslint.config.js`.
 ## 🚨 Current Issues & Troubleshooting
 
 ### Known Issues
-3. **Mock Data $state** - Works in development, production needs API integration
-4. **FormShell + $state Problem** - `structuredClone()` can't clone $state proxies
+1. **API Integration In Progress** - Some components still use mockData
+2. **FormShell + $state Problem** - `structuredClone()` can't clone $state proxies
 
 ### Critical Fixes Needed
 ```typescript
-// ❌ Problem: FormShell crashes with $state proxies
+// ⌛ Problem: FormShell crashes with $state proxies
 <SupplierForm initial={selectedSupplier} /> // selectedSupplier ist $state proxy
 
 // ✅ Fix: Entproxy beim Prop passing  
@@ -237,6 +300,11 @@ Strikte TypeScript compliance ohne "unexpected any" - siehe `eslint.config.js`.
 - Check dass alle Rows eine gültige ID haben
 - SupplierGrid erwartet `wholesaler_id`, nicht `id`
 
+**API Client Errors:**
+- Check network tab für actual HTTP errors
+- Use `getErrorMessage(error)` für user-friendly messages
+- Check loading states mit `supplierLoadingState.isLoading`
+
 **"Column not in allowed list" bei QueryBuilder:**
 - Check `supplierQueryConfig.allowedTables` in `/lib/server/supplierQueryConfig.ts`
 - Neue Columns müssen in whitelist eingetragen werden
@@ -248,7 +316,7 @@ Strikte TypeScript compliance ohne "unexpected any" - siehe `eslint.config.js`.
 
 **Svelte 5 Reactivity Issues:**
 ```typescript
-// ❌ Svelte 4 syntax - funktioniert nicht
+// ⌛ Svelte 4 syntax - funktioniert nicht
 let data = [...];
 $: filteredData = data.filter(...);
 
@@ -264,6 +332,9 @@ const filteredData = $derived(data.filter(...));
 
 ## 🔧 Technical Decisions
 
+### Why API Client Layer?
+Eliminates duplicate fetch logic across components and provides consistent error handling. Type-safe integration between UI and server APIs.
+
 ### Why QueryBuilder Pattern?
 Eliminates hard-coded SQL while maintaining security. Client requests flexible queries, server enforces table binding and access controls.
 
@@ -273,14 +344,11 @@ Makes application state bookmarkable, shareable, and robust. No complex state ma
 ### Why End-to-End Types?
 Eliminates runtime type errors between client and server. API changes break at compile time, not runtime.
 
-### Why Mock Data $state?
-Enables reactive UI development without backend dependencies. Production will use API calls with same component interfaces.
-
 ## 📋 Development Guidelines & Code Conventions
 
 ### Svelte 5 + Runes Patterns
 ```typescript
-// ❌ Svelte 4 - Alt
+// ⌛ Svelte 4 - Alt
 export let count = 0;
 $: doubled = count * 2;
 
@@ -300,6 +368,27 @@ const { rows = [], onRowClick } = $props<{
 2. **Domain Components = Thin Wrappers** - SupplierGrid wraps Datagrid
 3. **Reusable Components in /client/** - Datagrid, FormShell, etc.
 4. **CSS modular** - component.css für jede Komponente
+
+### API Client Patterns (NEW)
+```typescript
+// ✅ Use type-safe API clients
+import { loadSuppliers } from '$lib/api/client/supplier';
+
+// ✅ Handle errors gracefully
+try {
+  const suppliers = await loadSuppliers(query);
+} catch (error) {
+  console.error('Failed:', getErrorMessage(error));
+}
+
+// ✅ Manage loading states
+supplierLoadingState.start('loadSuppliers');
+try {
+  const data = await loadSuppliers(query);
+} finally {
+  supplierLoadingState.finish('loadSuppliers');
+}
+```
 
 ### TypeScript Standards (ESLint enforced)
 ```typescript
@@ -335,81 +424,61 @@ export const POST: RequestHandler = async (event) => {
 };
 ```
 
-### Delete Workflow Pattern
-**Alle Delete-Operationen folgen diesem 3-Stufen-Pattern:**
-1. **Normal Delete** - Erste Anfrage ohne cascade
-2. **Dependency Check** - Bei Abhängigkeiten → 409 Conflict mit Details  
-3. **Cascade Delete** - User bestätigt → Delete mit `?cascade=true`
+## 💤 User Workflows (Examples)
 
-### Form Integration Pattern
-```typescript
-// Alle Forms wrappen FormShell:
-<FormShell
-  entity="Wholesaler"
-  {initial}
-  validate={validateWholesaler} 
-  submit={submitWholesaler}
->
-  {#snippet fields({ get, set, errors })}
-    <input value={get('name')} oninput={e => set('name', e.target.value)} />
-    {#if errors.name}<div class="error">{errors.name[0]}</div>{/if}
-  {/snippet}
-</FormShell>
-```
-
-## 👤 User Workflows (Examples)
-
-### Workflow 1: Neuen Supplier mit Categories erstellen
+### Workflow 1: Neuen Supplier mit Categories erstellen (API-enabled)
 1. `/supplierbrowser` → Suppliers Grid → "Add Supplier" 
 2. Navigiert zu Level 2 → SupplierForm (create mode) + leeres CategoryGrid
 3. User füllt Name, Region, Dropship aus → "Save Supplier"
-4. Form wird zu edit mode → CategoryAssignment wird verfügbar
-5. User klickt "Assign Category" → Dropdown mit verfügbaren Categories
-6. User wählt Category → Bleibt auf Level 2, CategoryGrid updated reaktiv
-7. **Status**: ✅ Funktioniert mit Mock-Daten
+4. API Call: `POST /api/suppliers` → Creates new supplier
+5. Form wird zu edit mode → CategoryAssignment wird verfügbar
+6. User klickt "Assign Category" → API Call: `POST /api/categories` loads options
+7. User wählt Category → API Call: `POST /api/supplier-categories` 
+8. **Status**: ✅ Ready for API integration
 
-### Workflow 2: Supplier bearbeiten und Category hinzufügen  
+### Workflow 2: Supplier bearbeiten und Category hinzufügen (API-enabled)
 1. Suppliers Grid → User klickt Supplier row
-2. Navigiert zu Level 2 mit SupplierForm (edit mode)
-3. User ändert Region → Speichert
-4. User assigned neue Category via CategoryAssignment
-5. **Status**: ✅ Funktioniert mit Mock-Daten
+2. Navigiert zu Level 2 → API Call: `POST /api/suppliers/[id]` loads data
+3. User ändert Region → API Call: `PUT /api/suppliers/[id]` saves changes
+4. User assigned neue Category → API Call: `POST /api/supplier-categories`
+5. **Status**: ✅ Ready for API integration
 
-### Workflow 3: Category → Offerings → Attributes (TODO)
+### Workflow 3: Category → Offerings → Attributes (Future)
 1. Level 2 CategoryGrid → User klickt Category row
-2. Navigiert zu Level 3 → OfferingGrid für diese Category  
+2. Navigiert zu Level 3 → API Call: `POST /api/offerings` für diese Category  
 3. User klickt Offering → Navigiert zu Level 4 mit OfferingForm
 4. Sidebar Toggle "Attributes" → AttributeGrid sichtbar
 5. User klickt Attribute → Level 5 AttributeForm
-6. **Status**: ❌ Level 3-5 nur Stubs, Forms fehlen
+6. **Status**: ⌛ Level 3-5 APIs noch TODO
 
 ## 📈 Current Development Priorities
 
-### 🔥 P1 - High (Level 3 completion)
-1. **OfferingForm.svelte** - Wrapper um FormShell für WholesalerItemOffering
-2. **Offering API Types** - `/lib/api/types/offering.ts` nach supplier.ts Pattern  
-3. **Offering CRUD API** - `/api/offerings/[id]` GET/POST/PUT/DELETE
-4. **Mock Data Extension** - Mehr WholesalerItemOffering test data
+### 🔥 P1 - High (API Integration Completion)
+1. **Supplier API Client** - Complete `$lib/api/client/supplier.ts`
+2. **Category API Client** - Complete `$lib/api/client/category.ts`  
+3. **Page Integration** - Replace mockData with API calls in `/supplierbrowser`
+4. **Loading States** - Integrate LoadingState with UI components
 
-### 🎯 P2 - Medium (Level 4-5 planning)
-1. **AttributeForm/LinkForm** - Detail forms für Level 5
-2. **Level 4 Mode Toggle** - UI für Attributes ↔ Links switching
-3. **Attribute/Link APIs** - `/api/attributes/[id]` und `/api/links/[id]`
-4. **Navigation Level 4-5** - offeringId parameter handling
+### 🎯 P2 - Medium (Level 3 preparation)
+1. **OfferingForm.svelte** - Wrapper um FormShell für WholesalerItemOffering
+2. **Offering API Types** - `$lib/api/types/offering.ts` nach supplier.ts Pattern  
+3. **Offering API Client** - `$lib/api/client/offering.ts`
+4. **Offering CRUD API** - `/api/offerings/[id]` GET/POST/PUT/DELETE
 
 ### 🌟 P3 - Nice to Have  
-1. **Loading States** - Skeleton UI für alle Grids
-2. **Error Boundaries** - Graceful error handling in UI
-3. **Performance** - Virtual scrolling für große Datasets
-4. **Bulk Operations** - Multiple selection mit bulk delete
+1. **Error Boundaries** - Graceful error handling in UI
+2. **Performance** - Virtual scrolling für große Datasets
+3. **Bulk Operations** - Multiple selection mit bulk delete
+4. **Optimistic Updates** - UI updates before API confirmation
 
-## 🔄 Immediate Next Steps für neue AI
+## 📄 Immediate Next Steps für neue AI
 
-2. **Test existing Suppliers API** - Verify GET/POST/PUT/DELETE mit Postman
-3. **Plan OfferingForm** - Copy SupplierForm.svelte pattern für WholesalerItemOffering  
-4. **Extend Mock Data** - Add more test data für Level 3 testing
+1. **Complete Supplier API Client** - Finish `loadSuppliers()`, `updateSupplier()`, `deleteSupplier()` functions
+2. **Create Category API Client** - Copy supplier.ts pattern für category operations
+3. **Integrate API clients** - Replace mockData in `/supplierbrowser/+page.svelte`
+4. **Test API Integration** - Verify all CRUD operations work end-to-end
 
 ---
 
-**Current Progress: ~90% Level 1-2, 10% Level 3-5**  
-**Target: Production-ready 5-level hierarchical data management system**
+**Current Progress: ~95% Level 1-2 (API Integration In Progress), 10% Level 3-5**  
+**Target: Production-ready 5-level hierarchical data management system with full API integration**

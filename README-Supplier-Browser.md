@@ -54,8 +54,10 @@ dbo.wholesaler_offering_links     -- URLs/Links pro Offering
 - **QueryBuilder** - Client-flexible, server-secure SQL generation
 - **Suppliers API** - `/api/suppliers/[id]` GET/POST/PUT/DELETE vollständig
 
+### Test level 1-2
+Test supplier browser level 1-2 mit echten DB-daten - ❌ TODO
+
 ### 🔄 Level 3 (In Progress)  
-- **OfferingGrid.svelte** - ✅ Stub mit Mock-Daten
 - **OfferingForm.svelte** - ❌ TODO
 - **Offerings API** - ❌ TODO (`/api/offerings/[id]`)
 
@@ -65,12 +67,8 @@ dbo.wholesaler_offering_links     -- URLs/Links pro Offering
 - **Toggle zwischen Attributes/Links** - ❌ UI-Logic TODO
 - **APIs für Attributes/Links** - ❌ Komplett TODO
 
-## 🧪 Development Strategy: Mock-First
 
-### Current State
-- **Mock-Daten in** `/src/routes/supplierbrowser/mockData.ts` 
-- **Mock-State ist reaktiv** mit `$state()` für UI-Development
-- **CategoryAssignment** verwendet Mock-API mit setTimeout() für Async-Verhalten
+
 
 ### Production Transition Pattern
 ```typescript
@@ -221,8 +219,6 @@ Strikte TypeScript compliance ohne "unexpected any" - siehe `eslint.config.js`.
 ## 🚨 Current Issues & Troubleshooting
 
 ### Known Issues
-1. **Category Assignment API Missing** - `/api/supplier-categories` Server implementation TODO
-2. **File Naming** - `server.ts` should be `+server.ts` (SvelteKit convention)
 3. **Mock Data $state** - Works in development, production needs API integration
 4. **FormShell + $state Problem** - `structuredClone()` can't clone $state proxies
 
@@ -389,10 +385,6 @@ export const POST: RequestHandler = async (event) => {
 
 ## 📈 Current Development Priorities
 
-### 🚨 P0 - Critical (Blockiert weitere Entwicklung)
-1. **Category Assignment API Server** - `/api/supplier-categories` POST/DELETE
-2. **File Naming Fix** - Rename `server.ts` zu `+server.ts` 
-
 ### 🔥 P1 - High (Level 3 completion)
 1. **OfferingForm.svelte** - Wrapper um FormShell für WholesalerItemOffering
 2. **Offering API Types** - `/lib/api/types/offering.ts` nach supplier.ts Pattern  
@@ -413,7 +405,6 @@ export const POST: RequestHandler = async (event) => {
 
 ## 🔄 Immediate Next Steps für neue AI
 
-1. **Fix Category Assignment API** - Server implementation in `/src/routes/api/supplier-categories/+server.ts`
 2. **Test existing Suppliers API** - Verify GET/POST/PUT/DELETE mit Postman
 3. **Plan OfferingForm** - Copy SupplierForm.svelte pattern für WholesalerItemOffering  
 4. **Extend Mock Data** - Add more test data für Level 3 testing

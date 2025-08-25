@@ -491,8 +491,8 @@
     color: var(--pc-grid-fg, #0f172a);
   }
 
-  .empty-state p {
+  /* .empty-state p {
     margin: 0;
     font-size: 0.875rem;
-  }
+  } */
 </style>

@@ -117,7 +117,7 @@ export interface ValidationOptions {
 const FORMAT_PATTERNS = {
   email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
   url: /^https?:\/\/.+/,
-  phone: /^\+?[\d\s\-\(\)]+$/,
+  phone: /^\+?[\d\s\-()]+$/,
   date: /^\d{4}-\d{2}-\d{2}$/, // YYYY-MM-DD
   currency: /^\d+(\.\d{2})?$/ // 123.45
 } as const;
@@ -166,12 +166,12 @@ const DOMAIN_SCHEMAS: {
       b2b_notes: COMMON_CONSTRAINTS.longText,
       // dropship is boolean - handled by type checking
     },
-    entityValidator: (data, mode) => {
+    entityValidator: (data) => {
       const errors: Record<string, string[]> = {};
       
       // Business rule: name must not contain certain characters
       if (data.name && typeof data.name === 'string') {
-        if (/[<>\"'&]/.test(data.name)) {
+        if (/[<>"'&]/.test(data.name)) {
           errors.name = ['Name cannot contain special characters: < > " \' &'];
         }
       }
@@ -211,7 +211,7 @@ const DOMAIN_SCHEMAS: {
       },
       comment: COMMON_CONSTRAINTS.longText,
     },
-    entityValidator: (data, mode) => {
+    entityValidator: (data) => {
       const errors: Record<string, string[]> = {};
       
       // Business rule: if price is set, currency must be set
@@ -419,6 +419,9 @@ export function validateDomainEntity<T extends Record<string, unknown>>(
       const field = fieldKey as keyof T;
       const fieldName = String(field);
       const value = data[field];
+      
+      // Type guard: ensure constraints exists
+      if (!constraints) continue;
       
       // Skip validation if value is not provided (handled by required field validation)
       if (value !== null && value !== undefined) {

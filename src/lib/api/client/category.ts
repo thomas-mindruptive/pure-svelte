@@ -24,7 +24,7 @@ import {
   getErrorMessage 
 } from './common';
 import { log } from '$lib/utils/logger';
-import { ComparisonOperator, LogicalOperator } from '$lib/clientAndBack/queryGrammar';
+
 import type {
   ListCategoriesParams,
   ListCategoriesResponse,
@@ -50,11 +50,6 @@ export const categoryLoadingState = new LoadingState();
 
 // ===== CATEGORY LIST OPERATIONS =====
 
-/**
- * Default query for category list loading
- * Requests essential category fields in efficient order
- */
-const DEFAULT_CATEGORY_SELECT = ['category_id', 'name', 'description'];
 
 /**
  * Loads available categories with filtering options

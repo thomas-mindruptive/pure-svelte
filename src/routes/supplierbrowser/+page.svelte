@@ -2,6 +2,7 @@
   import { page } from "$app/stores";
   import { goto } from "$app/navigation";
   import { log } from "$lib/utils/logger";
+  import { onMount } from "svelte";
 
   // Import CSS styles
   import "$lib/components/styles/grid.css";
@@ -12,25 +13,56 @@
   import SupplierGrid from "$lib/components/domain/suppliers/SupplierGrid.svelte";
   import SupplierForm from "$lib/components/domain/suppliers/SupplierForm.svelte";
   import CategoryGrid from "$lib/components/domain/categories/CategoryGrid.svelte";
+  import CategoryAssignment from "$lib/components/domain/suppliers/CategoryAssignment.svelte";
+  import OfferingGrid from "$lib/components/domain/offerings/OfferingGrid.svelte";
 
   // Import types
   import type {
     Level,
     ProductCategory,
     Wholesaler,
-    WholesalerCategoryWithCount,
+    WholesalerCategory_Category,
     WholesalerItemOffering_ProductDef_Category,
   } from "$lib/domain/types";
-  import CategoryAssignment from "$lib/components/domain/suppliers/CategoryAssignment.svelte";
+
+  // Import API client functions
+  import { 
+    loadSuppliers, 
+    loadSupplier,
+    updateSupplier,
+    deleteSupplier,
+    DEFAULT_SUPPLIER_QUERY 
+  } from "$lib/api/client/supplier";
+  import { 
+    loadSupplierCategories, 
+    assignCategoryToSupplier, 
+    removeCategoryFromSupplier,
+    getAvailableCategoriesForSupplier
+  } from "$lib/api/client/category";
+
   import { addNotification } from "$lib/stores/notifications";
 
-  import { mockData as constMockData, type MockData } from "./mockData";
-  import OfferingGrid from "$lib/components/domain/offerings/OfferingGrid.svelte";
+  // Mock data only for Level 3-5 (offerings, attributes, links)
+  import { mockData as constMockData } from "./mockData";
 
-  // ===== MOCK DATA =====
-  const mockData: MockData = $state(constMockData);
+  // ===== STATE (Svelte 5 Runes) =====
+  
+  // Real data from API
+  let suppliers = $state<Wholesaler[]>([]);
+  let selectedSupplierData = $state<Wholesaler | null>(null);
+  let supplierCategories = $state<WholesalerCategory_Category[]>([]);
+  let availableCategories = $state<ProductCategory[]>([]);
+  
+  // Loading states
+  let loadingSuppliers = $state(false);
+  let loadingSupplierData = $state(false);
+  let loadingCategories = $state(false);
+  let loadingAvailableCategories = $state(false);
 
-  // ===== URL-DRIVEN STATE (Svelte 5 Runes) =====
+  // Mock data for Level 3-5 (still using mocks)
+  const mockOfferingsData = constMockData.wholesalerItemOfferings;
+
+  // ===== URL-DRIVEN STATE =====
   const currentLevel = $derived(
     ($page.url.searchParams.get("level") as Level) || "wholesalers",
   );
@@ -44,43 +76,30 @@
   // ===== DERIVED STATE =====
   const selectedSupplier = $derived(
     selectedSupplierId
-      ? mockData.wholesalers.find(
-          (s) => s.wholesaler_id === selectedSupplierId,
-        ) || null
+      ? suppliers.find(s => s.wholesaler_id === selectedSupplierId) || selectedSupplierData
       : null,
   );
 
   const selectedCategory = $derived(
-    selectedCategoryId && selectedSupplier && selectedSupplier.wholesaler_id
-      ? (
-          mockData.assignedCategories[selectedSupplier.wholesaler_id] || []
-        ).find(
-          (c: WholesalerCategoryWithCount) =>
-            c.category_id === selectedCategoryId,
-        ) || null
+    selectedCategoryId
+      ? supplierCategories.find(c => c.category_id === selectedCategoryId) || null
       : null,
   );
 
-  const categoriesForSupplier = $derived(
-    selectedSupplier && selectedSupplier.wholesaler_id
-      ? (mockData.assignedCategories[selectedSupplier.wholesaler_id] ?? [])
-      : [],
-  );
-
   const offeringsForSupplierAndCategory = $derived(
-    selectedSupplier && selectedSupplier.wholesaler_id
-      ? (mockData.wholesalerItemOfferings.filter(
+    selectedSupplier && selectedCategoryId
+      ? mockOfferingsData.filter(
           (o: WholesalerItemOffering_ProductDef_Category) =>
             o.wholesaler_id === selectedSupplier.wholesaler_id &&
             o.category_id === selectedCategoryId,
-        ) ?? [])
+        )
       : [],
   );
 
-  // Sidebar data
+  // Sidebar data with real counts
   const counts = $derived({
-    wholesalers: mockData.wholesalers.length,
-    categories: categoriesForSupplier.length,
+    wholesalers: suppliers.length,
+    categories: supplierCategories.length,
     offerings: offeringsForSupplierAndCategory.length,
     attributes: 0, // Not implemented yet
     links: 0, // Not implemented yet
@@ -119,7 +138,131 @@
     },
   ]);
 
-  // ===== URL UPDATE FUNCTION =====
+  // ===== API LOADING FUNCTIONS =====
+
+  /**
+   * Load all suppliers from API
+   */
+  async function loadSuppliersData() {
+    try {
+      loadingSuppliers = true;
+      log.info("Loading suppliers from API");
+      
+      suppliers = await loadSuppliers({
+        ...DEFAULT_SUPPLIER_QUERY,
+        orderBy: [{ key: 'name', direction: 'asc' }]
+      });
+      
+      log.info("Suppliers loaded successfully", { count: suppliers.length });
+    } catch (error) {
+      log.error("Failed to load suppliers", { error });
+      addNotification("Failed to load suppliers", "error");
+      suppliers = [];
+    } finally {
+      loadingSuppliers = false;
+    }
+  }
+
+  /**
+   * Load detailed supplier data when selected
+   */
+  async function loadSupplierData(supplierId: number) {
+    try {
+      loadingSupplierData = true;
+      log.info("Loading supplier details", { supplierId });
+      
+      selectedSupplierData = await loadSupplier(supplierId);
+      
+      log.info("Supplier details loaded", { 
+        supplierId, 
+        name: selectedSupplierData.name 
+      });
+    } catch (error) {
+      log.error("Failed to load supplier details", { supplierId, error });
+      addNotification("Failed to load supplier details", "error");
+      selectedSupplierData = null;
+    } finally {
+      loadingSupplierData = false;
+    }
+  }
+
+  /**
+   * Load supplier categories when supplier is selected
+   */
+  async function loadSupplierCategoriesData(supplierId: number) {
+    try {
+      loadingCategories = true;
+      log.info("Loading supplier categories", { supplierId });
+      
+      supplierCategories = await loadSupplierCategories(supplierId, {
+        includeOfferingCounts: true
+      });
+      
+      log.info("Supplier categories loaded", { 
+        supplierId, 
+        count: supplierCategories.length 
+      });
+    } catch (error) {
+      log.error("Failed to load supplier categories", { supplierId, error });
+      addNotification("Failed to load supplier categories", "error");
+      supplierCategories = [];
+    } finally {
+      loadingCategories = false;
+    }
+  }
+
+  /**
+   * Load available categories for assignment
+   */
+  async function loadAvailableCategoriesData(supplierId: number) {
+    try {
+      loadingAvailableCategories = true;
+      log.info("Loading available categories", { supplierId });
+      
+      availableCategories = await getAvailableCategoriesForSupplier(supplierId);
+      
+      log.info("Available categories loaded", { 
+        supplierId, 
+        count: availableCategories.length 
+      });
+    } catch (error) {
+      log.error("Failed to load available categories", { supplierId, error });
+      addNotification("Failed to load available categories", "error");
+      availableCategories = [];
+    } finally {
+      loadingAvailableCategories = false;
+    }
+  }
+
+  // ===== REACTIVE DATA LOADING =====
+
+  // Load suppliers on mount
+  onMount(() => {
+    loadSuppliersData();
+  });
+
+  // Load supplier data when supplier is selected
+  $effect(() => {
+    if (selectedSupplierId && currentLevel !== "wholesalers") {
+      // Load detailed supplier data if not already loaded or different supplier
+      if (!selectedSupplierData || selectedSupplierData.wholesaler_id !== selectedSupplierId) {
+        loadSupplierData(selectedSupplierId);
+      }
+      
+      // Load supplier categories
+      loadSupplierCategoriesData(selectedSupplierId);
+      
+      // Load available categories for assignment
+      loadAvailableCategoriesData(selectedSupplierId);
+    } else {
+      // Clear data when no supplier selected
+      selectedSupplierData = null;
+      supplierCategories = [];
+      availableCategories = [];
+    }
+  });
+
+  // ===== URL NAVIGATION =====
   function updateURL(params: {
     level?: Level;
     supplierId?: number | null | undefined;
@@ -182,12 +325,12 @@
     });
     updateURL({
       level: "categories",
-      supplierId: supplier.wholesaler_id ?? null,
+      supplierId: supplier.wholesaler_id,
       categoryId: null,
     });
   }
 
-  function handleCategorySelect(category: WholesalerCategoryWithCount) {
+  function handleCategorySelect(category: WholesalerCategory_Category) {
     log.info("Category selected", {
       categoryId: category.category_id,
       category_name: category.category_name,
@@ -198,9 +341,7 @@
     });
   }
 
-  function handleOfferingSelect(
-    offering: WholesalerItemOffering_ProductDef_Category,
-  ) {
+  function handleOfferingSelect(offering: WholesalerItemOffering_ProductDef_Category) {
     log.info("Offering selected", {
       offeringId: offering.offering_id,
       offering_name: offering.product_def_title,
@@ -211,37 +352,211 @@
     });
   }
 
-  // Silence unused warnings (handlers will be used when Grid components support rowclick)
-  void handleSupplierSelect;
-  void handleCategorySelect;
-
-  // ===== DELETE HANDLERS =====
+  // ===== DELETE HANDLERS (Real API) =====
+  
+  /**
+   * Handle supplier deletion via API
+   */
   async function handleSupplierDelete(ids: (string | number)[]) {
-    log.info("Mock: Delete suppliers", { ids });
-    alert(`MOCK: Would delete suppliers with IDs: ${ids.join(", ")}`);
+    log.info("Deleting suppliers via API", { ids });
+    
+    for (const id of ids) {
+      try {
+        const result = await deleteSupplier(Number(id), false);
+        
+        if (!result.success && 'cascade_available' in result && result.cascade_available) {
+          // Supplier has dependencies, ask for cascade delete
+          const dependencies = result.dependencies as string[] || [];
+          const confirmed = confirm(
+            `Supplier has dependencies: ${dependencies.join(', ')}. Delete anyway with all related data?`
+          );
+          
+          if (confirmed) {
+            const cascadeResult = await deleteSupplier(Number(id), true);
+            if (cascadeResult.success) {
+              addNotification("Supplier and all related data deleted successfully", "success");
+            }
+          }
+        } else if (result.success) {
+          addNotification(`Supplier "${result.deleted_supplier?.name}" deleted successfully`, "success");
+        }
+      } catch (error) {
+        log.error("Failed to delete supplier", { id, error });
+        addNotification("Failed to delete supplier", "error");
+      }
+    }
+    
+    // Reload suppliers list
+    await loadSuppliersData();
+    
+    // Clear selection if current supplier was deleted
+    if (selectedSupplierId && ids.includes(selectedSupplierId)) {
+      updateURL({ level: "wholesalers", supplierId: null, categoryId: null });
+    }
   }
 
+  /**
+   * Handle category assignment removal via API
+   */
   async function handleCategoryDelete(ids: (string | number)[]) {
-    log.info("Mock: Remove categories", { ids });
-    alert(
-      `MOCK: Would remove category assignments with IDs: ${ids.join(", ")}`,
-    );
+    if (!selectedSupplierId) return;
+    
+    log.info("Removing category assignments via API", { ids });
+    
+    for (const id of ids) {
+      // Parse compound ID: "supplierId-categoryId"
+      const [supplierIdStr, categoryIdStr] = String(id).split('-');
+      const supplierId = Number(supplierIdStr);
+      const categoryId = Number(categoryIdStr);
+      
+      if (!supplierId || !categoryId) continue;
+      
+      try {
+        const result = await removeCategoryFromSupplier({
+          supplierId,
+          categoryId,
+          cascade: false
+        });
+        
+        if (!result.success && 'cascade_available' in result && result.cascade_available) {
+          // Category has offerings, ask for cascade delete
+          const offeringCount = 'dependencies' in result && result.dependencies && 
+            typeof result.dependencies === 'object' && 'offering_count' in result.dependencies
+            ? result.dependencies.offering_count as number
+            : 0;
+          
+          const confirmed = confirm(
+            `Category has ${offeringCount} offerings. Delete them too?`
+          );
+          
+          if (confirmed) {
+            const cascadeResult = await removeCategoryFromSupplier({
+              supplierId,
+              categoryId,
+              cascade: true
+            });
+            if (cascadeResult.success) {
+              addNotification(
+                `Category and ${cascadeResult.offerings_removed || 0} offerings removed successfully`,
+                "success"
+              );
+            }
+          }
+        } else if (result.success) {
+          addNotification(
+            `Category "${result.removed_assignment?.category_name}" removed successfully`,
+            "success"
+          );
+        }
+      } catch (error) {
+        log.error("Failed to remove category assignment", { id, error });
+        addNotification("Failed to remove category assignment", "error");
+      }
+    }
+    
+    // Reload supplier categories
+    if (selectedSupplierId) {
+      await loadSupplierCategoriesData(selectedSupplierId);
+      await loadAvailableCategoriesData(selectedSupplierId);
+    }
   }
 
+  /**
+   * Handle offering deletion (still mock)
+   */
   async function handleOfferingDelete(ids: (string | number)[]) {
-    log.info("Mock: Remove offerings", { ids });
-    alert(`MOCK: Would remove offerings with IDs: ${ids.join(", ")}`);
+    log.info("Mock: Delete offerings", { ids });
+    addNotification(`MOCK: Would delete offerings with IDs: ${ids.join(", ")}`, "info");
   }
 
-  // // ===== FORM HANDLERS =====
-  // function handleSupplierSubmit(p: { data: Record<string, any>; result: unknown }) {
-  //   log.info('Mock: Supplier form submitted', p);
-  //   alert('MOCK: Supplier saved successfully!');
-  // }
+  // ===== CATEGORY ASSIGNMENT HANDLERS =====
+  
+  /**
+   * Handle supplier form submission via API
+   */
+  async function handleSupplierUpdate(p: { data: Record<string, any>; result: unknown }) {
+    if (!selectedSupplierId) return;
+    
+    try {
+      log.info("Updating supplier via API", { 
+        supplierId: selectedSupplierId,
+        data: p.data 
+      });
+      
+      const updatedSupplier = await updateSupplier(selectedSupplierId, p.data);
+      
+      addNotification(
+        `Supplier "${updatedSupplier.name}" updated successfully`,
+        "success"
+      );
+      
+      // Update local data
+      selectedSupplierData = updatedSupplier;
+      
+      // Update suppliers list if needed
+      const supplierIndex = suppliers.findIndex(s => s.wholesaler_id === selectedSupplierId);
+      if (supplierIndex >= 0) {
+        suppliers[supplierIndex] = { ...suppliers[supplierIndex], ...updatedSupplier };
+      }
+      
+    } catch (error) {
+      log.error("Failed to update supplier", { 
+        supplierId: selectedSupplierId, 
+        error 
+      });
+      addNotification("Failed to update supplier", "error");
+    }
+  }
 
-  // function handleSupplierCancel(p: { data: Record<string, any>; reason?: string }) {
-  //   log.info('Mock: Supplier form cancelled', p);
-  // }
+  /**
+   * Handle supplier form cancellation
+   */
+  function handleFormCancel(p: { data: Record<string, any>; reason?: string }) {
+    log.info("Supplier form cancelled", { reason: p.reason });
+    // Could navigate away or reset form, but for now just log
+  }
+
+  /**
+   * Handle category assignment via API
+   */
+  async function handleCategoryAssigned(category: ProductCategory) {
+    if (!selectedSupplierId) return;
+    
+    try {
+      log.info("Assigning category via API", { 
+        supplierId: selectedSupplierId, 
+        categoryId: category.category_id 
+      });
+      
+      await assignCategoryToSupplier({
+        supplierId: selectedSupplierId,
+        categoryId: category.category_id,
+        comment: "",
+        link: ""
+      });
+      
+      addNotification(
+        `Category "${category.name}" assigned successfully`,
+        "success"
+      );
+      
+      // Reload data
+      await loadSupplierCategoriesData(selectedSupplierId);
+      await loadAvailableCategoriesData(selectedSupplierId);
+      
+    } catch (error) {
+      log.error("Failed to assign category", { 
+        supplierId: selectedSupplierId, 
+        categoryId: category.category_id, 
+        error 
+      });
+      addNotification("Failed to assign category", "error");
+    }
+  }
+
+  function handleCategoryError(error: string) {
+    addNotification(error, "error", 5000);
+  }
 
   // ===== COMPUTED PROPS =====
   const pageTitle = $derived(() => {
@@ -253,52 +568,12 @@
     return "Supplier Browser";
   });
 
-  // ===== CALLBACKS =====
-  const availableCategoriesForSupplier = $derived(
-    // Mock: Alle Categories minus bereits assigned
-    mockData.allCategories.filter(
-      (cat) =>
-        !categoriesForSupplier.some(
-          (assigned) => assigned.category_id === cat.category_id,
-        ),
-    ),
+  const isLoading = $derived(
+    loadingSuppliers || 
+    loadingSupplierData || 
+    loadingCategories || 
+    loadingAvailableCategories
   );
-
-  function handleCategoryAssigned(category: ProductCategory) {
-    // Update Mock-Daten + Snackbar
-
-    if (!selectedSupplier?.wholesaler_id) return;
-
-    // Optimistic update: Add to assigned categories list
-    const newAssignment: WholesalerCategoryWithCount = {
-      wholesaler_id: selectedSupplier.wholesaler_id,
-      category_id: category.category_id,
-      category_name: category.name,
-      comment: "",
-      created_at: new Date().toISOString(),
-      offering_count: 0,
-    };
-
-    // Update mock data (triggers reactive update)
-    if (!mockData.assignedCategories[selectedSupplier.wholesaler_id]) {
-      mockData.assignedCategories[selectedSupplier.wholesaler_id] = [];
-    }
-    mockData.assignedCategories[selectedSupplier.wholesaler_id].push(
-      newAssignment,
-    );
-
-    addNotification(
-      `Category "${category.name}" assigned successfully`,
-      "success",
-    );
-  }
-
-  function handleCategoryError(error: string) {
-    addNotification(error, "error", 5000);
-  }
-
-  // Loading state (mock)
-  let loading = $state(false);
 </script>
 
 <svelte:head>
@@ -327,23 +602,28 @@
         {#if selectedCategory}
           <span class="badge">Category: {selectedCategory.category_name}</span>
         {/if}
+        {#if isLoading}
+          <span class="badge loading">Loading...</span>
+        {/if}
       </div>
     </div>
 
     <div class="content-body">
-      <!-- EBENE 2: SupplierForm oben + CategoryGrid unten -->
+      <!-- LEVEL 2: SupplierForm + CategoryGrid + CategoryAssignment -->
       {#if currentLevel === "categories" && selectedSupplier}
         <div class="master-form-section">
           <SupplierForm
-            initial={selectedSupplier
-              ? { ...selectedSupplier }
-              : ({} as Wholesaler)}
-            disabled={false}
+            initial={selectedSupplier}
+            disabled={loadingSupplierData}
+            onSubmitted={handleSupplierUpdate}
+            onCancelled={handleFormCancel}
           />
         </div>
+        
         <CategoryAssignment
           supplierId={selectedSupplier.wholesaler_id}
-          availableCategories={availableCategoriesForSupplier}
+          availableCategories={availableCategories}
+          loading={loadingAvailableCategories}
           onAssigned={handleCategoryAssigned}
           onError={handleCategoryError}
         />
@@ -353,28 +633,33 @@
       <div class="grid-section">
         {#if currentLevel === "wholesalers"}
           <SupplierGrid
-            rows={mockData.wholesalers}
-            {loading}
+            rows={suppliers}
+            loading={loadingSuppliers}
             executeDelete={handleSupplierDelete}
             onRowClick={handleSupplierSelect}
           />
         {:else if currentLevel === "categories"}
           <CategoryGrid
-            rows={categoriesForSupplier}
-            {loading}
+            rows={supplierCategories}
+            loading={loadingCategories}
             showOfferingCount={true}
             executeDelete={handleCategoryDelete}
             onRowClick={handleCategorySelect}
           />
         {:else if currentLevel === "offerings"}
+          <div class="mock-notice">
+            <p><strong>🚧 Mock Data:</strong> Offerings are still using mock data</p>
+          </div>
+          <OfferingGrid
+            rows={offeringsForSupplierAndCategory}
+            loading={false}
+            executeDelete={handleOfferingDelete}
+            onRowClick={handleOfferingSelect}
+          />
+        {:else}
           <div class="empty-state">
-            <h3>Offerings Grid</h3>
-            <OfferingGrid
-              rows={offeringsForSupplierAndCategory}
-              {loading}
-              executeDelete={handleOfferingDelete}
-              onRowClick={handleOfferingSelect}
-            />
+            <h3>Level {currentLevel}</h3>
+            <p>This level is not implemented yet.</p>
           </div>
         {/if}
       </div>
@@ -445,6 +730,11 @@
     font-weight: 500;
   }
 
+  .badge.loading {
+    background: var(--pc-grid-warning, #d97706);
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
   .content-body {
     flex-grow: 1;
     overflow-y: auto;
@@ -473,6 +763,20 @@
     overflow: hidden;
   }
 
+  .mock-notice {
+    background: #fef3c7;
+    border: 1px solid #f59e0b;
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    color: #92400e;
+  }
+
+  .mock-notice p {
+    margin: 0;
+    font-size: 0.875rem;
+  }
+
   .empty-state {
     display: flex;
     flex-direction: column;
@@ -491,8 +795,17 @@
     color: var(--pc-grid-fg, #0f172a);
   }
 
-  /* .empty-state p {
+  .empty-state p {
     margin: 0;
     font-size: 0.875rem;
-  } */
+  }
+
+  @keyframes pulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
+  }
 </style>

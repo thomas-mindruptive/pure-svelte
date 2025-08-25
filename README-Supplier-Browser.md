@@ -5,37 +5,179 @@ Das SupplierBrowser System ist eine **5-Ebenen hierarchische Navigation** durch 
 
 ## 🚀 **AKTUELLER IMPLEMENTIERUNGSSTATUS**
 
-### ✅ **IMPLEMENTIERT:**
+### ✅ **VOLLSTÄNDIG IMPLEMENTIERT:**
 - **HierarchySidebar.svelte** - Navigation mit disabled states & counts (Svelte 5 + ausgelagerte CSS)
 - **SupplierGrid.svelte** - Wrapper um Datagrid für Wholesaler[]
-- **SupplierForm.svelte** - Wrapper um FormShell für Wholesaler create/edit **✅ VOLLSTÄNDIG GESTYLT**
+- **SupplierForm.svelte** - Wrapper um FormShell für Wholesaler create/edit **✅ VOLLSTÄNDIG GESTYLT + JSDoc**
 - **CategoryGrid.svelte** - Wrapper um Datagrid für WholesalerCategory[]
 - **CategoryAssignment.svelte** - Einfaches n:m Assignment UI für Category-Supplier Relationships **✅ VOLLSTÄNDIG IMPLEMENTIERT**
 - **URL-driven State** - Level, supplierId, categoryId via URL-Parameter
 - **Svelte 5 + Runes** - Alle Komponenten nutzen neue Syntax
 - **CSS-System Integration** - Form.css, Sidebar.css, Grid.css vollständig integriert
 - **Farbkonsistenz** - Einheitliches Violett (#4f46e5) durch alle UI-Komponenten
+- **🆕 QueryBuilder Refactoring** - buildQuery() + executeQuery() Trennung für bessere Testbarkeit
+- **🆕 MSSQL Error Mapper** - DB Constraints zu HTTP Status Codes Mapping
+- **🆕 Suppliers API** - GET + POST mit QueryPayload Support
+- **🆕 ESLint Standards** - Kein "unexpected any", "const" wo möglich
 
-### 🔄 **IN PROGRESS:**
-- **API-Integration** - Übergang von Mock-Daten zu echten API-Calls
+### 📄 **IN PROGRESS:**
+- **Generic Domain Validation** - Type-basierte Validierung (geplant)
 
 ### ⌘ **NOCH ZU IMPLEMENTIEREN:**
 - **OfferingGrid.svelte** + **OfferingForm.svelte** (Ebene 3)
 - **AttributeGrid.svelte** + **AttributeForm.svelte** (Ebene 5)
 - **LinkGrid.svelte** + **LinkForm.svelte** (Ebene 5)
-- **Echte API-Integration** (derzeit Mock-Daten)
-- **Delete-Strategien** mit Dependency-Checks
+- **Suppliers API** - PUT /api/suppliers/[id] + DELETE /api/suppliers/[id]
+- **Categories/Offerings/Attributes APIs** - Weitere Domain APIs
 - **Ebene 4-5 Navigation** (Attributes/Links Toggle)
 
 ### 🎨 **STYLING UPDATES:**
-- **SupplierForm.svelte**: Vollständig responsive Form mit .form-grid, .form-group, Error-Styling
+- **SupplierForm.svelte**: Vollständig responsive Form mit .form-grid, .form-group, Error-Styling + Comprehensive JSDoc
 - **HierarchySidebar.svelte**: Ausgelagerte CSS nach sidebar.css, Svelte 5 callback props
 - **CSS-System**: form.css erweitert um select-Styles, Farbvariablen harmonisiert
 - **Design-Konsistenz**: --color-primary (#4f46e5) als zentrale Brand-Color
 
 ---
 
-## 🔧 **TECHNISCHE HERAUSFORDERUNGEN & LEARNINGS**
+## 🛠️ **NEUE TECHNISCHE ARCHITEKTUR**
+
+### **📊 QueryBuilder Refactoring (✅ IMPLEMENTIERT):**
+
+**Problem:** Monolithische `executeGenericQuery()` schwer testbar
+```typescript
+// ❌ ALT: Alles in einer Funktion
+executeGenericQuery(payload, config) -> results[]
+```
+
+**Lösung:** Separation of Concerns
+```typescript
+// ✅ NEU: Build + Execute getrennt
+const { sql, parameters, metadata } = buildQuery(payload, config);
+const results = await executeQuery(sql, parameters);
+
+// ✅ Backward Compatibility
+executeGenericQuery(payload, config) // Wrapper um build + execute
+```
+
+**Vorteile:**
+- ✅ **Pure Functions** - buildQuery() ohne DB-Abhängigkeiten
+- ✅ **Testbarkeit** - SQL-Generation unit-testbar
+- ✅ **Debugging** - SQL vor Execution inspizieren
+- ✅ **Flexibilität** - Query-Modifikation zwischen Build/Execute
+
+### **🚨 MSSQL Error Mapper (✅ IMPLEMENTIERT):**
+
+**Problem:** Redundante App-Level Constraint Checks + Race Conditions
+```typescript
+// ❌ ALT: App-Level Duplicate Check
+const count = await checkDuplicate();
+if (count > 0) throw error(409);
+await insert(); // Race condition möglich!
+```
+
+**Lösung:** DB Constraints + Error Mapping
+```typescript
+// ✅ NEU: Optimistic Insert + DB Error Mapping
+try {
+  const result = await insertSupplier(data);
+  return success(result);
+} catch (dbError) {
+  const { status, message } = mssqlErrorMapper.mapToHttpError(dbError);
+  throw error(status, message);
+}
+```
+
+**MSSQL Error Code Mapping:**
+- **2627** (Unique Constraint) → **409 Conflict**
+- **547** (Check/FK Constraint) → **400 Bad Request**
+- **515** (NOT NULL) → **400 Bad Request**
+- **8152** (String Truncation) → **422 Unprocessable Entity**
+
+**Benefits:**
+- ✅ **Race Condition Safe** - DB handles concurrency
+- ✅ **Consistent Error Messages** - User-friendly translations
+- ✅ **Performance** - Keine redundanten Queries
+- ✅ **DB-Agnostic APIs** - Error handling abstracted
+
+### **🔧 ESLint Standards (✅ IMPLEMENTIERT):**
+
+**Strict TypeScript Configuration:**
+```json
+{
+  "noImplicitAny": true,
+  "noUnusedLocals": true,
+  "exactOptionalPropertyTypes": true
+}
+```
+
+**Code Quality Standards:**
+- ✅ **Kein "unexpected any"** - Spezifische Types überall
+- ✅ **"const" wo möglich** - Unveränderliche Werte als const
+- ✅ **Type Guards** - Proper error instanceof checks
+- ✅ **Comprehensive JSDoc** - @description, @example, @throws, @businessRules
+
+**Beispiel - Vorher/Nachher:**
+```typescript
+// ❌ ALT: ESLint violations
+function parseError(error: any): any {
+  let result = { status: 500 };
+  return result;
+}
+
+// ✅ NEU: ESLint konform
+function parseError(error: unknown): { status: number; message: string } {
+  const result = { status: 500, message: 'Unknown error' };
+  if (error instanceof Error) {
+    result.message = error.message;
+  }
+  return result;
+}
+```
+
+---
+
+## 📡 **SUPPLIERS API IMPLEMENTATION (✅ IMPLEMENTIERT)**
+
+### **GET /api/suppliers - QueryPayload Support:**
+```typescript
+// Client sendet flexible Query
+POST /api/suppliers
+{
+  "select": ["name", "region", "status", "dropship"],
+  "where": {
+    "op": "AND",
+    "conditions": [
+      {"key": "status", "op": "=", "val": "active"},
+      {"key": "region", "op": "LIKE", "val": "%Europe%"}
+    ]
+  },
+  "orderBy": [{"key": "name", "direction": "asc"}],
+  "limit": 25
+}
+```
+
+### **POST /api/suppliers - Transaction-Safe Creation:**
+```typescript
+// Optimistic insert mit DB error mapping
+try {
+  const supplier = await insertSupplier(data);
+  return json({ success: true, data: supplier });
+} catch (dbError) {
+  const { status, message } = mssqlErrorMapper.mapToHttpError(dbError);
+  throw error(status, message);
+}
+```
+
+**Features:**
+- ✅ **Flexible Client Filtering** - QueryPayload für komplexe UIs
+- ✅ **Domain Validation** - Nur wholesaler queries erlaubt
+- ✅ **DB Constraint Handling** - Duplicate name checks via DB
+- ✅ **Type Safety** - Comprehensive TypeScript interfaces
+- ✅ **Transaction Safety** - ACID compliance für data integrity
+
+---
+
+## 📧 **TECHNISCHE HERAUSFORDERUNGEN & LEARNINGS**
 
 ### **🔥 Mock-Daten Reaktivität (Development):**
 
@@ -106,6 +248,19 @@ async function handleCategoryAssigned(category) {
 
 **Note:** `$state mockData` nur für Development - Production verwendet separaten $state + API-Calls
 
+### **🎯 QueryGrammar Migration:**
+
+**Änderung:** queryGrammar.ts verschoben für bessere Architektur
+```typescript
+// ✅ NEU: Shared zwischen Client und Server
+import { type QueryPayload } from '$lib/clientAndBack/queryGrammar';
+
+// ❌ ALT: War in routes/api/query/
+import { type QueryPayload } from '../../routes/api/query/queryGrammar';
+```
+
+**Benefit:** Client und Server nutzen identische Query-Language für End-to-End Type Safety
+
 ---
 
 ## Ebenen-Struktur
@@ -122,7 +277,7 @@ async function handleCategoryAssigned(category) {
 ### **Ebene 2: Categories** ✅ **IMPLEMENTIERT**  
 - **Layout:** `SupplierForm` oben + `CategoryGrid` unten
 - **SupplierForm:** 
-  - ✅ **VOLLSTÄNDIG GESTYLT** mit form.css Integration
+  - ✅ **VOLLSTÄNDIG GESTYLT** mit form.css Integration + Comprehensive JSDoc
   - Zeigt/editiert Supplier (create wenn von Add-Button, edit wenn von Row-Click)
   - Wrapper um `FormShell` mit `Wholesaler` Type
   - Responsive 4-Spalten Layout, Validation, Error-Handling
@@ -130,7 +285,7 @@ async function handleCategoryAssigned(category) {
   - **Datenquelle:** Assigned categories für diesen Supplier
   - **Type:** `WholesalerCategoryWithCount[]` (erweitert um offering_count)
   - **Query:** Mock-Daten, später `wholesaler_categories` JOIN `product_categories`
-- **Add-Button:** "Assign Category" 🔄 **NOCH ZU IMPLEMENTIEREN**
+- **Add-Button:** "Assign Category" ✅ **VOLLSTÄNDIG IMPLEMENTIERT**
   - **Typ:** NUR RELATIONSHIP herstellen
   - **UI:** Dropdown mit verfügbaren `product_categories` 
   - **Aktion:** Erstellt n:m Eintrag in `wholesaler_categories` - **KEINE Navigation!**
@@ -263,7 +418,7 @@ if (level === 'suppliers' || level === 'offerings') {
   showFormInCreateMode();
 }
 
-// NUR RELATIONSHIPS → Dropdown 🔄 (Categories TODO)
+// NUR RELATIONSHIPS → Dropdown ✅ (Categories IMPLEMENTIERT)
 if (level === 'categories') {
   showAssignmentDropdown();
   // KEINE Navigation!
@@ -312,59 +467,85 @@ onselect={handleSidebarNavigation}
 ## 📦 **DATEI-STRUKTUR (AKTUELL)**
 
 ```
-src/lib/components/
-├── browser/
-│   └── HierarchySidebar.svelte           ✅ IMPLEMENTIERT + CSS ausgelagert
-├── domain/suppliers/
-│   ├── SupplierGrid.svelte               ✅ IMPLEMENTIERT
-│   └── SupplierForm.svelte               ✅ VOLLSTÄNDIG GESTYLT
-├── domain/categories/
-│   ├── CategoryGrid.svelte               ✅ IMPLEMENTIERT
-│   └── CategoryAssignment.svelte         ✅ VOLLSTÄNDIG IMPLEMENTIERT
-├── styles/                               ✅ CSS-SYSTEM
-│   ├── grid.css                          ✅ BASIS-KOMPONENTE + Farbharmonisierung
-│   ├── form.css                          ✅ ERWEITERT (select-styles)
-│   └── sidebar.css                       ✅ NEU ERSTELLT
-├── domain/offerings/                            ⌘ TODO
-│   ├── OfferingGrid.svelte ✅ IMPLEMENTIERT
-│   └── OfferingForm.svelte     ⌘ TODO
-├── domain/attributes/                           ⌘ TODO
-│   ├── AttributeGrid.svelte ✅ IMPLEMENTIERT
-│   └── AttributeForm.svelte      ⌘ TODO
-├── domain/links/                                ⌘ TODO
-│   ├── LinkGrid.svelte ✅ IMPLEMENTIERT
-│   └── LinkForm.svelte     ⌘ TODO
-├── Datagrid.svelte                       ✅ BASIS-KOMPONENTE + Dokumentation
-└── forms/FormShell.svelte                ✅ BASIS-KOMPONENTE
-
-src/routes/
-└── supplierbrowser/
-    └── +page.svelte                    ✅ TEST-SEITE (Ebene 1-2 vollständig)
-    └── mocdkData.ts                
+src/lib/
+├── clientAndBack/
+│   ├── queryGrammar.ts                   ✅ NEU - Shared Query Language
+│   └── columnDefinitions.ts             ✅ BASIS-KOMPONENTE
+├── components/
+│   ├── browser/
+│   │   └── HierarchySidebar.svelte       ✅ IMPLEMENTIERT + CSS ausgelagert
+│   ├── domain/suppliers/
+│   │   ├── SupplierGrid.svelte           ✅ IMPLEMENTIERT
+│   │   └── SupplierForm.svelte           ✅ VOLLSTÄNDIG GESTYLT + JSDoc
+│   ├── domain/categories/
+│   │   ├── CategoryGrid.svelte           ✅ IMPLEMENTIERT
+│   │   └── CategoryAssignment.svelte     ✅ VOLLSTÄNDIG IMPLEMENTIERT
+│   ├── styles/                           ✅ CSS-SYSTEM
+│   │   ├── grid.css                      ✅ BASIS-KOMPONENTE + Farbharmonisierung
+│   │   ├── form.css                      ✅ ERWEITERT (select-styles)
+│   │   └── sidebar.css                   ✅ NEU ERSTELLT
+│   ├── domain/offerings/                 ⌘ TODO
+│   │   ├── OfferingGrid.svelte           ✅ IMPLEMENTIERT (STUB)
+│   │   └── OfferingForm.svelte           ⌘ TODO
+│   ├── domain/attributes/                ⌘ TODO
+│   │   ├── AttributeGrid.svelte          ✅ IMPLEMENTIERT (STUB)
+│   │   └── AttributeForm.svelte          ⌘ TODO
+│   ├── domain/links/                     ⌘ TODO
+│   │   ├── LinkGrid.svelte               ✅ IMPLEMENTIERT (STUB)
+│   │   └── LinkForm.svelte               ⌘ TODO
+│   ├── client/
+│   │   ├── Datagrid.svelte               ✅ BASIS-KOMPONENTE + Dokumentation
+│   │   └── ConfirmDialog.svelte          ✅ BASIS-KOMPONENTE
+│   └── forms/
+│       └── FormShell.svelte              ✅ BASIS-KOMPONENTE
+├── server/
+│   ├── queryBuilder.ts                   ✅ NEU REFACTORED - Build + Execute Trennung
+│   ├── supplierQueryConfig.ts            ✅ VEREINFACHT - Config only
+│   └── errors/
+│       └── mssqlErrorMapper.ts           ✅ NEU IMPLEMENTIERT - DB Error Mapping
+└── routes/
+    ├── api/
+    │   ├── suppliers/
+    │   │   └── +server.ts                ✅ NEU IMPLEMENTIERT - GET + POST mit QueryPayload
+    │   └── query/
+    │       └── +server.ts                ✅ BASIS-KOMPONENTE (Generic Query API)
+    └── supplierbrowser/
+        ├── +page.svelte                  ✅ TEST-SEITE (Ebene 1-2 vollständig)
+        └── mockData.ts                   ✅ DEVELOPMENT DATEN
 ```
 
 ---
 
 ## 🎯 **NEXT STEPS**
 
-### ** (Offerings):**
-- OfferingForm.svelte
-- Ebene 3 Navigation
-- Mock-Daten für Offerings erweitern
+### **📡 (API):**
+- **PUT /api/suppliers/[id]** - Update existing supplier
+- **DELETE /api/suppliers/[id]** - Delete supplier with dependencies
+- **Categories/Offerings APIs** - Weitere Domain APIs implementieren
+- **Generic Domain Validation** - Type-basierte Validierung system
+- IMPORTANT: trenne den generische validator und den domain-spezifischen,
+  beseitige fehler im domainValidator: Unnecessary escape character: \(.  
 
-### **(Details):**
-- AttributeForm + LinkForm
-- Ebene 4-5 Navigation mit Mode-Toggle
-- Mock-Daten für Attributes/Links
+### **🚀 (Offerings):**
+- **OfferingForm.svelte** - Form wrapper um FormShell
+- **Ebene 3 Navigation** - Offerings Grid Integration  
+- **Mock-Daten erweitern** - WholesalerItemOffering_ProductDef_Category data
 
-### **(API-Integration):**
-- Echte API-Calls statt Mock-Daten
-- Delete-Strategien mit Dependency-Checks
-- Error-Handling & Loading-States
+### **🔧  (Details):**
+- **AttributeForm + LinkForm** - Detail forms für Ebene 5
+- **Ebene 4-5 Navigation** mit Mode-Toggle (Attributes/Links)
+- **Mock-Daten** für Attributes/Links erweitern
+
+
+### **🎨 (Polish):**
+- **Loading States** - Skeleton loading für alle Grids
+- **Error Boundaries** - Graceful error handling in UI
+- **Performance** - Virtual scrolling für große Datasets
+- **Accessibility** - ARIA labels, keyboard navigation
 
 ---
 
-## 🔧 **ARCHITEKTUR-COMPLIANCE**
+## 🏗️ **ARCHITEKTUR-COMPLIANCE**
 
 ### ✅ **Eingehalten:**
 - **Svelte 5 + Runes** überall
@@ -375,12 +556,14 @@ src/routes/
 - **FormShell-Wrapper** - für alle Forms
 - **CSS-Design-System** - Modulare, wiederverwendbare Styles
 - **Callback Props** statt DOM Events (Svelte 5 Pattern)
+- **ESLint Compliance** - Kein "unexpected any", const usage, type safety
+- **DB-First Constraints** - Optimistic operations mit error mapping
 
-### 📋 **Zu beachten:**
-- Mock-Daten durch echte API ersetzen
-- Delete-Handler implementieren  
-- Loading-States & Error-Handling
-- Performance-Optimierung für große Datensets
+### 📋 **Neue Standards etabliert:**
+- **QueryBuilder Pattern** - Build/Execute Separation für Testbarkeit
+- **DB Error Mapping** - SQL Constraints → HTTP Status Codes
+- **Generic Validation** - Type-basierte Domain validation (geplant)
+- **End-to-End Type Safety** - Shared clientAndBack interfaces
 
 ### 🎨 **Styling-Standards etabliert:**
 - **Farbkonsistenz:** Einheitliches --color-primary (#4f46e5)
@@ -390,6 +573,8 @@ src/routes/
 
 ---
 
-**🎯 Ziel: Vollständig funktionsfähiges 5-Ebenen SupplierBrowser System mit URL-driven Navigation und konsistenter Architektur.**
+**🎯 Ziel: Vollständig funktionsfähiges 5-Ebenen SupplierBrowser System mit URL-driven Navigation, konsistenter Architektur und production-ready API Backend.**
 
-**📊 Fortschritt: ~70% implementiert** (Ebene 1-2 vollständig + Category Assignment funktional)
+**📊 Fortschritt: ~80% implementiert** (Ebene 1-2 vollständig + Category Assignment + QueryBuilder + Error Handling + Suppliers API funktional)
+
+**🚀 Nächster Milestone: Ebene 3 (Offerings) Implementation mit neuer QueryBuilder Architektur**

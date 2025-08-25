@@ -1,13 +1,14 @@
 // src/lib/server/queryBuilder.ts
 import { db } from '$lib/server/db';
 import { log } from '$lib/utils/logger';
-import { 
-  type QueryPayload, 
-  type ConditionGroup, 
-  type Condition, 
-  type JoinClause, 
-  LogicalOperator 
-} from '$lib/clientAndBack/queryGrammar';
+import type { Request as MSSQLRequest } from 'mssql';
+import {
+  type QueryPayload,
+  type ConditionGroup,
+  type Condition,
+  type JoinClause,
+  LogicalOperator
+} from '../clientAndBack/queryGrammar';
 
 // Configuration passed from outside (domain-agnostic!)
 export interface QueryConfig {
@@ -16,44 +17,24 @@ export interface QueryConfig {
 }
 
 /**
- * SQL parameter value types that can be safely passed to MSSQL
- */
-export type SqlParameterValue = string | number | boolean | Date | null;
-
-/**
- * Result from buildQuery() containing the generated SQL and parameters
- */
-export interface QueryBuildResult {
-  sql: string;
-  parameters: Record<string, SqlParameterValue>;
-  metadata: {
-    selectColumns: string[];
-    fromClause: string;
-    hasJoins: boolean;
-    hasWhere: boolean;
-    parameterCount: number;
-  };
-}
-
-/**
  * Recursively parses WHERE conditions into parameterized SQL string
  * @param item - Condition or ConditionGroup to parse
+ * @param sqlRequest - MSSQL request object for parameter binding
  * @param allowedColumns - Whitelist of allowed columns for security
- * @param parameters - Parameter object to collect parameters
  * @param paramIndex - Reference object to track parameter indices
  * @returns Parameterized SQL WHERE clause
  */
 function parseWhere(
   item: ConditionGroup | Condition,
+  sqlRequest: MSSQLRequest,
   allowedColumns: string[],
-  parameters: Record<string, SqlParameterValue>,
   paramIndex: { i: number }
 ): string {
   try {
     // Base case: simple condition
     if (!('conditions' in item)) {
       const condition = item as Condition;
-      
+
       // Security check: validate column against whitelist
       if (!allowedColumns.includes(condition.key)) {
         throw new Error(`Column '${condition.key}' is not in the allowed columns list`);
@@ -66,7 +47,7 @@ function parseWhere(
 
       // Parameterized condition to prevent SQL injection
       const paramName = `p${paramIndex.i++}`;
-      parameters[paramName] = condition.val as SqlParameterValue;
+      sqlRequest.input(paramName, condition.val);
       return `${condition.key} ${condition.op} @${paramName}`;
     }
 
@@ -75,26 +56,26 @@ function parseWhere(
     if (conditionGroup.conditions.length === 0) {
       return '1=1'; // Neutral expression for empty group
     }
-    
-    const parts = conditionGroup.conditions.map(c => 
-      parseWhere(c, allowedColumns, parameters, paramIndex)
+
+    const parts = conditionGroup.conditions.map(c =>
+      parseWhere(c, sqlRequest, allowedColumns, paramIndex)
     );
 
     switch (conditionGroup.op) {
       case LogicalOperator.AND:
       case LogicalOperator.OR:
         return `(${parts.join(` ${conditionGroup.op} `)})`;
-      
+
       case LogicalOperator.NOT:
         if (parts.length !== 1) {
           throw new Error('A NOT group must contain exactly one condition or group');
         }
         return `NOT ${parts[0]}`;
-      
+
       default:
         throw new Error(`Unsupported logical operator: ${conditionGroup.op}`);
     }
-  } catch (error: unknown) {
+  } catch (error) {
     log.error("Error parsing WHERE clause:", { error, item, allowedColumns });
     throw error;
   }
@@ -108,33 +89,36 @@ function parseWhere(
 function buildJoinClauses(joins: JoinClause[]): string {
   try {
     if (!joins || joins.length === 0) return '';
-    
+
     return joins.map(join => {
       // Validate JOIN definition
       if (!join.table || !join.on) {
         throw new Error('JOIN clause missing required table or ON condition');
       }
-      
+
       const alias = join.alias ? ` ${join.alias}` : '';
       return `${join.type} ${join.table}${alias} ON ${join.on}`;
     }).join(' ');
-  } catch (error: unknown) {
+  } catch (error) {
     log.error("Error building JOIN clauses:", { error, joins });
     throw error;
   }
 }
 
 /**
- * PURE FUNCTION: Builds SQL query from payload and configuration
+ * GENERIC QueryBuilder - domain-agnostic, secure SQL query execution
  * 
  * @param payload - Query definition (SELECT, FROM, WHERE, etc.)
  * @param config - Security configuration with allowed tables and JOINs
- * @returns QueryBuildResult with SQL, parameters, and metadata
- * @throws Error for validation failures
+ * @returns Promise resolving to query results
+ * @throws Error for validation failures or database errors
  */
-export function buildQuery(payload: QueryPayload, config: QueryConfig): QueryBuildResult {
+export async function executeGenericQuery(
+  payload: QueryPayload,
+  config: QueryConfig
+): Promise<unknown[]> {
   const startTime = Date.now();
-  
+
   try {
     // Input validation
     if (!payload) {
@@ -150,8 +134,8 @@ export function buildQuery(payload: QueryPayload, config: QueryConfig): QueryBui
       throw new Error('FROM clause is required');
     }
 
-    log.info("Building query", { 
-      from: payload.from, 
+    log.info("Executing generic query", {
+      from: payload.from,
       selectCount: payload.select.length,
       hasWhere: !!payload.where,
       hasJoins: !!(payload.joins && payload.joins.length > 0)
@@ -159,20 +143,20 @@ export function buildQuery(payload: QueryPayload, config: QueryConfig): QueryBui
 
     let allowedColumns: string[];
     let fromClause: string;
-    let joinClauses = '';
-    
+    let joinClauses: string = '';
+
     // Check if this is a predefined JOIN configuration (virtual view)
     if (config.joinConfigurations && config.joinConfigurations[payload.from]) {
       const joinConfig = config.joinConfigurations[payload.from];
       allowedColumns = config.allowedTables[payload.from];
-      
+
       if (!allowedColumns) {
         throw new Error(`No column definitions found for virtual view '${payload.from}'`);
       }
-      
+
       fromClause = joinConfig.from;
       joinClauses = buildJoinClauses(joinConfig.joins);
-      
+
       log.info("Using predefined JOIN configuration", { view: payload.from, joinCount: joinConfig.joins.length });
     } else {
       // Regular table query
@@ -180,9 +164,9 @@ export function buildQuery(payload: QueryPayload, config: QueryConfig): QueryBui
       if (!allowedColumns) {
         throw new Error(`Table '${payload.from}' is not in the allowed tables list`);
       }
-      
+
       fromClause = payload.from;
-      
+
       // Build custom JOINs if provided in payload
       if (payload.joins && payload.joins.length > 0) {
         joinClauses = buildJoinClauses(payload.joins);
@@ -190,13 +174,13 @@ export function buildQuery(payload: QueryPayload, config: QueryConfig): QueryBui
       }
     }
 
-    const parameters: Record<string, SqlParameterValue> = {};
+    const sqlRequest = db.request();
     const paramIndex = { i: 0 };
 
     // --- WHERE Clause ---
     let whereClause = '';
     if (payload.where && payload.where.conditions.length > 0) {
-      const parsedConditions = parseWhere(payload.where, allowedColumns, parameters, paramIndex);
+      const parsedConditions = parseWhere(payload.where, sqlRequest, allowedColumns, paramIndex);
       if (parsedConditions !== '1=1') {
         whereClause = `WHERE ${parsedConditions}`;
       }
@@ -216,14 +200,14 @@ export function buildQuery(payload: QueryPayload, config: QueryConfig): QueryBui
       });
       orderByClause = `ORDER BY ${orderByParts.join(', ')}`;
     }
-    
+
     // --- SELECT Clause ---
     const selectCols = payload.select.filter(col => {
       // Allow column names with aliases (e.g., 'pc.name AS category_name')
       const baseCol = col.includes(' AS ') ? col.split(' AS ')[0].trim() : col;
       return allowedColumns.includes(baseCol) || allowedColumns.includes(col);
     });
-    
+
     if (selectCols.length === 0) {
       throw new Error('No valid columns found in SELECT clause after security filtering');
     }
@@ -231,12 +215,12 @@ export function buildQuery(payload: QueryPayload, config: QueryConfig): QueryBui
     // --- LIMIT / OFFSET ---
     const limit = Math.min(payload.limit ?? 50, 1000); // Cap at 1000 for performance
     const offset = Math.max(payload.offset ?? 0, 0);   // Ensure non-negative
-    
-    parameters['limit'] = limit;
-    parameters['offset'] = offset;
+
+    sqlRequest.input('limit', limit);
+    sqlRequest.input('offset', offset);
 
     // --- Assemble Final Query ---
-    const sql = `
+    const finalQuery = `
       SELECT ${selectCols.join(', ')}
       FROM ${fromClause}
       ${joinClauses}
@@ -246,118 +230,49 @@ export function buildQuery(payload: QueryPayload, config: QueryConfig): QueryBui
       FETCH NEXT @limit ROWS ONLY;
     `.trim();
 
-    const buildTime = Date.now() - startTime;
-    
-    log.info("Query built successfully", { 
-      sql: sql.replace(/\s+/g, ' '), 
+    log.info("Query assembled", {
+      query: finalQuery.replace(/\s+/g, ' '),
       parameterCount: paramIndex.i,
       limit,
-      offset,
-      buildTimeMs: buildTime
+      offset
     });
 
-    return {
-      sql,
-      parameters,
-      metadata: {
-        selectColumns: selectCols,
-        fromClause,
-        hasJoins: joinClauses.length > 0,
-        hasWhere: whereClause.length > 0,
-        parameterCount: paramIndex.i
-      }
-    };
+    // --- Execute Query ---
+    const result = await sqlRequest.query(finalQuery);
+    const executionTime = Date.now() - startTime;
 
+    log.info("Query executed successfully", {
+      rowCount: result.recordset.length,
+      executionTimeMs: executionTime,
+      from: payload.from
+    });
+
+    return result.recordset;
   } catch (error: unknown) {
-    const buildTime = Date.now() - startTime;
-    
-    log.error("Query building failed", { 
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
+    const executionTime = Date.now() - startTime;
+    let message;
+    let stack;
+    if (error instanceof Error) {
+      message = error.message;
+      stack = error.stack;
+    } else {
+      message = String(error);
+    }
+
+    log.error("Query execution failed", {
+      error: message,
+      stack: stack,
       payload: {
         from: payload?.from,
         selectCount: payload?.select?.length,
         hasWhere: !!(payload?.where?.conditions?.length),
         hasJoins: !!(payload?.joins?.length)
       },
-      buildTimeMs: buildTime,
+      executionTimeMs: executionTime,
       configTables: config ? Object.keys(config.allowedTables) : []
     });
 
-    // Re-throw with more context
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Query building failed: ${message}`);
+    // Re-throw with more context for API layer
+    throw new Error(`Database query failed: ${message}`);
   }
-}
-
-/**
- * Database query result row - represents a generic database record
- */
-export type QueryResultRow = Record<string, SqlParameterValue>;
-
-/**
- * PURE FUNCTION: Executes a SQL query with parameters
- * 
- * @param sql - Parameterized SQL query string
- * @param parameters - Query parameters object
- * @returns Promise resolving to query results
- * @throws Error for database execution failures
- */
-export async function executeQuery(sql: string, parameters: Record<string, SqlParameterValue>): Promise<QueryResultRow[]> {
-  const startTime = Date.now();
-  
-  try {
-    log.info("Executing query", { 
-      sql: sql.replace(/\s+/g, ' '), 
-      parameterCount: Object.keys(parameters).length 
-    });
-
-    const sqlRequest = db.request();
-    
-    // Add all parameters to the request
-    Object.entries(parameters).forEach(([key, value]) => {
-      sqlRequest.input(key, value);
-    });
-
-    // Execute the query
-    const result = await sqlRequest.query(sql);
-    const executionTime = Date.now() - startTime;
-    
-    log.info("Query executed successfully", { 
-      rowCount: result.recordset.length,
-      executionTimeMs: executionTime
-    });
-
-    return result.recordset as QueryResultRow[];
-
-  } catch (error: unknown) {
-    const executionTime = Date.now() - startTime;
-    
-    log.error("Query execution failed", { 
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      sql: sql.replace(/\s+/g, ' '),
-      parameterCount: Object.keys(parameters).length,
-      executionTimeMs: executionTime
-    });
-
-    // Re-throw with more context
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Database query execution failed: ${message}`);
-  }
-}
-
-/**
- * BACKWARD COMPATIBILITY: Generic query execution (build + execute)
- * 
- * @param payload - Query definition
- * @param config - Security configuration  
- * @returns Promise resolving to query results
- */
-export async function executeGenericQuery(
-  payload: QueryPayload, 
-  config: QueryConfig
-): Promise<QueryResultRow[]> {
-  const { sql, parameters } = buildQuery(payload, config);
-  return executeQuery(sql, parameters);
 }

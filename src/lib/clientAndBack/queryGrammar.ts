@@ -32,7 +32,7 @@ export enum JoinType {
 export interface Condition {
   key: string;            // Can include alias, e.g., 'w.region'
   op: ComparisonOperator;
-  val?: any | any[];
+  val?: unknown | unknown[];
 }
 
 export interface ConditionGroup {

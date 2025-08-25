@@ -1,7 +1,7 @@
 // src/routes/api/query/+server.ts
 import { json, error, type RequestEvent, type RequestHandler } from '@sveltejs/kit';
 import { executeGenericQuery } from '$lib/server/queryBuilder';
-import type { QueryPayload } from './queryGrammar';
+import type { QueryPayload } from '../../../lib/clientAndBack/queryGrammar';
 // KORREKTUR: Die Konfiguration für die Abfragesicherheit muss importiert werden.
 import { supplierQueryConfig } from '$lib/server/supplierQueryConfig';
 

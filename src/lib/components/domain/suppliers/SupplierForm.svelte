@@ -1,9 +1,34 @@
 <script lang="ts">
-  // SupplierForm built on FormShell (Svelte 5 + Runes)
-  // - English comments
-  // - Uses domain type Wholesaler (no component-local entity types)
-  // - Wide validator/submit signatures to satisfy FormShell's ValidateFn/SubmitFn
-  // - UPDATED: Now uses proper CSS classes from form.css instead of inline styles
+  /**
+   * SupplierForm Component (Svelte 5 + Runes)
+   * 
+   * @description A comprehensive form component for creating and editing supplier (wholesaler) records.
+   * Built as a wrapper around the reusable FormShell component, providing supplier-specific
+   * validation, business logic, and UI elements.
+   * 
+   * @features
+   * - Create/Edit mode detection based on presence of ID
+   * - Comprehensive validation with custom business rules
+   * - Responsive 4-column grid layout with mobile adaptivity
+   * - Integration with logging and notification systems
+   * - Type-safe props and validation using domain types
+   * 
+   * @architecture
+   * - Uses FormShell for form state management and lifecycle
+   * - Implements adapter pattern for validation and submission
+   * - Follows CSS-in-JS pattern with form.css integration
+   * - Svelte 5 callback props for event handling
+   * 
+   * @example
+   * ```svelte
+   * <SupplierForm
+   *   initial={selectedSupplier}
+   *   disabled={false}
+   *   onSubmitted={(data) => handleSuccess(data)}
+   *   onCancelled={() => navigateBack()}
+   * />
+   * ```
+   */
 
   import FormShell, {
     type ValidateResult,
@@ -13,75 +38,155 @@
   import "$lib/components/styles/form.css";
   import "$lib/components/styles/grid.css";
 
-  // Provide a Wholesaler-conform default (dropship is required)
+  // ===== COMPONENT PROPS & TYPES =====
+
+  /**
+   * Form validation error structure
+   * Maps field names to arrays of error messages for comprehensive error display
+   */
+  type ValidationErrors = Record<string, string[]>;
+
+  // ===== PROPS DESTRUCTURING =====
+
   const {
+    // Default to minimal Wholesaler object with required fields
     initial = { name: "", dropship: false } as Wholesaler,
     disabled = false,
     onSubmitted,
     onCancelled,
   } = $props<{
+    /** Initial form data - if provided with ID, enables edit mode */
     initial?: Wholesaler;
+    /** Whether the entire form should be disabled */
     disabled?: boolean;
+    /** Callback fired when form submission succeeds */
     onSubmitted?: (p: any) => void;
+    /** Callback fired when form is cancelled by user */
     onCancelled?: (p: any) => void;
   }>();
 
+  // Silence unused variable warnings - these are used by FormShell via callback props
   onSubmitted;
   onCancelled;
 
-  // Adapter validator: wide input (FormData) → check required + optional UI fields
+  // ===== VALIDATION LOGIC =====
+
+  /**
+   * Validates supplier form data against business rules and UI constraints
+   * 
+   * @param raw - Raw form data from FormShell (includes both domain and UI-specific fields)
+   * @returns ValidationResult with validation status and field-specific errors
+   * 
+   * @businessRules
+   * - Name: Required, non-empty after trimming
+   * - Dropship: Required boolean (business constraint)
+   * - Email: Optional, but must be valid format if provided
+   * - Country: Required for business operations (UI constraint)
+   */
   function validateWholesaler(raw: Record<string, any>): ValidateResult {
     const data = raw as Partial<Wholesaler> & Record<string, any>;
-    const errors: Record<string, string[]> = {};
+    const errors: ValidationErrors = {};
 
-    // required by Wholesaler
-    if (!String(data.name ?? "").trim()) errors.name = ["Name is required"];
-    if (typeof data.dropship !== "boolean")
+    // === REQUIRED DOMAIN FIELDS ===
+    // These are enforced by the Wholesaler domain type
+    
+    if (!String(data.name ?? "").trim()) {
+      errors.name = ["Name is required"];
+    }
+    
+    if (typeof data.dropship !== "boolean") {
       errors.dropship = ["Dropship must be true/false"];
+    }
 
-    // optional UI fields (not necessarily part of Wholesaler type)
-    if (data.email && !/^\S+@\S+\.\S+$/.test(String(data.email)))
+    // === OPTIONAL UI VALIDATION ===
+    // These fields may not be part of core Wholesaler type but are required by UI/business logic
+    
+    // Email validation: optional field, but must be valid if provided
+    if (data.email && !/^\S+@\S+\.\S+$/.test(String(data.email))) {
       errors.email = ["Invalid email address"];
-    if (data.country == null || String(data.country).trim() === "")
+    }
+    
+    // Country validation: required for business operations
+    if (data.country == null || String(data.country).trim() === "") {
       errors.country = ["Country is required"];
+    }
 
-    return { valid: Object.keys(errors).length === 0, errors };
+    return { 
+      valid: Object.keys(errors).length === 0, 
+      errors 
+    };
   }
 
-  // Adapter submit: wide input (FormData) → cast minimally for API
+  // ===== SUBMISSION LOGIC =====
+
+  /**
+   * Handles form submission with automatic create/update detection
+   * 
+   * @param raw - Form data from FormShell
+   * @returns API response data for success handling
+   * 
+   * @throws {Error} When API request fails or returns non-ok status
+   * 
+   * @apiEndpoints
+   * - POST /api/wholesalers - Create new supplier
+   * - PUT /api/wholesalers/:id - Update existing supplier
+   */
   async function submitWholesaler(raw: Record<string, any>) {
     const data = raw as Partial<Wholesaler> & Record<string, any>;
-    const id = data.id as string | undefined; // may be undefined
+    
+    // Detect create vs update mode based on presence of ID
+    const id = data.id as string | undefined;
     const isUpdate = Boolean(id);
 
+    // Configure API endpoint based on operation type
     const url = isUpdate ? `/api/wholesalers/${id}` : "/api/wholesalers";
     const method = isUpdate ? "PUT" : "POST";
 
     try {
       log.info({ component: "SupplierForm", method, url }, "SUBMIT_START");
+      
+      // Execute API request with JSON payload
       const res = await fetch(url, {
         method,
         headers: { "content-type": "application/json" },
         body: JSON.stringify(data),
       });
-      if (!res.ok) throw new Error(await res.text().catch(() => "Save failed"));
+      
+      // Handle non-ok responses
+      if (!res.ok) {
+        const errorText = await res.text().catch(() => "Save failed");
+        throw new Error(errorText);
+      }
+      
+      // Parse successful response
       const json = await res.json().catch(() => ({}));
       log.info({ component: "SupplierForm", ok: true }, "SUBMIT_OK");
+      
       return json;
     } catch (e) {
       log.error(
         { component: "SupplierForm", error: String(e) },
         "SUBMIT_FAILED",
       );
-      throw e;
+      throw e; // Re-throw for FormShell error handling
     }
   }
 
-  // Component-callback handlers (NOT CustomEvent)
+  // ===== EVENT HANDLERS =====
+
+  /**
+   * Handles successful form submission
+   * Logs the event and delegates to parent component via callback prop
+   */
   function handleSubmitted(p: { data: Record<string, any>; result: unknown }) {
     log.info({ component: "SupplierForm", event: "submitted" }, "FORM_EVENT");
+    // Parent component handles success logic (notifications, navigation, etc.)
   }
-  
+
+  /**
+   * Handles form submission errors
+   * Logs the error for debugging and monitoring
+   */
   function handleSubmitError(p: { data: Record<string, any>; error: unknown }) {
     log.warn(
       {
@@ -91,15 +196,29 @@
       },
       "FORM_EVENT",
     );
+    // Error handling is managed by FormShell and parent component
   }
+
+  /**
+   * Handles form cancellation
+   * Logs the cancellation reason and delegates to parent component
+   */
   function handleCancelled(p: { data: Record<string, any>; reason?: string }) {
     log.info(
       { component: "SupplierForm", event: "cancelled", reason: p.reason },
       "FORM_EVENT",
     );
+    // Parent component handles cancellation logic (navigation, state reset, etc.)
   }
 </script>
 
+<!-- 
+  SUPPLIER FORM TEMPLATE
+  
+  Uses FormShell as the foundation and provides supplier-specific form fields
+  through the 'fields' snippet. The form automatically handles validation,
+  submission, and error states.
+-->
 <FormShell
   entity="Wholesaler"
   {initial}
@@ -110,6 +229,8 @@
   onSubmitError={handleSubmitError}
   onCancelled={handleCancelled}
 >
+  <!-- FORM HEADER -->
+  <!-- Displays entity info and unsaved changes indicator -->
   {#snippet header({ data, dirty })}
     <div class="form-header">
       <div>
@@ -126,11 +247,15 @@
     </div>
   {/snippet}
 
+  <!-- FORM FIELDS -->
+  <!-- Responsive 4-column grid layout with comprehensive supplier fields -->
   {#snippet fields({ get, set, errors, markTouched })}
     <div class="category-form">
-      <!-- Main supplier information -->
+      
+      <!-- === MAIN SUPPLIER INFORMATION SECTION === -->
       <div class="form-grid">
-        <!-- Name (required, spans 2 columns) -->
+        
+        <!-- Supplier Name (Required, Primary Identifier) -->
         <div class="form-group span-2">
           <label for="wh-name">Supplier Name *</label>
           <input
@@ -153,7 +278,7 @@
           {/if}
         </div>
 
-        <!-- Region -->
+        <!-- Region (Optional, Business Context) -->
         <div class="form-group">
           <label for="wh-region">Region</label>
           <input
@@ -167,7 +292,7 @@
           />
         </div>
 
-        <!-- Status -->
+        <!-- Status (Optional, Workflow State) -->
         <div class="form-group">
           <label for="wh-status">Status</label>
           <select
@@ -183,7 +308,7 @@
           </select>
         </div>
 
-        <!-- Country (required) -->
+        <!-- Country (Required for Business Operations) -->
         <div class="form-group">
           <label for="wh-country">Country *</label>
           <select
@@ -197,6 +322,7 @@
             aria-describedby={errors.country ? "err-country" : undefined}
           >
             <option value="">Select country…</option>
+            <!-- Common business countries - could be externalized to a data source -->
             <option value="AT">Austria</option>
             <option value="DE">Germany</option>
             <option value="CH">Switzerland</option>
@@ -211,7 +337,7 @@
           {/if}
         </div>
 
-        <!-- Dropship (checkbox) -->
+        <!-- Dropshipping Capability (Required Business Feature) -->
         <div class="form-group">
           <label for="wh-dropship">
             <input
@@ -237,9 +363,10 @@
         </div>
       </div>
 
-      <!-- Contact information section -->
+      <!-- === CONTACT INFORMATION SECTION === -->
       <div class="form-grid">
-        <!-- Email -->
+        
+        <!-- Email Address (Optional but Validated) -->
         <div class="form-group span-2">
           <label for="wh-email">Email Address</label>
           <input
@@ -262,7 +389,7 @@
           {/if}
         </div>
 
-        <!-- Website -->
+        <!-- Website URL (Optional, Business Reference) -->
         <div class="form-group span-2">
           <label for="wh-website">Website</label>
           <input
@@ -277,8 +404,10 @@
         </div>
       </div>
 
-      <!-- Notes section -->
+      <!-- === BUSINESS NOTES SECTION === -->
       <div class="form-grid">
+        
+        <!-- Business Notes (Optional, Free-form Business Context) -->
         <div class="form-group span-4">
           <label for="wh-notes">Business Notes</label>
           <textarea
@@ -288,6 +417,7 @@
             oninput={(e: Event) =>
               set("b2b_notes", (e.currentTarget as HTMLTextAreaElement).value)}
             >{get("b2b_notes") ?? ""}</textarea>
+          <!-- Character count feedback for user guidance -->
           <div class="char-count">
             {(get("b2b_notes") ?? "").length} / 1000 characters
           </div>
@@ -296,6 +426,8 @@
     </div>
   {/snippet}
 
+  <!-- FORM ACTIONS -->
+  <!-- Cancel and Save buttons with proper state management -->
   {#snippet actions({ submit, cancel, submitting, dirty })}
     <div class="form-actions">
       <button

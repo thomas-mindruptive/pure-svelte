@@ -14,9 +14,9 @@ import { supplierQueryConfig } from '$lib/clientAndBack/queryConfig';
 import { mssqlErrorMapper } from '$lib/server/errors/mssqlErrorMapper';
 import { LogicalOperator, type QueryPayload } from '$lib/clientAndBack/queryGrammar';
 import type { Wholesaler } from '$lib/domain/types';
+import type { QuerySuccessResponse } from '$lib/api/types';
 
-// ✅ CRITICAL: Import the actual response type
-import type { SupplierQueryResponse } from '$lib/api/types/supplier';
+
 
 /**
  * POST /api/suppliers
@@ -58,22 +58,27 @@ export const POST: RequestHandler = async (event) => {
             hasWhere: metadata.hasWhere
         });
 
-        // ✅ FIXED: Use the actual SupplierQueryResponse type
-        const response: SupplierQueryResponse = {
-            results: results as Partial<Wholesaler>[],  // ✅ 'results' field required by type
+        const response: QuerySuccessResponse<Wholesaler> = {
+            success: true,
+            message: 'Suppliers retrieved successfully',
+            data: {
+                results: results as Partial<Wholesaler>[],
+                meta: {
+                    retrieved_at: new Date().toISOString(),
+                    result_count: results.length,
+                    columns_selected: metadata.selectColumns,
+                    has_joins: metadata.hasJoins,
+                    has_where: metadata.hasWhere,
+                    parameter_count: metadata.parameterCount,
+                    table_fixed: 'dbo.wholesalers',
+                    sql_generated: sql.replace(/\s+/g, ' ').trim()
+                }
+            },
             meta: {
-                retrieved_at: new Date().toISOString(),
-                result_count: results.length,
-                columns_selected: metadata.selectColumns,
-                has_joins: metadata.hasJoins,
-                has_where: metadata.hasWhere,
-                parameter_count: metadata.parameterCount,
-                table_fixed: 'dbo.wholesalers',
-                sql_generated: sql.replace(/\s+/g, ' ').trim()
+                timestamp: new Date().toISOString()
             }
         };
 
-        // ✅ TypeScript now ENFORCES the correct structure
         return json(response);
 
     } catch (err: unknown) {

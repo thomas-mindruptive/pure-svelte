@@ -1,5 +1,5 @@
 <script lang="ts">
-  // FormShell (Svelte 5 + Runes)
+  // FormShell (Svelte 5 + Runes) - FIXED structuredClone Issue
   // - English comments
   // - Owns data state, dirty/touched tracking, validation, submit/cancel orchestration
   // - Callback props for component events (recommended in Svelte 5):
@@ -13,6 +13,8 @@
   //     fields({ data, set, get, errors, touched, markTouched, validate })
   //     actions({ submit, cancel, submitting, valid, dirty, disabled })
   //     footer({ data })
+  //
+  // FIXED: Safe cloning to prevent DataCloneError from DOM elements, functions, etc.
   //
   // Accessibility:
   // - No onkeydown on <form> (avoids a11y warning). Keyboard shortcuts are bound programmatically.
@@ -96,16 +98,75 @@
     actions?: Snippet<[ActionsProps]>;
     footer?:  Snippet<[FooterProps]>;
 
-    // Callback props (component “events” in Svelte 5)
+    // Callback props (component "events" in Svelte 5)
     onSubmitted?: (p: { data: FormData; result: unknown }) => void;
     onSubmitError?: (p: { data: FormData; error: unknown }) => void;
     onCancelled?: (p: { data: FormData; reason?: string }) => void;
     onChanged?: (p: { data: FormData; dirty: boolean }) => void;
   }>();
 
+  // ---- SAFE CLONING UTILITY ----
+  
+  /**
+   * Safely clones form data, handling DataCloneError from non-cloneable objects
+   * Falls back to JSON clone if structuredClone fails
+   */
+  function safeClone<T extends Record<string, any>>(obj: T): T {
+    try {
+      return structuredClone(obj);
+    } catch (error) {
+      log.warn("structuredClone failed, using JSON fallback", { 
+        entity, 
+        error: String(error) 
+      });
+      
+      try {
+        // JSON fallback: works for most form data but loses functions/dates
+        return JSON.parse(JSON.stringify(obj));
+      } catch (jsonError) {
+        log.error("JSON clone also failed, using shallow copy", { 
+          entity, 
+          error: String(jsonError) 
+        });
+        
+        // Last resort: shallow copy
+        return { ...obj } as T;
+      }
+    }
+  }
+
+  /**
+   * Creates a clean snapshot for dirty checking
+   * Strips potentially problematic properties
+   */
+  function createSnapshot(data: FormData): FormData {
+    const cleaned: FormData = {};
+    
+    for (const [key, value] of Object.entries(data)) {
+      // Skip known problematic types
+      if (value === null || value === undefined) {
+        cleaned[key] = value;
+      } else if (typeof value === 'object' && value instanceof Date) {
+        cleaned[key] = value.toISOString(); // Convert dates to strings
+      } else if (typeof value === 'object' && value.constructor === Object) {
+        cleaned[key] = createSnapshot(value); // Recursively clean nested objects
+      } else if (Array.isArray(value)) {
+        cleaned[key] = value.map(item => 
+          typeof item === 'object' && item !== null ? createSnapshot(item) : item
+        );
+      } else if (['string', 'number', 'boolean'].includes(typeof value)) {
+        cleaned[key] = value;
+      }
+      // Skip functions, DOM elements, circular references, etc.
+    }
+    
+    return cleaned;
+  }
+
   // ---- State (Runes) ----
-  const data     = $state<FormData>(structuredClone(initial));
-  const snapshot = $state<FormData>(structuredClone(initial)); // for dirty check
+  const cleanInitial = createSnapshot(initial);
+  const data     = $state<FormData>(safeClone(cleanInitial));
+  const snapshot = $state<FormData>(safeClone(cleanInitial)); // for dirty check
   const errors   = $state<Errors>({});
   const touched  = $state<Set<string>>(new Set());
   let submitting = $state(false);
@@ -175,8 +236,15 @@
   }
 
   function isDirty(): boolean {
-    try { return JSON.stringify(data) !== JSON.stringify(snapshot); }
-    catch { return true; } // assume dirty if stringify fails
+    try { 
+      // Use safe comparison for dirty checking
+      const currentSnapshot = createSnapshot(data);
+      return JSON.stringify(currentSnapshot) !== JSON.stringify(snapshot); 
+    }
+    catch { 
+      log.warn({ component: 'FormShell', entity }, 'isDirty comparison failed, assuming dirty');
+      return true; // assume dirty if comparison fails
+    }
   }
 
   function clearErrors(paths?: string[]) {
@@ -261,40 +329,42 @@
       const ok = await runValidate();
       if (!ok) {
         submitting = false;
-        emitSubmitError({ data: structuredClone(data), error: { message: 'validation failed' } });
+        emitSubmitError({ data: safeClone(data), error: { message: 'validation failed' } });
         return;
       }
     }
 
     try {
-      const result = await submit(structuredClone(data));
-      Object.assign(snapshot, structuredClone(data)); // update snapshot after success
-      emitSubmitted({ data: structuredClone(data), result });
+      const result = await submit(safeClone(data));
+      // Update snapshot after successful submission
+      const newSnapshot = createSnapshot(data);
+      Object.assign(snapshot, newSnapshot);
+      emitSubmitted({ data: safeClone(data), result });
       log.info({ component: 'FormShell', entity }, 'FORM_SUBMITTED');
     } catch (e) {
       log.error({ component: 'FormShell', entity, error: coerceMessage(e) }, 'FORM_SUBMIT_FAILED');
-      emitSubmitError({ data: structuredClone(data), error: e });
+      emitSubmitError({ data: safeClone(data), error: e });
     } finally {
       submitting = false;
     }
   }
 
-function doCancel(reason?: string) {
-  try {
-    onCancel?.(structuredClone(data));
-  } catch (e) {
-    log.warn({ component: 'FormShell', entity, error: coerceMessage(e) }, 'onCancel threw');
-  } finally {
-    const detail: { data: FormData; reason?: string } = { data: structuredClone(data) };
-    if (reason !== undefined) detail.reason = reason;
-    emitCancelled(detail);
+  function doCancel(reason?: string) {
+    try {
+      onCancel?.(safeClone(data));
+    } catch (e) {
+      log.warn({ component: 'FormShell', entity, error: coerceMessage(e) }, 'onCancel threw');
+    } finally {
+      const detail: { data: FormData; reason?: string } = { data: safeClone(data) };
+      if (reason !== undefined) detail.reason = reason;
+      emitCancelled(detail);
+    }
   }
-}
 
   // auto-validate on change mode
   function handleInput(path: string, value: unknown) {
     set(path, value);
-    emitChanged({ data: structuredClone(data), dirty: isDirty() });
+    emitChanged({ data: safeClone(data), dirty: isDirty() });
     if (autoValidate === 'change') {
       void runValidate(path);
     }

@@ -1,322 +1,161 @@
+Absolut. Das ist ein entscheidender Punkt, um die Qualität und Wartbarkeit des Projekts langfristig zu sichern. Die Architektur ist das "Was", die technischen Rahmenbedingungen sind das "Wie".
+
+Ich werde einen neuen Abschnitt "Development Guidelines & Technical Framework" in das `README-Supplier-Browser.md` einfügen, der diese Regeln klar und unmissverständlich darlegt.
+
+Hier ist die finale, vollständige Version des **`README-Supplier-Browser.md`**, inklusive des neuen Abschnitts.
+
+---
 # SupplierBrowser - 5-Level Hierarchical Data Management
 
-**5-stufige URL-driven Navigation** für Supplier/Wholesaler-Datenmanagement mit End-to-End Type Safety.
-
-## Business Context
-
-**Problem**: Tausende Lieferanten mit Kategorien, Produktangeboten, Attributen und Links verwalten.
-**Lösung**: 5-Level Navigation: Supplier → Category → Offering → Attributes/Links. URL-getrieben für Bookmarking.
-**Domain**: B2B-Beschaffung, Wholesale-Management, Produktkataloge
-
-## System Architecture
-
-### Database Schema (MSSQL)
-```sql
-dbo.wholesalers              -- Supplier-Stammdaten
-dbo.product_categories       -- Produktkategorien (global)  
-dbo.wholesaler_categories    -- n:m Supplier-Category Assignment
-dbo.wholesaler_item_offerings -- Produktangebote pro Supplier+Category
-dbo.wholesaler_offering_attributes -- Key-Value Attribute pro Offering
-dbo.wholesaler_offering_links     -- URLs/Links pro Offering
-```
-
-### Hierarchische Navigation
-1. **Suppliers** (Wholesalers) - Hauptlieferanten
-2. **Categories** - Produktkategorien pro Supplier  
-3. **Offerings** - Produktangebote pro Category
-4. **Attributes** - Produkteigenschaften pro Offering
-5. **Links** - Externe Referenzen pro Offering
-
-**URL-driven State**: Alle Parameter in URL (level, supplierId, categoryId, etc.)
-
-## Implementation Status
-
-### ✅ Level 1-2 (API Integrated)
-- **Complete API Integration** - No mock data, all real DB calls
-- **HierarchySidebar.svelte** - Navigation mit counts & disabled states  
-- **SupplierGrid/Form.svelte** - CRUD operations, validation, responsive design
-- **CategoryGrid.svelte** - Category assignments per supplier
-- **CategoryAssignment.svelte** - n:m relationship management
-- **API Client System** - Type-safe clients in `$lib/api/client/`
-- **API Types System** - Shared request/response types in `$lib/api/types/`
-- **Suppliers API** - `/api/suppliers/[id]` GET/POST/PUT/DELETE complete
-- **Categories API** - `/api/categories` & `/api/supplier-categories` complete
-- **loadSupplierCategories()** - Loads supplier's categories with offering counts
-
-### 🔄 Level 3-5 (Planned)
-- **OfferingForm.svelte** - ⏱️ TODO
-- **Offerings API** - ⏱️ TODO (`/api/offerings/[id]`)
-- **AttributeGrid/Form.svelte** - ⏱️ Stubs vorhanden, Forms TODO  
-- **LinkGrid/Form.svelte** - ⏱️ Stubs vorhanden, Forms TODO
-- **APIs für Attributes/Links** - ⏱️ Komplett TODO
-
-## Core Architecture Patterns
-
-### 1. QueryBuilder Security Pattern
-```typescript
-// Client sendet Query OHNE 'from' (optional) - Server setzt Table
-const query: QueryPayload = {
-  select: ["name", "region", "status"],
-  where: { op: LogicalOperator.AND, conditions: [...] }
-  // ⚠️ KEIN 'from' field - Server sets for security
-};
-
-// Server fügt Security hinzu:
-const securePayload: QueryPayload = {
-  ...clientPayload,
-  from: 'dbo.wholesalers', // ✅ Route = Table binding
-  where: { /* supplier ID filter + client conditions */ }
-};
-```
-
-### 2. Type-Safe API Clients
-```typescript
-// Usage
-import { loadSuppliers, updateSupplier, loadSupplierCategories } from '$lib/api/client/supplier';
-
-const suppliers = await loadSuppliers({
-  select: ['name', 'region', 'status'],
-  where: { 
-    op: LogicalOperator.AND, 
-    conditions: [{ key: 'status', op: ComparisonOperator.EQUALS, val: 'active' }] 
-  }
-});
-
-// Load supplier's categories with offering counts
-const categories = await loadSupplierCategories(supplierId);
-```
-
-### 3. JOIN View Pattern
-```typescript
-// queryConfig.ts - Predefined JOIN configurations
-'supplier_categories': {
-  from: 'dbo.wholesalers w',
-  joins: [
-    { type: JoinType.INNER, table: 'dbo.wholesaler_categories', alias: 'wc' },
-    { type: JoinType.INNER, table: 'dbo.product_categories', alias: 'pc' },
-    { type: JoinType.LEFT, table: '(SELECT ... COUNT(*) as offering_count ...)', alias: 'oc' }
-  ],
-  exampleQuery: {
-    select: ['w.name AS supplier_name', 'pc.name AS category_name', 'oc.offering_count']
-  }
-}
-```
-
-### 4. URL-Driven State (Svelte 5 Runes)
-```typescript
-const currentLevel = $derived(($page.url.searchParams.get('level') as Level) || 'wholesalers');
-const selectedSupplierId = $derived(Number($page.url.searchParams.get('supplierId')) || null);
-
-function updateURL(params: { level?: Level; supplierId?: number }) {
-  goto(`?${new URLSearchParams(params).toString()}`);
-}
-```
-
-## Tech Stack & Key Decisions
-
-- **SvelteKit** mit Svelte 5 + Runes
-- **TypeScript** strict mode
-- **MSSQL** mit connection pooling
-- **Shared queryConfig** in `$lib/clientAndBack/queryConfig.ts` (client + server access)
-- **End-to-End Types** zwischen Client/Server APIs
-
-### Why QueryBuilder Pattern?
-Flexible queries ohne hard-coded SQL, Security durch server-side table binding.
-
-### Why URL-driven State?  
-Bookmarkable, shareable application state ohne complex state management.
-
-## Key File Locations
-
-### API Layer  
-- `$lib/api/client/` - Client-side API functions (supplier.ts, category.ts)
-- `$lib/api/types/` - Shared API type definitions
-- `$lib/clientAndBack/queryConfig.ts` - Security whitelists + JOIN configurations
-
-### Server Layer
-- `/src/routes/api/suppliers/` - Supplier REST endpoints
-- `/src/routes/api/categories/` - Category REST endpoints  
-- `/src/routes/api/supplier-categories/` - Category assignment endpoints
-
-### Components
-- `/src/lib/components/domain/suppliers/` - Supplier-specific UI
-- `/src/lib/components/domain/categories/` - Category management UI
-- `/src/lib/components/client/` - Reusable UI (Datagrid, FormShell)
-- `/src/lib/components/browser/` - Navigation components
-
-### Test Environment
-- `/src/routes/supplierbrowser/` - Main test page (API integrated)
-
-## Current Development Priorities
-
-### 🔥 P1 - High (Final Integration)
-1. **Page Integration Complete** - Replace remaining mock usage in components
-2. **Error Boundaries** - Graceful error handling in UI
-3. **Loading State Integration** - Connect LoadingState with UI components
-
-### 🎯 P2 - Medium (Level 3 Prep)
-1. **OfferingForm.svelte** - Wrapper für WholesalerItemOffering
-2. **Offering API Types** - Following supplier.ts pattern
-3. **Offering API Client & Endpoints** - Full CRUD
-
-### 🌟 P3 - Future
-1. **Level 4-5** - Attributes/Links management
-2. **Performance** - Virtual scrolling für große Datasets
-3. **Bulk Operations** - Multiple selection mit bulk delete
-
-## Development Guidelines
-
-### Svelte 5 + Runes
-```typescript
-// ✅ Svelte 5
-let data = $state([...]);
-const filtered = $derived(data.filter(...));
-
-// Props destructuring  
-const { rows = [], onRowClick } = $props<{
-  rows?: Supplier[];
-  onRowClick?: (supplier: Supplier) => void;
-}>();
-```
-
-### API Client Patterns
-```typescript
-// ✅ QueryBuilder usage
-const query: QueryPayload = {
-  select: ['name', 'status'],
-  // from is optional - server sets it
-  where: { op: LogicalOperator.AND, conditions: [...] }
-};
-
-// ✅ Error handling
-try {
-  const data = await loadSuppliers(query);
-} catch (error) {
-  console.error('Failed:', getErrorMessage(error));
-}
-```
-
-# Type Safety Lessons Learned
-
-## Critical Bug: Missing Type Enforcement in API Endpoints
-
-### The Problem
-Despite having comprehensive type definitions in `$lib/api/types/`, **ALL** server endpoints were written without type enforcement, leading to runtime bugs that TypeScript couldn't catch.
-
-### Root Cause Analysis
-
-**Defined Types vs Implementation Gap:**
-```typescript
-// ✅ Types were correctly defined
-interface SupplierQueryResponse {
-  results: Partial<Wholesaler>[];
-  meta: QueryResultMeta;
-}
-
-// ❌ Server ignored the types
-export const POST: RequestHandler = async () => {
-  return json({
-    suppliers: results  // Wrong field name!
-  });
-};
-
-// ❌ Client trusted the types blindly
-const response = await fetch(...) as SupplierQueryResponse;
-const suppliers = response.results; // Runtime error: undefined
-```
-
-### Systematic Issues Found
-
-1. **`/api/suppliers/+server.ts`** - Returned `suppliers` instead of `results`
-2. **`/api/suppliers/[id]/+server.ts`** - No type enforcement
-3. **`/api/categories/+server.ts`** - No type enforcement  
-4. **`/api/supplier-categories/+server.ts`** - No type enforcement
-
-### The Fix: Mandatory Type Enforcement
-
-**Before (Wrong):**
-```typescript
-export const POST: RequestHandler = async () => {
-  return json({
-    suppliers: results,  // No compile-time validation
-    meta: { /* ... */ }
-  });
-};
-```
-
-**After (Correct):**
-```typescript
-import type { SupplierQueryResponse } from '$lib/api/types/supplier';
-
-export const POST: RequestHandler = async () => {
-  // ✅ TypeScript now ENFORCES the correct structure
-  const response: SupplierQueryResponse = {
-    results: results,  // Must match interface
-    meta: { /* ... */ }
-  };
-  
-  return json(response); // Compile-time guaranteed correct
-};
-```
-
-### Why TypeScript Didn't Catch This
-
-1. **Runtime vs Compile-Time Gap**: TypeScript can't validate what the server actually returns at runtime
-2. **Type Assertions**: Using `as` bypasses compile-time checking
-3. **Missing Enforcement**: Server responses weren't typed to their interfaces
-
-### Mandatory Rules Going Forward
-
-#### Rule 1: Always Import Response Types
-```typescript
-// ✅ REQUIRED for every API endpoint
-import type { 
-  SupplierQueryResponse,
-  UpdateSupplierResponse 
-} from '$lib/api/types/supplier';
-```
-
-#### Rule 2: Type All Responses
-```typescript
-// ✅ REQUIRED pattern for all endpoints
-const response: ExpectedResponseType = {
-  // TypeScript will enforce structure
-};
-return json(response);
-```
-
-#### Rule 3: Never Direct json() Returns
-```typescript
-// ❌ FORBIDDEN - bypasses type checking
-return json({ someField: data });
-
-// ✅ REQUIRED - type-enforced
-const response: ResponseType = { someField: data };
-return json(response);
-```
-
-### Type Safety Checklist
-
-**Before merging any API endpoint:**
-
-- [ ] Imports correct response type from `$lib/api/types/`
-- [ ] Declares response variable with explicit type
-- [ ] Uses `json(response)` not `json({ ... })`
-- [ ] TypeScript compiles without errors
-- [ ] Client and server use identical type definitions
-
-### Architecture Benefits
-
-With proper type enforcement:
-
-1. **Compile-Time Safety**: Interface mismatches caught during development
-2. **Refactor Safety**: Type changes automatically propagate
-3. **Documentation**: Types serve as executable contracts
-4. **Runtime Consistency**: Server responses guaranteed to match client expectations
-
-### Performance Note
-
-Type enforcement has **zero runtime cost** - it's purely compile-time validation that prevents entire classes of bugs from reaching production.
-
-**Current Status: ~95% Level 1-2 Complete, 10% Level 3-5**  
-**Target: Production-ready 5-level hierarchical data management system**
+**URL-driven, single-page navigation for Supplier/Wholesaler data management with a secure, type-safe, and generic API architecture.**
+
+## What This Is
+
+A hierarchical data management tool built as a Single-Page Application (SPA) that operates on five distinct levels of data relationships:
+
+1.  **Level 1: Suppliers** - Master data for `Wholesaler` entities.
+2.  **Level 2: Categories** - Manages the **n:m assignment** between a selected Supplier and global `Product Categories`.
+3.  **Level 3: Offerings** - Master data for `WholesalerItemOffering` entities within a selected Supplier/Category context.
+4.  **Level 4: Attributes** - Manages the **n:m assignment** of key-value `Attributes` to a selected Offering.
+5.  **Level 5: Links** - Master data for external URLs (`Links`) related to a selected Offering.
+
+---
+
+## Application Flow & UI/UX
+
+The entire user experience is contained within the single route `/supplierbrowser` and is controlled by two primary concepts: URL-driven state and a dependent sidebar navigation.
+
+### 1. URL-Driven State
+
+The application has no complex client-side state stores for navigation. The entire UI state is derived directly from the URL's search parameters. This makes the application robust, bookmarkable, and shareable.
+
+**Example URL:**
+`/supplierbrowser?level=categories&supplierId=123&categoryId=456`
+
+-   `level`: The currently active navigation level (`wholesalers` | `categories` | `offerings` | `attributes` | `links`). This determines which components are visible in the main content area.
+-   `supplierId`: The ID of the currently selected supplier.
+-   `categoryId`: The ID of the currently selected category assignment.
+-   `offeringId`: The ID of the currently selected offering.
+
+### 2. Hierarchical Sidebar Navigation
+
+A persistent sidebar (`HierarchySidebar.svelte`) is the primary navigation control. Its levels become enabled or disabled based on selections made in the hierarchy, providing clear user guidance.
+
+-   **Suppliers**: Always enabled. Clicking navigates to `level=wholesalers` and clears selections.
+-   **Categories**: **Enabled only when a `supplierId` is present in the URL.** Clicking navigates to `level=categories`.
+-   **Offerings**: **Enabled only when both `supplierId` and `categoryId` are present.** Clicking navigates to `level=offerings`.
+-   **Attributes & Links**: **Enabled only when an `offeringId` is present.**
+
+The sidebar also displays a live count of items at each level for the current context (e.g., the number of categories assigned to the *selected* supplier).
+
+### 3. Main Content Pane
+
+The main content area dynamically renders components based on the `level` parameter in the URL.
+
+-   **`level=wholesalers`**: Displays a single `SupplierGrid` component listing all suppliers. Clicking a supplier sets the `supplierId` in the URL and navigates to the `categories` level.
+-   **`level=categories`**: Displays a master-detail view:
+    -   A `SupplierForm` to edit the selected supplier's master data.
+    -   A `CategoryAssignment` component to add new categories.
+    -   A `CategoryGrid` showing all categories currently assigned to this supplier.
+-   **`level=offerings`**: Displays a `OfferingGrid` with all products for the selected supplier/category pair.
+-   **Levels 4 & 5**: Will display `AttributeGrid` and `LinkGrid` respectively.
+
+---
+
+## Core Architecture Patterns (FINAL)
+
+The application follows a strict, generic, and type-safe architecture. All generic types are defined in **`src/lib/api/types/common.ts`**.
+
+### 1. The Universal API Response Envelope
+
+All API endpoints return a JSON object following one of two structures: `ApiSuccessResponse<TData>` on success, or `ApiErrorResponse` on failure. This creates a predictable API.
+
+### 2. The API Endpoint Strategy (Entity vs. Query)
+
+The backend is divided into two clear types of endpoints to ensure security and separation of concerns.
+
+-   **A. Secure Entity Endpoints (e.g., `/api/suppliers`, `/api/categories`)**: These are responsible for the master data (CRUD) of a single entity. The client sends a `QueryRequest` but **omits the `from` field**, which the server securely injects to prevent unauthorized table access.
+
+-   **B. The Generic Query Endpoint (`/api/query`)**: This is the workhorse for all **complex, relational queries** (1:n, n:m). It accepts two types of request bodies:
+    1.  **`QueryRequest`**: For simple, direct queries where the client specifies the `from` table, which is validated against a server-side whitelist.
+    2.  **`PredefinedQueryRequest`**: The primary method for complex JOINs. The client specifies a `namedQuery` (e.g., `'supplier_categories'`), and the server uses a secure, predefined SQL template from `queryConfig.ts`, applying only the client's safe `where`, `select`, and `orderBy` clauses.
+
+### 3. The Client-Side Fetch Strategy
+
+The client uses two different fetch wrappers from `lib/api/client/common.ts`:
+
+-   **`apiFetch<TData>()`**: For standard calls expecting success. Throws a structured `ApiError` on any failure.
+-   **`apiFetchUnion<TUnion>()`**: For calls with expected error states (e.g., delete conflicts). It **returns** the full response union (`ApiSuccessResponse | ApiErrorResponse`), allowing the UI to use type guards like `isDeleteConflict` to handle the different outcomes.
+
+---
+
+## Development Guidelines & Technical Framework
+
+Adherence to these technical standards is mandatory to maintain code quality, security, and maintainability.
+
+### 1. TypeScript Strictness is Non-Negotiable
+
+The project is configured with TypeScript's strictest settings (`"strict": true`, `"noImplicitAny": true`, `"exactOptionalPropertyTypes": true`).
+
+-   **The `any` type is forbidden.** The ESLint rule `@typescript-eslint/no-explicit-any` is set to `warn` and must be treated as an error. Using `any` defeats the purpose of TypeScript and introduces potential runtime errors. Use `unknown` for values whose type is truly unknown and perform type-safe checks.
+
+### 2. ESLint is the Gatekeeper
+
+All code must be ESLint-compliant before merging. Use the provided scripts to check and fix your code:
+
+-   `npm run lint`: Checks for any style or type errors.
+-   `npm run lint:fix`: Attempts to automatically fix any issues.
+
+### 3. Svelte 5 Patterns are Mandatory
+
+This project is built on Svelte 5 and leverages its new features for cleaner, more efficient code.
+
+-   **Use Runes for Reactivity**: All component-level state must use Runes (`$state`, `$derived`). Avoid `let` for reactive variables.
+-   **Use Typed Props**: All components must use the `$props` rune with an explicit type definition for their props:
+    ```typescript
+    const { rows = [] } = $props<{ rows: MyType[] }>();
+    ```
+
+### 4. API and Type Consistency is Critical
+
+-   **One Source of Truth**: All API response and request types are derived from the generic definitions in **`src/lib/api/types/common.ts`**. Do not create new, one-off interfaces for API responses.
+-   **Type-Check Before Returning**: On the server, all API endpoints **must** explicitly type their response variable before returning it. This acts as a final type-check to ensure compliance with the common types.
+    ```typescript
+    // ✅ DO THIS
+    const response: ApiSuccessResponse<{ supplier: Wholesaler }> = { /* ... */ };
+    return json(response);
+
+    // ❌ AVOID THIS
+    return json({ success: true, /* ... */ }); // No type checking!
+    ```
+
+### 5. Security is Paramount
+
+-   **Never Trust the Client**: The client is never allowed to dictate the table for primary entity queries. Always use the **Secure Entity Endpoint** pattern where the server enforces the `from` clause.
+
+---
+
+## Implementation Status & Next Steps
+
+The core architecture (`types/common.ts`, `client/common.ts`) is now finalized. The existing codebase must be refactored to align with this architecture.
+
+### 🔄 Priority 1: Create/Refactor API Endpoints (`/routes/api/`)
+
+1.  **Create `/api/query/+server.ts`**: Implement the new generic query endpoint to handle both `QueryRequest` and `PredefinedQueryRequest` bodies.
+2.  **Refactor `/api/suppliers/...` & `/api/categories/...`**: Update all entity endpoints to use the correct `ApiSuccessResponse`/`ApiErrorResponse` types and the secure entity pattern (server-injected `from`).
+3.  **Refactor `/api/supplier-categories/+server.ts`**: Update this assignment endpoint to use the generic `AssignmentApiResponse` and `DeleteApiResponse` types.
+
+### 🔄 Priority 2: Refactor API Clients (`/lib/api/client/`)
+
+1.  **`lib/api/client/supplier.ts`**:
+    -   Update `loadSuppliers` to call `/api/suppliers` using `createQueryBody`.
+    -   Update `loadSupplierCategories` (the n:m query) to call the new `/api/query` endpoint with a `PredefinedQueryRequest`.
+    -   Update `deleteSupplier` to use `apiFetchUnion`.
+2.  **`lib/api/client/category.ts`**:
+    -   Update `getAvailableCategoriesForSupplier` to call `/api/query` with a standard `QueryRequest`.
+    -   Update `removeCategoryFromSupplier` to use `apiFetchUnion`.
+
+### 🔄 Priority 3: Refactor UI (`/routes/supplierbrowser/+page.svelte`)
+
+1.  **Update Delete Handlers**: Modify the delete logic to correctly handle the `DeleteApiResponse` union. Use the `isDeleteConflict` type guard to check the response and trigger the cascade confirmation dialog.
+2.  **Add Error Handling**: Wrap all data-loading calls in `try/catch` blocks to gracefully handle errors thrown by `apiFetch`.

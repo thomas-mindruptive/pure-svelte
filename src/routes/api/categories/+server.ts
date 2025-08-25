@@ -19,7 +19,7 @@ import { supplierQueryConfig } from '$lib/clientAndBack/queryConfig';
 import { mssqlErrorMapper } from '$lib/server/errors/mssqlErrorMapper';
 import type { QueryPayload } from '$lib/clientAndBack/queryGrammar';
 import type { ProductCategory } from '$lib/domain/types';
-import type { ListCategoriesResponse } from '$lib/api/types';
+import type { QuerySuccessResponse } from '$lib/api/types';
 
 /**
  * POST /api/categories
@@ -63,17 +63,25 @@ export const POST: RequestHandler = async (event) => {
             hasWhere: metadata.hasWhere
         });
 
-        const response: ListCategoriesResponse = {
+        const response: QuerySuccessResponse<ProductCategory> = {
             success: true,
             message: 'Categories retrieved successfully',
-            categories: results as ProductCategory[],
-            meta: {
-                timestamp: new Date().toISOString(),
-                total: results.length,
-                returned: results.length,
-                limit: securePayload.limit || 100,
-                offset: securePayload.offset || 0,
-                has_more: false
+            data: { // Die 'data'-Eigenschaft ist jetzt obligatorisch
+                results: results as ProductCategory[],
+                meta: {
+                    retrieved_at: new Date().toISOString(),
+                    result_count: results.length,
+                    // ... andere Metadaten der Query
+                    columns_selected: metadata.selectColumns,
+                    has_joins: metadata.hasJoins,
+                    has_where: metadata.hasWhere,
+                    parameter_count: metadata.parameterCount,
+                    table_fixed: 'dbo.product_categories',
+                    sql_generated: sql
+                }
+            },
+            meta: { // Die äußere Meta-Eigenschaft für die API-Antwort
+                timestamp: new Date().toISOString()
             }
         };
 

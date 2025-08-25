@@ -1,401 +1,212 @@
-// $lib/api/client/common.ts
+// src/lib/api/client/common.ts
 
 /**
- * Client-Side API Utilities
- * 
- * @description Client-specific utilities for API functions including fetch wrapper,
- * loading state management, and retry logic. Reuses shared types from ../types/common
- * for consistent API response handling.
- * 
- * @features
- * - Type-safe fetch wrapper with error handling
- * - Loading state management utilities
- * - Retry logic for failed requests
- * - URL and body creation helpers
+ * @file Client-Side API Utilities - FINAL ARCHITECTURE
+ * @description This file provides the foundational, reusable utilities for all client-side API
+ * interactions. It features two distinct, type-safe fetch wrappers that form the core
+ * of the client-side data fetching strategy.
  */
 
 import { log } from '$lib/utils/logger';
-import {
-  type BaseApiErrorResponse,
-  type ValidationErrors,
-} from '../types/common';
+import { type ApiErrorResponse, type ApiSuccessResponse, type ValidationErrors, HTTP_STATUS, type QueryRequest } from '../types/common';
+import type { QueryPayload } from '$lib/clientAndBack/queryGrammar';
 
 /**
- * Client-side API error class for additional context
- * Extends Error with structured information from server responses
+ * A custom client-side error class that extends the native Error.
+ * It enriches the error with structured information from API responses,
+ * such as the HTTP status code and field-specific validation errors.
  */
 export class ApiError extends Error {
-  constructor(
-    message: string,
-    public status: number,
-    public errors?: ValidationErrors,
-    public response?: unknown
-  ) {
-    super(message);
-    this.name = 'ApiError';
-  }
+	constructor(
+		public message: string,
+		public status: number,
+		public errors?: ValidationErrors,
+		public response?: unknown
+	) {
+		super(message);
+		this.name = 'ApiError';
+	}
 }
 
 /**
- * Options for API requests
+ * Defines configuration options for API requests made via the fetch wrappers.
  */
 export interface ApiRequestOptions {
-  /** Request timeout in milliseconds */
-  timeout?: number;
-  /** Additional headers */
-  headers?: Record<string, string>;
-  /** Whether to include credentials */
-  credentials?: RequestCredentials;
-  /** Custom error message for logging */
-  context?: string;
+	/** The request timeout in milliseconds. Defaults to 30000. */
+	timeout?: number;
+	/** A string context for improved logging and debugging. */
+	context?: string;
 }
 
 /**
- * Type-safe fetch wrapper with comprehensive error handling
- * 
- * @template T - Expected response type
- * @param url - Request URL
- * @param init - Fetch init options
- * @param options - Additional API options
- * @returns Promise resolving to typed response data
- * @throws ApiError with structured error information
- * 
- * @example
- * ```typescript
- * const suppliers = await apiFetch<Wholesaler[]>('/api/suppliers', {
- *   method: 'POST',
- *   body: JSON.stringify(queryPayload)
- * }, { context: 'loadSuppliers' });
- * ```
+ * The standard fetch wrapper for API calls that are expected to succeed.
+ * It directly returns the `data` payload from a successful (2xx) response.
+ * For any non-2xx server response or network failure, it throws a structured `ApiError`.
+ *
+ * @template TSuccessData The expected type of the `data` property within a successful `ApiSuccessResponse`.
+ * @param url The API endpoint URL.
+ * @param init Standard `RequestInit` options (e.g., method, body).
+ * @param options Custom options for the API request, like `context`.
+ * @returns A promise that resolves with the `data` object from the successful API response.
+ * @throws {ApiError} If the fetch fails or the server returns a non-2xx status.
  */
-export async function apiFetch<T = unknown>(
-  url: string,
-  init: RequestInit = {},
-  options: ApiRequestOptions = {}
-): Promise<T> {
-  const { timeout = 30000, context = 'API Request', headers = {}, credentials } = options;
-  
-  // Create AbortController for timeout handling
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeout);
-  
-  // Prepare request init with defaults
-  const requestInit: RequestInit = {
-    ...init,
-    headers: {
-      'content-type': 'application/json',
-      ...headers,
-      ...init.headers,
-    },
-    credentials: credentials || 'same-origin',
-    signal: controller.signal,
-  };
+export async function apiFetch<TSuccessData extends Record<string, unknown>>(
+	url: string,
+	init: RequestInit = {},
+	options: ApiRequestOptions = {}
+): Promise<TSuccessData> {
+	const { timeout = 30000, context = 'API Request' } = options;
+	const controller = new AbortController();
+	const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-  try {
-    log.info("API Request", {
-      url,
-      method: init.method || 'GET',
-      context,
-      hasBody: !!init.body
-    });
+	try {
+		log.info(`API Request: ${context}`, { url, method: init.method || 'GET' });
 
-    const response = await fetch(url, requestInit);
-    clearTimeout(timeoutId);
+		const response = await fetch(url, {
+			...init,
+			headers: { 'content-type': 'application/json', ...init.headers },
+			signal: controller.signal
+		});
+		clearTimeout(timeoutId);
 
-    // Handle non-JSON responses (e.g., HTML error pages)
-    const contentType = response.headers.get('content-type');
-    if (!contentType?.includes('application/json')) {
-      const text = await response.text();
-      throw new ApiError(
-        `Server returned ${response.status}: ${response.statusText}`,
-        response.status,
-        undefined,
-        { text, contentType }
-      );
-    }
+		// Attempt to parse JSON, even for errors, to get structured error messages.
+		const data: unknown = await response.json().catch(() => ({ message: 'Invalid JSON response from server' }));
 
-    // Parse JSON response
-    let data: unknown;
-    try {
-      data = await response.json();
-    } catch (parseError) {
-      throw new ApiError(
-        `Failed to parse server response as JSON`,
-        response.status,
-        undefined,
-        { parseError: String(parseError) }
-      );
-    }
+		if (response.ok) {
+			// On success, return only the nested `data` payload, as defined by the architecture.
+			return (data as ApiSuccessResponse<TSuccessData>).data;
+		}
 
-    // Handle successful responses
-    if (response.ok) {
-      log.info("API Success", {
-        url,
-        method: init.method || 'GET',
-        status: response.status,
-        context
-      });
-      return data as T;
-    }
+		// Any non-ok response is treated as an exception to be thrown.
+		const errorData = data as ApiErrorResponse;
+		throw new ApiError(
+			errorData.message || `Request failed with status ${response.status}`,
+			response.status,
+			errorData.errors,
+			errorData
+		);
+	} catch (error) {
+		clearTimeout(timeoutId);
+		// Re-throw known API errors to be caught by the calling function.
+		if (error instanceof ApiError) throw error;
 
-    // Handle error responses with structured data
-    const errorData = data as BaseApiErrorResponse;
-    
-    log.warn("API Error Response", {
-      url,
-      method: init.method || 'GET',
-      status: response.status,
-      context,
-      message: errorData.message,
-      hasValidationErrors: !!errorData.errors
-    });
-
-    throw new ApiError(
-      errorData.message || `Request failed with status ${response.status}`,
-      response.status,
-      errorData.errors,
-      errorData
-    );
-
-  } catch (error) {
-    clearTimeout(timeoutId);
-    
-    // Handle fetch-level errors (network, timeout, etc.)
-    if (error instanceof ApiError) {
-      throw error; // Re-throw structured API errors
-    }
-
-    // Handle network and other fetch errors
-    if (error instanceof TypeError || error instanceof DOMException) {
-      log.error("API Network Error", {
-        url,
-        method: init.method || 'GET',
-        context,
-        error: String(error)
-      });
-
-      throw new ApiError(
-        `Network error: Unable to reach server`,
-        0, // Network errors don't have HTTP status
-        undefined,
-        { originalError: String(error) }
-      );
-    }
-
-    // Handle unknown errors
-    log.error("API Unknown Error", {
-      url,
-      method: init.method || 'GET',
-      context,
-      error: String(error)
-    });
-
-    throw new ApiError(
-      `Unexpected error: ${String(error)}`,
-      500,
-      undefined,
-      { originalError: String(error) }
-    );
-  }
+		// Wrap unknown errors (network issues, etc.) in a standard ApiError.
+		const errorMessage = error instanceof Error ? error.message : String(error);
+		log.error(`API Fetch failed: ${context}`, { url, error: errorMessage });
+		throw new ApiError(`Network error: ${errorMessage}`, 0);
+	}
 }
 
 /**
- * Creates a GET request with query parameters
- * 
- * @param baseUrl - Base URL without query params
- * @param params - Query parameters as key-value object
- * @returns Complete URL with encoded query string
- * 
- * @example
- * ```typescript
- * const url = createGetUrl('/api/suppliers', { status: 'active', limit: 50 });
- * // Returns: '/api/suppliers?status=active&limit=50'
- * ```
+ * A specialized fetch wrapper for operations that can return a union of success
+ * and expected, structured error types (e.g., DeleteApiResponse which includes DeleteConflictResponse).
+ * This function returns the entire response object for type guarding, instead of throwing on handled errors like 409 or 400.
+ *
+ * @template TUnion The expected union type of the API response (e.g., `DeleteApiResponse<...>` or `AssignmentApiResponse<...>`).
+ * @param url The API endpoint URL.
+ * @param init Standard `RequestInit` options.
+ * @param options Custom options for the API request.
+ * @returns A promise that resolves with the full API response object (success or handled error).
+ * @throws {ApiError} Only for unexpected server errors (e.g., 500) or network failures.
  */
-export function createGetUrl(baseUrl: string, params: Record<string, unknown> = {}): string {
-  const validParams = Object.entries(params)
-    .filter(([, value]) => value !== null && value !== undefined && value !== '')
-    .map(([key, value]) => [key, String(value)]);
-  
-  if (validParams.length === 0) {
-    return baseUrl;
-  }
-  
-  const searchParams = new URLSearchParams(validParams);
-  return `${baseUrl}?${searchParams.toString()}`;
+export async function apiFetchUnion<TUnion>(
+	url: string,
+	init: RequestInit = {},
+	options: ApiRequestOptions = {}
+): Promise<TUnion> {
+	const { timeout = 30000, context = 'API Request' } = options;
+	const controller = new AbortController();
+	const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+	try {
+		log.info(`API Union Request: ${context}`, { url, method: init.method || 'GET' });
+
+		const response = await fetch(url, {
+			...init,
+			headers: { 'content-type': 'application/json', ...init.headers },
+			signal: controller.signal
+		});
+		clearTimeout(timeoutId);
+
+		const data: unknown = await response.json().catch(() => ({ message: 'Invalid JSON response from server' }));
+
+		// For success OR expected, structured errors (like conflict or validation), return the full payload.
+		if (response.ok || response.status === HTTP_STATUS.CONFLICT || response.status === HTTP_STATUS.BAD_REQUEST) {
+			return data as TUnion;
+		}
+
+		// Throw only for unexpected server errors (e.g., 500, 503).
+		const errorData = data as ApiErrorResponse;
+		throw new ApiError(
+			errorData.message || `Request failed with status ${response.status}`,
+			response.status,
+			errorData.errors,
+			errorData
+		);
+	} catch (error) {
+		clearTimeout(timeoutId);
+		if (error instanceof ApiError) throw error;
+		const errorMessage = error instanceof Error ? error.message : String(error);
+		log.error(`API Union Fetch failed: ${context}`, { url, error: errorMessage });
+		throw new ApiError(`Network error: ${errorMessage}`, 0);
+	}
 }
 
 /**
- * Creates a POST request body from object
- * 
- * @param data - Object to serialize
- * @returns JSON string for request body
+ * Creates a JSON string for a standard POST or PUT request body.
+ * Use this for simple data payloads that are not queries.
+ * @param data The object to serialize.
+ * @returns A JSON string representation of the data.
  */
 export function createPostBody(data: unknown): string {
-  return JSON.stringify(data);
+	return JSON.stringify(data);
 }
 
 /**
- * Type guard to check if error is a client ApiError
+ * Creates a JSON string for a Query POST request.
+ * This correctly wraps the `QueryPayload` in the standard `QueryRequest`
+ * envelope, as expected by the server's query endpoints.
+ * @param payload The `QueryPayload` defining the desired query.
+ * @returns A JSON string representation of the `QueryRequest`.
  */
-export function isClientApiError(error: unknown): error is ApiError {
-  return error instanceof ApiError;
+export function createQueryBody(payload: QueryPayload): string {
+	const request: QueryRequest = { payload };
+	return JSON.stringify(request);
 }
 
 /**
- * Extracts user-friendly error message from various error types
- * 
- * @param error - Error of unknown type
- * @returns Human-readable error message
+ * A utility function to safely extract a human-readable error message
+ * from various potential error types caught in a try-catch block.
+ * @param error The caught error, of type `unknown`.
+ * @returns A user-friendly string.
  */
 export function getErrorMessage(error: unknown): string {
-  if (isClientApiError(error)) {
-    return error.message;
-  }
-  
-  if (error instanceof Error) {
-    return error.message;
-  }
-  
-  return String(error);
+	if (error instanceof ApiError) return error.message;
+	if (error instanceof Error) return error.message;
+	return 'An unexpected error occurred.';
 }
 
 /**
- * Formats validation errors for display
- * 
- * @param errors - Validation errors from API response
- * @returns Array of formatted error messages
- */
-export function formatValidationErrors(errors: Record<string, string[]>): string[] {
-  return Object.entries(errors).flatMap(([field, messages]) =>
-    messages.map(message => `${field}: ${message}`)
-  );
-}
-
-/**
- * Loading state manager for API operations
+ * A generic class to manage loading states for multiple concurrent API operations.
+ * This allows the UI to show loading indicators for specific actions (e.g., deleting a specific row)
+ * or for any ongoing operation.
  */
 export class LoadingState {
-  private loadingOperations = new Set<string>();
-  private callbacks = new Set<() => void>();
+	private loadingOperations = new Set<string>();
+	private callbacks = new Set<() => void>();
 
-  /**
-   * Starts a loading operation
-   */
-  start(operationId: string): void {
-    this.loadingOperations.add(operationId);
-    this.notifyCallbacks();
-  }
-
-  /**
-   * Finishes a loading operation
-   */
-  finish(operationId: string): void {
-    this.loadingOperations.delete(operationId);
-    this.notifyCallbacks();
-  }
-
-  /**
-   * Checks if any operation is loading
-   */
-  get isLoading(): boolean {
-    return this.loadingOperations.size > 0;
-  }
-
-  /**
-   * Checks if specific operation is loading
-   */
-  isOperationLoading(operationId: string): boolean {
-    return this.loadingOperations.has(operationId);
-  }
-
-  /**
-   * Subscribe to loading state changes
-   */
-  subscribe(callback: () => void): () => void {
-    this.callbacks.add(callback);
-    return () => this.callbacks.delete(callback);
-  }
-
-  private notifyCallbacks(): void {
-    this.callbacks.forEach(callback => callback());
-  }
-}
-
-/**
- * Retry configuration for failed requests
- */
-export interface RetryConfig {
-  /** Maximum number of retry attempts */
-  maxAttempts: number;
-  /** Base delay between retries in milliseconds */
-  baseDelay: number;
-  /** Whether to use exponential backoff */
-  exponentialBackoff: boolean;
-  /** Status codes that should trigger retries */
-  retryOn: number[];
-}
-
-/**
- * Default retry configuration
- */
-export const DEFAULT_RETRY_CONFIG: RetryConfig = {
-  maxAttempts: 3,
-  baseDelay: 1000,
-  exponentialBackoff: true,
-  retryOn: [500, 502, 503, 504], // Server errors
-};
-
-/**
- * Fetch with automatic retry logic
- * 
- * @template T - Expected response type
- * @param url - Request URL
- * @param init - Fetch init options
- * @param options - API options
- * @param retryConfig - Retry configuration
- * @returns Promise resolving to typed response data
- */
-export async function apiFetchWithRetry<T = unknown>(
-  url: string,
-  init: RequestInit = {},
-  options: ApiRequestOptions = {},
-  retryConfig: RetryConfig = DEFAULT_RETRY_CONFIG
-): Promise<T> {
-  let lastError: ApiError;
-  
-  for (let attempt = 1; attempt <= retryConfig.maxAttempts; attempt++) {
-    try {
-      return await apiFetch<T>(url, init, {
-        ...options,
-        context: `${options.context} (attempt ${attempt}/${retryConfig.maxAttempts})`
-      });
-    } catch (error) {
-      // Only retry on configured status codes
-      if (isClientApiError(error) && !retryConfig.retryOn.includes(error.status)) {
-        throw error;
-      }
-      
-      lastError = error as ApiError;
-      
-      // Don't delay after the last attempt
-      if (attempt < retryConfig.maxAttempts) {
-        const delay = retryConfig.exponentialBackoff
-          ? retryConfig.baseDelay * Math.pow(2, attempt - 1)
-          : retryConfig.baseDelay;
-        
-        log.info("API Retry", {
-          url,
-          attempt,
-          maxAttempts: retryConfig.maxAttempts,
-          delayMs: delay,
-          error: String(error)
-        });
-        
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
-    }
-  }
-  
-  throw lastError!;
+	/** Marks an operation as started. */
+	start(operationId: string) { this.loadingOperations.add(operationId); this.notifyCallbacks(); }
+	/** Marks an operation as finished. */
+	finish(operationId: string) { this.loadingOperations.delete(operationId); this.notifyCallbacks(); }
+	/** Returns true if any operation is currently in progress. */
+	get isLoading(): boolean { return this.loadingOperations.size > 0; }
+	/** Returns true if a specific operation is in progress. */
+	isOperationLoading(operationId: string): boolean { return this.loadingOperations.has(operationId); }
+	/** Subscribes to changes in the loading state. Returns an unsubscribe function. */
+	subscribe(callback: () => void): () => void {
+		this.callbacks.add(callback);
+		return () => this.callbacks.delete(callback);
+	}
+	private notifyCallbacks() { this.callbacks.forEach((cb) => cb()); }
 }

@@ -8,12 +8,8 @@ import {
   type JoinClause, 
   LogicalOperator 
 } from '$lib/clientAndBack/queryGrammar';
+import type { QueryConfig } from '$lib/clientAndBack/queryConfig';
 
-// Configuration passed from outside (domain-agnostic!)
-export interface QueryConfig {
-  allowedTables: { [tableName: string]: string[] };
-  joinConfigurations?: { [viewName: string]: { from: string; joins: JoinClause[] } };
-}
 
 /**
  * SQL parameter value types that can be safely passed to MSSQL

@@ -56,7 +56,7 @@ export interface SortDescriptor {
 
 export interface QueryPayload {
   select: string[];             // e.g., ['w.name', 'pc.name AS category_name']
-  from: string;                 // e.g., 'dbo.wholesalers w' or virtual view name
+  from?: string;                 // e.g., 'dbo.wholesalers w' or virtual view name
   joins?: JoinClause[];         // NEU: Optional JOIN clauses
   where?: ConditionGroup;
   orderBy?: SortDescriptor[];

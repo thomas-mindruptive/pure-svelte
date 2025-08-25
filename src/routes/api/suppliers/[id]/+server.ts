@@ -16,7 +16,7 @@ import { json, error, type RequestHandler } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { log } from '$lib/utils/logger';
 import { buildQuery, executeQuery } from '$lib/server/queryBuilder';
-import { supplierQueryConfig } from '$lib/server/supplierQueryConfig';
+import { supplierQueryConfig } from '$lib/clientAndBack/queryConfig';
 import { validateWholesaler } from '$lib/server/validation/domainValidator';
 import { mssqlErrorMapper } from '$lib/server/errors/mssqlErrorMapper';
 import { checkWholesalerDependencies } from '$lib/dataModel/dependencyChecks';
@@ -40,7 +40,7 @@ export const POST: RequestHandler = async (event) => {
         }
 
         // Client defines what they want (columns, sorting, etc.) - but NOT the table
-        const clientPayload = await request.json() as Omit<QueryPayload, 'from'>;
+        const clientPayload = await request.json() as QueryPayload;
 
         // Validate required fields from client
         if (!clientPayload.select || clientPayload.select.length === 0) {

@@ -61,7 +61,8 @@ export type ApiResponse<TSuccess extends Record<string, unknown> = Record<string
  * Client query request for supplier data
  * Uses QueryBuilder pattern but WITHOUT 'from' field (server sets table)
  */
-export type SupplierQueryRequest = Omit<QueryPayload, 'from'>;
+export type SupplierQueryRequest = QueryPayload;
+
 /**
  * Query result metadata from QueryBuilder
  */

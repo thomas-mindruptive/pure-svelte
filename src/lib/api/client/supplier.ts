@@ -24,7 +24,7 @@ import {
   getErrorMessage 
 } from './common';
 import { log } from '$lib/utils/logger';
-import { ComparisonOperator, LogicalOperator } from '$lib/clientAndBack/queryGrammar';
+import { ComparisonOperator, LogicalOperator, type QueryPayload } from '$lib/clientAndBack/queryGrammar';
 import type {
   SupplierQueryRequest,
   SupplierQueryResponse,
@@ -35,7 +35,7 @@ import type {
   
 } from '$lib/api/types/supplier';
 import {isDeleteConflict} from '$lib/api/types/supplier';
-import type { Wholesaler } from '$lib/domain/types';
+import type { Wholesaler, WholesalerCategoryWithCount } from '$lib/domain/types';
 
 // ===== LOADING STATE MANAGER =====
 
@@ -440,6 +440,99 @@ export async function canDeleteSupplier(supplierId: number): Promise<boolean> {
       error: getErrorMessage(error)
     });
     return false;
+  }
+}
+
+// ===== "JOINS" =====
+
+// In supplier.ts hinzufügen
+
+/**
+ * Loads all categories assigned to a specific supplier with offering counts
+ * Uses supplier_categories view from queryConfig for JOIN optimization
+ * 
+ * @param supplierId - Supplier ID to load categories for
+ * @param fields - Optional fields to select (uses example query if not provided)
+ * @returns Promise resolving to supplier's assigned categories with counts
+ * 
+ * @example
+ * ```typescript
+ * const categories = await loadSupplierCategories(123);
+ * // Returns categories with offering_count from the JOIN subquery
+ * ```
+ */
+export async function loadSupplierCategories(
+  supplierId: number,
+  fields?: string[]
+): Promise<WholesalerCategoryWithCount[]> {
+  if (!supplierId || supplierId <= 0) {
+    throw new Error('Invalid supplier ID provided');
+  }
+
+  const operationId = `loadSupplierCategories-${supplierId}`;
+  supplierLoadingState.start(operationId);
+
+  try {
+    log.info("Loading supplier categories with offering counts", { 
+      supplierId, 
+      customFields: !!fields 
+    });
+
+    // Use example query from queryConfig or custom fields
+    const selectFields = fields || [
+      'w.wholesaler_id',
+      'w.name AS supplier_name',
+      'wc.category_id', 
+      'pc.name AS category_name',
+      'pc.description AS category_description',
+      'wc.comment',
+      'wc.link',
+      'oc.offering_count'
+    ];
+
+    const query: QueryPayload = {
+      select: selectFields,
+      from: 'supplier_categories', // Uses queryConfig JOIN configuration
+      where: {
+        op: LogicalOperator.AND,
+        conditions: [{ 
+          key: 'w.wholesaler_id', 
+          op: ComparisonOperator.EQUALS, 
+          val: supplierId 
+        }]
+      },
+      orderBy: [{ key: 'pc.name', direction: 'asc' }],
+      limit: 100
+    };
+
+    const response = await apiFetch<SupplierQueryResponse>(
+      '/api/categories',
+      {
+        method: 'POST',
+        body: createPostBody(query)
+      },
+      { context: `loadSupplierCategories-${supplierId}` }
+    );
+
+    const categories = response.results as WholesalerCategoryWithCount[];
+
+    log.info("Supplier categories loaded successfully", {
+      supplierId,
+      categoryCount: categories.length,
+      operationId
+    });
+
+    return categories;
+
+  } catch (error) {
+    log.error("Failed to load supplier categories", {
+      supplierId,
+      error: getErrorMessage(error),
+      operationId
+    });
+    throw error;
+  } finally {
+    supplierLoadingState.finish(operationId);
   }
 }
 

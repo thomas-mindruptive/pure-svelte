@@ -121,42 +121,6 @@ const request: PredefinedQueryRequest = {
 // The function sends this to the generic `/api/query` endpoint.
 ```
 
-## New approach?: Highly typed query grammar:
-
-// 1. Extract alias from join definition
-type ExtractAlias<T> = T extends { alias: infer A } ? A : never;
-
-// 2. Extract available columns from joins array  
-type ExtractJoinColumns<TJoins extends readonly JoinClause[]> = {
-  [K in keyof TJoins]: TJoins[K] extends { alias: infer Alias }
-    ? Alias extends keyof AliasToEntityMap
-      ? `${Alias}.${keyof AliasToEntityMap[Alias] & string}`
-      : never
-    : never
-}[number];
-
-// 3. Combined column type
-type AvailableColumns<T, TJoins extends readonly JoinClause[]> = 
-  | keyof T & string
-  | ExtractJoinColumns<TJoins>;
-
-// 4. Usage
-interface QueryPayload<T, TJoins extends readonly JoinClause[] = []> {
-  joins?: TJoins;
-  select: AvailableColumns<T, TJoins>[];
-  where?: ConditionGroup<T, TJoins>;
-  orderBy?: SortDescriptor<T, TJoins>[];
-}
-
-// 5. Client code
-const query = {
-  joins: [
-    { type: JoinType.INNER, table: 'product_categories', alias: 'pc', on: ... }
-  ] as const,
-  select: ['name', 'pc.name'], // ✓ TypeScript validates
-  select: ['name', 'pc.invalid'], // ❌ TypeScript error
-} satisfies QueryPayload<Wholesaler, typeof query.joins>;
-
 
 ---
 

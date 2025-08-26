@@ -43,7 +43,7 @@ export const POST: RequestHandler = async (event) => {
 
         log.info(`[${operationId}] Parsed request body`, {
             clientColumns: clientPayload.select?.length || 0,
-            hasWhere: !!clientPayload.where?.conditions?.length
+            where: clientPayload.where
         });
 
         // 2. SECURITY: Enforce the table name on the server.

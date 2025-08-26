@@ -6,7 +6,7 @@
  * This file defines all generic envelopes and patterns for the entire application.
  */
 
-import type { QueryPayload, JoinQueryPayload } from '$lib/clientAndBack/queryGrammar';
+import type { QueryPayload } from '$lib/clientAndBack/queryGrammar';
 
 // ===== BASE RESPONSE ENVELOPES =====
 
@@ -59,11 +59,11 @@ export interface QueryRequest<T> {
 }
 
 /**
- * Request for a predefined, named JOIN query. Uses the flexible `JoinQueryPayload`.
+ * Request for a predefined, named JOIN query.
  */
 export interface PredefinedQueryRequest {
 	namedQuery: string;
-	payload: QueryPayload<unknown> | JoinQueryPayload;
+	payload: QueryPayload<unknown>;
 }
 
 /**

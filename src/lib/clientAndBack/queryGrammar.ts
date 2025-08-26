@@ -27,16 +27,16 @@ export interface JoinClause_old {
 }
 
 export interface JoinClause {
-  type: JoinType;
-  table: string;
-  alias?: string;
-  on: JoinConditionGroup; // dieselbe Struktur wie WHERE-Bedingungen
+	type: JoinType;
+	table: string;
+	alias?: string;
+	on: JoinConditionGroup; // dieselbe Struktur wie WHERE-Bedingungen
 }
 
-interface JoinCondition {
-  columnA: AllQualifiedColumns | AllAliasedColumns;
-  op: ComparisonOperator;
-  columnB: AllQualifiedColumns | AllAliasedColumns;
+export interface JoinCondition {
+	columnA: AllQualifiedColumns | AllAliasedColumns;
+	op: ComparisonOperator;
+	columnB: AllQualifiedColumns | AllAliasedColumns;
 }
 
 export interface JoinConditionGroup {
@@ -52,7 +52,7 @@ export interface JoinSortDescriptor {
 // --- STRUCTURE 1: For Strictly Typed Single-Entity Queries ---
 
 export interface Condition<T> {
-	key: keyof T & string; // STRICT: Only allows keys of the provided domain type.
+	key: keyof T & string | AllQualifiedColumns | AllAliasedColumns;
 	op: ComparisonOperator;
 	val?: unknown | unknown[];
 }
@@ -62,20 +62,37 @@ export interface ConditionGroup<T> {
 	conditions: (Condition<T> | ConditionGroup<T>)[];
 }
 
+export function isConditionGroup<T>(item: Condition<T> | ConditionGroup<T>): item is ConditionGroup<T> {
+  return 'conditions' in item;
+}
+
 export interface SortDescriptor<T> {
-	key: keyof T & string; // STRICT
+	key: keyof T & string | AllQualifiedColumns | AllAliasedColumns 
 	direction: 'asc' | 'desc';
 }
+
+// // Für WHERE-Klauseln (Column = Value, oder Column = Column)
+// export interface WhereCondition<T> {
+// 	key: keyof T & string | AllQualifiedColumns | AllAliasedColumns
+// 	op: ComparisonOperator;
+// 	val?: unknown | unknown[];
+// }
+
+// export interface WhereConditionGroup<T> {
+// 	op: LogicalOperator;
+// 	conditions: (WhereCondition<T> | WhereConditionGroup<T>)[]; // Hier wird die Generik angewendet
+// }
+
 
 /**
  * A strictly generic payload. Using this with `QueryPayload<Wholesaler>` makes it
  * impossible to specify an invalid key like `'color'`, providing compile-time safety.
  */
 export interface QueryPayload<T> {
-	select: Array<keyof T | AllQualifiedColumns | AllAliasedColumns>; 
+	select: Array<keyof T | AllQualifiedColumns | AllAliasedColumns>;
 	from?: string;
 	joins?: JoinClause[];
-	where?: ConditionGroup<T>;
+	where?: Condition<T> | ConditionGroup<T>;
 	orderBy?: SortDescriptor<T>[];
 	limit?: number;
 	offset?: number;
@@ -89,12 +106,12 @@ export interface QueryPayload<T> {
  * and `where` clauses need to reference aliased or joined columns. The ultimate
  * security guarantee for these strings comes from the server-side validation against `queryConfig.ts`.
  */
-export interface JoinQueryPayload {
-	from?: string;
-	joins?: JoinClause[];
-	select: string[];
-	where?: JoinConditionGroup;
-	orderBy?: JoinSortDescriptor[];
-	limit?: number;
-	offset?: number;
-}
+// export interface JoinQueryPayload {
+// 	from?: string;
+// 	joins?: JoinClause[];
+// 	select: string[];
+// 	where?: JoinConditionGroup;
+// 	orderBy?: JoinSortDescriptor[];
+// 	limit?: number;
+// 	offset?: number;
+// }

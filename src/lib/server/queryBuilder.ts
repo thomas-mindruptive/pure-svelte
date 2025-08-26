@@ -12,13 +12,15 @@ import { db } from '$lib/server/db';
 import { log } from '$lib/utils/logger';
 import {
 	type QueryPayload,
-	type JoinQueryPayload,
 	type JoinClause,
-	type JoinCondition,
-	type JoinConditionGroup,
 	type JoinSortDescriptor,
 	LogicalOperator,
-	ComparisonOperator
+	ComparisonOperator,
+	type ConditionGroup,
+	type Condition,
+	type JoinConditionGroup,
+	type JoinCondition,
+	isConditionGroup
 } from '$lib/clientAndBack/queryGrammar';
 import type { supplierQueryConfig as SupplierQueryConfigType } from '$lib/clientAndBack/queryConfig';
 
@@ -57,13 +59,13 @@ export type QueryResultRow = Record<string, SqlParameterValue>;
  * @private
  */
 function parseWhere(
-	item: JoinConditionGroup | JoinCondition,
+	item: Condition<unknown> | ConditionGroup<unknown>,
 	allowedColumns: ReadonlyArray<string>,
 	parameters: Record<string, SqlParameterValue>,
 	paramIndex: { i: number }
 ): string {
 	// Base case: item is a single condition
-	if (!('conditions' in item)) {
+	if (!isConditionGroup(item)) {
 		// SECURITY: Regardless of compile-time type, validate every key at runtime against the whitelist.
 		if (!allowedColumns.includes(item.key)) {
 			throw new Error(`Column '${item.key}' is not allowed in the WHERE clause.`);
@@ -130,23 +132,60 @@ function buildOrderBy(
 	return `ORDER BY ${orderByParts.join(', ')}`;
 }
 
-/**
- * Builds the JOIN clauses string from an array of JoinClause objects.
- * @private
- */
-function buildJoinClauses(joins: ReadonlyArray<JoinClause>): string {
-    if (!joins || joins.length === 0) return '';
+function buildJoinClauses(
+	joins: ReadonlyArray<JoinClause>,
+	allowedColumns: ReadonlyArray<string>
+): string {
+	if (!joins || joins.length === 0) return '';
+	
 	return joins.map(join => {
 		if (!join.table || !join.on) {
 			throw new Error('JOIN clause requires "table" and "on" properties.');
 		}
+		
 		// SECURITY: Basic check to prevent trivial injection in JOIN clauses.
-		if (/[;']/.test(join.table) || /[;']/.test(join.on) || (join.alias && /[;']/.test(join.alias))) {
+		if (/[;']/.test(join.table) || (join.alias && /[;']/.test(join.alias))) {
 			throw new Error('Invalid characters detected in JOIN clause.');
 		}
+		
 		const alias = join.alias ? ` AS ${join.alias}` : '';
-		return `${join.type} ${join.table}${alias} ON ${join.on}`;
+		const onClause = parseJoinConditions(join.on, allowedColumns);
+		
+		return `${join.type} ${join.table}${alias} ON ${onClause}`;
 	}).join(' ');
+}
+
+function parseJoinConditions(
+	item: JoinConditionGroup | JoinCondition,
+	allowedColumns: ReadonlyArray<string>
+): string {
+	// Base case: item is a single join condition (columnA = columnB)
+	if (!('conditions' in item)) {
+		// SECURITY: Validate both columns against whitelist
+		if (!allowedColumns.includes(item.columnA) || !allowedColumns.includes(item.columnB)) {
+			throw new Error(`Join columns '${item.columnA}' or '${item.columnB}' are not allowed.`);
+		}
+		
+		// For JOIN conditions, we typically don't parameterize - it's column = column
+		// But we could parameterize if needed for security
+		return `${item.columnA} ${item.op} ${item.columnB}`;
+	}
+
+	// Recursive case: item is a condition group
+	if (item.conditions.length === 0) return '1=1'; // Neutral for empty groups
+	
+	const parts = item.conditions.map(c => 
+		parseJoinConditions(c, allowedColumns)
+	);
+
+	if (item.op === LogicalOperator.NOT) {
+		if (parts.length !== 1) {
+			throw new Error('A NOT group must contain exactly one condition or group.');
+		}
+		return `NOT (${parts[0]})`;
+	}
+
+	return `(${parts.join(` ${item.op} `)})`;
 }
 
 
@@ -165,7 +204,7 @@ function buildJoinClauses(joins: ReadonlyArray<JoinClause>): string {
  * @returns A `QueryBuildResult` object with the SQL string, parameters, and metadata.
  */
 export function buildQuery<T>(
-	payload: QueryPayload<T> | JoinQueryPayload,
+	payload: QueryPayload<T>,
 	config: typeof SupplierQueryConfigType,
 	fixedFrom?: string
 ): QueryBuildResult {
@@ -190,10 +229,10 @@ export function buildQuery<T>(
 		if (config.joinConfigurations?.[fromSource as keyof typeof config.joinConfigurations]) {
 			const joinConfig = config.joinConfigurations[fromSource as keyof typeof config.joinConfigurations];
 			fromClause = joinConfig.from;
-			joinClauses = buildJoinClauses(joinConfig.joins);
+			joinClauses = buildJoinClauses(joinConfig.joins, allowedColumns);
 		} else {
 			fromClause = fromSource;
-			if (payload.joins) joinClauses = buildJoinClauses(payload.joins);
+			if (payload.joins) joinClauses = buildJoinClauses(payload.joins, allowedColumns);
 		}
 
 		const parameters: Record<string, SqlParameterValue> = {};
@@ -207,9 +246,9 @@ export function buildQuery<T>(
 		if (validatedSelect.length === 0) throw new Error('No valid columns in SELECT clause after filtering.');
 
 		let whereClause = '';
-		if (payload.where?.conditions?.length) {
+		if (payload.where) {
 			// `payload.where` is structurally compatible, allowing TypeScript to resolve this safely.
-			const parsed = parseWhere(payload.where, allowedColumns, parameters, paramIndex);
+			const parsed = parseWhere(payload.where as Condition<unknown>, allowedColumns, parameters, paramIndex);
 			if (parsed !== '1=1') whereClause = `WHERE ${parsed}`;
 		}
 		

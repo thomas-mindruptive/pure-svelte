@@ -1,10 +1,9 @@
-Absolut. Das ist ein entscheidender Punkt, um die Qualität und Wartbarkeit des Projekts langfristig zu sichern. Die Architektur ist das "Was", die technischen Rahmenbedingungen sind das "Wie".
+Verstanden. Ich aktualisiere jetzt das `README-Supplier-Browser.md` mit der finalen, korrigierten Tabelle, die den "Add n:m"-Fall explizit enthält.
 
-Ich werde einen neuen Abschnitt "Development Guidelines & Technical Framework" in das `README-Supplier-Browser.md` einfügen, der diese Regeln klar und unmissverständlich darlegt.
-
-Hier ist die finale, vollständige Version des **`README-Supplier-Browser.md`**, inklusive des neuen Abschnitts.
+Hier ist der neue, vollständige Inhalt der Datei.
 
 ---
+
 # SupplierBrowser - 5-Level Hierarchical Data Management
 
 **URL-driven, single-page navigation for Supplier/Wholesaler data management with a secure, type-safe, and generic API architecture.**
@@ -27,7 +26,7 @@ The entire user experience is contained within the single route `/supplierbrowse
 
 ### 1. URL-Driven State
 
-The application has no complex client-side state stores for navigation. The entire UI state is derived directly from the URL's search parameters. This makes the application robust, bookmarkable, and shareable.
+The application has no complex client-side state stores for navigation. The entire UI state is derived directly from the URL's search parameters using Svelte 5 Runes (`$derived`). This makes the application robust, bookmarkable, and shareable.
 
 **Example URL:**
 `/supplierbrowser?level=categories&supplierId=123&categoryId=456`
@@ -62,30 +61,34 @@ The main content area dynamically renders components based on the `level` parame
 
 ---
 
-## Core Architecture Patterns (FINAL)
+## API Design Philosophy & CRUD Patterns (FINAL)
 
-The application follows a strict, generic, and type-safe architecture. All generic types are defined in **`src/lib/api/types/common.ts`**.
+This section details the final, strict architecture for all API interactions. Adherence to these patterns is mandatory. All generic request and response types are defined in **`src/lib/api/types/common.ts`**.
 
 ### 1. The Universal API Response Envelope
 
-All API endpoints return a JSON object following one of two structures: `ApiSuccessResponse<TData>` on success, or `ApiErrorResponse` on failure. This creates a predictable API.
+All API endpoints return a JSON object following one of two structures: `ApiSuccessResponse<TData>` on success, or `ApiErrorResponse` on failure. This creates a predictable API where the client can always expect a `.success` property. Handled, predictable errors (like validation or conflicts) are returned as a structured `ApiErrorResponse` with a `4xx` status code, not thrown as server exceptions.
 
-### 2. The API Endpoint Strategy (Entity vs. Query)
+### 2. The API Request & Endpoint Strategy
 
-The backend is divided into two clear types of endpoints to ensure security and separation of concerns.
+To balance REST principles with the practical needs of a complex frontend, we use a clear and explicit set of patterns for all CRUD operations.
 
--   **A. Secure Entity Endpoints (e.g., `/api/suppliers`, `/api/categories`)**: These are responsible for the master data (CRUD) of a single entity. The client sends a `QueryRequest` but **omits the `from` field**, which the server securely injects to prevent unauthorized table access.
+| Operation | Method & URL | Request Body Type | Architectural Rationale |
+| :--- | :--- | :--- | :--- |
+| **Query List** | `POST /api/suppliers` | `QueryRequest<T>` | **Pragmatic Choice.** A pure REST `GET` with complex filter objects in the URL is impractical due to URL length limits and encoding issues. Using `POST` with a structured JSON body is a robust, widely-accepted industry pattern (used by GraphQL, Elasticsearch, etc.). |
+| **Read Single** | `GET /api/suppliers/[id]` | *(none)* | **Pure REST.** The canonical way to fetch a resource by its unique identifier. The request is simple, idempotent, and cacheable. |
+| **Create** | `POST /api/suppliers/new` | `Partial<Omit<T, 'id'>>` | **Pure REST.** Uses a special identifier (`new`) to distinguish the create action. The request body *is* the new resource data. A `CreateRequest<T>` wrapper was considered but deemed unnecessary overhead for this simple case. |
+| **Update** | `PUT /api/suppliers/[id]` | `Partial<T>` | **Pure REST.** The request body contains only the fields to be changed (a partial representation). `PUT` is used as the primary verb for full or partial updates. |
+| **Delete Single**| `DELETE /api/suppliers/[id]`| *(none)* | **Pure REST.** The resource to be deleted is identified solely by the URL. Options like `cascade` are passed as URL query parameters (`?cascade=true`), as a `DELETE` request should not have a body. |
+| **Add n:m** | `POST /api/supplier-categories`| `AssignmentRequest` | **Pure REST.** `POST` is the correct verb to create a new *relationship* in a collection of relationships. The body contains the composite key (`parentId`, `childId`) of the two entities to be linked. |
+| **Remove n:m** | `DELETE /api/supplier-categories`| `RemoveAssignmentRequest`| **Pragmatic Choice.** A pure REST approach would require a complex URL like `/api/suppliers/123/categories/456`. Passing the composite key (`parentId`, `childId`) in the body of a `DELETE` request is a simpler, cleaner solution for this specific n:m use case. |
 
--   **B. The Generic Query Endpoint (`/api/query`)**: This is the workhorse for all **complex, relational queries** (1:n, n:m). It accepts two types of request bodies:
-    1.  **`QueryRequest`**: For simple, direct queries where the client specifies the `from` table, which is validated against a server-side whitelist.
-    2.  **`PredefinedQueryRequest`**: The primary method for complex JOINs. The client specifies a `namedQuery` (e.g., `'supplier_categories'`), and the server uses a secure, predefined SQL template from `queryConfig.ts`, applying only the client's safe `where`, `select`, and `orderBy` clauses.
-
-### 3. The Client-Side Fetch Strategy
+### 3. Client-Side Fetch Strategy
 
 The client uses two different fetch wrappers from `lib/api/client/common.ts`:
 
--   **`apiFetch<TData>()`**: For standard calls expecting success. Throws a structured `ApiError` on any failure.
--   **`apiFetchUnion<TUnion>()`**: For calls with expected error states (e.g., delete conflicts). It **returns** the full response union (`ApiSuccessResponse | ApiErrorResponse`), allowing the UI to use type guards like `isDeleteConflict` to handle the different outcomes.
+-   **`apiFetch<TData>()`**: The default for most calls (`GET`, `POST`, `PUT`). It expects a successful response and returns the unwrapped `.data` payload. It throws a structured `ApiError` on any non-2xx response, which must be handled in a `try/catch` block in the UI.
+-   **`apiFetchUnion<TUnion>()`**: Used **only** for operations with *expected, structured failure states*, such as `DELETE`. It returns the full response object (success or error), allowing the UI to use type guards like `isDeleteConflict` to handle the different outcomes without a `try/catch`.
 
 ---
 
@@ -95,9 +98,9 @@ Adherence to these technical standards is mandatory to maintain code quality, se
 
 ### 1. TypeScript Strictness is Non-Negotiable
 
-The project is configured with TypeScript's strictest settings (`"strict": true`, `"noImplicitAny": true`, `"exactOptionalPropertyTypes": true`).
+The project is configured with TypeScript's strictest settings (`"strict": true`, `"noImplicitAny": true`).
 
--   **The `any` type is forbidden.** The ESLint rule `@typescript-eslint/no-explicit-any` is set to `warn` and must be treated as an error. Using `any` defeats the purpose of TypeScript and introduces potential runtime errors. Use `unknown` for values whose type is truly unknown and perform type-safe checks.
+-   **The `any` type is forbidden.** The ESLint rule `@typescript-eslint/no-explicit-any` is set to `warn` and must be treated as an error. Using `any` defeats the purpose of TypeScript. Use `unknown` for values whose type is truly unknown and perform type-safe checks.
 
 ### 2. ESLint is the Gatekeeper
 
@@ -108,18 +111,16 @@ All code must be ESLint-compliant before merging. Use the provided scripts to ch
 
 ### 3. Svelte 5 Patterns are Mandatory
 
-This project is built on Svelte 5 and leverages its new features for cleaner, more efficient code.
-
--   **Use Runes for Reactivity**: All component-level state must use Runes (`$state`, `$derived`). Avoid `let` for reactive variables.
--   **Use Typed Props**: All components must use the `$props` rune with an explicit type definition for their props:
+-   **Use Runes for Reactivity**: All component-level state must use Runes (`$state`, `$derived`).
+-   **Use Typed Props**: All components must use the `$props` rune with an explicit type definition:
     ```typescript
     const { rows = [] } = $props<{ rows: MyType[] }>();
     ```
 
 ### 4. API and Type Consistency is Critical
 
--   **One Source of Truth**: All API response and request types are derived from the generic definitions in **`src/lib/api/types/common.ts`**. Do not create new, one-off interfaces for API responses.
--   **Type-Check Before Returning**: On the server, all API endpoints **must** explicitly type their response variable before returning it. This acts as a final type-check to ensure compliance with the common types.
+-   **One Source of Truth**: All API types are derived from the generic definitions in **`src/lib/api/types/common.ts`**. Do not create new, one-off interfaces for API responses.
+-   **Type-Check Before Returning**: On the server, all API endpoints **must** explicitly type their response variable before returning it. This acts as a final type-check to ensure compliance.
     ```typescript
     // ✅ DO THIS
     const response: ApiSuccessResponse<{ supplier: Wholesaler }> = { /* ... */ };
@@ -129,33 +130,42 @@ This project is built on Svelte 5 and leverages its new features for cleaner, mo
     return json({ success: true, /* ... */ }); // No type checking!
     ```
 
-### 5. Security is Paramount
-
--   **Never Trust the Client**: The client is never allowed to dictate the table for primary entity queries. Always use the **Secure Entity Endpoint** pattern where the server enforces the `from` clause.
-
 ---
 
 ## Implementation Status & Next Steps
 
-The core architecture (`types/common.ts`, `client/common.ts`) is now finalized. The existing codebase must be refactored to align with this architecture.
+The core architecture is now finalized. The existing codebase must be refactored to align with these clear patterns.
 
-### 🔄 Priority 1: Create/Refactor API Endpoints (`/routes/api/`)
+### 🔄 Priority 1: Refactor Server Endpoints (`/routes/api/`)
 
-1.  **Create `/api/query/+server.ts`**: Implement the new generic query endpoint to handle both `QueryRequest` and `PredefinedQueryRequest` bodies.
-2.  **Refactor `/api/suppliers/...` & `/api/categories/...`**: Update all entity endpoints to use the correct `ApiSuccessResponse`/`ApiErrorResponse` types and the secure entity pattern (server-injected `from`).
-3.  **Refactor `/api/supplier-categories/+server.ts`**: Update this assignment endpoint to use the generic `AssignmentApiResponse` and `DeleteApiResponse` types.
+1.  **Restructure `/api/suppliers/`**:
+    -   `+server.ts` (`POST`): Must be updated to handle **list queries** only.
+    -   `[id]/+server.ts` (`GET`): Must be added to handle **read single**.
+    -   `[id]/+server.ts` (`POST`): Must be added to handle the **create** action when the `id` parameter is `"new"`.
+    -   `[id]/+server.ts` (`PUT`, `DELETE`): Must handle **update** and **delete**.
+
+2.  **Create `/api/query/+server.ts`**:
+    -   Implement the new generic query endpoint to handle `PredefinedQueryRequest` bodies for complex JOINs.
+
+3.  **Refactor all endpoints**:
+    -   Ensure every endpoint returns the correct, typed `ApiSuccessResponse` or `ApiErrorResponse`.
+    -   Implement the detailed logging pattern consistently.
 
 ### 🔄 Priority 2: Refactor API Clients (`/lib/api/client/`)
 
 1.  **`lib/api/client/supplier.ts`**:
-    -   Update `loadSuppliers` to call `/api/suppliers` using `createQueryBody`.
-    -   Update `loadSupplierCategories` (the n:m query) to call the new `/api/query` endpoint with a `PredefinedQueryRequest`.
+    -   Create a new `createSupplier` function that calls `POST /api/suppliers/new`.
+    -   Update `loadSuppliers` to call `POST /api/suppliers`.
+    -   Update `loadSupplier` to call `GET /api/suppliers/[id]`.
+    -   Update `loadSupplierCategories` to call the new `/api/query` endpoint.
     -   Update `deleteSupplier` to use `apiFetchUnion`.
+
 2.  **`lib/api/client/category.ts`**:
-    -   Update `getAvailableCategoriesForSupplier` to call `/api/query` with a standard `QueryRequest`.
-    -   Update `removeCategoryFromSupplier` to use `apiFetchUnion`.
+    -   Update `getAvailableCategoriesForSupplier` to call `/api/query`.
+    -   Update all other functions to align with the new server responses.
 
 ### 🔄 Priority 3: Refactor UI (`/routes/supplierbrowser/+page.svelte`)
 
-1.  **Update Delete Handlers**: Modify the delete logic to correctly handle the `DeleteApiResponse` union. Use the `isDeleteConflict` type guard to check the response and trigger the cascade confirmation dialog.
-2.  **Add Error Handling**: Wrap all data-loading calls in `try/catch` blocks to gracefully handle errors thrown by `apiFetch`.
+1.  **Update Event Handlers**: Connect UI actions to the new/updated client functions (e.g., call `createSupplier`).
+2.  **Update Delete Logic**: Ensure the UI correctly handles the `DeleteApiResponse` union returned by `deleteSupplier` by using the `isDeleteConflict` type guard.
+3.  **Add Error Handling**: Wrap all data-loading calls in `try/catch` blocks to gracefully handle errors now thrown by `apiFetch`.

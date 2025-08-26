@@ -28,19 +28,22 @@ export enum JoinType {
   FULL = 'FULL OUTER JOIN'
 }
 
-// --- Building blocks for the WHERE clause ---
-export interface Condition {
-  key: string;            // Can include alias, e.g., 'w.region'
-  op: ComparisonOperator;
-  val?: unknown | unknown[];
+export interface Condition<T = Record<string, unknown>> {
+	key: keyof T | (string & {}); // Allow keys of T or any string for joins/aliases
+	op: ComparisonOperator;
+	val?: unknown | unknown[];
 }
 
-export interface ConditionGroup {
-  op: LogicalOperator;
-  conditions: (Condition | ConditionGroup)[];
+export interface ConditionGroup<T = Record<string, unknown>> {
+	op: LogicalOperator;
+	conditions: (Condition<T> | ConditionGroup<T>)[];
 }
 
-// NEU: JOIN-Definition
+export interface SortDescriptor<T = Record<string, unknown>> {
+	key: keyof T | (string & {});
+	direction: 'asc' | 'desc';
+}
+
 export interface JoinClause {
   type: JoinType;
   table: string;          // e.g., 'dbo.product_categories'
@@ -48,18 +51,19 @@ export interface JoinClause {
   on: string;             // e.g., 'wc.category_id = pc.category_id'
 }
 
-// --- ORDER BY ---
-export interface SortDescriptor {
-  key: string;            // Can include alias, e.g., 'pc.name'
-  direction: 'asc' | 'desc';
+/**
+ * A generic QueryPayload. When used with a domain type (e.g., QueryPayload<Wholesaler>),
+ * it provides compile-time checking for `select`, `where`, and `orderBy` keys.
+ */
+export interface QueryPayload<T = Record<string, unknown>> {
+	select: (keyof T | (string & {}))[]; // Allow keys of T or any string for aliases
+	from?: string;
+	joins?: JoinClause[];
+	where?: ConditionGroup<T>;
+	orderBy?: SortDescriptor<T>[];
+	limit?: number;
+	offset?: number;
 }
 
-export interface QueryPayload {
-  select: string[];             // e.g., ['w.name', 'pc.name AS category_name']
-  from?: string;                 // e.g., 'dbo.wholesalers w' or virtual view name
-  joins?: JoinClause[];         // NEU: Optional JOIN clauses
-  where?: ConditionGroup;
-  orderBy?: SortDescriptor[];
-  limit?: number;
-  offset?: number;
-}
+
+

@@ -14,6 +14,7 @@ import type { Wholesaler, WholesalerCategoryWithCount } from '$lib/domain/types'
 
 // Import generic types from the single source of truth: common.ts
 import type {
+	CreateRequest,
 	DeleteApiResponse,
 	PredefinedQueryRequest,
 	QueryResponseData
@@ -26,11 +27,39 @@ export const supplierLoadingState = new LoadingState();
  * The default query payload used when fetching a list of suppliers.
  * Ensures a consistent initial view.
  */
-export const DEFAULT_SUPPLIER_QUERY: QueryPayload = {
+export const DEFAULT_SUPPLIER_QUERY: QueryPayload<Wholesaler> = {
 	select: ['wholesaler_id', 'name', 'region', 'status', 'dropship', 'website', 'created_at'],
 	orderBy: [{ key: 'name', direction: 'asc' }],
 	limit: 100
 };
+
+/**
+ * Creates a new supplier by calling the dedicated `/api/suppliers/new` endpoint.
+ *
+ * @param supplierData The data for the new supplier.
+ * @returns A promise that resolves to the newly created `Wholesaler` object from the server.
+ * @throws {ApiError} If validation fails (400) or another server error occurs.
+ */
+export async function createSupplier(
+	supplierData: CreateRequest<Partial<Omit<Wholesaler, 'wholesaler_id'>>>
+): Promise<Wholesaler> {
+	const operationId = 'createSupplier';
+	supplierLoadingState.start(operationId);
+	try {
+		// Use `createPostBody` for the simple object body.
+		const responseData = await apiFetch<{ supplier: Wholesaler }>(
+			'/api/suppliers/new', // Correct endpoint for creation
+			{ method: 'POST', body: createPostBody(supplierData) },
+			{ context: operationId }
+		);
+		return responseData.supplier;
+	} catch (err) {
+		log.error(`[${operationId}] Failed.`, { supplierData, error: getErrorMessage(err) });
+		throw err; // Re-throw the ApiError for the UI layer to handle.
+	} finally {
+		supplierLoadingState.finish(operationId);
+	}
+}
 
 /**
  * Loads a list of suppliers from the secure entity endpoint `/api/suppliers`.
@@ -41,11 +70,11 @@ export const DEFAULT_SUPPLIER_QUERY: QueryPayload = {
  * @returns A promise that resolves to an array of `Wholesaler` objects.
  * @throws {ApiError} If the API call fails for any reason.
  */
-export async function loadSuppliers(query: Partial<QueryPayload> = {}): Promise<Wholesaler[]> {
+export async function loadSuppliers(query: Partial<QueryPayload<Wholesaler>> = {}): Promise<Wholesaler[]> {
 	const operationId = 'loadSuppliers';
 	supplierLoadingState.start(operationId);
 	try {
-		const fullQuery = { ...DEFAULT_SUPPLIER_QUERY, ...query };
+		const fullQuery: QueryPayload<Wholesaler> = { ...DEFAULT_SUPPLIER_QUERY, ...query };
 		
 		// Use `createQueryBody` to wrap the payload in the `{ "payload": ... }` envelope.
 		const responseData = await apiFetch<QueryResponseData<Wholesaler>>(
@@ -65,17 +94,44 @@ export async function loadSuppliers(query: Partial<QueryPayload> = {}): Promise<
 }
 
 /**
- * Loads a single, complete supplier object by its ID from `/api/suppliers/[id]`.
+ * Loads a single, complete supplier object by its ID using a canonical GET request.
  *
  * @param supplierId The ID of the supplier to fetch.
  * @returns A promise that resolves to a single `Wholesaler` object.
- * @throws {ApiError} If the supplier is not found or the API call fails.
+ * @throws {ApiError} If the supplier is not found (404) or the API call fails.
  */
 export async function loadSupplier(supplierId: number): Promise<Wholesaler> {
 	const operationId = `loadSupplier-${supplierId}`;
 	supplierLoadingState.start(operationId);
 	try {
-		const query: QueryPayload = { select: ['*'], limit: 1 };
+		// apiFetch nutzt standardmäßig GET, kein Body nötig.
+		const responseData = await apiFetch<{ supplier: Wholesaler }>(
+			`/api/suppliers/${supplierId}`,
+			{ method: 'GET' }, 
+			{ context: operationId }
+		);
+
+		return responseData.supplier;
+	} catch (err) {
+		log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
+		throw err;
+	} finally {
+		supplierLoadingState.finish(operationId);
+	}
+}
+
+/**
+ * Loads a single, supplier object by its ID from POST `/api/suppliers/[id]`.
+ *
+ * @param supplierId The ID of the supplier to fetch.
+ * @returns A promise that resolves to a single `Wholesaler` object.
+ * @throws {ApiError} If the supplier is not found or the API call fails.
+ */
+export async function loadSupplierWithQueryPayload(supplierId: number): Promise<Wholesaler> {
+	const operationId = `loadSupplier-${supplierId}`;
+	supplierLoadingState.start(operationId);
+	try {
+		const query: QueryPayload<Wholesaler> = { select: ['wholesaler_id', 'name', 'region', 'status', 'dropship', 'website', 'created_at'], limit: 1 };
 		const responseData = await apiFetch<QueryResponseData<Wholesaler>>(
 			`/api/suppliers/${supplierId}`,
 			{ method: 'POST', body: createQueryBody(query) },

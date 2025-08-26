@@ -27,7 +27,7 @@ export const POST: RequestHandler = async (event) => {
 
 	try {
 		// 1. Expect the standard QueryRequest envelope and extract the payload.
-		const requestBody = (await event.request.json()) as QueryRequest;
+		const requestBody = (await event.request.json()) as QueryRequest<Wholesaler>;
 		const clientPayload = requestBody.payload;
 
 		if (!clientPayload) {
@@ -46,7 +46,7 @@ export const POST: RequestHandler = async (event) => {
 		});
 
 		// 2. SECURITY: Enforce the table name on the server. Ignore any `from` field sent by the client.
-		const securePayload: QueryPayload = {
+		const securePayload: QueryPayload<Wholesaler> = {
 			...clientPayload,
 			from: 'dbo.wholesalers' // <-- SERVER-ENFORCED
 		};

@@ -28,7 +28,7 @@ export interface JoinClause {
 // --- STRUCTURE 1: For Strictly Typed Single-Entity Queries ---
 
 export interface Condition<T> {
-	key: keyof T; // STRICT: Only allows keys of the provided domain type.
+	key: keyof T & string; // STRICT: Only allows keys of the provided domain type.
 	op: ComparisonOperator;
 	val?: unknown | unknown[];
 }
@@ -39,7 +39,7 @@ export interface ConditionGroup<T> {
 }
 
 export interface SortDescriptor<T> {
-	key: keyof T; // STRICT
+	key: keyof T & string; // STRICT
 	direction: 'asc' | 'desc';
 }
 
@@ -82,6 +82,8 @@ export interface JoinSortDescriptor {
  * security guarantee for these strings comes from the server-side validation against `queryConfig.ts`.
  */
 export interface JoinQueryPayload {
+	from?: string;
+	joins?: JoinClause[];
 	select: string[];
 	where?: JoinConditionGroup;
 	orderBy?: JoinSortDescriptor[];

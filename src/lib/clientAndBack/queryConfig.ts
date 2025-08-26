@@ -36,14 +36,14 @@ type BaseTableConfig = {
   'dbo.wholesaler_offering_links': (keyof Domain.WholesalerOfferingLink)[];
 };
 
-type PredefinedQueryConfig = {
+export type PredefinedQueryConfig = {
   supplier_categories: (AllQualifiedColumns | AllAliasedColumns)[];
   category_offerings: (AllQualifiedColumns | AllAliasedColumns)[];
   offering_attributes: (AllQualifiedColumns | AllAliasedColumns)[];
   offering_links: (AllQualifiedColumns | AllAliasedColumns)[];
 };
 
-interface QueryConfig {
+export interface QueryConfig {
   allowedTables: BaseTableConfig & PredefinedQueryConfig;
   joinConfigurations?: {
     [viewName: string]: {

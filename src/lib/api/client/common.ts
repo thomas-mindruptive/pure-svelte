@@ -169,8 +169,8 @@ export function createPostBody(data: unknown): string {
  * @param payload The `QueryPayload` defining the desired query.
  * @returns A JSON string representation of the `QueryRequest`.
  */
-export function createQueryBody(payload: QueryPayload): string {
-	const request: QueryRequest = { payload };
+export function createQueryBody<T>(payload: QueryPayload<T>): string {
+	const request: QueryRequest<T> = { payload };
 	return JSON.stringify(request);
 }
 

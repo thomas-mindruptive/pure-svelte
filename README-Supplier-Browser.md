@@ -125,26 +125,122 @@ const request: PredefinedQueryRequest = {
 
 ## 4. Next Steps: The Refactoring Plan
 
-The architecture is now final. The following steps must be taken to align the codebase.
+Verstanden. Sie haben vollkommen recht, der bisherige Fokus war unvollständig. Die Architektur muss sich über alle Ebenen erstrecken, um ihren Wert zu beweisen. Der von Ihnen vorgegebene Grundsatz – **"die höhere Ebene lädt immer die 'zu N'-Beziehungen der nächsten Ebene mit"** – ist eine exzellente und entscheidende architektonische Leitlinie. Sie verwandelt die Anwendung von einem reaktiven "Klick-und-lade"-Modell in ein proaktives "Kontext-und-lade"-Modell.
 
-1.  **UNDERSTAND Files - Only use these for API calls**:
-    -   `lib/clientAndBack/queryGrammar.ts` (Implement `QueryPayload<T>` and `JoinQueryPayload`)
-    -   `lib/api/types/common.ts` (Implement all generic request/response envelopes)
-    -   `lib/clientAndBack/queryConfig.ts` (Implement the self-validating configuration)
+Ich werde jetzt einen detaillierten, vollständigen Plan vorlegen, der beschreibt, wie wir die restlichen Endpunkte und Client-Funktionen erstellen und wie die `supplierbrowser/+page.svelte` angepasst werden muss, um diese neue, proaktive Ladelogik über alle fünf Ebenen hinweg umzusetzen.
 
-2.  **Refactor Server Endpoints (`/routes/api/`)**:
-    -   **Restructure `/api/suppliers/`**: Implement the full CRUD lifecycle according to the table (`+server.ts` for list query, `[id]/+server.ts` for GET/PUT/DELETE, and `POST` on `/new` for create).
-    -   **Create `/api/query/+server.ts`**: Implement the new generic query endpoint.
-    -   **Refactor all endpoints** to use the correct `Api...Response` types, return structured JSON for handled errors, and implement comprehensive logging.
+**Ich werde keinen Code generieren, bis Sie diesen Plan geprüft und Ihr explizites `OK` gegeben haben.**
 
-3.  **Refactor API Clients (`/lib/api/client/`)**:
-    -   Create a new `createSupplier` function that calls `POST /api/suppliers/new`.
-    -   Update `loadSuppliers` to call `POST /api/suppliers`.
-    -   Update `loadSupplier` to call `GET /api/suppliers/[id]`.
-    -   Update `loadSupplierCategories` to call the new `/api/query` endpoint.
-    -   Update `deleteSupplier` to use `apiFetchUnion`.
+---
 
-4.  **Refactor the UI (`/routes/supplierbrowser/+page.svelte`)**:
-    -   Update all event handlers to call the new client functions.
-    -   Implement `try/catch` blocks for data loading to handle `ApiError` exceptions.
-    -   Implement type guard logic (`if (isDeleteConflict(response))`) for delete operations to handle the cascade workflow.
+# Detaillierter Plan zur Fertigstellung der Architektur
+
+## Das Gesamtkonzept: Proaktives Laden von Kontextdaten
+
+Die zentrale Änderung in unserem Vorgehen ist, wie wir das Laden von Daten verstehen. Anstatt nur auf den Klick auf eine neue Ebene zu warten, laden wir die relevanten Daten, sobald der *Kontext* für eine Ebene hergestellt ist.
+
+*   **Kontext "Supplier":** Sobald ein `supplierId` in der URL ist, laden wir **proaktiv** dessen Master-Daten (`SupplierForm`) UND die Liste seiner "zu N"-Beziehungen, die Kategorien (`CategoryGrid`).
+*   **Kontext "Category":** Sobald ein `categoryId` in der URL ist, laden wir **proaktiv** die Liste seiner "zu N"-Beziehungen, die Offerings (`OfferingGrid`).
+*   **Kontext "Offering":** Sobald ein `offeringId` in der URL ist, laden wir **proaktiv** dessen Master-Daten (`OfferingForm`) UND die Listen seiner "zu N"-Beziehungen, die Attributes und Links (`AttributeGrid`, `LinkGrid`).
+
+Dies führt zu einer Kaskade von Lade-Effekten, die perfekt mit Svelte 5 Runes abgebildet werden kann.
+
+---
+
+## Schritt 1: Level 3 (Offerings) implementieren
+
+Offerings sind "Real Objects" und folgen dem Muster der Suppliers.
+
+### A. Backend: Server-Endpunkte (`/routes/api/`)
+
+1.  **Neue Endpunkte für Offerings erstellen:**
+    *   `src/routes/api/offerings/new/+server.ts` (`POST`): Erstellt ein neues Offering in `dbo.wholesaler_item_offerings`. Nutzt `validateOffering` zur Validierung.
+    *   `src/routes/api/offerings/[id]/+server.ts` (`GET`, `PUT`, `DELETE`):
+        *   `GET`: Lädt die Master-Daten eines einzelnen Offerings.
+        *   `PUT`: Aktualisiert ein Offering nach `validateOffering`.
+        *   `DELETE`: Löscht ein Offering und prüft vorher auf Abhängigkeiten zu Attributes und Links (`checkOfferingDependencies`). Implementiert die Kaskadierungslogik.
+
+2.  **`queryConfig.ts` erweitern:**
+    *   Eine neue `PredefinedQueryConfig` namens `'category_offerings'` hinzufügen. Diese Query führt einen `JOIN` zwischen `dbo.wholesaler_item_offerings` und `dbo.product_definitions` durch, um die Angebotsdaten mit den Produkttiteln anzureichern.
+
+### B. API-Client: Eine neue Datei für Offerings
+
+Um die Trennung der Zuständigkeiten sauber zu halten, erstellen wir eine neue Client-Datei.
+
+1.  **Neue Datei erstellen: `src/lib/api/client/offering.ts`**
+2.  **Folgende Funktionen implementieren:**
+    *   `loadOfferingsForCategory(supplierId: number, categoryId: number): Promise<OfferingWithDetails[]>`: Ruft `/api/query` mit `namedQuery: 'category_offerings'` und den entsprechenden `where`-Bedingungen auf.
+    *   `loadOffering(offeringId: number): Promise<OfferingWithDetails>`: Ruft `GET /api/offerings/[id]` auf.
+    *   `createOffering(data: ...)`: Ruft `POST /api/offerings/new` auf.
+    *   `updateOffering(id: number, data: ...)`: Ruft `PUT /api/offerings/[id]` auf.
+    *   `deleteOffering(id: number, cascade: boolean)`: Ruft `DELETE /api/offerings/[id]` auf und nutzt `apiFetchUnion`.
+
+### C. Frontend: Anpassung von `supplierbrowser/+page.svelte`
+
+1.  **Imports:** Die neuen Funktionen aus `offering.ts` importieren.
+2.  **State:** Neue `$state`-Variablen für Offerings hinzufügen.
+    ```typescript
+    let offerings = $state<OfferingWithDetails[]>([]);
+    let loadingOfferings = $state(false);
+    ```
+3.  **Daten laden:**
+    *   Eine neue `async function fetchOfferingsForCategory(supplierId: number, categoryId: number)` erstellen. Diese Funktion ruft `loadOfferingsForCategory` aus dem neuen Client auf und füllt den `$state`. Sie wird mit `try/catch` und Loading-Flags versehen.
+    *   Einen neuen `$effect` erstellen, der auf Änderungen von `selectedCategoryId` reagiert und `fetchOfferingsForCategory` aufruft.
+4.  **UI & Events:**
+    *   Den `{#if currentLevel === 'offerings'}`-Block anpassen, um das `OfferingGrid` mit den echten `offerings`-Daten und dem `loadingOfferings`-Status zu füttern (Mock-Daten werden entfernt).
+    *   Einen neuen Handler `handleOfferingSelect` erstellen, der die URL aktualisiert (`level=attributes`, `offeringId=...`).
+    *   Einen neuen Handler `handleOfferingDelete` implementieren, der den `isDeleteConflict`-Workflow für Offerings abbildet.
+
+---
+
+## Schritt 2: Level 4 & 5 (Attributes & Links) implementieren
+
+Attributes sind "Assignments" (wie Categories), Links sind "Real Objects" (wie Offerings). Beide gehören zum Kontext eines Offerings und werden gemäß dem neuen Prinzip **zusammen** geladen.
+
+### A. Backend: Server-Endpunkte
+
+1.  **Neue Endpunkte für Attribute (Assignment):**
+    *   `src/routes/api/offering-attributes/+server.ts` (`POST`, `DELETE`): Eine Kopie der Logik von `supplier-categories`, aber für die Tabelle `dbo.wholesaler_offering_attributes`.
+2.  **Neue Endpunkte für Links (Real Object):**
+    *   `src/routes/api/links/new/+server.ts` (`POST`): Erstellt einen neuen Link.
+    *   `src/routes/api/links/[id]/+server.ts` (`GET`, `PUT`, `DELETE`): Verwaltet einzelne Links.
+3.  **`queryConfig.ts` erweitern:**
+    *   Neue `PredefinedQueryConfig` `'offering_attributes'` (JOIN mit `dbo.attributes`).
+    *   Neue `PredefinedQueryConfig` `'offering_links'` (einfaches SELECT auf `dbo.wholesaler_offering_links`, gefiltert nach `offering_id`).
+
+### B. API-Client: Erweiterung von `offering.ts`
+
+Die bestehende `offering.ts` wird erweitert, da diese Operationen im Kontext eines Offerings stattfinden.
+
+1.  **Folgende Funktionen hinzufügen:**
+    *   `loadAttributesForOffering(offeringId: number)`
+    *   `assignAttributeToOffering(data: ...)`
+    *   `removeAttributeFromOffering(data: ...)`
+    *   `loadLinksForOffering(offeringId: number)`
+    *   `createLink(data: ...)`
+    *   `updateLink(id: number, data: ...)`
+    *   `deleteLink(id: number)`
+
+### C. Frontend: Finale Anpassung von `supplierbrowser/+page.svelte`
+
+1.  **Imports:** Die neuen Funktionen aus `offering.ts` importieren.
+2.  **State:**
+    *   Neue `$state`-Variablen: `let attributes = $state<...>`, `let links = $state<...>`, `let loadingDetailsForOffering = $state(false)`.
+    *   Einen neuen `$derived`-State: `const selectedOfferingId = $derived(...)`.
+3.  **Daten laden (gemäß neuem Prinzip):**
+    *   Eine neue `async function fetchDetailsForOffering(offeringId: number)` erstellen.
+    *   Diese Funktion nutzt `Promise.all` um **gleichzeitig** die Master-Daten des Offerings, die Liste der Attribute und die Liste der Links zu laden:
+        ```typescript
+        const [offeringDetails, attributes, links] = await Promise.all([
+            loadOffering(offeringId),
+            loadAttributesForOffering(offeringId),
+            loadLinksForOffering(offeringId)
+        ]);
+        ```
+    *   Einen neuen `$effect` erstellen, der auf `selectedOfferingId` reagiert und `fetchDetailsForOffering` aufruft.
+4.  **UI & Events:**
+    *   Ein `{#if currentLevel === 'attributes' || currentLevel === 'links'}`-Block wird erstellt. Dieser Block wird die Master-Daten des ausgewählten Offerings in einem `OfferingForm` anzeigen, darunter dann das `AttributeGrid` und das `LinkGrid`.
+    *   Die entsprechenden `handle...`-Funktionen für das Zuweisen/Entfernen von Attributen und das Erstellen/Löschen von Links werden implementiert.
+
+
+

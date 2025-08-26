@@ -17,7 +17,7 @@ START_DIR = Path(__file__).parent.parent.resolve()
 #OUTPUT_FILE = START_DIR / "generate_files" / "generated" / "all_classes_bundle.txt"
 OUTPUT_FILE = Path(__file__).parent.resolve()  / "generated" / "bundle.txt"
 # Dateiendungen, die gesammelt werden sollen
-EXTENSIONS = ['.cs', '.ts', '.html', '.json', '.yaml', '.yml', '.css', '.md', '.json', '.old', '.svelte', '.js', '.txt', '.scss', '.cjs', '.mjs']
+EXTENSIONS = ['.cs', '.ts', '.html', '.json', '.yaml', '.yml', '.css', '.md', '.json', '.svelte', '.js', '.txt', '.scss', '.cjs', '.mjs']
 # Verzeichnisnamen (oder Pfadteile), die ausgeschlossen werden sollen
 EXCLUDE_DIRS = [
     'bin', 'obj', '.git', 'Tests', '.venv', 'output', '.svelte-kit', '.venv'

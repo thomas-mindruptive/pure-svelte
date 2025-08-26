@@ -72,7 +72,7 @@ export interface SortDescriptor<T> {
  * impossible to specify an invalid key like `'color'`, providing compile-time safety.
  */
 export interface QueryPayload<T> {
-	select: (keyof T)[]; 
+	select: Array<keyof T | AllQualifiedColumns | AllAliasedColumns>; 
 	from?: string;
 	joins?: JoinClause[];
 	where?: ConditionGroup<T>;

@@ -12,7 +12,7 @@ import { json, error, type RequestHandler } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { log } from '$lib/utils/logger';
 import { mssqlErrorMapper } from '$lib/server/errors/mssqlErrorMapper';
-import type { WholesalerOfferingAttribute } from '$lib/domain/types';
+import type { Attribute, WholesalerItemOffering, WholesalerOfferingAttribute } from '$lib/domain/types';
 import { v4 as uuidv4 } from 'uuid';
 
 import type {
@@ -32,7 +32,7 @@ export const POST: RequestHandler = async ({ request }) => {
     log.info(`[${operationId}] POST /offering-attributes: FN_START`);
 
     try {
-        const body = (await request.json()) as AssignmentRequest<number, number> & { value?: string };
+        const body = (await request.json()) as AssignmentRequest<WholesalerItemOffering, Attribute, { value?: string } >;
         const { parentId: offeringId, childId: attributeId, value } = body;
         log.info(`[${operationId}] Parsed request body`, { offeringId, attributeId, value });
 

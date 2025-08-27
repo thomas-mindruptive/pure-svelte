@@ -8,14 +8,7 @@
  */
 
 import type { QueryPayload } from '$lib/clientAndBack/queryGrammar';
-import type {
-    Wholesaler,
-    ProductCategory,
-    WholesalerCategory,
-    WholesalerItemOffering,
-    WholesalerOfferingAttribute,
-    WholesalerOfferingLink
-} from '$lib/domain/types';
+
 
 // ===== BASE RESPONSE ENVELOPES =====
 
@@ -79,7 +72,11 @@ export interface PredefinedQueryRequest {
  * Request envelope for creating a new entity. The body is the entity data itself.
  * For a `Wholesaler`, `T` would be `Partial<Omit<Wholesaler, 'wholesaler_id'>>`.
  */
-export type CreateRequest<T> = T;
+//export type CreateRequest<T> = T;
+export type CreateRequest<TParent, TMetadata = object> = {
+  id: TParent[IdField<TParent>];
+} & TMetadata;
+
 
 /**
  * Request envelope for updating an existing entity.
@@ -91,78 +88,78 @@ export interface UpdateRequest<TId, TData> {
 
 // ===== TYPE-SAFE RELATIONSHIP REQUESTS =====
 
-/**
- * Type-safe assignment request for supplier-categories relationship
- */
-export interface SupplierCategoryAssignmentRequest {
-    parentId: Wholesaler['wholesaler_id'];      // Type-safe: must be number
-    childId: ProductCategory['category_id'];    // Type-safe: must be number
-    comment?: WholesalerCategory['comment'];    // Type-safe: optional string
-    link?: WholesalerCategory['link'];          // Type-safe: optional string
-}
+// /**
+//  * Type-safe assignment request for supplier-categories relationship
+//  */
+// export interface SupplierCategoryAssignmentRequest {
+//     parentId: Wholesaler['wholesaler_id'];      // Type-safe: must be number
+//     childId: ProductCategory['category_id'];    // Type-safe: must be number
+//     comment?: WholesalerCategory['comment'];    // Type-safe: optional string
+//     link?: WholesalerCategory['link'];          // Type-safe: optional string
+// }
 
-/**
- * Type-safe assignment request for offering-attributes relationship
- */
-export interface OfferingAttributeAssignmentRequest {
-    parentId: WholesalerItemOffering['offering_id'];           // Type-safe: offering_id
-    childId: WholesalerOfferingAttribute['attribute_id'];      // Type-safe: attribute_id
-    value?: WholesalerOfferingAttribute['value'];              // Type-safe: optional string
-}
+// /**
+//  * Type-safe assignment request for offering-attributes relationship
+//  */
+// export interface OfferingAttributeAssignmentRequest {
+//     parentId: WholesalerItemOffering['offering_id'];           // Type-safe: offering_id
+//     childId: WholesalerOfferingAttribute['attribute_id'];      // Type-safe: attribute_id
+//     value?: WholesalerOfferingAttribute['value'];              // Type-safe: optional string
+// }
 
-/**
- * Type-safe creation request for offering links
- */
-export interface OfferingLinkCreateRequest {
-    offering_id: WholesalerOfferingLink['offering_id'];  // Type-safe: number
-    url: WholesalerOfferingLink['url'];                  // Type-safe: string (required)
-    notes?: WholesalerOfferingLink['notes'];             // Type-safe: optional string
-}
+// /**
+//  * Type-safe creation request for offering links
+//  */
+// export interface OfferingLinkCreateRequest {
+//     offering_id: WholesalerOfferingLink['offering_id'];  // Type-safe: number
+//     url: WholesalerOfferingLink['url'];                  // Type-safe: string (required)
+//     notes?: WholesalerOfferingLink['notes'];             // Type-safe: optional string
+// }
 
-/**
- * Type-safe update request for offering links
- */
-export interface OfferingLinkUpdateRequest {
-    link_id: WholesalerOfferingLink['link_id'];          // Type-safe: number (required for updates)
-    offering_id?: WholesalerOfferingLink['offering_id']; // Type-safe: optional number
-    url?: WholesalerOfferingLink['url'];                 // Type-safe: optional string
-    notes?: WholesalerOfferingLink['notes'];             // Type-safe: optional string
-}
+// /**
+//  * Type-safe update request for offering links
+//  */
+// export interface OfferingLinkUpdateRequest {
+//     link_id: WholesalerOfferingLink['link_id'];          // Type-safe: number (required for updates)
+//     offering_id?: WholesalerOfferingLink['offering_id']; // Type-safe: optional number
+//     url?: WholesalerOfferingLink['url'];                 // Type-safe: optional string
+//     notes?: WholesalerOfferingLink['notes'];             // Type-safe: optional string
+// }
 
-/**
- * Type-safe removal request for supplier-categories relationship
- */
-export interface SupplierCategoryRemovalRequest {
-    parentId: Wholesaler['wholesaler_id'];      // Type-safe: must be number
-    childId: ProductCategory['category_id'];    // Type-safe: must be number
-    cascade?: boolean;                          // Optional cascade flag
-}
+// /**
+//  * Type-safe removal request for supplier-categories relationship
+//  */
+// export interface SupplierCategoryRemovalRequest {
+//     parentId: Wholesaler['wholesaler_id'];      // Type-safe: must be number
+//     childId: ProductCategory['category_id'];    // Type-safe: must be number
+//     cascade?: boolean;                          // Optional cascade flag
+// }
 
-/**
- * Type-safe removal request for offering-attributes relationship
- */
-export interface OfferingAttributeRemovalRequest {
-    parentId: WholesalerItemOffering['offering_id'];      // Type-safe: offering_id
-    childId: WholesalerOfferingAttribute['attribute_id']; // Type-safe: attribute_id
-    cascade?: boolean;                                    // Optional cascade flag
-}
+// /**
+//  * Type-safe removal request for offering-attributes relationship
+//  */
+// export interface OfferingAttributeRemovalRequest {
+//     parentId: WholesalerItemOffering['offering_id'];      // Type-safe: offering_id
+//     childId: WholesalerOfferingAttribute['attribute_id']; // Type-safe: attribute_id
+//     cascade?: boolean;                                    // Optional cascade flag
+// }
 
-/**
- * Type-safe removal request for offering links
- */
-export interface OfferingLinkRemovalRequest {
-    link_id: WholesalerOfferingLink['link_id'];  // Type-safe: number
-    cascade?: boolean;                           // Optional cascade flag
-}
+// /**
+//  * Type-safe removal request for offering links
+//  */
+// export interface OfferingLinkRemovalRequest {
+//     link_id: WholesalerOfferingLink['link_id'];  // Type-safe: number
+//     cascade?: boolean;                           // Optional cascade flag
+// }
 
-/**
- * Type-safe update request for offering-attribute value
- */
-export interface OfferingAttributeUpdateRequest {
-    parentId: WholesalerItemOffering['offering_id'];      // Type-safe: offering_id
-    childId: WholesalerOfferingAttribute['attribute_id']; // Type-safe: attribute_id
-    value?: WholesalerOfferingAttribute['value'];         // Type-safe: optional string
-}
+// /**
+//  * Type-safe update request for offering-attribute value
+//  */
+// export interface OfferingAttributeUpdateRequest {
+//     parentId: WholesalerItemOffering['offering_id'];      // Type-safe: offering_id
+//     childId: WholesalerOfferingAttribute['attribute_id']; // Type-safe: attribute_id
+//     value?: WholesalerOfferingAttribute['value'];         // Type-safe: optional string
+// }
 
 // ===== GENERIC RESPONSE PATTERNS =====
 
@@ -220,26 +217,50 @@ export type DeleteApiResponse<TDeletedResource, TDependencies> =
     DeleteConflictResponse<TDependencies> |
     ApiErrorResponse;
 
-// ===== DEPRECATED - Legacy Generic Types (Remove after client updates) =====
+// ===== Generic Types =====
 
-/**
- * @deprecated Use specific typed request interfaces instead
- */
-export interface AssignmentRequest<TParentId, TChildId> {
-    parentId: TParentId; 
-    childId: TChildId; 
-    comment?: string; 
-    link?: string;
+// Generic system that derives ID fields at compile time.
+type IdField<T> = Extract<keyof T, `${string}_id`>;
+
+export type AssignmentRequest<TParent, TChild, TMetadata = object> = {
+  parentId: TParent[IdField<TParent>];
+  childId: TChild[IdField<TChild>];
+} & TMetadata;
+
+export type AssignmentUpdateRequest<TParent, TChild, TMetadata = object> = {
+  parentId: TParent[IdField<TParent>];
+  childId: TChild[IdField<TChild>];
+} & TMetadata;
+
+export type RemoveAssignmentRequest<TParent, TChild> = {
+  parentId: TParent[IdField<TParent>];
+  childId: TChild[IdField<TChild>];
+  cascade?: boolean;
 }
 
-/**
- * @deprecated Use specific typed request interfaces instead
- */
-export interface RemoveAssignmentRequest<TParentId, TChildId> {
-    parentId: TParentId; 
-    childId: TChildId; 
-    cascade?: boolean;
-}
+export type DeleteRequest<T> = {
+  id: T[IdField<T>];
+  cascade?: boolean;
+};
+
+// /**
+//  * @deprecated Use specific typed request interfaces instead
+//  */
+// export interface AssignmentRequest<TParentId, TChildId> {
+//     parentId: TParentId; 
+//     childId: TChildId; 
+//     comment?: string; 
+//     link?: string;
+// }
+
+// /**
+//  * @deprecated Use specific typed request interfaces instead
+//  */
+// export interface RemoveAssignmentRequest<TParentId, TChildId> {
+//     parentId: TParentId; 
+//     childId: TChildId; 
+//     cascade?: boolean;
+// }
 
 // ===== GENERIC TYPE GUARDS =====
 

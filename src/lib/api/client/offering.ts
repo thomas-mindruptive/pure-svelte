@@ -13,10 +13,10 @@
 import { apiFetch, apiFetchUnion, createPostBody, createQueryBody, getErrorMessage, LoadingState } from './common';
 import { log } from '$lib/utils/logger';
 import { ComparisonOperator, LogicalOperator, type QueryPayload } from '$lib/clientAndBack/queryGrammar';
-import type { 
+import type {
     WholesalerItemOffering,
     WholesalerItemOffering_ProductDef_Category,
-    WholesalerOfferingAttribute, 
+    WholesalerOfferingAttribute,
     WholesalerOfferingAttribute_Attribute,
     WholesalerOfferingLink,
     Attribute
@@ -27,12 +27,12 @@ import type {
     DeleteApiResponse,
     PredefinedQueryRequest,
     QueryResponseData,
-    OfferingAttributeAssignmentRequest,
-    OfferingAttributeUpdateRequest,
-    OfferingAttributeRemovalRequest,
-    OfferingLinkCreateRequest,
-    OfferingLinkRemovalRequest,
-    AssignmentSuccessData
+    AssignmentSuccessData,
+    AssignmentRequest,
+    AssignmentUpdateRequest,
+    RemoveAssignmentRequest,
+    CreateRequest,
+    DeleteRequest
 } from '$lib/api/types/common';
 
 // A dedicated loading state manager for all offering-related operations.
@@ -98,7 +98,7 @@ export async function loadOfferingAttributes(offeringId: number): Promise<Attrib
             payload: {
                 select: [
                     'woa.offering_id',
-                    'woa.attribute_id', 
+                    'woa.attribute_id',
                     'woa.value',
                     'a.name AS attribute_name',
                     'a.description AS attribute_description'
@@ -116,17 +116,17 @@ export async function loadOfferingAttributes(offeringId: number): Promise<Attrib
             { method: 'POST', body: createPostBody(request) },
             { context: operationId }
         );
-        
-        log.info(`[${operationId}] Successfully loaded offering attributes.`, { 
-            offeringId, 
-            count: responseData.results.length 
+
+        log.info(`[${operationId}] Successfully loaded offering attributes.`, {
+            offeringId,
+            count: responseData.results.length
         });
-        
+
         return responseData.results as AttributeWithDetails[];
     } catch (err) {
-        log.error(`[${operationId}] Failed to load offering attributes.`, { 
-            offeringId, 
-            error: getErrorMessage(err) 
+        log.error(`[${operationId}] Failed to load offering attributes.`, {
+            offeringId,
+            error: getErrorMessage(err)
         });
         throw err;
     } finally {
@@ -155,15 +155,15 @@ export async function loadAvailableAttributes(): Promise<Attribute[]> {
             { method: 'POST', body: createQueryBody(query) },
             { context: operationId }
         );
-        
-        log.info(`[${operationId}] Successfully loaded available attributes.`, { 
-            count: responseData.results.length 
+
+        log.info(`[${operationId}] Successfully loaded available attributes.`, {
+            count: responseData.results.length
         });
-        
+
         return responseData.results as Attribute[];
     } catch (err) {
-        log.error(`[${operationId}] Failed to load available attributes.`, { 
-            error: getErrorMessage(err) 
+        log.error(`[${operationId}] Failed to load available attributes.`, {
+            error: getErrorMessage(err)
         });
         throw err;
     } finally {
@@ -187,22 +187,22 @@ export async function getAvailableAttributesForOffering(offeringId: number): Pro
             loadAvailableAttributes(),
             loadOfferingAttributes(offeringId)
         ]);
-        
+
         const assignedIds = new Set(assignedAttributes.map(a => a.attribute_id));
         const availableAttributes = allAttributes.filter(attr => !assignedIds.has(attr.attribute_id));
-        
-        log.info(`[${operationId}] Successfully calculated available attributes.`, { 
+
+        log.info(`[${operationId}] Successfully calculated available attributes.`, {
             offeringId,
             total: allAttributes.length,
             assigned: assignedAttributes.length,
-            available: availableAttributes.length 
+            available: availableAttributes.length
         });
-        
+
         return availableAttributes;
     } catch (err) {
-        log.error(`[${operationId}] Failed to get available attributes for offering.`, { 
-            offeringId, 
-            error: getErrorMessage(err) 
+        log.error(`[${operationId}] Failed to get available attributes for offering.`, {
+            offeringId,
+            error: getErrorMessage(err)
         });
         throw err;
     } finally {
@@ -229,29 +229,29 @@ export async function createOfferingAttribute(
     offeringLoadingState.start(operationId);
     try {
         // Use type-safe assignment request
-        const requestBody: OfferingAttributeAssignmentRequest = {
+        const requestBody: AssignmentRequest<WholesalerItemOffering, Attribute, { value?: string }> = {
             parentId: assignmentData.offering_id,
             childId: assignmentData.attribute_id,
-            value: assignmentData.value
-        };
+            ...(assignmentData.value !== undefined && { value: assignmentData.value })
+        }
 
         const responseData = await apiFetch<AssignmentSuccessData<WholesalerOfferingAttribute>>(
             '/api/offering-attributes',
             { method: 'POST', body: createPostBody(requestBody) },
             { context: operationId }
         );
-        
-        log.info(`[${operationId}] Successfully created offering attribute assignment.`, { 
+
+        log.info(`[${operationId}] Successfully created offering attribute assignment.`, {
             offeringId: assignmentData.offering_id,
             attributeId: assignmentData.attribute_id,
             value: assignmentData.value
         });
-        
+
         return responseData.assignment;
     } catch (err) {
-        log.error(`[${operationId}] Failed to create offering attribute assignment.`, { 
-            assignmentData, 
-            error: getErrorMessage(err) 
+        log.error(`[${operationId}] Failed to create offering attribute assignment.`, {
+            assignmentData,
+            error: getErrorMessage(err)
         });
         throw err;
     } finally {
@@ -269,18 +269,18 @@ export async function createOfferingAttribute(
  * @throws {ApiError} If validation fails or another error occurs.
  */
 export async function updateOfferingAttribute(
-    offeringId: number, 
-    attributeId: number, 
+    offeringId: number,
+    attributeId: number,
     updates: { value?: string }
 ): Promise<WholesalerOfferingAttribute> {
     const operationId = `updateOfferingAttribute-${offeringId}-${attributeId}`;
     offeringLoadingState.start(operationId);
     try {
         // Use type-safe update request
-        const requestBody: OfferingAttributeUpdateRequest = {
+        const requestBody: AssignmentUpdateRequest<WholesalerItemOffering, Attribute, { value?: string }> = {
             parentId: offeringId,
             childId: attributeId,
-            value: updates.value
+            ...(updates.value !== undefined && { value: updates.value })
         };
 
         const responseData = await apiFetch<AssignmentSuccessData<WholesalerOfferingAttribute>>(
@@ -288,20 +288,20 @@ export async function updateOfferingAttribute(
             { method: 'PUT', body: createPostBody(requestBody) },
             { context: operationId }
         );
-        
-        log.info(`[${operationId}] Successfully updated offering attribute assignment.`, { 
+
+        log.info(`[${operationId}] Successfully updated offering attribute assignment.`, {
             offeringId,
             attributeId,
             updatedFields: Object.keys(updates)
         });
-        
+
         return responseData.assignment;
     } catch (err) {
-        log.error(`[${operationId}] Failed to update offering attribute assignment.`, { 
+        log.error(`[${operationId}] Failed to update offering attribute assignment.`, {
             offeringId,
-            attributeId, 
-            updates, 
-            error: getErrorMessage(err) 
+            attributeId,
+            updates,
+            error: getErrorMessage(err)
         });
         throw err;
     } finally {
@@ -327,7 +327,7 @@ export async function deleteOfferingAttribute(
     offeringLoadingState.start(operationId);
     try {
         // Use type-safe removal request
-        const requestBody: OfferingAttributeRemovalRequest = {
+        const requestBody: RemoveAssignmentRequest<WholesalerItemOffering, Attribute> = {
             parentId: offeringId,
             childId: attributeId,
             cascade
@@ -338,28 +338,28 @@ export async function deleteOfferingAttribute(
             { method: 'DELETE', body: createPostBody(requestBody) },
             { context: operationId }
         );
-        
+
         if (result.success) {
-            log.info(`[${operationId}] Successfully deleted offering attribute assignment.`, { 
-                offeringId,
-                attributeId, 
-                cascade 
-            });
-        } else if ('cascade_available' in result) {
-            log.warn(`[${operationId}] Attribute assignment deletion blocked by dependencies.`, { 
+            log.info(`[${operationId}] Successfully deleted offering attribute assignment.`, {
                 offeringId,
                 attributeId,
-                dependencies: result.dependencies 
+                cascade
+            });
+        } else if ('cascade_available' in result) {
+            log.warn(`[${operationId}] Attribute assignment deletion blocked by dependencies.`, {
+                offeringId,
+                attributeId,
+                dependencies: result.dependencies
             });
         }
-        
+
         return result;
     } catch (err) {
-        log.error(`[${operationId}] Failed to delete offering attribute assignment.`, { 
+        log.error(`[${operationId}] Failed to delete offering attribute assignment.`, {
             offeringId,
-            attributeId, 
-            cascade, 
-            error: getErrorMessage(err) 
+            attributeId,
+            cascade,
+            error: getErrorMessage(err)
         });
         throw err;
     } finally {
@@ -387,7 +387,7 @@ export async function loadOfferingLinks(offeringId: number): Promise<WholesalerO
                 select: [
                     'wol.link_id',
                     'wol.offering_id',
-                    'wol.url', 
+                    'wol.url',
                     'wol.notes',
                     'wol.created_at'
                 ],
@@ -404,17 +404,17 @@ export async function loadOfferingLinks(offeringId: number): Promise<WholesalerO
             { method: 'POST', body: createPostBody(request) },
             { context: operationId }
         );
-        
-        log.info(`[${operationId}] Successfully loaded offering links.`, { 
-            offeringId, 
-            count: responseData.results.length 
+
+        log.info(`[${operationId}] Successfully loaded offering links.`, {
+            offeringId,
+            count: responseData.results.length
         });
-        
+
         return responseData.results as WholesalerOfferingLink[];
     } catch (err) {
-        log.error(`[${operationId}] Failed to load offering links.`, { 
-            offeringId, 
-            error: getErrorMessage(err) 
+        log.error(`[${operationId}] Failed to load offering links.`, {
+            offeringId,
+            error: getErrorMessage(err)
         });
         throw err;
     } finally {
@@ -440,10 +440,10 @@ export async function createOfferingLink(
     offeringLoadingState.start(operationId);
     try {
         // Use type-safe create request
-        const requestBody: OfferingLinkCreateRequest = {
-            offering_id: linkData.offering_id,
-            url: linkData.url,
-            notes: linkData.notes
+        const requestBody: CreateRequest<WholesalerItemOffering, { url: string; notes?: string }> = {
+            id: linkData.offering_id,  // Parent-ID
+            url: linkData.url,         // Link-Daten
+            ...(linkData.notes !== undefined && { notes: linkData.notes })
         };
 
         const responseData = await apiFetch<{ link: WholesalerOfferingLink }>(
@@ -451,18 +451,18 @@ export async function createOfferingLink(
             { method: 'POST', body: createPostBody(requestBody) },
             { context: operationId }
         );
-        
-        log.info(`[${operationId}] Successfully created offering link.`, { 
+
+        log.info(`[${operationId}] Successfully created offering link.`, {
             linkId: responseData.link.link_id,
             offeringId: responseData.link.offering_id,
             url: responseData.link.url
         });
-        
+
         return responseData.link;
     } catch (err) {
-        log.error(`[${operationId}] Failed to create offering link.`, { 
-            linkData, 
-            error: getErrorMessage(err) 
+        log.error(`[${operationId}] Failed to create offering link.`, {
+            linkData,
+            error: getErrorMessage(err)
         });
         throw err;
     } finally {
@@ -479,7 +479,7 @@ export async function createOfferingLink(
  * @throws {ApiError} If validation fails or another error occurs.
  */
 export async function updateOfferingLink(
-    linkId: number, 
+    linkId: number,
     updates: {
         offering_id?: number;
         url?: string;
@@ -489,24 +489,24 @@ export async function updateOfferingLink(
     const operationId = `updateOfferingLink-${linkId}`;
     offeringLoadingState.start(operationId);
     try {
-        const rb = {link_id: linkId, ...updates}
+        const rb = { link_id: linkId, ...updates }
         const responseData = await apiFetch<{ link: WholesalerOfferingLink }>(
             `/api/offering-links`,
             { method: 'PUT', body: createPostBody(rb) },
             { context: operationId }
         );
-        
-        log.info(`[${operationId}] Successfully updated offering link.`, { 
+
+        log.info(`[${operationId}] Successfully updated offering link.`, {
             linkId,
             updatedFields: Object.keys(updates)
         });
-        
+
         return responseData.link;
     } catch (err) {
-        log.error(`[${operationId}] Failed to update offering link.`, { 
-            linkId, 
-            updates, 
-            error: getErrorMessage(err) 
+        log.error(`[${operationId}] Failed to update offering link.`, {
+            linkId,
+            updates,
+            error: getErrorMessage(err)
         });
         throw err;
     } finally {
@@ -530,8 +530,8 @@ export async function deleteOfferingLink(
     offeringLoadingState.start(operationId);
     try {
         // Use type-safe removal request
-        const requestBody: OfferingLinkRemovalRequest = {
-            link_id: linkId,
+        const requestBody: DeleteRequest<WholesalerOfferingLink> = {
+            id: linkId,
             cascade
         };
 
@@ -540,25 +540,25 @@ export async function deleteOfferingLink(
             { method: 'DELETE', body: createPostBody(requestBody) },
             { context: operationId }
         );
-        
+
         if (result.success) {
-            log.info(`[${operationId}] Successfully deleted offering link.`, { 
-                linkId, 
-                cascade 
+            log.info(`[${operationId}] Successfully deleted offering link.`, {
+                linkId,
+                cascade
             });
         } else if ('cascade_available' in result) {
-            log.warn(`[${operationId}] Link deletion blocked by dependencies.`, { 
+            log.warn(`[${operationId}] Link deletion blocked by dependencies.`, {
                 linkId,
-                dependencies: result.dependencies 
+                dependencies: result.dependencies
             });
         }
-        
+
         return result;
     } catch (err) {
-        log.error(`[${operationId}] Failed to delete offering link.`, { 
-            linkId, 
-            cascade, 
-            error: getErrorMessage(err) 
+        log.error(`[${operationId}] Failed to delete offering link.`, {
+            linkId,
+            cascade,
+            error: getErrorMessage(err)
         });
         throw err;
     } finally {
@@ -585,12 +585,12 @@ export function parseAttributeCompositeId(compositeId: string): { offeringId: nu
         const [offeringIdStr, attributeIdStr] = compositeId.split('-');
         const offeringId = Number(offeringIdStr);
         const attributeId = Number(attributeIdStr);
-        
+
         if (isNaN(offeringId) || isNaN(attributeId)) {
             log.warn('Failed to parse attribute composite ID: invalid numbers', { compositeId });
             return null;
         }
-        
+
         return { offeringId, attributeId };
     } catch (error) {
         log.error('Failed to parse attribute composite ID', { compositeId, error: getErrorMessage(error) });

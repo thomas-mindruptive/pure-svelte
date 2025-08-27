@@ -19,13 +19,6 @@ export enum JoinType { INNER = 'INNER JOIN', LEFT = 'LEFT JOIN', RIGHT = 'RIGHT 
 
 // --- Base Interface for Joins ---
 
-export interface JoinClause_old {
-	type: JoinType;
-	table: string;
-	alias?: string;
-	on: string;
-}
-
 export interface JoinClause {
 	type: JoinType;
 	table: string;
@@ -71,19 +64,6 @@ export interface SortDescriptor<T> {
 	direction: 'asc' | 'desc';
 }
 
-// // Für WHERE-Klauseln (Column = Value, oder Column = Column)
-// export interface WhereCondition<T> {
-// 	key: keyof T & string | AllQualifiedColumns | AllAliasedColumns
-// 	op: ComparisonOperator;
-// 	val?: unknown | unknown[];
-// }
-
-// export interface WhereConditionGroup<T> {
-// 	op: LogicalOperator;
-// 	conditions: (WhereCondition<T> | WhereConditionGroup<T>)[]; // Hier wird die Generik angewendet
-// }
-
-
 /**
  * A strictly generic payload. Using this with `QueryPayload<Wholesaler>` makes it
  * impossible to specify an invalid key like `'color'`, providing compile-time safety.
@@ -97,21 +77,3 @@ export interface QueryPayload<T> {
 	limit?: number;
 	offset?: number;
 }
-
-
-// --- STRUCTURE 2: For Flexible Predefined JOIN Queries ---
-
-/**
- * A flexible payload for predefined JOIN queries. This is used when the `select`
- * and `where` clauses need to reference aliased or joined columns. The ultimate
- * security guarantee for these strings comes from the server-side validation against `queryConfig.ts`.
- */
-// export interface JoinQueryPayload {
-// 	from?: string;
-// 	joins?: JoinClause[];
-// 	select: string[];
-// 	where?: JoinConditionGroup;
-// 	orderBy?: JoinSortDescriptor[];
-// 	limit?: number;
-// 	offset?: number;
-// }

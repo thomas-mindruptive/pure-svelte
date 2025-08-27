@@ -17,6 +17,7 @@ export type AliasToEntityMap = {
   woa: Domain.WholesalerOfferingAttribute;
   wol: Domain.WholesalerOfferingLink;
   pd: Domain.ProductDefinition;
+  a: Domain.Attribute;
 };
 
 export type AllQualifiedColumns = {

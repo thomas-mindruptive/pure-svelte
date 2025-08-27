@@ -1,11 +1,11 @@
 // src/lib/api/client/offering.ts
 
 /**
- * @file Offering API Client - COMPOSITION ARCHITECTURE
+ * @file Offering API Client - TYPE-SAFE COMPOSITION ARCHITECTURE
  * @description Provides type-safe client functions for offering-related operations.
  * This handles Level 3 (Offerings) as Kompositions-Manager according to the 
  * Composition-Prinzip, managing all direct offering compositions:
- * - Offering Master CRUD (dbo.wholesaler_item_offerings)
+ * - Offering Entity Load (individual offering details)
  * - Attribute Assignments (dbo.wholesaler_offering_attributes) 
  * - Links (dbo.wholesaler_offering_links)
  */
@@ -22,13 +22,17 @@ import type {
     Attribute
 } from '$lib/domain/types';
 
-// Import generic types from the single source of truth: common.ts
+// Import type-safe request types
 import type {
-    CreateRequest,
     DeleteApiResponse,
     PredefinedQueryRequest,
     QueryResponseData,
-    UpdateRequest
+    OfferingAttributeAssignmentRequest,
+    OfferingAttributeUpdateRequest,
+    OfferingAttributeRemovalRequest,
+    OfferingLinkCreateRequest,
+    OfferingLinkRemovalRequest,
+    AssignmentSuccessData
 } from '$lib/api/types/common';
 
 // A dedicated loading state manager for all offering-related operations.
@@ -37,7 +41,6 @@ export const offeringLoadingState = new LoadingState();
 // Type aliases for better readability
 export type OfferingWithDetails = WholesalerItemOffering_ProductDef_Category;
 export type AttributeWithDetails = WholesalerOfferingAttribute_Attribute;
-export type ID = string | number;
 
 /**
  * The default query payload used when fetching offerings with details.
@@ -48,6 +51,33 @@ export const DEFAULT_OFFERING_QUERY: QueryPayload<WholesalerItemOffering> = {
     limit: 100
 };
 
+// ===== OFFERING ENTITY LOAD =====
+
+/**
+ * Loads a single offering with all its details by ID.
+ * This is direct entity access, not a relationship operation.
+ *
+ * @param offeringId The ID of the offering to fetch.
+ * @returns A promise that resolves to a single offering with details.
+ * @throws {ApiError} If the offering is not found or the API call fails.
+ */
+export async function loadOffering(offeringId: number): Promise<OfferingWithDetails> {
+    const operationId = `loadOffering-${offeringId}`;
+    offeringLoadingState.start(operationId);
+    try {
+        const responseData = await apiFetch<{ offering: OfferingWithDetails }>(
+            `/api/offerings/${offeringId}`,
+            { method: 'GET' },
+            { context: operationId }
+        );
+        return responseData.offering;
+    } catch (err) {
+        log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
+        throw err;
+    } finally {
+        offeringLoadingState.finish(operationId);
+    }
+}
 
 // ===== LEVEL 4: ATTRIBUTE MANAGEMENT (Offering Compositions) =====
 
@@ -181,7 +211,7 @@ export async function getAvailableAttributesForOffering(offeringId: number): Pro
 }
 
 /**
- * Creates a new offering-attribute assignment.
+ * Creates a new offering-attribute assignment using type-safe request.
  * This is a composition relationship managed by offering.ts.
  *
  * @param assignmentData The data for the new assignment.
@@ -189,18 +219,25 @@ export async function getAvailableAttributesForOffering(offeringId: number): Pro
  * @throws {ApiError} If validation fails or another server error occurs.
  */
 export async function createOfferingAttribute(
-    assignmentData: CreateRequest<{
+    assignmentData: {
         offering_id: number;
         attribute_id: number;
         value?: string;
-    }>
+    }
 ): Promise<WholesalerOfferingAttribute> {
     const operationId = 'createOfferingAttribute';
     offeringLoadingState.start(operationId);
     try {
-        const responseData = await apiFetch<{ assignment: WholesalerOfferingAttribute }>(
-            '/api/offering-attributes/new',
-            { method: 'POST', body: createPostBody(assignmentData) },
+        // Use type-safe assignment request
+        const requestBody: OfferingAttributeAssignmentRequest = {
+            parentId: assignmentData.offering_id,
+            childId: assignmentData.attribute_id,
+            value: assignmentData.value
+        };
+
+        const responseData = await apiFetch<AssignmentSuccessData<WholesalerOfferingAttribute>>(
+            '/api/offering-attributes',
+            { method: 'POST', body: createPostBody(requestBody) },
             { context: operationId }
         );
         
@@ -223,7 +260,7 @@ export async function createOfferingAttribute(
 }
 
 /**
- * Updates an existing offering-attribute assignment.
+ * Updates an existing offering-attribute assignment using type-safe request.
  *
  * @param offeringId The ID of the offering.
  * @param attributeId The ID of the attribute.
@@ -234,18 +271,20 @@ export async function createOfferingAttribute(
 export async function updateOfferingAttribute(
     offeringId: number, 
     attributeId: number, 
-    updates: Partial<Pick<WholesalerOfferingAttribute, 'value'>>
+    updates: { value?: string }
 ): Promise<WholesalerOfferingAttribute> {
     const operationId = `updateOfferingAttribute-${offeringId}-${attributeId}`;
     offeringLoadingState.start(operationId);
     try {
-        const requestBody: UpdateRequest<{ offering_id: number; attribute_id: number }, typeof updates> = {
-            id: { offering_id: offeringId, attribute_id: attributeId },
-            data: updates
+        // Use type-safe update request
+        const requestBody: OfferingAttributeUpdateRequest = {
+            parentId: offeringId,
+            childId: attributeId,
+            value: updates.value
         };
 
-        const responseData = await apiFetch<{ assignment: WholesalerOfferingAttribute }>(
-            `/api/offering-attributes/${offeringId}/${attributeId}`,
+        const responseData = await apiFetch<AssignmentSuccessData<WholesalerOfferingAttribute>>(
+            `/api/offering-attributes`,
             { method: 'PUT', body: createPostBody(requestBody) },
             { context: operationId }
         );
@@ -271,7 +310,7 @@ export async function updateOfferingAttribute(
 }
 
 /**
- * Deletes an offering-attribute assignment.
+ * Deletes an offering-attribute assignment using type-safe request.
  *
  * @param offeringId The ID of the offering.
  * @param attributeId The ID of the attribute.
@@ -287,10 +326,16 @@ export async function deleteOfferingAttribute(
     const operationId = `deleteOfferingAttribute-${offeringId}-${attributeId}`;
     offeringLoadingState.start(operationId);
     try {
-        const url = `/api/offering-attributes/${offeringId}/${attributeId}${cascade ? '?cascade=true' : ''}`;
+        // Use type-safe removal request
+        const requestBody: OfferingAttributeRemovalRequest = {
+            parentId: offeringId,
+            childId: attributeId,
+            cascade
+        };
+
         const result = await apiFetchUnion<DeleteApiResponse<{ offering_id: number; attribute_id: number; attribute_name: string }, string[]>>(
-            url,
-            { method: 'DELETE' },
+            '/api/offering-attributes',
+            { method: 'DELETE', body: createPostBody(requestBody) },
             { context: operationId }
         );
         
@@ -378,21 +423,32 @@ export async function loadOfferingLinks(offeringId: number): Promise<WholesalerO
 }
 
 /**
- * Creates a new offering link.
+ * Creates a new offering link using type-safe request.
  *
  * @param linkData The data for the new link.
  * @returns A promise that resolves to the newly created link.
  * @throws {ApiError} If validation fails or another server error occurs.
  */
 export async function createOfferingLink(
-    linkData: CreateRequest<Partial<Omit<WholesalerOfferingLink, 'link_id'>>>
+    linkData: {
+        offering_id: number;
+        url: string;
+        notes?: string;
+    }
 ): Promise<WholesalerOfferingLink> {
     const operationId = 'createOfferingLink';
     offeringLoadingState.start(operationId);
     try {
+        // Use type-safe create request
+        const requestBody: OfferingLinkCreateRequest = {
+            offering_id: linkData.offering_id,
+            url: linkData.url,
+            notes: linkData.notes
+        };
+
         const responseData = await apiFetch<{ link: WholesalerOfferingLink }>(
-            '/api/offering-links/new',
-            { method: 'POST', body: createPostBody(linkData) },
+            '/api/offering-links',
+            { method: 'POST', body: createPostBody(requestBody) },
             { context: operationId }
         );
         
@@ -415,20 +471,28 @@ export async function createOfferingLink(
 }
 
 /**
- * Updates an existing offering link.
+ * Updates an existing offering link using type-safe request.
  *
  * @param linkId The ID of the link to update.
  * @param updates A partial link object with the fields to update.
  * @returns A promise that resolves to the fully updated link.
  * @throws {ApiError} If validation fails or another error occurs.
  */
-export async function updateOfferingLink(linkId: number, updates: Partial<WholesalerOfferingLink>): Promise<WholesalerOfferingLink> {
+export async function updateOfferingLink(
+    linkId: number, 
+    updates: {
+        offering_id?: number;
+        url?: string;
+        notes?: string;
+    }
+): Promise<WholesalerOfferingLink> {
     const operationId = `updateOfferingLink-${linkId}`;
     offeringLoadingState.start(operationId);
     try {
+        const rb = {link_id: linkId, ...updates}
         const responseData = await apiFetch<{ link: WholesalerOfferingLink }>(
-            `/api/offering-links/${linkId}`,
-            { method: 'PUT', body: createPostBody(updates) },
+            `/api/offering-links`,
+            { method: 'PUT', body: createPostBody(rb) },
             { context: operationId }
         );
         
@@ -451,7 +515,7 @@ export async function updateOfferingLink(linkId: number, updates: Partial<Wholes
 }
 
 /**
- * Deletes an offering link.
+ * Deletes an offering link using type-safe request.
  *
  * @param linkId The ID of the link to delete.
  * @param cascade Whether to perform a cascade delete of related data.
@@ -465,10 +529,15 @@ export async function deleteOfferingLink(
     const operationId = `deleteOfferingLink-${linkId}`;
     offeringLoadingState.start(operationId);
     try {
-        const url = `/api/offering-links/${linkId}${cascade ? '?cascade=true' : ''}`;
+        // Use type-safe removal request
+        const requestBody: OfferingLinkRemovalRequest = {
+            link_id: linkId,
+            cascade
+        };
+
         const result = await apiFetchUnion<DeleteApiResponse<{ link_id: number; url: string }, string[]>>(
-            url,
-            { method: 'DELETE' },
+            '/api/offering-links',
+            { method: 'DELETE', body: createPostBody(requestBody) },
             { context: operationId }
         );
         

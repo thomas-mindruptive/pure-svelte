@@ -21,6 +21,7 @@ EXCLUDE_PATTERNS = [
     ".vscode",
     ".svelte-kit",
     ".vite",
+    "static",
     "playwright-report",
     "generated_data",
     "generate_files",
@@ -32,7 +33,7 @@ EXCLUDE_PATTERNS = [
 ]
 
 EXCLUDE_FILES = [
-    "package-lock.json",
+    "package-lock.json", ".gitignore", "package.json", "package-lock.json"
 ]
 
 def should_skip_dir(dirpath: str) -> bool:

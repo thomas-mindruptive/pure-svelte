@@ -1,9 +1,10 @@
 // src/routes/api/offering-attributes/+server.ts
 
 /**
- * @file Offering-Attribute Assignment API - FINAL ARCHITECTURE
- * @description Handles the n:m relationship between offerings and attributes with explicit 
- * type usage for all success and error responses. Managed by offering.ts composition logic.
+ * @file Offering-Attribute Assignment API - FINAL ARCHITECTURE (FIXED)
+ * @description Handles the n:m attributed relationship between offerings and attributes.
+ * This endpoint provides complete CREATE/UPDATE/DELETE operations using consistent
+ * relationship patterns. Individual endpoint handles only GET for forms.
  * Level 4 Assignment endpoints (offering_id + attribute_id composite key).
  */
 
@@ -24,7 +25,7 @@ import type {
 
 /**
  * POST /api/offering-attributes
- * @description Assigns an attribute to an offering with optional value.
+ * @description Creates a new offering-attribute assignment with optional value.
  */
 export const POST: RequestHandler = async ({ request }) => {
     const operationId = uuidv4();
@@ -136,6 +137,115 @@ export const POST: RequestHandler = async ({ request }) => {
 };
 
 /**
+ * PUT /api/offering-attributes
+ * @description Updates an existing offering-attribute assignment (ADDED - was missing).
+ */
+export const PUT: RequestHandler = async ({ request }) => {
+    const operationId = uuidv4();
+    log.info(`[${operationId}] PUT /offering-attributes: FN_START`);
+
+    try {
+        const body = (await request.json()) as {
+            parentId: number; // offeringId
+            childId: number;  // attributeId  
+            value?: string;
+        };
+        const { parentId: offeringId, childId: attributeId, value } = body;
+        log.info(`[${operationId}] Parsed request body`, { offeringId, attributeId, value });
+
+        if (!offeringId || !attributeId) {
+            const errRes: ApiErrorResponse = {
+                success: false,
+                message: 'offeringId (parentId) and attributeId (childId) are required.',
+                status_code: 400,
+                error_code: 'BAD_REQUEST',
+                meta: { timestamp: new Date().toISOString() }
+            };
+            log.warn(`[${operationId}] FN_FAILURE: Validation failed - missing IDs.`);
+            return json(errRes, { status: 400 });
+        }
+
+        // Check if assignment exists and get context info
+        const existsCheck = await db.request()
+            .input('offeringId', offeringId)
+            .input('attributeId', attributeId)
+            .query(`
+                SELECT 
+                    woa.offering_id, 
+                    woa.attribute_id,
+                    woa.value,
+                    a.name as attribute_name,
+                    pd.title as offering_title
+                FROM dbo.wholesaler_offering_attributes woa
+                LEFT JOIN dbo.attributes a ON woa.attribute_id = a.attribute_id
+                LEFT JOIN dbo.wholesaler_item_offerings wio ON woa.offering_id = wio.offering_id
+                LEFT JOIN dbo.product_definitions pd ON wio.product_def_id = pd.product_def_id
+                WHERE woa.offering_id = @offeringId AND woa.attribute_id = @attributeId
+            `);
+
+        if (existsCheck.recordset.length === 0) {
+            const errRes: ApiErrorResponse = {
+                success: false,
+                message: `Assignment not found for offering ${offeringId} and attribute ${attributeId}.`,
+                status_code: 404,
+                error_code: 'NOT_FOUND',
+                meta: { timestamp: new Date().toISOString() }
+            };
+            log.warn(`[${operationId}] FN_FAILURE: Assignment not found for update.`, { offeringId, attributeId });
+            return json(errRes, { status: 404 });
+        }
+
+        const assignmentDetails = existsCheck.recordset[0];
+
+        // Update the assignment value
+        const result = await db.request()
+            .input('offeringId', offeringId)
+            .input('attributeId', attributeId)
+            .input('value', value)
+            .query(`
+                UPDATE dbo.wholesaler_offering_attributes 
+                SET value = @value
+                OUTPUT INSERTED.*
+                WHERE offering_id = @offeringId AND attribute_id = @attributeId
+            `);
+
+        if (result.recordset.length === 0) {
+            const errRes: ApiErrorResponse = {
+                success: false,
+                message: `Assignment not found for offering ${offeringId} and attribute ${attributeId}.`,
+                status_code: 404,
+                error_code: 'NOT_FOUND',
+                meta: { timestamp: new Date().toISOString() }
+            };
+            log.warn(`[${operationId}] FN_FAILURE: Assignment not found during update execution.`);
+            return json(errRes, { status: 404 });
+        }
+
+        const response: AssignmentSuccessResponse<WholesalerOfferingAttribute> = {
+            success: true,
+            message: `Attribute "${assignmentDetails.attribute_name}" assignment updated successfully.`,
+            data: {
+                assignment: result.recordset[0] as WholesalerOfferingAttribute,
+                meta: {
+                    assigned_at: new Date().toISOString(),
+                    parent_name: assignmentDetails.offering_title || `Offering #${offeringId}`,
+                    child_name: assignmentDetails.attribute_name || `Attribute #${attributeId}`
+                }
+            },
+            meta: { timestamp: new Date().toISOString() }
+        };
+
+        log.info(`[${operationId}] FN_SUCCESS: Assignment updated.`, { offeringId, attributeId });
+        return json(response);
+
+    } catch (err: unknown) {
+        const { status, message } = mssqlErrorMapper.mapToHttpError(err);
+        log.error(`[${operationId}] FN_EXCEPTION: Unhandled error during update.`, { error: err });
+        throw error(status, message);
+    }
+};
+
+/**
  * DELETE /api/offering-attributes
  * @description Removes an attribute assignment from an offering.
  */
@@ -212,11 +322,16 @@ export const DELETE: RequestHandler = async ({ request }) => {
                 error_code: 'NOT_FOUND',
                 meta: { timestamp: new Date().toISOString() }
             };
-            log.warn(`[${operationId}] FN_FAILURE: Assignment not found during delete.`, { offeringId, attributeId });
+            log.warn(`[${operationId}] FN_FAILURE: Assignment not found during delete execution.`, { offeringId, attributeId });
             return json(errRes, { status: 404 });
         }
 
-        const response: DeleteSuccessResponse<{ offering_id: number; attribute_id: number; offering_title: string; attribute_name: string }> = {
+        const response: DeleteSuccessResponse<{ 
+            offering_id: number; 
+            attribute_id: number; 
+            offering_title: string; 
+            attribute_name: string 
+        }> = {
             success: true,
             message: `Attribute assignment removed successfully.`,
             data: {

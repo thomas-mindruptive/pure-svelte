@@ -10,10 +10,10 @@
 import { apiFetch, apiFetchUnion, createPostBody, createQueryBody, getErrorMessage, LoadingState } from './common';
 import { log } from '$lib/utils/logger';
 import { ComparisonOperator, LogicalOperator, type QueryPayload } from '$lib/clientAndBack/queryGrammar';
-import type { 
-    ProductCategory, 
+import type {
+    ProductCategory,
     WholesalerItemOffering,
-    WholesalerItemOffering_ProductDef_Category 
+    WholesalerItemOffering_ProductDef_Category
 } from '$lib/domain/types';
 
 // Import generic types from the single source of truth: common.ts
@@ -68,7 +68,7 @@ export async function loadCategories(query: Partial<QueryPayload<ProductCategory
             { method: 'POST', body: createQueryBody(fullQuery) },
             { context: operationId }
         );
-        
+
         return responseData.results as ProductCategory[];
     } catch (err) {
         log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
@@ -203,13 +203,13 @@ export async function loadOfferingsForCategory(supplierId: number, categoryId: n
             payload: {
                 select: [
                     'wio.offering_id',
-                    'wio.wholesaler_id', 
+                    'wio.wholesaler_id',
                     'wio.category_id',
                     'wio.product_def_id',
                     'wio.price',
                     'wio.currency',
                     'wio.size',
-                    'wio.dimensions', 
+                    'wio.dimensions',
                     'wio.comment',
                     'wio.created_at',
                     'pd.title AS product_def_title',
@@ -241,30 +241,7 @@ export async function loadOfferingsForCategory(supplierId: number, categoryId: n
     }
 }
 
-/**
- * Loads a single offering with all its details by ID.
- *
- * @param offeringId The ID of the offering to fetch.
- * @returns A promise that resolves to a single offering with details.
- * @throws {ApiError} If the offering is not found or the API call fails.
- */
-export async function loadOffering(offeringId: number): Promise<OfferingWithDetails> {
-    const operationId = `loadOffering-${offeringId}`;
-    categoryLoadingState.start(operationId);
-    try {
-        const responseData = await apiFetch<{ offering: OfferingWithDetails }>(
-            `/api/offerings/${offeringId}`,
-            { method: 'GET' },
-            { context: operationId }
-        );
-        return responseData.offering;
-    } catch (err) {
-        log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
-        throw err;
-    } finally {
-        categoryLoadingState.finish(operationId);
-    }
-}
+
 
 /**
  * Creates a new offering for a category.
@@ -280,7 +257,7 @@ export async function createOfferingForCategory(
     categoryLoadingState.start(operationId);
     try {
         const responseData = await apiFetch<{ offering: WholesalerItemOffering }>(
-            '/api/offerings/new',
+            '/api/category-offerings',
             { method: 'POST', body: createPostBody(offeringData) },
             { context: operationId }
         );
@@ -306,8 +283,8 @@ export async function updateOffering(offeringId: number, updates: Partial<Wholes
     categoryLoadingState.start(operationId);
     try {
         const responseData = await apiFetch<{ offering: WholesalerItemOffering }>(
-            `/api/offerings/${offeringId}`,
-            { method: 'PUT', body: createPostBody(updates) },
+            `/api/category-offerings`,
+            { method: 'PUT', body: createPostBody({ offering_id: offeringId, ...updates }) },
             { context: operationId }
         );
         return responseData.offering;
@@ -330,15 +307,17 @@ export async function updateOffering(offeringId: number, updates: Partial<Wholes
 export async function deleteOffering(
     offeringId: number,
     cascade = false
-): Promise<DeleteApiResponse<{ offering_id: number; product_def_title: string }, string[]>> {
+): Promise<DeleteApiResponse<{ offering_id: number }, string[]>> {
     const operationId = `deleteOffering-${offeringId}`;
     categoryLoadingState.start(operationId);
     try {
-        const url = `/api/offerings/${offeringId}${cascade ? '?cascade=true' : ''}`;
-        return await apiFetchUnion<DeleteApiResponse<{ offering_id: number; product_def_title: string }, string[]>>(
+        const url = `/api/category-offerings`;
+        const body = createPostBody({ offering_id: offeringId, cascade });
+        return await apiFetchUnion<DeleteApiResponse<{ offering_id: number}, string[]>>(
             url,
-            { method: 'DELETE' },
-            { context: operationId }
+            { method: 'DELETE', body },
+            { context: operationId },
+
         );
     } finally {
         categoryLoadingState.finish(operationId);

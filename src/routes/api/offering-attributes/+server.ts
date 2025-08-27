@@ -1,0 +1,243 @@
+// src/routes/api/offering-attributes/+server.ts
+
+/**
+ * @file Offering-Attribute Assignment API - FINAL ARCHITECTURE
+ * @description Handles the n:m relationship between offerings and attributes with explicit 
+ * type usage for all success and error responses. Managed by offering.ts composition logic.
+ * Level 4 Assignment endpoints (offering_id + attribute_id composite key).
+ */
+
+import { json, error, type RequestHandler } from '@sveltejs/kit';
+import { db } from '$lib/server/db';
+import { log } from '$lib/utils/logger';
+import { mssqlErrorMapper } from '$lib/server/errors/mssqlErrorMapper';
+import type { WholesalerOfferingAttribute } from '$lib/domain/types';
+import { v4 as uuidv4 } from 'uuid';
+
+import type {
+    ApiErrorResponse,
+    AssignmentRequest,
+    AssignmentSuccessResponse,
+    DeleteSuccessResponse,
+    RemoveAssignmentRequest
+} from '$lib/api/types/common';
+
+/**
+ * POST /api/offering-attributes
+ * @description Assigns an attribute to an offering with optional value.
+ */
+export const POST: RequestHandler = async ({ request }) => {
+    const operationId = uuidv4();
+    log.info(`[${operationId}] POST /offering-attributes: FN_START`);
+
+    try {
+        const body = (await request.json()) as AssignmentRequest<number, number> & { value?: string };
+        const { parentId: offeringId, childId: attributeId, value } = body;
+        log.info(`[${operationId}] Parsed request body`, { offeringId, attributeId, value });
+
+        if (!offeringId || !attributeId) {
+            const errRes: ApiErrorResponse = {
+                success: false,
+                message: 'offeringId (parentId) and attributeId (childId) are required.',
+                status_code: 400,
+                error_code: 'BAD_REQUEST',
+                meta: { timestamp: new Date().toISOString() }
+            };
+            log.warn(`[${operationId}] FN_FAILURE: Validation failed - missing IDs.`, { error: errRes });
+            return json(errRes, { status: 400 });
+        }
+
+        // Check if offering and attribute exist, and if assignment already exists
+        const checkResult = await db.request()
+            .input('offeringId', offeringId)
+            .input('attributeId', attributeId)
+            .query(`
+                SELECT 
+                    (SELECT COUNT(*) FROM dbo.wholesaler_item_offerings WHERE offering_id = @offeringId) as offering_exists,
+                    (SELECT COUNT(*) FROM dbo.attributes WHERE attribute_id = @attributeId) as attribute_exists,
+                    (SELECT COUNT(*) FROM dbo.wholesaler_offering_attributes WHERE offering_id = @offeringId AND attribute_id = @attributeId) as assignment_count,
+                    (SELECT a.name FROM dbo.attributes a WHERE a.attribute_id = @attributeId) as attribute_name,
+                    (SELECT pd.title FROM dbo.wholesaler_item_offerings wio 
+                     LEFT JOIN dbo.product_definitions pd ON wio.product_def_id = pd.product_def_id 
+                     WHERE wio.offering_id = @offeringId) as offering_title
+            `);
+
+        const { offering_exists, attribute_exists, assignment_count, attribute_name, offering_title } = checkResult.recordset[0];
+
+        if (!offering_exists) {
+            const errRes: ApiErrorResponse = {
+                success: false,
+                message: `Offering with ID ${offeringId} not found.`,
+                status_code: 404,
+                error_code: 'NOT_FOUND',
+                meta: { timestamp: new Date().toISOString() }
+            };
+            log.warn(`[${operationId}] FN_FAILURE: Offering not found.`, { offeringId });
+            return json(errRes, { status: 404 });
+        }
+
+        if (!attribute_exists) {
+            const errRes: ApiErrorResponse = {
+                success: false,
+                message: `Attribute with ID ${attributeId} not found.`,
+                status_code: 404,
+                error_code: 'NOT_FOUND',
+                meta: { timestamp: new Date().toISOString() }
+            };
+            log.warn(`[${operationId}] FN_FAILURE: Attribute not found.`, { attributeId });
+            return json(errRes, { status: 404 });
+        }
+
+        if (assignment_count > 0) {
+            const errRes: ApiErrorResponse = {
+                success: false,
+                message: `Attribute "${attribute_name}" is already assigned to this offering.`,
+                status_code: 409,
+                error_code: 'ASSIGNMENT_CONFLICT',
+                meta: { timestamp: new Date().toISOString() }
+            };
+            log.warn(`[${operationId}] FN_FAILURE: Assignment already exists.`, { offeringId, attributeId });
+            return json(errRes, { status: 409 });
+        }
+
+        // Create the assignment
+        const result = await db.request()
+            .input('offeringId', offeringId)
+            .input('attributeId', attributeId)
+            .input('value', value || null)
+            .query(`
+                INSERT INTO dbo.wholesaler_offering_attributes (offering_id, attribute_id, value) 
+                OUTPUT INSERTED.* 
+                VALUES (@offeringId, @attributeId, @value)
+            `);
+
+        const response: AssignmentSuccessResponse<WholesalerOfferingAttribute> = {
+            success: true,
+            message: `Attribute "${attribute_name}" assigned to offering successfully.`,
+            data: {
+                assignment: result.recordset[0] as WholesalerOfferingAttribute,
+                meta: {
+                    assigned_at: new Date().toISOString(),
+                    parent_name: offering_title || `Offering #${offeringId}`,
+                    child_name: attribute_name || `Attribute #${attributeId}`
+                }
+            },
+            meta: { timestamp: new Date().toISOString() }
+        };
+
+        log.info(`[${operationId}] FN_SUCCESS: Assignment created.`, { offeringId, attributeId });
+        return json(response, { status: 201 });
+
+    } catch (err: unknown) {
+        const { status, message } = mssqlErrorMapper.mapToHttpError(err);
+        log.error(`[${operationId}] FN_EXCEPTION: Unhandled error during assignment.`, { error: err });
+        throw error(status, message);
+    }
+};
+
+/**
+ * DELETE /api/offering-attributes
+ * @description Removes an attribute assignment from an offering.
+ */
+export const DELETE: RequestHandler = async ({ request }) => {
+    const operationId = uuidv4();
+    log.info(`[${operationId}] DELETE /offering-attributes: FN_START`);
+
+    try {
+        const body = (await request.json()) as RemoveAssignmentRequest<number, number>;
+        const { parentId: offeringId, childId: attributeId, cascade = false } = body;
+        log.info(`[${operationId}] Parsed request body`, { offeringId, attributeId, cascade });
+
+        if (!offeringId || !attributeId) {
+            const errRes: ApiErrorResponse = {
+                success: false,
+                message: 'offeringId (parentId) and attributeId (childId) are required.',
+                status_code: 400,
+                error_code: 'BAD_REQUEST',
+                meta: { timestamp: new Date().toISOString() }
+            };
+            log.warn(`[${operationId}] FN_FAILURE: Validation failed - missing IDs.`, { error: errRes });
+            return json(errRes, { status: 400 });
+        }
+
+        // Get assignment details before deletion
+        const assignmentResult = await db.request()
+            .input('offeringId', offeringId)
+            .input('attributeId', attributeId)
+            .query(`
+                SELECT 
+                    woa.offering_id, 
+                    woa.attribute_id,
+                    a.name as attribute_name,
+                    pd.title as offering_title
+                FROM dbo.wholesaler_offering_attributes woa
+                LEFT JOIN dbo.attributes a ON woa.attribute_id = a.attribute_id
+                LEFT JOIN dbo.wholesaler_item_offerings wio ON woa.offering_id = wio.offering_id
+                LEFT JOIN dbo.product_definitions pd ON wio.product_def_id = pd.product_def_id
+                WHERE woa.offering_id = @offeringId AND woa.attribute_id = @attributeId
+            `);
+
+        if (assignmentResult.recordset.length === 0) {
+            const errRes: ApiErrorResponse = {
+                success: false,
+                message: 'Assignment not found to delete.',
+                status_code: 404,
+                error_code: 'NOT_FOUND',
+                meta: { timestamp: new Date().toISOString() }
+            };
+            log.warn(`[${operationId}] FN_FAILURE: Assignment not found during delete.`, { offeringId, attributeId });
+            return json(errRes, { status: 404 });
+        }
+
+        const assignmentDetails = assignmentResult.recordset[0];
+
+        // Since offering-attribute assignments are leaf nodes in the hierarchy,
+        // there are typically no dependencies to check. But we keep the cascade pattern for consistency.
+        // In future, there could be dependencies like attribute value history, audit logs, etc.
+        
+        // Delete the assignment
+        const deleteResult = await db.request()
+            .input('offeringId', offeringId)
+            .input('attributeId', attributeId)
+            .query(`
+                DELETE FROM dbo.wholesaler_offering_attributes 
+                WHERE offering_id = @offeringId AND attribute_id = @attributeId
+            `);
+
+        if (deleteResult.rowsAffected[0] === 0) {
+            const errRes: ApiErrorResponse = {
+                success: false,
+                message: 'Assignment not found to delete.',
+                status_code: 404,
+                error_code: 'NOT_FOUND',
+                meta: { timestamp: new Date().toISOString() }
+            };
+            log.warn(`[${operationId}] FN_FAILURE: Assignment not found during delete.`, { offeringId, attributeId });
+            return json(errRes, { status: 404 });
+        }
+
+        const response: DeleteSuccessResponse<{ offering_id: number; attribute_id: number; offering_title: string; attribute_name: string }> = {
+            success: true,
+            message: `Attribute assignment removed successfully.`,
+            data: {
+                deleted_resource: {
+                    offering_id: assignmentDetails.offering_id,
+                    attribute_id: assignmentDetails.attribute_id,
+                    offering_title: assignmentDetails.offering_title || `Offering #${offeringId}`,
+                    attribute_name: assignmentDetails.attribute_name || `Attribute #${attributeId}`
+                },
+                cascade_performed: cascade,
+                dependencies_cleared: 0 // No dependencies for leaf-level assignments
+            },
+            meta: { timestamp: new Date().toISOString() }
+        };
+
+        log.info(`[${operationId}] FN_SUCCESS: Assignment removed.`, { responseData: response.data });
+        return json(response);
+
+    } catch (err: unknown) {
+        const { status, message } = mssqlErrorMapper.mapToHttpError(err);
+        log.error(`[${operationId}] FN_EXCEPTION: Unhandled error during removal.`, { error: err });
+        throw error(status, message);
+    }
+};

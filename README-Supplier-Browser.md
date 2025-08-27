@@ -104,23 +104,16 @@ All API calls go through dedicated client modules in `lib/api/client/`, followin
 
 ### Composition-Prinzip mit Cascade-Delete
 
-**Grundprinzip**: Die API-Client-Struktur folgt dem Composition-Pattern: Jede Hauptentität verwaltet ihre eigenen Daten und alle direkten Kompositionsbeziehungen. Dies spiegelt die Aggregation/Composition-Beziehungen der Datenbankstruktur in der API-Schicht wider.
-
-### Entitäts-Verantwortlichkeiten (IMPLEMENTED)
-
-* **supplier.ts (Aggregat-Root)** ✅
-  * Supplier CRUD (dbo.wholesalers)
-  * Category Assignment CRUD (dbo.wholesaler_categories)
-  * `loadCategoriesForSupplier()`, `assignCategoryToSupplier()`, `removeCategoryFromSupplier()`
-  * Verwaltet alle direkten Supplier-Kompositionen
+**Super WICHTIG Grundprinzip**: Die API-Client-Struktur folgt dem Composition-Pattern: Jede Hauptentität verwaltet ihre eigenen Daten und alle direkten Kompositionsbeziehungen. Sie erzeugt auch die die jeweiligen "zu N" - "Objekte": Echte Objekte oder Zuordnungen. 
 
 * **category.ts (Kompositions-Manager)** ✅
   * Category Master-Data CRUD (allgemeine Stammdatenverwaltung aller Kategorien)
-  * Category->Offering relationship: `loadOfferingsForCategory()`
+  * Category->Offering relationship: 
+    * `loadOfferingsForCategory()`
+    * Offering CRUD (dbo.wholesaler_item_offerings), e.g. "createOffering()", "deleteOffering()"
   * Verwaltet Category-Offering Kompositionsbeziehungen
 
 * **offering.ts (Kompositions-Manager)** ✅
-  * Offering Master CRUD (dbo.wholesaler_item_offerings)
   * Offering-Attribute Assignment CRUD (dbo.wholesaler_offering_attributes)
   * Links CRUD (dbo.wholesaler_offering_links)
   * Verwaltet alle direkten Offering-Kompositionen
@@ -271,6 +264,12 @@ if (!validation.isValid) {
 - **DataGrid**: Reusable, type-safe grid mit delete-workflows
 - **Domain-specific grids**: SupplierGrid, CategoryGrid, OfferingGrid
 
+## Frontend Implementation (TODO)
+- supplier-browser/+page.svelte anpassen: 
+  - api/client/einbauen
+  - Mockdaten entfernen
+  - Falls notwendig: Ebenen dazufügen: Attributes und Links.
+
 ### Data Flow Pattern
 ```typescript
 // URL State → Reactive Loading → Component Props
@@ -290,34 +289,10 @@ $effect(() => {
 
 Die Client-Architektur ist vollständig implementiert. Die fehlenden Komponenten sind Server-Endpunkte:
 
-### Phase 1: Core Offering Endpoints (HIGH PRIORITY)
-- [ ] `routes/api/offerings/[id]/+server.ts` - GET, PUT, DELETE für einzelne Offerings
-- [ ] `routes/api/offerings/new/+server.ts` - POST für Create neue Offerings
-- [ ] Add `validateOffering` support in domainValidator.ts (if missing)
-
-### Phase 2: Attribute Master-Data Endpoints (MEDIUM PRIORITY)
-- [ ] `routes/api/attributes/+server.ts` - POST für Attribute-Listen
-- [ ] `routes/api/attributes/[id]/+server.ts` - GET, PUT, DELETE für einzelne Attribute
-- [ ] `routes/api/attributes/new/+server.ts` - POST für Create neue Attribute
-
 ### Phase 3: Offering Composition Endpoints (MEDIUM PRIORITY)
-- [ ] `routes/api/offering-attributes/+server.ts` - Assignment endpoints
 - [ ] `routes/api/offering-attributes/[offeringId]/[attributeId]/+server.ts` - Individual assignment management
 - [ ] `routes/api/offering-links/+server.ts` - Link management endpoints
 - [ ] `routes/api/offering-links/[id]/+server.ts` - Individual link CRUD
-
-### Phase 4: Advanced Features (LOW PRIORITY)
-- [ ] Batch operations für bulk updates
-- [ ] Search endpoints mit full-text search
-- [ ] File upload für offering images
-- [ ] Export functionality (CSV, Excel)
-- [ ] API versioning strategy
-
-### Phase 5: Performance & Monitoring (LOW PRIORITY)
-- [ ] Database indices optimization
-- [ ] Query performance monitoring
-- [ ] Caching strategy implementation
-- [ ] Rate limiting
 
 ## Architecture Validation Checklist
 

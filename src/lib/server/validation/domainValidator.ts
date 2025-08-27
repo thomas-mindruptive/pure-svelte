@@ -508,6 +508,9 @@ export const validateProductCategory = (data: Partial<ProductCategory>, options:
 export const validateOffering = (data: Partial<WholesalerItemOffering>, options: Omit<ValidationOptions, 'entity'>) =>
   validateDomainEntity<WholesalerItemOffering>(data, { ...options, entity: 'offering' });
 
+export const validateAttribute = (data: Partial<WholesalerOfferingAttribute>, options: Omit<ValidationOptions, 'entity'>) =>
+  validateDomainEntity<WholesalerOfferingAttribute>(data, { ...options, entity: 'attribute' });
+
 export const validateOfferingAttribute = (data: Partial<WholesalerOfferingAttribute>, options: Omit<ValidationOptions, 'entity'>) =>
   validateDomainEntity<WholesalerOfferingAttribute>(data, { ...options, entity: 'attribute' });
 

@@ -18,7 +18,6 @@ import { v4 as uuidv4 } from 'uuid';
 import type {
     ApiErrorResponse,
     ApiSuccessResponse,
-    CreateRequest,
     DeleteConflictResponse,
     DeleteSuccessResponse,
     RemoveAssignmentRequest
@@ -69,7 +68,8 @@ export const POST: RequestHandler = async ({ request }) => {
 
     try {
         // 1. Expect the request body to be the new offering data.
-        const requestData = (await request.json()) as CreateRequest<Partial<WholesalerItemOffering>>;
+        const requestData = (await request.json()) as Partial<Omit<WholesalerItemOffering, 'offering_id'>>;
+        //const requestData = (await request.json()) as Partial<WholesalerItemOffering>;
         log.info(`[${operationId}] Parsed request body`, { fields: Object.keys(requestData) });
 
         // 2. Validate the incoming data in 'create' mode.
@@ -97,7 +97,7 @@ export const POST: RequestHandler = async ({ request }) => {
             price, 
             currency, 
             comment 
-        } = validation.sanitized as Partial<WholesalerItemOffering>;
+        } = validation.sanitized as Partial<Omit<WholesalerItemOffering, 'offering_id'>>
 
         // 4. Verify that supplier and category exist and are related
         const relationCheck = await db.request()

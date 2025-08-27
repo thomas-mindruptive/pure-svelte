@@ -1,16 +1,14 @@
 // src/lib/api/types/common.ts
 
 /**
- * @file Common API Types - TYPE-SAFE FINAL VERSION
+ * @file Common API Types - ORGANIZED GENERIC TYPE SYSTEM
  * @description The single source of truth for all API request and response structures.
- * This version provides proper compile-time type safety by enforcing actual entity
- * field names instead of generic IDs.
+ * Uses compile-time validated generic types with automatic field derivation.
  */
 
 import type { QueryPayload } from '$lib/clientAndBack/queryGrammar';
 
-
-// ===== BASE RESPONSE ENVELOPES =====
+// ===== 1. BASE CONSTANTS & UTILITIES =====
 
 export const HTTP_STATUS = {
     OK: 200, CREATED: 201, NO_CONTENT: 204, BAD_REQUEST: 400, UNAUTHORIZED: 401,
@@ -20,6 +18,7 @@ export const HTTP_STATUS = {
 } as const;
 
 export type HttpStatusCode = (typeof HTTP_STATUS)[keyof typeof HTTP_STATUS];
+export type ValidationErrors = Record<string, string[]>;
 
 export interface ApiMeta {
     timestamp: string;
@@ -28,7 +27,7 @@ export interface ApiMeta {
     processing_time_ms?: number;
 }
 
-export type ValidationErrors = Record<string, string[]>;
+// ===== 2. CORE RESPONSE ENVELOPES =====
 
 export interface ApiSuccessResponse<TData extends Record<string, unknown>> {
     success: true;
@@ -51,135 +50,104 @@ export type ApiResponse<TSuccessData extends Record<string, unknown>> =
     | ApiSuccessResponse<TSuccessData>
     | ApiErrorResponse;
 
-// ===== GENERIC REQUEST ENVELOPES =====
+// ===== 3. GENERIC TYPE SYSTEM =====
 
 /**
- * Request for a simple entity query. Uses the strictly generic `QueryPayload<T>`.
+ * Automatic ID field extraction from entity types
  */
-export interface QueryRequest<T> {
-    payload: QueryPayload<T>;
-}
+type IdField<T> = Extract<keyof T, `${string}_id`>;
 
 /**
- * Request for a predefined, named JOIN query.
+ * Assignment between two master entities (n:m relationships)
  */
-export interface PredefinedQueryRequest {
-    namedQuery: string;
-    payload: QueryPayload<unknown>;
-}
+export type AssignmentRequest<TParent, TChild, TMetadata = object> = {
+  parentId: TParent[IdField<TParent>];
+  childId: TChild[IdField<TChild>];
+} & TMetadata;
 
 /**
- * Request envelope for creating a new entity. The body is the entity data itself.
- * For a `Wholesaler`, `T` would be `Partial<Omit<Wholesaler, 'wholesaler_id'>>`.
+ * Update assignment between two master entities
  */
-//export type CreateRequest<T> = T;
+export type AssignmentUpdateRequest<TParent, TChild, TMetadata = object> = {
+  parentId: TParent[IdField<TParent>];
+  childId: TChild[IdField<TChild>];
+} & TMetadata;
+
+/**
+ * Remove assignment between two master entities
+ */
+export type RemoveAssignmentRequest<TParent, TChild> = {
+  parentId: TParent[IdField<TParent>];
+  childId: TChild[IdField<TChild>];
+  cascade?: boolean;
+};
+
+/**
+ * Create child entity in parent context (1:n compositions)
+ */
 export type CreateRequest<TParent, TMetadata = object> = {
   id: TParent[IdField<TParent>];
 } & TMetadata;
 
+/**
+ * Delete entity by its ID
+ */
+export type DeleteRequest<T> = {
+  id: T[IdField<T>];
+  cascade?: boolean;
+};
 
 /**
- * Request envelope for updating an existing entity.
+ * Update existing entity
  */
 export interface UpdateRequest<TId, TData> {
     id: TId;
     data: TData;
 }
 
-// ===== TYPE-SAFE RELATIONSHIP REQUESTS =====
+// ===== 4. REQUEST ENVELOPES =====
 
-// /**
-//  * Type-safe assignment request for supplier-categories relationship
-//  */
-// export interface SupplierCategoryAssignmentRequest {
-//     parentId: Wholesaler['wholesaler_id'];      // Type-safe: must be number
-//     childId: ProductCategory['category_id'];    // Type-safe: must be number
-//     comment?: WholesalerCategory['comment'];    // Type-safe: optional string
-//     link?: WholesalerCategory['link'];          // Type-safe: optional string
-// }
+/**
+ * Request for entity query using QueryPayload
+ */
+export interface QueryRequest<T> {
+    payload: QueryPayload<T>;
+}
 
-// /**
-//  * Type-safe assignment request for offering-attributes relationship
-//  */
-// export interface OfferingAttributeAssignmentRequest {
-//     parentId: WholesalerItemOffering['offering_id'];           // Type-safe: offering_id
-//     childId: WholesalerOfferingAttribute['attribute_id'];      // Type-safe: attribute_id
-//     value?: WholesalerOfferingAttribute['value'];              // Type-safe: optional string
-// }
+/**
+ * Request for predefined named JOIN query
+ */
+export interface PredefinedQueryRequest {
+    namedQuery: string;
+    payload: QueryPayload<unknown>;
+}
 
-// /**
-//  * Type-safe creation request for offering links
-//  */
-// export interface OfferingLinkCreateRequest {
-//     offering_id: WholesalerOfferingLink['offering_id'];  // Type-safe: number
-//     url: WholesalerOfferingLink['url'];                  // Type-safe: string (required)
-//     notes?: WholesalerOfferingLink['notes'];             // Type-safe: optional string
-// }
-
-// /**
-//  * Type-safe update request for offering links
-//  */
-// export interface OfferingLinkUpdateRequest {
-//     link_id: WholesalerOfferingLink['link_id'];          // Type-safe: number (required for updates)
-//     offering_id?: WholesalerOfferingLink['offering_id']; // Type-safe: optional number
-//     url?: WholesalerOfferingLink['url'];                 // Type-safe: optional string
-//     notes?: WholesalerOfferingLink['notes'];             // Type-safe: optional string
-// }
-
-// /**
-//  * Type-safe removal request for supplier-categories relationship
-//  */
-// export interface SupplierCategoryRemovalRequest {
-//     parentId: Wholesaler['wholesaler_id'];      // Type-safe: must be number
-//     childId: ProductCategory['category_id'];    // Type-safe: must be number
-//     cascade?: boolean;                          // Optional cascade flag
-// }
-
-// /**
-//  * Type-safe removal request for offering-attributes relationship
-//  */
-// export interface OfferingAttributeRemovalRequest {
-//     parentId: WholesalerItemOffering['offering_id'];      // Type-safe: offering_id
-//     childId: WholesalerOfferingAttribute['attribute_id']; // Type-safe: attribute_id
-//     cascade?: boolean;                                    // Optional cascade flag
-// }
-
-// /**
-//  * Type-safe removal request for offering links
-//  */
-// export interface OfferingLinkRemovalRequest {
-//     link_id: WholesalerOfferingLink['link_id'];  // Type-safe: number
-//     cascade?: boolean;                           // Optional cascade flag
-// }
-
-// /**
-//  * Type-safe update request for offering-attribute value
-//  */
-// export interface OfferingAttributeUpdateRequest {
-//     parentId: WholesalerItemOffering['offering_id'];      // Type-safe: offering_id
-//     childId: WholesalerOfferingAttribute['attribute_id']; // Type-safe: attribute_id
-//     value?: WholesalerOfferingAttribute['value'];         // Type-safe: optional string
-// }
-
-// ===== GENERIC RESPONSE PATTERNS =====
+// ===== 5. RESPONSE DATA TYPES =====
 
 // --- Query Responses ---
 export interface QueryResponseData<T> extends Record<string, unknown> {
     results: Partial<T>[];
     meta: {
-        retrieved_at: string; result_count: number; columns_selected: string[];
-        has_joins: boolean; has_where: boolean; parameter_count: number;
-        table_fixed: string; sql_generated: string;
+        retrieved_at: string; 
+        result_count: number; 
+        columns_selected: string[];
+        has_joins: boolean; 
+        has_where: boolean; 
+        parameter_count: number;
+        table_fixed: string; 
+        sql_generated: string;
     };
 }
+
 export type QuerySuccessResponse<T> = ApiSuccessResponse<QueryResponseData<T>>;
 
 export interface SingleEntityResponseData<T> extends Record<string, unknown> {
     entity: Partial<T> | null;
 }
+
 export type SingleEntitySuccessResponse<T> = ApiSuccessResponse<SingleEntityResponseData<T>>;
 
-// --- Assignment (n:m) Responses ---
+// --- Assignment Responses ---
 export interface AssignmentSuccessData<TAssignment> extends Record<string, unknown> {
     assignment: TAssignment; 
     meta: {
@@ -188,6 +156,7 @@ export interface AssignmentSuccessData<TAssignment> extends Record<string, unkno
         child_name: string;
     };
 }
+
 export type AssignmentSuccessResponse<TAssignment> = ApiSuccessResponse<AssignmentSuccessData<TAssignment>>;
 
 export interface AssignmentConflictResponse<TDetails extends Record<string, unknown>> extends ApiErrorResponse {
@@ -204,6 +173,7 @@ export interface DeleteSuccessData<TDeletedResource> extends Record<string, unkn
     cascade_performed: boolean; 
     dependencies_cleared: number;
 }
+
 export type DeleteSuccessResponse<TDeletedResource> = ApiSuccessResponse<DeleteSuccessData<TDeletedResource>>;
 
 export interface DeleteConflictResponse<TDependencies> extends ApiErrorResponse {
@@ -217,52 +187,7 @@ export type DeleteApiResponse<TDeletedResource, TDependencies> =
     DeleteConflictResponse<TDependencies> |
     ApiErrorResponse;
 
-// ===== Generic Types =====
-
-// Generic system that derives ID fields at compile time.
-type IdField<T> = Extract<keyof T, `${string}_id`>;
-
-export type AssignmentRequest<TParent, TChild, TMetadata = object> = {
-  parentId: TParent[IdField<TParent>];
-  childId: TChild[IdField<TChild>];
-} & TMetadata;
-
-export type AssignmentUpdateRequest<TParent, TChild, TMetadata = object> = {
-  parentId: TParent[IdField<TParent>];
-  childId: TChild[IdField<TChild>];
-} & TMetadata;
-
-export type RemoveAssignmentRequest<TParent, TChild> = {
-  parentId: TParent[IdField<TParent>];
-  childId: TChild[IdField<TChild>];
-  cascade?: boolean;
-}
-
-export type DeleteRequest<T> = {
-  id: T[IdField<T>];
-  cascade?: boolean;
-};
-
-// /**
-//  * @deprecated Use specific typed request interfaces instead
-//  */
-// export interface AssignmentRequest<TParentId, TChildId> {
-//     parentId: TParentId; 
-//     childId: TChildId; 
-//     comment?: string; 
-//     link?: string;
-// }
-
-// /**
-//  * @deprecated Use specific typed request interfaces instead
-//  */
-// export interface RemoveAssignmentRequest<TParentId, TChildId> {
-//     parentId: TParentId; 
-//     childId: TChildId; 
-//     cascade?: boolean;
-// }
-
-// ===== GENERIC TYPE GUARDS =====
+// ===== 6. TYPE GUARDS =====
 
 export function isApiError(response: unknown): response is ApiErrorResponse {
     const res = response as Record<string, unknown> | null;

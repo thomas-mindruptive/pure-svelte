@@ -299,7 +299,7 @@ export async function assignCategoryToSupplier(assignmentData: {
 	const operationId = 'assignCategoryToSupplier';
 	supplierLoadingState.start(operationId);
 	try {
-		const requestBody: AssignmentRequest<number, number> = {
+		const requestBody: AssignmentRequest<Wholesaler, ProductCategory, { comment?: string; link?: string }> = {
 			parentId: assignmentData.supplierId,
 			childId: assignmentData.categoryId,
 			...(assignmentData.comment !== undefined && { comment: assignmentData.comment }),
@@ -335,7 +335,7 @@ export async function removeCategoryFromSupplier(removalData: {
 	const operationId = 'removeCategoryFromSupplier';
 	supplierLoadingState.start(operationId);
 	try {
-		const requestBody: RemoveAssignmentRequest<number, number> = {
+		const requestBody: RemoveAssignmentRequest<Wholesaler, ProductCategory> = {
 			parentId: removalData.supplierId,
 			childId: removalData.categoryId,
 			cascade: removalData.cascade || false

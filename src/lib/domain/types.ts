@@ -136,7 +136,3 @@ export type OfferingWithDetails = WholesalerItemOffering & {
   product_title?: string;
 };
 
-// export type AttributeWithDetails = WholesalerOfferingAttribute & {
-//   attribute_name?: string;
-//   attribute_description?: string;
-// };

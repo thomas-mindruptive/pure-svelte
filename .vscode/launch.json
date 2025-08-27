@@ -1,0 +1,23 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "SvelteKit dev (Backend debuggen)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],        // nutzt dein "dev"-Script
+      "env": {
+        "NODE_OPTIONS": "--inspect=127.0.0.1:9229"
+      },
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"],
+      "outFiles": [
+        "${workspaceFolder}/.svelte-kit/**",
+        "${workspaceFolder}/build/**",
+        "${workspaceFolder}/**/*.ts",
+        "${workspaceFolder}/**/*.svelte"
+      ]
+    }
+  ]
+}

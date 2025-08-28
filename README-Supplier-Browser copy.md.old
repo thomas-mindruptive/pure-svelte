@@ -1,13 +1,3 @@
-Ja, absolut. Ich verstehe die Anweisung zu 100%.
-
-Ich werde das `README-Supplier-Browser.md` aktualisieren, um das "Optimistic Delete Pattern" mit der zweistufigen Bestätigung als offizielles architektonisches Prinzip zu dokumentieren. Alle vorhandenen Informationen bleiben erhalten. Die Ergänzung wird nahtlos in die bestehende Struktur integriert, um die Logik und die Gründe für diese Design-Entscheidung klar darzulegen.
-
-Hier ist die aktualisierte Version des Dokuments. Die Ergänzung befindet sich unter dem neuen Punkt **`5.2.d) Deletion Pattern`**.
-
----
-
-### README-Supplier-Browser.md (Aktualisierte Version)
-
 # SupplierBrowser - Architectural Specification & Developer Guide
 
 **Single source of truth for the project's architecture. All development must adhere to the patterns and principles defined herein.**
@@ -298,7 +288,7 @@ POST /api/supplier-categories
 
 ### 5.2. Request Pattern Architecture
 
-#### a) Master Data Pattern
+#### Master Data Pattern
 ```typescript
 // Create
 POST /api/{entity}/new
@@ -306,9 +296,10 @@ Body: Omit<Entity, 'id_field'>
 
 // Update  
 PUT /api/{entity}/[id]
-Body: Partial<Entity>```
+Body: Partial<Entity>
+```
 
-#### b) Hierarchical Child Pattern  
+#### Hierarchical Child Pattern  
 ```typescript
 // Create child in parent context
 POST /api/{parent}-{child}
@@ -316,9 +307,10 @@ Body: CreateChildRequest<Parent, Omit<Child, 'id_field'>>
 
 // Update child (individual)
 PUT /api/{parent}-{child}
-Body: { child_id, ...updates }```
+Body: { child_id, ...updates }
+```
 
-#### c) Assignment Pattern
+#### Assignment Pattern
 ```typescript
 // Create assignment
 POST /api/{parent}-{child}  
@@ -327,42 +319,6 @@ Body: AssignmentRequest<Parent, Child, Metadata>
 // Remove assignment
 DELETE /api/{parent}-{child}
 Body: RemoveAssignmentRequest<Parent, Child>
-```
-
-#### d) Deletion Pattern: Optimistic Delete with Two-Step Confirmation
-Due to the backend API design, information about cascading dependencies is only revealed after a `DELETE` attempt results in a `409 Conflict`. A separate, pre-emptive "dry run" API call is inefficient and not provided. Therefore, the client implements an **"Optimistic Delete"** pattern, which provides both performance benefits and enhanced user safety.
-
-**This is the official, intended workflow for all deletion operations:**
-
-1.  **Step 1: Initial, Generic Confirmation (Intent)**
-    -   **Trigger**: The user clicks a "Delete" button.
-    -   **Action**: The generic `DataGrid` component displays a first, simple confirmation dialog (`"Are you sure you want to delete this item?"`). Or, if callback property "deleteStrategy.confirm" is defined, it is called. => Customize the confirmation.
-    -   **Purpose**: To confirm the user's basic *intent* to delete, preventing accidental clicks.
-
-2.  **Step 2: The Optimistic API Call**
-    -   **Action**: If the user confirms, the `deleteStrategy.execute` function attempts a non-cascade `DELETE` request.
-    -   **Happy Path (`200 OK`)**: If the entity has no dependencies, it's deleted immediately. The process ends here. This is the most common and fastest case.
-    -   **Conflict Path (`409 Conflict`)**: The API responds with dependency details.
-
-3.  **Step 3: Specific, Consequence-Aware Confirmation (Warning)**
-    -   **Trigger**: The `execute` function receives the `409 Conflict` response.
-    -   **Action**: It now displays a **second, specific confirmation dialog** that details the consequences (e.g., `"This supplier has dependencies: 5 offerings, 2 categories. Delete anyway?"`).
-    -   **Purpose**: To warn the user about the side effects and get explicit permission for a cascading delete.
-
-**Implementation Guideline & Race Condition Prevention:**
-The `deleteStrategy.execute` function handles this entire workflow. To prevent UI race conditions where a row might get stuck in a "deleting" state, data reloading must be decoupled.
-
-```typescript
-// Correct implementation inside deleteStrategy.execute
-if (dataChanged) {
-  // Fire-and-forget: Start the reload but do not 'await' it.
-  // This allows the execute function to return immediately, letting the
-  // DataGrid clean up its internal state *before* the new data arrives
-  // and triggers a re-render.
-  loadData().then(() => {
-    // Handle post-reload logic like navigation here
-  });
-}
 ```
 
 ---
@@ -512,18 +468,11 @@ assign{Child}To{Parent}(data: {
 
 ---
 
-## 10. Svelte 5 Runes Integration - LoadingState Architecture
-
-*Insights from Frontend Integration*
-
-During the integration of the API clients with Svelte 5 Runes, key architectural insights emerged that are relevant for all future implementations:
-
--   **Runes Compatibility:** Svelte 5 Runes (`$state`, `$derived`) function exclusively within `.svelte` files. The original `LoadingState` class in `lib/api/client/common.ts` had to be refactored from Runes to Svelte Stores to avoid "rune_outside_svelte" errors.
-
--   **Store-based `LoadingState` (Finalized):** The `LoadingState` class now uses `writable()` and `derived()` stores instead of Runes. This enables reactivity between TypeScript modules and Svelte components. The correct way to access the state is via `$loadingState.isLoadingStore` instead of the non-reactive getter `loadingState.isLoading`.
-
--   **"Null Initial State" Pattern:** For an optimal loading UX, the "null initial state" pattern was implemented. Data arrays now start as `null` (not `[]`), allowing grid components to distinguish between a "loading" state (`null` + `loading=true`) and a "no data" state (`[]` + `loading=false`). This prevents the brief "No data" flash on the initial load.
-
--   **Integration Pattern:** Frontend components combine the individual loading stores (e.g., `$supplierLoadingState`, `$categoryLoadingState`) using `$derived` to create a central, reactive `isLoading` state for global UI feedback. This ensures automatic reactivity to API operations. For example: `const isLoading = $derived($supplierLoadingState || $categoryLoadingState);`
-
-This solution eliminates race conditions between component mounting and API initialization and provides a consistent loading UX across all hierarchy levels.
+## Svelte 5 Runes Integration - LoadingState Architecture
+Erkenntnisse aus der Frontend-Integration
+Bei der Integration der API-Clients mit Svelte 5 Runes traten wichtige architektonische Erkenntnisse auf, die für alle zukünftigen Implementierungen relevant sind:
+Runes-Kompatibilität: Svelte 5 Runes ($state, $derived) funktionieren ausschließlich in .svelte-Dateien. Die ursprüngliche LoadingState-Klasse in lib/api/client/common.ts musste von Runes auf Svelte Stores umgestellt werden, um "rune_outside_svelte" Fehler zu vermeiden.
+Store-basierte LoadingState (Finalized): Die LoadingState-Klasse verwendet jetzt writable() und derived() stores anstelle von Runes. Dies ermöglicht reactivity zwischen TypeScript-Modulen und Svelte-Komponenten. Der korrekte Zugriff erfolgt über $loadingState.isLoadingStore anstelle des non-reactive getters loadingState.isLoading.
+Initial State Pattern: Für optimale Loading-UX wurde das "null initial state" Pattern implementiert. Data-Arrays starten als null (nicht []), wodurch Grid-Komponenten zwischen "loading" (null + loading=true) und "no data" ([] + loading=false) unterscheiden können. Dies verhindert das kurze "No data"-Flash beim ersten Laden.
+Integration Pattern: Frontend-Komponenten konsumieren LoadingStates über $derived($apiClient.isLoadingStore), wodurch automatische Reaktivität auf API-Operationen gewährleistet ist. Der zentrale isLoading state kombiniert alle relevanten LoadingStates für globale UI-Feedback.
+Diese Lösung eliminiert Race-Conditions zwischen Component-Mounting und API-Initialisierung und bietet konsistente Loading-UX für alle Hierarchie-Level.RetryClaude can make mistakes. Please double-check responses.

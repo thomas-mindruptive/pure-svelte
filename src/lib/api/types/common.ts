@@ -86,7 +86,7 @@ export type RemoveAssignmentRequest<TParent, TChild> = {
  * Create child entity in parent context (1:n compositions)
  */
 export type CreateChildRequest<TParent, TChild> = {
-  id: TParent[IdField<TParent>];
+  parentId: TParent[IdField<TParent>];
   data: TChild;
 } 
 

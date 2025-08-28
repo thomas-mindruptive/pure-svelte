@@ -34,7 +34,7 @@ export const POST: RequestHandler = async ({ request }) => {
     try {
         // 1. Expect the request body to be the new offering link data.
         const childRequestData = (await request.json()) as CreateChildRequest<WholesalerItemOffering, Omit<WholesalerOfferingLink, 'link_id'>>;
-        const offeringId = childRequestData.id;
+        const offeringId = childRequestData.parentId;
         const linkData = childRequestData.data;
         log.info(`[${operationId}] Parsed request body`, { fields: Object.keys(childRequestData) });
 

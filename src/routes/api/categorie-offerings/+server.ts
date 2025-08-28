@@ -70,7 +70,7 @@ export const POST: RequestHandler = async ({ request }) => {
     try {
         // 1. Expect the request body to be CreateChildRequest.
         const chilRequestData = (await request.json()) as CreateChildRequest<ProductCategory, Omit<WholesalerItemOffering, 'offering_id'>>;
-        const categoryId = chilRequestData.id;
+        const categoryId = chilRequestData.parentId;
         const offeringData = chilRequestData.data;
         log.info(`[${operationId}] Parsed request body`, { fields: Object.keys(chilRequestData) });
 

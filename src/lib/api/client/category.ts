@@ -257,7 +257,7 @@ export async function createOfferingForCategory(
     categoryLoadingState.start(operationId);
     try {
         const requestBody: CreateChildRequest<ProductCategory, Omit<WholesalerItemOffering, 'offering_id'>> = {
-            id: categoryId,
+            parentId: categoryId,
             data: offeringData
         };
         const responseData = await apiFetch<{ offering: WholesalerItemOffering }>(

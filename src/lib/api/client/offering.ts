@@ -437,7 +437,7 @@ export async function createOfferingLink(
     try {
         // Use type-safe create request
         const requestBody: CreateChildRequest<WholesalerItemOffering, Omit<WholesalerOfferingLink, 'link_id'>> = {
-            id: linkData.offering_id,  // Parent-ID
+            parentId: linkData.offering_id,  // Parent-ID
             data: linkData
         };
 

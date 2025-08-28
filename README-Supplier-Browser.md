@@ -2,7 +2,7 @@
 
 **Single source of truth for the project's architecture. All development must adhere to the patterns and principles defined herein.**
 
-*Updated: 27. August 2025 - Generic Type System Implementation In Progress*
+*Updated: 28. August 2025 - Generic Type System & Hierarchical Patterns Finalized*
 
 ---
 
@@ -18,29 +18,33 @@ The application's logic is built around a clear, five-level data model. Understa
 - **Entity**: `dbo.wholesalers`
 - **Purpose**: Independent master data entities that can be queried flexibly
 - **API Pattern**: QueryPayload for lists + Standard CRUD for individuals
+- **Creation**: `/api/suppliers/new` POST with direct entity data
 
 #### Level 2: Categories (Relationship - Simple Assignment)  
 - **Entity**: `dbo.wholesaler_categories`
 - **Purpose**: Pure n:m relationship between suppliers and global categories
 - **Properties**: `comment`, `link` (simple metadata)
-- **API Pattern**: `/api/supplier-categories` CREATE/DELETE
+- **API Pattern**: `/api/supplier-categories` CREATE/DELETE with AssignmentRequest
+- **Master Data**: Category definitions via `/api/categories/new`
 
 #### Level 3: Offerings (Relationship - 1:n Hierarchical)
 - **Entity**: `dbo.wholesaler_item_offerings`
 - **Purpose**: Products that exist only in [supplier + category] context
-- **Key Characteristic**: Cannot be queried independently - always contextual
-- **API Pattern**: `/api/category-offerings` CREATE/UPDATE/DELETE + Individual reads
+- **Key Characteristic**: Cannot be created independently - always require parent context
+- **API Pattern**: `/api/category-offerings` CREATE/UPDATE/DELETE with CreateChildRequest
+- **NO** `/api/offerings/new` - violates hierarchical principle
 
 #### Level 4: Attributes (Relationship - Attributed)
 - **Entity**: `dbo.wholesaler_offering_attributes`  
 - **Purpose**: n:m relationship between offerings and attributes WITH business data (`value`)
 - **Key Distinction**: Not just a link - stores attribute values (e.g., Color="Red")
-- **API Pattern**: `/api/offering-attributes` CREATE/UPDATE/DELETE
+- **API Pattern**: `/api/offering-attributes` CREATE/UPDATE/DELETE with AssignmentRequest
+- **Master Data**: Attribute definitions via `/api/attributes/new`
 
 #### Level 5: Links (Relationship - 1:n Composition)
 - **Entity**: `dbo.wholesaler_offering_links`
 - **Purpose**: Links that belong to specific offerings
-- **API Pattern**: `/api/offering-links` CREATE/UPDATE/DELETE
+- **API Pattern**: `/api/offering-links` CREATE/UPDATE/DELETE with CreateChildRequest
 
 ### 1.2. The User Experience: A URL-Driven Single-Page Application
 
@@ -52,32 +56,33 @@ The entire application exists on a single route (`/supplierbrowser`) and creates
 
 ---
 
-## 2. Generic Type System - NEW ARCHITECTURE
+## 2. Generic Type System - FINALIZED ARCHITECTURE
 
-### 2.1. Core Generic Types (Implementation In Progress)
+### 2.1. Core Generic Types with Request Pattern Distinction
 
-**New compile-time validated type system:**
+**The architecture distinguishes between two fundamental relationship patterns:**
 
 ```typescript
 // Automatic ID field extraction
 type IdField<T> = Extract<keyof T, `${string}_id`>;
 
-// Assignment between two master entities (n:m)
+// 1:n Hierarchical Creation (one parent ID, child exists in parent context)
+export type CreateChildRequest<TParent, TChild> = {
+  id: TParent[IdField<TParent>];
+  data: TChild;
+};
+
+// n:m Assignment between existing entities (two entity IDs)
 export type AssignmentRequest<TParent, TChild, TMetadata = object> = {
   parentId: TParent[IdField<TParent>];
   childId: TChild[IdField<TChild>];
 } & TMetadata;
 
-// Creation of child entity in parent context (1:n)
-export type CreateRequest<TParent, TMetadata = object> = {
-  id: TParent[IdField<TParent>];
+// Update assignment between two master entities
+export type AssignmentUpdateRequest<TParent, TChild, TMetadata = object> = {
+  parentId: TParent[IdField<TParent>];
+  childId: TChild[IdField<TChild>];
 } & TMetadata;
-
-// Deletion of entity by its ID
-export type DeleteRequest<T> = {
-  id: T[IdField<T>];
-  cascade?: boolean;
-};
 
 // Removal of assignment relationship
 export type RemoveAssignmentRequest<TParent, TChild> = {
@@ -85,15 +90,61 @@ export type RemoveAssignmentRequest<TParent, TChild> = {
   childId: TChild[IdField<TChild>];
   cascade?: boolean;
 };
+
+// Deletion of entity by its ID
+export type DeleteRequest<T> = {
+  id: T[IdField<T>];
+  cascade?: boolean;
+};
 ```
 
-### 2.2. Benefits of Generic System
+### 2.1. a) Option: Adjust AssignmentReqeust to same semantics as ChreateChildRequest:
+```
+export type AssignmentRequest<TParent, TChild> = {
+  parentId: TParent[IdField<TParent>];
+  childId: TChild[IdField<TChild>];
+  data?: object // "Attributes" oder additonalData for the relationship.
+};
+```
 
-- TypeScript validates field names at compile-time
-- IntelliSense shows correct field structure
-- Prevents typos in request bodies
-- Consistent patterns across all relationships
-- Replaces specific request types like `SupplierCategoryAssignmentRequest`
+
+### 2.2. Request Pattern Decision Matrix
+
+| Relationship Type | Pattern | Use Case | Example |
+|------------------|---------|----------|---------|
+| **Master Data Creation** | Direct Entity Data | Independent entities | `POST /api/suppliers/new` with `Omit<Wholesaler, 'wholesaler_id'>` |
+| **1:n Hierarchical Creation** | `CreateChildRequest<Parent, Child>` | Child exists only in parent context | `POST /api/category-offerings` with parent categoryId |
+| **n:m Assignment** | `AssignmentRequest<Parent, Child>` | Link two existing entities | `POST /api/supplier-categories` with supplierID + categoryId |
+
+### 2.3. Redundancy Handling in CreateChildRequest (Option B)
+
+For hierarchical relationships, we accept controlled redundancy between parent context and child FK:
+
+```typescript
+// Client sends:
+CreateChildRequest<ProductCategory, Partial<Omit<WholesalerItemOffering, 'offering_id'>>> = {
+  id: 5,           // category_id as parent context  
+  data: {
+    category_id: 5,  // May be redundant - server validates consistency
+    wholesaler_id: 1,
+    product_def_id: 10
+  }
+}
+
+// Server logic:
+if (requestData.id !== requestData.data.category_id) {
+  throw new Error("Category ID mismatch");
+}
+// OR auto-set if missing:
+if (!requestData.data.category_id) {
+  requestData.data.category_id = requestData.id;
+}
+```
+
+**Benefits of Option B:**
+- Stays close to DB reality and constraints
+- Allows flexible client behavior (explicit or implicit parent FK)
+- Server validates consistency without complex entity assembly
 
 ---
 
@@ -115,37 +166,56 @@ The `/api/query` endpoint is a central architectural component that handles all 
 - `offering_attributes`: Offering-attribute assignments with attribute details
 - `offering_links`: Offering links with context information
 
-### 3.2. The QueryPayload Pattern (NOT Pure REST)
+### 3.2. Master Data Pattern: QueryPayload + Individual CRUD
 
-Our API does NOT follow pure REST for list operations. Master data uses the flexible `QueryPayload<T>` pattern:
+Master data entities follow a consistent pattern:
 
 ```typescript
-// NOT: GET /api/suppliers?name=ABC&limit=10
-// INSTEAD: POST /api/suppliers with QueryRequest<Wholesaler>
-{
-  "payload": {
-    "select": ["wholesaler_id", "name", "region"],
-    "where": { "key": "name", "op": "LIKE", "val": "%ABC%" },
-    "orderBy": [{ "key": "name", "direction": "asc" }],
-    "limit": 10
-  }
-}
-```
+// List with flexible querying
+POST /api/suppliers with QueryRequest<Wholesaler>
 
-#### When to Use QueryPayload
-- **Master Data ONLY**: `POST /api/suppliers`, `POST /api/attributes`
-- Entities that can be queried independently
-- Need flexible column selection, filtering, sorting
+// Individual operations
+GET /api/suppliers/[id]           // Read single
+POST /api/suppliers/new           // Create new with Omit<Entity, 'id_field'>
+PUT /api/suppliers/[id]           // Update with Partial<Entity>  
+DELETE /api/suppliers/[id]        // Delete with dependency checking
+```
 
 ### 3.3. Relationship Endpoint Pattern: `/api/<parent>-<child>`
 
 All relationship endpoints follow a consistent naming pattern that makes the parent-child relationship explicit.
 
-#### Current Relationships
-- `/api/supplier-categories`: Supplier has Categories (n:m assignment)
-- `/api/category-offerings`: Category has Offerings (1:n hierarchical)
-- `/api/offering-attributes`: Offering has Attributes (n:m attributed relationship) 
-- `/api/offering-links`: Offering has Links (1:n composition)
+#### 1:n Hierarchical Relationships (CreateChildRequest)
+- `/api/category-offerings`: Category has Offerings 
+- `/api/offering-links`: Offering has Links
+
+```typescript
+// CreateChildRequest pattern
+POST /api/category-offerings
+{
+  id: 5,                    // parent category_id
+  data: {                   // child offering data (may include category_id for validation)
+    wholesaler_id: 1,
+    product_def_id: 10,
+    price: 100
+  }
+}
+```
+
+#### n:m Assignment Relationships (AssignmentRequest)
+- `/api/supplier-categories`: Supplier assigned to Categories
+- `/api/offering-attributes`: Offering assigned to Attributes
+
+```typescript
+// AssignmentRequest pattern  
+POST /api/supplier-categories
+{
+  parentId: 1,              // supplier_id
+  childId: 5,               // category_id
+  comment: "High priority", // metadata
+  link: "https://..."
+}
+```
 
 ---
 
@@ -156,37 +226,39 @@ All relationship endpoints follow a consistent naming pattern that makes the par
 | **SUPPLIERS (Master Data)**                           |                                   |                                                              |               |               |                          |
 | Query List                                            | `POST /api/suppliers`             | `QueryRequest<Wholesaler>`                                   | ✅             | ✅             |                          |
 | Read Single                                           | `GET /api/suppliers/[id]`         | -                                                            | ✅             | ✅             |                          |
-| Create                                                | `POST /api/suppliers/new`         | `CreateRequest<Partial<Wholesaler>>`                         | ✅             | ✅             |                          |
+| Create                                                | `POST /api/suppliers/new`         | `Omit<Wholesaler, 'wholesaler_id'>`                         | ✅             | ✅             | **Fixed**                |
 | Update                                                | `PUT /api/suppliers/[id]`         | `Partial<Wholesaler>`                                        | ✅             | ✅             |                          |
 | Delete                                                | `DELETE /api/suppliers/[id]`      | -                                                            | ✅             | ✅             |                          |
 | **ATTRIBUTES (Master Data)**                          |                                   |                                                              |               |               |                          |
 | Query List                                            | `POST /api/attributes`            | `QueryRequest<Attribute>`                                    | ✅             | ✅             |                          |
 | Read Single                                           | `GET /api/attributes/[id]`        | -                                                            | ✅             | ✅             |                          |
-| Create                                                | `POST /api/attributes/new`        | `CreateRequest<Partial<Attribute>>`                          | ✅             | ✅             |                          |
+| Create                                                | `POST /api/attributes/new`        | `Omit<Attribute, 'attribute_id'>`                           | ✅             | ✅             | **Fixed**                |
 | Update                                                | `PUT /api/attributes/[id]`        | `Partial<Attribute>`                                         | ✅             | ✅             |                          |
 | Delete                                                | `DELETE /api/attributes/[id]`     | -                                                            | ✅             | ✅             |                          |
 | **CATEGORIES (Master Data)**                          |                                   |                                                              |               |               |                          |
 | Query List                                            | `POST /api/categories`            | `QueryRequest<ProductCategory>`                              | ✅             | ✅             | For assignment dropdowns |
+| Create                                                | `POST /api/categories/new`        | `Omit<ProductCategory, 'category_id'>`                      | ✅             | ✅             | **Added**                |
 | **SUPPLIER-CATEGORIES (Assignment - n:m)**            |                                   |                                                              |               |               |                          |
 | Query via JOINs                                       | `POST /api/query`                 | `namedQuery: 'supplier_categories'`                          | ✅             | ✅             |                          |
-| Create Assignment                                     | `POST /api/supplier-categories`   | `AssignmentRequest<Wholesaler, ProductCategory>`             | ⚠️            | ⚠️            | **Needs generic update** |
-| Remove Assignment                                     | `DELETE /api/supplier-categories` | `RemoveAssignmentRequest<Wholesaler, ProductCategory>`       | ⚠️            | ⚠️            | **Needs generic update** |
+| Create Assignment                                     | `POST /api/supplier-categories`   | `AssignmentRequest<Wholesaler, ProductCategory>`             | ✅             | ✅             | **Finalized**            |
+| Remove Assignment                                     | `DELETE /api/supplier-categories` | `RemoveAssignmentRequest<Wholesaler, ProductCategory>`       | ✅             | ✅             | **Finalized**            |
 | **CATEGORY-OFFERINGS (Hierarchical - 1:n)**           |                                   |                                                              |               |               |                          |
 | Query via JOINs                                       | `POST /api/query`                 | `namedQuery: 'category_offerings'`                           | ✅             | ✅             |                          |
-| Create                                                | `POST /api/category-offerings`    | `CreateRequest<ProductCategory, OfferingData>`               | ✅             | ✅             | **Fixed**                |
+| Create                                                | `POST /api/category-offerings`    | `CreateChildRequest<ProductCategory, OfferingData>`          | ✅             | ✅             | **Finalized**            |
 | Update                                                | `PUT /api/category-offerings`     | `{offering_id, ...updates}`                                  | ✅             | ✅             | **Fixed**                |
 | Delete                                                | `DELETE /api/category-offerings`  | `DeleteRequest<WholesalerItemOffering>`                      | ✅             | ✅             | **Fixed**                |
+| **~~OFFERINGS/NEW (Deprecated)~~**                     | ~~`POST /api/offerings/new`~~     | ~~Violates hierarchical principle~~                          | ❌             | ❌             | **Removed - Use category-offerings** |
 | **OFFERING-ATTRIBUTES (Assignment - n:m Attributed)** |                                   |                                                              |               |               |                          |
 | Query via JOINs                                       | `POST /api/query`                 | `namedQuery: 'offering_attributes'`                          | ✅             | ✅             |                          |
-| Create Assignment                                     | `POST /api/offering-attributes`   | `AssignmentRequest<WholesalerItemOffering, Attribute>`       | ⚠️            | ⚠️            | **Needs generic update** |
-| Update Assignment                                     | `PUT /api/offering-attributes`    | `AssignmentRequest<WholesalerItemOffering, Attribute>`       | ⚠️            | ⚠️            | **Needs generic update** |
-| Delete Assignment                                     | `DELETE /api/offering-attributes` | `RemoveAssignmentRequest<WholesalerItemOffering, Attribute>` | ⚠️            | ⚠️            | **Needs generic update** |
+| Create Assignment                                     | `POST /api/offering-attributes`   | `AssignmentRequest<WholesalerItemOffering, Attribute>`       | ✅             | ✅             | **Finalized**            |
+| Update Assignment                                     | `PUT /api/offering-attributes`    | `AssignmentUpdateRequest<WholesalerItemOffering, Attribute>` | ✅             | ✅             | **Finalized**            |
+| Delete Assignment                                     | `DELETE /api/offering-attributes` | `RemoveAssignmentRequest<WholesalerItemOffering, Attribute>` | ✅             | ✅             | **Finalized**            |
 | **OFFERING-LINKS (Composition - 1:n)**                |                                   |                                                              |               |               |                          |
 | Query via JOINs                                       | `POST /api/query`                 | `namedQuery: 'offering_links'`                               | ✅             | ✅             |                          |
 | Read Single                                           | `GET /api/offering-links/[id]`    | -                                                            | ✅             | ✅             | For forms only           |
-| Create                                                | `POST /api/offering-links`        | `CreateRequest<WholesalerItemOffering, LinkData>`            | ⚠️            | ⚠️            | **Needs generic update** |
-| Update                                                | `PUT /api/offering-links`         | Update pattern                                               | ⚠️            | ⚠️            | **Needs generic update** |
-| Delete                                                | `DELETE /api/offering-links`      | `DeleteRequest<WholesalerOfferingLink>`                      | ⚠️            | ⚠️            | **Needs generic update** |
+| Create                                                | `POST /api/offering-links`        | `CreateChildRequest<WholesalerItemOffering, LinkData>`       | ✅             | ✅             | **Finalized**            |
+| Update                                                | `PUT /api/offering-links`         | Update pattern                                               | ✅             | ✅             | **Finalized**            |
+| Delete                                                | `DELETE /api/offering-links`      | `DeleteRequest<WholesalerOfferingLink>`                      | ✅             | ✅             | **Finalized**            |
 
 ---
 
@@ -197,6 +269,7 @@ All relationship endpoints follow a consistent naming pattern that makes the par
 #### Pillar I: Generic API Types (`lib/api/types/common.ts`)
 - Universal response envelopes
 - Generic request patterns with compile-time validation
+- Distinct patterns for Master Data, Hierarchical Children, and Assignments
 - Type guards for union responses
 
 #### Pillar II: Query Grammar (`lib/clientAndBack/queryGrammar.ts`)  
@@ -213,67 +286,72 @@ All relationship endpoints follow a consistent naming pattern that makes the par
 - Converts QueryPayload to parameterized SQL
 - Individual CRUD uses direct SQL with mssqlErrorMapper
 
-### 5.2. QueryBuilder Usage Rules
+### 5.2. Request Pattern Architecture
 
-#### When to Use QueryBuilder
-- ONLY for SELECT statements
-- Complex filtering with WHERE clauses
-- Column selection and sorting
-- List endpoints with `QueryPayload<T>`
+#### Master Data Pattern
+```typescript
+// Create
+POST /api/{entity}/new
+Body: Omit<Entity, 'id_field'>
 
-#### When to Use Direct SQL
-- ALL CREATE, UPDATE, DELETE operations  
-- Simple lookups by primary key
-- Individual entity CRUD
-- Always with parameterized queries and `mssqlErrorMapper`
+// Update  
+PUT /api/{entity}/[id]
+Body: Partial<Entity>
+```
+
+#### Hierarchical Child Pattern  
+```typescript
+// Create child in parent context
+POST /api/{parent}-{child}
+Body: CreateChildRequest<Parent, Omit<Child, 'id_field'>>
+
+// Update child (individual)
+PUT /api/{parent}-{child}
+Body: { child_id, ...updates }
+```
+
+#### Assignment Pattern
+```typescript
+// Create assignment
+POST /api/{parent}-{child}  
+Body: AssignmentRequest<Parent, Child, Metadata>
+
+// Remove assignment
+DELETE /api/{parent}-{child}
+Body: RemoveAssignmentRequest<Parent, Child>
+```
 
 ---
 
-## 6. Current TODO: Generic Type Migration
+## 6. Architecture Validation Checklist
 
-### 6.1. PRIORITY - Server Endpoint Updates
-- [ ] Update `/api/supplier-categories` to use `AssignmentRequest<Wholesaler, ProductCategory>`
-- [ ] Update `/api/offering-attributes` to use `AssignmentRequest<WholesalerItemOffering, Attribute>`
-- [ ] Update `/api/offering-links` to use `CreateRequest<WholesalerItemOffering>` and `DeleteRequest<WholesalerOfferingLink>`
+### Generic Type System (Completed)
+- [x] Generic request types defined with clear pattern distinction
+- [x] All server endpoints use correct generic patterns
+- [x] All client endpoints use correct generic patterns  
+- [x] CreateChildRequest handles redundancy appropriately
 
-### 6.2. PRIORITY - Client Code Updates
-- [ ] Update `supplier.ts` to use generic `AssignmentRequest`
-- [ ] Update `offering.ts` to use generic request types
-- [ ] Remove old specific request types from `common.ts`
-- [ ] Test complete flow with generic architecture
-
-### 6.3. Frontend Integration TODO
-- [ ] Complete SupplierBrowser implementation with real API data
-- [ ] Remove remaining mock data usage
-- [ ] Implement Level 4 (Attributes) and Level 5 (Links) UI
-- [ ] Test all levels work with consistent API pattern
-
----
-
-## 7. Architecture Validation Checklist
-
-### Generic Type System (In Progress)
-- [x] Generic request types defined (`AssignmentRequest<Parent, Child>`, etc.)
-- [ ] All server endpoints updated to use generic types
-- [ ] All client endpoints updated to use generic types  
-- [ ] Old specific request types removed
+### Optional: Adjust Typesyste
+- See 2.1. a): Adjust "AssignmentRequest" and related types.
 
 ### API Consistency 
-- [x] QueryPayload pattern ONLY for Master Data (suppliers, attributes)
+- [x] QueryPayload pattern ONLY for Master Data (suppliers, attributes, categories)
 - [x] Relationship endpoints use consistent `/api/<parent>-<child>` pattern  
-- [ ] All relationships use generic CREATE/UPDATE/DELETE patterns
+- [x] Hierarchical creation uses CreateChildRequest with parent context
+- [x] Assignment operations use AssignmentRequest with two entity IDs
 - [x] Individual reads for forms use GET on individual endpoints where needed
 - [x] Hierarchical data only via `/api/query` with named queries
 
-### Client-Server Alignment (Needs Work)
-- [ ] Client calls match server endpoint patterns with generic types
-- [ ] All relationship operations use generic request body patterns
-- [ ] Complete flow testing with corrected architecture
+### Client-Server Alignment (Completed)
+- [x] Client calls match server endpoint patterns with generic types
+- [x] All relationship operations use appropriate request patterns
+- [x] Complete flow testing with corrected architecture
+- [x] Removed deprecated `/api/offerings/new` endpoint
 
 ### Type Safety
 - [x] No `any` types in production code
 - [x] Compile-time query validation via QueryPayload<T>
-- [x] Generic API response types
+- [x] Generic API response types with pattern-specific structures
 - [x] `exactOptionalPropertyTypes: true` configuration
 
 ### Security  
@@ -289,87 +367,105 @@ All relationship endpoints follow a consistent naming pattern that makes the par
 
 ---
 
-## 8. Examples of Generic Type Usage
+## 7. Examples of Generic Type Usage
 
-### 8.1. Assignment Relationships (n:m)
+### 7.1. Master Data Creation
+```typescript
+// Category Master Data
+POST /api/categories/new
+Body: Omit<ProductCategory, 'category_id'>
+// → { name: "Laptops", description: "Portable computers" }
+```
+
+### 7.2. Hierarchical Child Creation (1:n)
+```typescript
+// Category → Offering
+CreateChildRequest<ProductCategory, Partial<Omit<WholesalerItemOffering, 'offering_id'>>>
+// → { id: 5, data: { wholesaler_id: 1, category_id: 5, product_def_id: 10 } }
+
+// Offering → Link
+CreateChildRequest<WholesalerItemOffering, Omit<WholesalerOfferingLink, 'link_id'>>
+// → { id: 12, data: { offering_id: 12, url: "https://...", notes: "..." } }
+```
+
+### 7.3. Assignment Creation (n:m)
 ```typescript
 // Supplier-Category Assignment
 AssignmentRequest<Wholesaler, ProductCategory, { comment?: string; link?: string }>
-// → parentId: number (from wholesaler_id)
-// → childId: number (from category_id)
+// → { parentId: 1, childId: 5, comment: "High priority" }
 
 // Offering-Attribute Assignment  
 AssignmentRequest<WholesalerItemOffering, Attribute, { value?: string }>
-// → parentId: number (from offering_id)
-// → childId: number (from attribute_id)
-```
-
-### 8.2. Composition Relationships (1:n)
-```typescript
-// Offering Link Creation
-CreateRequest<WholesalerItemOffering, { url: string; notes?: string }>
-// → id: number (from offering_id)
-
-// Link Deletion
-DeleteRequest<WholesalerOfferingLink>
-// → id: number (from link_id)
-```
-
-### 8.3. Master Data
-```typescript
-// Uses existing patterns
-QueryRequest<Wholesaler>
-CreateRequest<Partial<Omit<Wholesaler, 'wholesaler_id'>>>
+// → { parentId: 12, childId: 3, value: "Red" }
 ```
 
 ---
 
-## 9. Implementation Guidelines
+## 8. Implementation Guidelines
 
-### 9.1. Adding New Relationships
+### 8.1. Adding New Master Data
 
-**For n:m Assignments:**
+**For Independent Entities:**
 ```typescript
-AssignmentRequest<ParentEntity, ChildEntity, MetadataType>
-RemoveAssignmentRequest<ParentEntity, ChildEntity>
+// Server endpoint: /api/{entity}/new
+Body: Omit<Entity, 'id_field'>
+
+// Client function:
+create{Entity}(data: Omit<Entity, 'id_field'>): Promise<Entity>
 ```
 
-**For 1:n Compositions:**
+### 8.2. Adding New Hierarchical Children
+
+**For 1:n Relationships:**
 ```typescript
-CreateRequest<ParentEntity, ChildDataType>
-DeleteRequest<ChildEntity>
+// Server endpoint: /api/{parent}-{child}
+Body: CreateChildRequest<ParentEntity, Omit<ChildEntity, 'child_id'>>
+
+// Client function:
+create{Child}For{Parent}(
+  parentId: number,
+  childData: Omit<ChildEntity, 'child_id' | 'parent_fk'>
+): Promise<ChildEntity>
 ```
 
-### 9.2. Client Code Pattern
+### 8.3. Adding New Assignments
+
+**For n:m Relationships:**
 ```typescript
-const requestBody: AssignmentRequest<Parent, Child, Metadata> = {
-  parentId: data.parent_id,
-  childId: data.child_id,
+// Server endpoint: /api/{parent}-{child}
+Body: AssignmentRequest<ParentEntity, ChildEntity, MetadataType>
+
+// Client function:
+assign{Child}To{Parent}(data: {
+  parentId: number,
+  childId: number,
   ...metadata
-};
+}): Promise<AssignmentData>
 ```
 
 ---
 
-## 10. Current Status Summary
+## 9. Current Status Summary
 
 ### ✅ Completed
-- Generic type system design
-- Core server endpoints (suppliers, attributes, categories)
+- Generic type system with pattern-specific structures
+- All Master Data endpoints (suppliers, attributes, categories)
+- All Assignment endpoints (supplier-categories, offering-attributes)
+- All Hierarchical endpoints (category-offerings, offering-links)
 - QueryBuilder and security framework
-- Basic frontend with Svelte 5
+- Complete client-server type alignment
+- Redundancy handling for hierarchical relationships
 
 ### ⚠️ In Progress  
-- Migrating all endpoints to generic types
-- Client API updates for generic patterns
-- Frontend completion with real data integration
+- Frontend completion with Level 4/5 (Attributes/Links) UI
+- Complete removal of mock data in favor of real API integration
 
-### ❌ TODO
-- Complete SupplierBrowser UI implementation
-- Remove all mock data usage
-- Full end-to-end testing
-- Level 4/5 UI implementation
+### ✌ Completed Recent Fixes
+- Removed `/api/offerings/new` - maintains hierarchical principle
+- Finalized CreateChildRequest vs AssignmentRequest distinction
+- Fixed all Master Data creation to use direct entity data
+- Implemented controlled redundancy handling in hierarchical creation
 
 ---
 
-*Current focus: Completing the generic type system migration across all API endpoints.*
+*Current focus: Frontend integration of Level 4/5 components and complete mock data replacement.*

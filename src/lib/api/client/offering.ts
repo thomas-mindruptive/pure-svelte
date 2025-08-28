@@ -10,7 +10,7 @@
  * - Links (dbo.wholesaler_offering_links)
  */
 
-import { apiFetch, apiFetchUnion, createPostBody, createQueryBody, getErrorMessage, LoadingState } from './common';
+import { apiFetch, apiFetchUnion, createPostBody, createQueryBody, getErrorMessage } from './common';
 import { log } from '$lib/utils/logger';
 import { ComparisonOperator, LogicalOperator, type QueryPayload } from '$lib/clientAndBack/queryGrammar';
 import type {
@@ -34,9 +34,12 @@ import type {
     CreateChildRequest,
     DeleteRequest
 } from '$lib/api/types/common';
+import { LoadingState } from './loadingState';
 
 // A dedicated loading state manager for all offering-related operations.
-export const offeringLoadingState = new LoadingState();
+const offeringLoadingManager = new LoadingState();
+export const offeringLoadingState = offeringLoadingManager.isLoadingStore; // Store für $-Syntax
+export const offeringLoadingOperations = offeringLoadingManager;
 
 // Type aliases for better readability
 export type OfferingWithDetails = WholesalerItemOffering_ProductDef_Category;
@@ -63,7 +66,7 @@ export const DEFAULT_OFFERING_QUERY: QueryPayload<WholesalerItemOffering> = {
  */
 export async function loadOffering(offeringId: number): Promise<OfferingWithDetails> {
     const operationId = `loadOffering-${offeringId}`;
-    offeringLoadingState.start(operationId);
+    offeringLoadingOperations.start(operationId);
     try {
         const responseData = await apiFetch<{ offering: OfferingWithDetails }>(
             `/api/offerings/${offeringId}`,
@@ -75,7 +78,7 @@ export async function loadOffering(offeringId: number): Promise<OfferingWithDeta
         log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
         throw err;
     } finally {
-        offeringLoadingState.finish(operationId);
+        offeringLoadingOperations.finish(operationId);
     }
 }
 
@@ -91,7 +94,7 @@ export async function loadOffering(offeringId: number): Promise<OfferingWithDeta
  */
 export async function loadOfferingAttributes(offeringId: number): Promise<AttributeWithDetails[]> {
     const operationId = `loadOfferingAttributes-${offeringId}`;
-    offeringLoadingState.start(operationId);
+    offeringLoadingOperations.start(operationId);
     try {
         const request: PredefinedQueryRequest = {
             namedQuery: 'offering_attributes',
@@ -130,7 +133,7 @@ export async function loadOfferingAttributes(offeringId: number): Promise<Attrib
         });
         throw err;
     } finally {
-        offeringLoadingState.finish(operationId);
+        offeringLoadingOperations.finish(operationId);
     }
 }
 
@@ -143,7 +146,7 @@ export async function loadOfferingAttributes(offeringId: number): Promise<Attrib
  */
 export async function loadAvailableAttributes(): Promise<Attribute[]> {
     const operationId = 'loadAvailableAttributes';
-    offeringLoadingState.start(operationId);
+    offeringLoadingOperations.start(operationId);
     try {
         const query: QueryPayload<Attribute> = {
             select: ['attribute_id', 'name', 'description'],
@@ -167,7 +170,7 @@ export async function loadAvailableAttributes(): Promise<Attribute[]> {
         });
         throw err;
     } finally {
-        offeringLoadingState.finish(operationId);
+        offeringLoadingOperations.finish(operationId);
     }
 }
 
@@ -180,7 +183,7 @@ export async function loadAvailableAttributes(): Promise<Attribute[]> {
  */
 export async function getAvailableAttributesForOffering(offeringId: number): Promise<Attribute[]> {
     const operationId = `getAvailableAttributesForOffering-${offeringId}`;
-    offeringLoadingState.start(operationId);
+    offeringLoadingOperations.start(operationId);
     try {
         // Get all attributes and assigned attributes in parallel
         const [allAttributes, assignedAttributes] = await Promise.all([
@@ -206,7 +209,7 @@ export async function getAvailableAttributesForOffering(offeringId: number): Pro
         });
         throw err;
     } finally {
-        offeringLoadingState.finish(operationId);
+        offeringLoadingOperations.finish(operationId);
     }
 }
 
@@ -226,7 +229,7 @@ export async function createOfferingAttribute(
     }
 ): Promise<WholesalerOfferingAttribute> {
     const operationId = 'createOfferingAttribute';
-    offeringLoadingState.start(operationId);
+    offeringLoadingOperations.start(operationId);
     try {
         // Use type-safe assignment request
         const requestBody: AssignmentRequest<WholesalerItemOffering, Attribute, { value?: string }> = {
@@ -255,7 +258,7 @@ export async function createOfferingAttribute(
         });
         throw err;
     } finally {
-        offeringLoadingState.finish(operationId);
+        offeringLoadingOperations.finish(operationId);
     }
 }
 
@@ -274,7 +277,7 @@ export async function updateOfferingAttribute(
     updates: { value?: string }
 ): Promise<WholesalerOfferingAttribute> {
     const operationId = `updateOfferingAttribute-${offeringId}-${attributeId}`;
-    offeringLoadingState.start(operationId);
+    offeringLoadingOperations.start(operationId);
     try {
         // Use type-safe update request
         const requestBody: AssignmentUpdateRequest<WholesalerItemOffering, Attribute, { value?: string }> = {
@@ -305,7 +308,7 @@ export async function updateOfferingAttribute(
         });
         throw err;
     } finally {
-        offeringLoadingState.finish(operationId);
+        offeringLoadingOperations.finish(operationId);
     }
 }
 
@@ -324,7 +327,7 @@ export async function deleteOfferingAttribute(
     cascade = false
 ): Promise<DeleteApiResponse<{ offering_id: number; attribute_id: number; attribute_name: string }, string[]>> {
     const operationId = `deleteOfferingAttribute-${offeringId}-${attributeId}`;
-    offeringLoadingState.start(operationId);
+    offeringLoadingOperations.start(operationId);
     try {
         // Use type-safe removal request
         const requestBody: RemoveAssignmentRequest<WholesalerItemOffering, Attribute> = {
@@ -363,7 +366,7 @@ export async function deleteOfferingAttribute(
         });
         throw err;
     } finally {
-        offeringLoadingState.finish(operationId);
+        offeringLoadingOperations.finish(operationId);
     }
 }
 
@@ -379,7 +382,7 @@ export async function deleteOfferingAttribute(
  */
 export async function loadOfferingLinks(offeringId: number): Promise<WholesalerOfferingLink[]> {
     const operationId = `loadOfferingLinks-${offeringId}`;
-    offeringLoadingState.start(operationId);
+    offeringLoadingOperations.start(operationId);
     try {
         const request: PredefinedQueryRequest = {
             namedQuery: 'offering_links',
@@ -418,7 +421,7 @@ export async function loadOfferingLinks(offeringId: number): Promise<WholesalerO
         });
         throw err;
     } finally {
-        offeringLoadingState.finish(operationId);
+        offeringLoadingOperations.finish(operationId);
     }
 }
 
@@ -433,7 +436,7 @@ export async function createOfferingLink(
     linkData: Omit<WholesalerOfferingLink, 'link_id'>
 ): Promise<WholesalerOfferingLink> {
     const operationId = 'createOfferingLink';
-    offeringLoadingState.start(operationId);
+    offeringLoadingOperations.start(operationId);
     try {
         // Use type-safe create request
         const requestBody: CreateChildRequest<WholesalerItemOffering, Omit<WholesalerOfferingLink, 'link_id'>> = {
@@ -461,7 +464,7 @@ export async function createOfferingLink(
         });
         throw err;
     } finally {
-        offeringLoadingState.finish(operationId);
+        offeringLoadingOperations.finish(operationId);
     }
 }
 
@@ -482,7 +485,7 @@ export async function updateOfferingLink(
     }
 ): Promise<WholesalerOfferingLink> {
     const operationId = `updateOfferingLink-${linkId}`;
-    offeringLoadingState.start(operationId);
+    offeringLoadingOperations.start(operationId);
     try {
         const rb = { link_id: linkId, ...updates }
         const responseData = await apiFetch<{ link: WholesalerOfferingLink }>(
@@ -505,7 +508,7 @@ export async function updateOfferingLink(
         });
         throw err;
     } finally {
-        offeringLoadingState.finish(operationId);
+        offeringLoadingOperations.finish(operationId);
     }
 }
 
@@ -522,7 +525,7 @@ export async function deleteOfferingLink(
     cascade = false
 ): Promise<DeleteApiResponse<{ link_id: number; url: string }, string[]>> {
     const operationId = `deleteOfferingLink-${linkId}`;
-    offeringLoadingState.start(operationId);
+    offeringLoadingOperations.start(operationId);
     try {
         // Use type-safe removal request
         const requestBody: DeleteRequest<WholesalerOfferingLink> = {
@@ -557,7 +560,7 @@ export async function deleteOfferingLink(
         });
         throw err;
     } finally {
-        offeringLoadingState.finish(operationId);
+        offeringLoadingOperations.finish(operationId);
     }
 }
 

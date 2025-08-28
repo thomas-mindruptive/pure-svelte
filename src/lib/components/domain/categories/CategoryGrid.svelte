@@ -32,7 +32,7 @@
 
 
 
-  // Svelte will say that "columns is updated." This is ok because this is jsut a workaorund.
+  // Svelte will say that "columns is updated." This is ok because this is jsut a workaorund for not being const.
   let columns: ColumnDef<WholesalerCategory_Category>[] = [];
   if (showOfferingCount) {
     let colsWithAccessor: ColumnDefWithAccessor<WholesalerCategory_Category>[] = [

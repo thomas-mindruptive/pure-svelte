@@ -70,7 +70,7 @@ function parseWhere(
 		if (!allowedColumns.includes(item.key)) {
 			throw new Error(`Column '${item.key}' is not allowed in the WHERE clause.`);
 		}
-		
+
 		if (item.op === ComparisonOperator.IS_NULL || item.op === ComparisonOperator.IS_NOT_NULL) {
 			return `${item.key} ${item.op}`;
 		}
@@ -78,7 +78,7 @@ function parseWhere(
 		if ((item.op === ComparisonOperator.IN || item.op === ComparisonOperator.NOT_IN) && Array.isArray(item.val)) {
 			// Handle empty arrays to prevent invalid SQL like `IN ()`
 			if (item.val.length === 0) return item.op === ComparisonOperator.IN ? '1=0' : '1=1';
-			
+
 			const paramNames = item.val.map(v => {
 				const paramName = `p${paramIndex.i++}`;
 				parameters[paramName] = v as SqlParameterValue;
@@ -137,20 +137,20 @@ function buildJoinClauses(
 	allowedColumns: ReadonlyArray<string>
 ): string {
 	if (!joins || joins.length === 0) return '';
-	
+
 	return joins.map(join => {
 		if (!join.table || !join.on) {
 			throw new Error('JOIN clause requires "table" and "on" properties.');
 		}
-		
+
 		// SECURITY: Basic check to prevent trivial injection in JOIN clauses.
 		if (/[;']/.test(join.table) || (join.alias && /[;']/.test(join.alias))) {
 			throw new Error('Invalid characters detected in JOIN clause.');
 		}
-		
+
 		const alias = join.alias ? ` AS ${join.alias}` : '';
 		const onClause = parseJoinConditions(join.on, allowedColumns);
-		
+
 		return `${join.type} ${join.table}${alias} ON ${onClause}`;
 	}).join(' ');
 }
@@ -159,13 +159,17 @@ function parseJoinConditions(
 	item: JoinConditionGroup | JoinCondition,
 	allowedColumns: ReadonlyArray<string>
 ): string {
+
+	log.debug(`parseJoinConditions`, { item, allowedColumns }); 
+
 	// Base case: item is a single join condition (columnA = columnB)
 	if (!('conditions' in item)) {
 		// SECURITY: Validate both columns against whitelist
 		if (!allowedColumns.includes(item.columnA) || !allowedColumns.includes(item.columnB)) {
-			throw new Error(`Join columns '${item.columnA}' or '${item.columnB}' are not allowed.`);
+			log.error(`parseJoinConditions: Join columns '${item.columnA}' or '${item.columnB}' are not allowed.`, { allowedColumns }); // Extra logging for security
+			throw new Error(`parseJoinConditions: Join columns '${item.columnA}' or '${item.columnB}' are not allowed.`);
 		}
-		
+
 		// For JOIN conditions, we typically don't parameterize - it's column = column
 		// But we could parameterize if needed for security
 		return `${item.columnA} ${item.op} ${item.columnB}`;
@@ -173,8 +177,8 @@ function parseJoinConditions(
 
 	// Recursive case: item is a condition group
 	if (item.conditions.length === 0) return '1=1'; // Neutral for empty groups
-	
-	const parts = item.conditions.map(c => 
+
+	const parts = item.conditions.map(c =>
 		parseJoinConditions(c, allowedColumns)
 	);
 
@@ -213,11 +217,11 @@ export function buildQuery<T>(
 		const fromSource = fixedFrom || payload.from;
 		if (!fromSource) throw new Error('FROM clause is required.');
 
-		log.info("Building query...", { fromSource, fixedFrom: !!fixedFrom });
-
 		const allowedColumns = config.allowedTables[
 			fromSource as keyof typeof config.allowedTables
 		] as ReadonlyArray<string>;
+
+		log.info("Building query...", { fromSource, fixedFrom: !!fixedFrom, allowedColumns });
 
 		if (!allowedColumns) {
 			throw new Error(`Table or View '${fromSource}' is not allowed for querying.`);
@@ -237,7 +241,7 @@ export function buildQuery<T>(
 
 		const parameters: Record<string, SqlParameterValue> = {};
 		const paramIndex = { i: 0 };
-		
+
 		const selectColumns = payload.select as ReadonlyArray<string>;
 		const validatedSelect = selectColumns.filter(col => {
 			const baseCol = col.split(' AS ')[0].trim();
@@ -251,10 +255,10 @@ export function buildQuery<T>(
 			const parsed = parseWhere(payload.where as Condition<unknown>, allowedColumns, parameters, paramIndex);
 			if (parsed !== '1=1') whereClause = `WHERE ${parsed}`;
 		}
-		
+
 		// The `orderBy` payload is cast to the broader type, which is safe due to the `keyof T & string` fix.
 		const orderByClause = buildOrderBy(
-			(payload.orderBy as JoinSortDescriptor[]) || [], 
+			(payload.orderBy as JoinSortDescriptor[]) || [],
 			allowedColumns
 		);
 
@@ -284,23 +288,23 @@ export function buildQuery<T>(
  * Executes a pre-built, parameterized SQL query against the database.
  */
 export async function executeQuery(sql: string, parameters: Record<string, SqlParameterValue>): Promise<QueryResultRow[]> {
-    const startTime = Date.now();
-    log.info("Executing query...", { parameterCount: Object.keys(parameters).length });
+	const startTime = Date.now();
+	log.info("Executing query...", { parameterCount: Object.keys(parameters).length });
 
-    try {
-        const request = db.request();
-        for (const [key, value] of Object.entries(parameters)) {
-            request.input(key, value);
-        }
-        const result = await request.query(sql);
-        const executionTime = Date.now() - startTime;
-        log.info(`Query executed successfully in ${executionTime}ms`, { rowCount: result.recordset.length });
-        return result.recordset as QueryResultRow[];
-    } catch (error: unknown) {
-        log.error("Query execution failed", {
-            sql: sql,
-            error: error instanceof Error ? error.message : String(error)
-        });
-        throw error;
-    }
+	try {
+		const request = db.request();
+		for (const [key, value] of Object.entries(parameters)) {
+			request.input(key, value);
+		}
+		const result = await request.query(sql);
+		const executionTime = Date.now() - startTime;
+		log.info(`Query executed successfully in ${executionTime}ms`, { rowCount: result.recordset.length });
+		return result.recordset as QueryResultRow[];
+	} catch (error: unknown) {
+		log.error("Query execution failed", {
+			sql: sql,
+			error: error instanceof Error ? error.message : String(error)
+		});
+		throw error;
+	}
 }

@@ -36,8 +36,8 @@ export const supplierQueryConfig: QueryConfig = {
 
     // Validated against PredefinedQueryConfig
     'supplier_categories': [
-      'w.wholesaler_id', 'w.name AS supplier_name', 'wc.category_id', 'pc.name AS category_name',
-      'pc.description AS category_description', 'wc.comment', 'wc.link', 'oc.offering_count'
+      'w.wholesaler_id', 'w.name AS supplier_name', 'wc.wholesaler_id', 'wc.category_id', 'pc.category_id', 'pc.name','pc.name AS category_name',
+      'pc.description AS category_description', 'wc.comment', 'wc.link'
     ],
     'category_offerings': [
       'pc.category_id', 'pc.name AS category_name', 'pc.description AS category_description',
@@ -57,95 +57,96 @@ export const supplierQueryConfig: QueryConfig = {
     ]
   },
   joinConfigurations: {
-  'supplier_categories': {
-    from: 'dbo.wholesalers w',
-    joins: [
-      { 
-        type: JoinType.INNER, 
-        table: 'dbo.wholesaler_categories', 
-        alias: 'wc', 
-        on: {
-          op: LogicalOperator.AND,
-          conditions: [
-            {columnA: 'w.wholesaler_id', op: ComparisonOperator.EQUALS, columnB: 'wc.wholesaler_id'}
-          ]
+    'supplier_categories': {
+      from: 'dbo.wholesalers w',
+      joins: [
+        {
+          type: JoinType.INNER,
+          table: 'dbo.wholesaler_categories',
+          alias: 'wc',
+          on: {
+            op: LogicalOperator.AND,
+            conditions: [
+              { columnA: 'w.wholesaler_id', op: ComparisonOperator.EQUALS, columnB: 'wc.wholesaler_id' }
+            ]
+          }
+        },
+        {
+          type: JoinType.INNER,
+          table: 'dbo.product_categories',
+          alias: 'pc',
+          on: {
+            op: LogicalOperator.AND,
+            conditions: [
+              { columnA: 'wc.category_id', op: ComparisonOperator.EQUALS, columnB: 'pc.category_id' }
+            ]
+          }
         }
-      },
-      { 
-        type: JoinType.INNER, 
-        table: 'dbo.product_categories', 
-        alias: 'pc', 
-        on: {
-          op: LogicalOperator.AND,
-          conditions: [
-            {columnA: 'wc.category_id', op: ComparisonOperator.EQUALS, columnB: 'pc.category_id'}
-          ]
+      ]
+    },
+    'category_offerings': {
+      from: 'dbo.product_categories pc',
+      joins: [
+        {
+          type: JoinType.INNER,
+          table: 'dbo.wholesaler_item_offerings',
+          alias: 'wio',
+          on: {
+            op: LogicalOperator.AND,
+            conditions: [
+              { columnA: 'pc.category_id', op: ComparisonOperator.EQUALS, columnB: 'wio.category_id' }
+            ]
+          }
         }
-      }
-    ]
-  },
-  'category_offerings': {
-    from: 'dbo.product_categories pc',
-    joins: [
-      { 
-        type: JoinType.INNER, 
-        table: 'dbo.wholesaler_item_offerings', 
-        alias: 'wio', 
-        on: {
-          op: LogicalOperator.AND,
-          conditions: [
-            {columnA: 'pc.category_id', op: ComparisonOperator.EQUALS, columnB: 'wio.category_id'}
-          ]
+      ]
+    },
+    'wholesaler_category_offerings': {
+      from: 'dbo.wholesaler_categories wc',
+      joins: [
+        {
+          type: JoinType.INNER,
+          table: 'dbo.wholesaler_item_offerings',
+          alias: 'wio',
+          on: {
+            op: LogicalOperator.AND,
+            conditions: [
+              { columnA: 'wc.wholesaler_id', op: ComparisonOperator.EQUALS, columnB: 'wio.wholesaler_id' }
+            ]
+          }
         }
-      }
-    ]
-  },
-  'wholesaler_category_offerings': {
-    from: 'dbo.wholesaler_categories wc',
-    joins: [
-      { 
-        type: JoinType.INNER, 
-        table: 'dbo.wholesaler_item_offerings', 
-        alias: 'wio', 
-        on: {
-          op: LogicalOperator.AND,
-          conditions: [
-            {columnA: 'wc.wholesaler_id', op: ComparisonOperator.EQUALS, columnB: 'wio.wholesaler_id'}
-          ]
+      ]
+    },
+    'offering_attributes': {
+      from: 'dbo.wholesaler_item_offerings wio',
+      joins: [
+        {
+          type: JoinType.LEFT,
+          table: 'dbo.wholesaler_offering_attributes',
+          alias: 'woa',
+          on: {
+            op: LogicalOperator.AND,
+            conditions: [
+              { columnA: 'wio.offering_id', op: ComparisonOperator.EQUALS, columnB: 'woa.offering_id' }
+            ]
+          }
         }
-      }
-    ]
-  },
-  'offering_attributes': {
-    from: 'dbo.wholesaler_item_offerings wio',
-    joins: [
-      { 
-        type: JoinType.LEFT, 
-        table: 'dbo.wholesaler_offering_attributes', 
-        alias: 'woa', 
-        on: {
-          op: LogicalOperator.AND,
-          conditions: [
-            {columnA: 'wio.offering_id', op: ComparisonOperator.EQUALS, columnB: 'woa.offering_id'}
-          ]
+      ]
+    },
+    'offering_links': {
+      from: 'dbo.wholesaler_item_offerings wio',
+      joins: [
+        {
+          type: JoinType.LEFT,
+          table: 'dbo.wholesaler_offering_links',
+          alias: 'wol',
+          on: {
+            op: LogicalOperator.AND,
+            conditions: [
+              { columnA: 'wio.offering_id', op: ComparisonOperator.EQUALS, columnB: 'wol.offering_id' }
+            ]
+          }
         }
-      }
-    ]
-  },
-  'offering_links': {
-    from: 'dbo.wholesaler_item_offerings wio',
-    joins: [
-      { 
-        type: JoinType.LEFT, 
-        table: 'dbo.wholesaler_offering_links', 
-        alias: 'wol', 
-        on: {
-          op: LogicalOperator.AND,
-          conditions: [
-            {columnA: 'wio.offering_id', op: ComparisonOperator.EQUALS, columnB: 'wol.offering_id'}
-          ]
-        }
-      }
-    ]
+      ]
+    }
   }
-}};
+};

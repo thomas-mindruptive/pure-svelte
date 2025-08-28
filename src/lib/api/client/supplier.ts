@@ -7,7 +7,7 @@
  * (Category Assignments) according to the Composition-Prinzip.
  */
 
-import { apiFetch, apiFetchUnion, createPostBody, createQueryBody, getErrorMessage, LoadingState } from './common';
+import { apiFetch, apiFetchUnion, createPostBody, createQueryBody, getErrorMessage } from './common';
 import { log } from '$lib/utils/logger';
 import { ComparisonOperator, LogicalOperator, type QueryPayload } from '$lib/clientAndBack/queryGrammar';
 import type { Wholesaler, WholesalerCategoryWithCount, ProductCategory, WholesalerCategory } from '$lib/domain/types';
@@ -21,9 +21,16 @@ import type {
 	RemoveAssignmentRequest,
 	AssignmentSuccessData
 } from '$lib/api/types/common';
+import { LoadingState } from './loadingState';
+
 
 // A dedicated loading state manager for all supplier-related operations.
-export const supplierLoadingState = new LoadingState();
+//export const supplierLoadingState = new LoadingState();
+const supplierLoadingManager = new LoadingState();
+export const supplierLoadingState = supplierLoadingManager.isLoadingStore; // Store für $-Syntax
+export const supplierLoadingOperations = supplierLoadingManager;
+
+
 
 /**
  * The default query payload used when fetching a list of suppliers.
@@ -51,7 +58,7 @@ type SupplierCategoryDeleteResponse = DeleteApiResponse<
  */
 export async function loadSuppliers(query: Partial<QueryPayload<Wholesaler>> = {}): Promise<Wholesaler[]> {
 	const operationId = 'loadSuppliers';
-	supplierLoadingState.start(operationId);
+	supplierLoadingOperations.start(operationId);
 	try {
 		const fullQuery: QueryPayload<Wholesaler> = { ...DEFAULT_SUPPLIER_QUERY, ...query };
 
@@ -61,12 +68,14 @@ export async function loadSuppliers(query: Partial<QueryPayload<Wholesaler>> = {
 			{ context: operationId }
 		);
 
+		// For test/debug: await delay(3000); 
+
 		return responseData.results as Wholesaler[];
 	} catch (err) {
 		log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
 		throw err;
 	} finally {
-		supplierLoadingState.finish(operationId);
+		supplierLoadingOperations.finish(operationId);
 	}
 }
 
@@ -79,7 +88,7 @@ export async function loadSuppliers(query: Partial<QueryPayload<Wholesaler>> = {
  */
 export async function loadSupplier(supplierId: number): Promise<Wholesaler> {
 	const operationId = `loadSupplier-${supplierId}`;
-	supplierLoadingState.start(operationId);
+	supplierLoadingOperations.start(operationId);
 	try {
 		const responseData = await apiFetch<{ supplier: Wholesaler }>(
 			`/api/suppliers/${supplierId}`,
@@ -92,7 +101,7 @@ export async function loadSupplier(supplierId: number): Promise<Wholesaler> {
 		log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
 		throw err;
 	} finally {
-		supplierLoadingState.finish(operationId);
+		supplierLoadingOperations.finish(operationId);
 	}
 }
 
@@ -107,7 +116,7 @@ export async function createSupplier(
 	supplierData: Partial<Omit<Wholesaler, 'wholesaler_id'>>
 ): Promise<Wholesaler> {
 	const operationId = 'createSupplier';
-	supplierLoadingState.start(operationId);
+	supplierLoadingOperations.start(operationId);
 	try {
 		const responseData = await apiFetch<{ supplier: Wholesaler }>(
 			'/api/suppliers/new',
@@ -119,7 +128,7 @@ export async function createSupplier(
 		log.error(`[${operationId}] Failed.`, { supplierData, error: getErrorMessage(err) });
 		throw err;
 	} finally {
-		supplierLoadingState.finish(operationId);
+		supplierLoadingOperations.finish(operationId);
 	}
 }
 
@@ -133,7 +142,7 @@ export async function createSupplier(
  */
 export async function updateSupplier(supplierId: number, updates: Partial<Wholesaler>): Promise<Wholesaler> {
 	const operationId = `updateSupplier-${supplierId}`;
-	supplierLoadingState.start(operationId);
+	supplierLoadingOperations.start(operationId);
 	try {
 		const responseData = await apiFetch<{ supplier: Wholesaler }>(
 			`/api/suppliers/${supplierId}`,
@@ -145,7 +154,7 @@ export async function updateSupplier(supplierId: number, updates: Partial<Wholes
 		log.error(`[${operationId}] Failed.`, { updates, error: getErrorMessage(err) });
 		throw err;
 	} finally {
-		supplierLoadingState.finish(operationId);
+		supplierLoadingOperations.finish(operationId);
 	}
 }
 
@@ -162,7 +171,7 @@ export async function deleteSupplier(
 	cascade = false
 ): Promise<DeleteApiResponse<{ wholesaler_id: number; name: string }, string[]>> {
 	const operationId = `deleteSupplier-${supplierId}`;
-	supplierLoadingState.start(operationId);
+	supplierLoadingOperations.start(operationId);
 	try {
 		const url = `/api/suppliers/${supplierId}${cascade ? '?cascade=true' : ''}`;
 		return await apiFetchUnion<DeleteApiResponse<{ wholesaler_id: number; name: string }, string[]>>(
@@ -171,7 +180,7 @@ export async function deleteSupplier(
 			{ context: operationId }
 		);
 	} finally {
-		supplierLoadingState.finish(operationId);
+		supplierLoadingOperations.finish(operationId);
 	}
 }
 
@@ -187,7 +196,7 @@ export async function deleteSupplier(
  */
 export async function loadCategoriesForSupplier(supplierId: number): Promise<WholesalerCategoryWithCount[]> {
 	const operationId = `loadCategoriesForSupplier-${supplierId}`;
-	supplierLoadingState.start(operationId);
+	supplierLoadingOperations.start(operationId);
 	try {
 		const request: PredefinedQueryRequest = {
 			namedQuery: 'supplier_categories',
@@ -197,8 +206,7 @@ export async function loadCategoriesForSupplier(supplierId: number): Promise<Who
 					'wc.category_id',
 					'pc.name AS category_name',
 					'wc.comment',
-					'wc.link',
-					'oc.offering_count'
+					'wc.link'
 				],
 				where: {
 					op: LogicalOperator.AND,
@@ -218,7 +226,7 @@ export async function loadCategoriesForSupplier(supplierId: number): Promise<Who
 		log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
 		throw err;
 	} finally {
-		supplierLoadingState.finish(operationId);
+		supplierLoadingOperations.finish(operationId);
 	}
 }
 
@@ -230,7 +238,7 @@ export async function loadCategoriesForSupplier(supplierId: number): Promise<Who
  */
 export async function loadAvailableCategories(): Promise<ProductCategory[]> {
 	const operationId = 'loadAvailableCategories';
-	supplierLoadingState.start(operationId);
+	supplierLoadingOperations.start(operationId);
 	try {
 		const query: QueryPayload<ProductCategory> = {
 			select: ['category_id', 'name', 'description'],
@@ -248,7 +256,7 @@ export async function loadAvailableCategories(): Promise<ProductCategory[]> {
 		log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
 		throw err;
 	} finally {
-		supplierLoadingState.finish(operationId);
+		supplierLoadingOperations.finish(operationId);
 	}
 }
 
@@ -261,7 +269,7 @@ export async function loadAvailableCategories(): Promise<ProductCategory[]> {
  */
 export async function loadAvailableCategoriesForSupplier(supplierId: number): Promise<ProductCategory[]> {
 	const operationId = `loadAvailableCategoriesForSupplier-${supplierId}`;
-	supplierLoadingState.start(operationId);
+	supplierLoadingOperations.start(operationId);
 	try {
 		// Get all categories and assigned categories in parallel
 		const [allCategories, assignedCategories] = await Promise.all([
@@ -278,7 +286,7 @@ export async function loadAvailableCategoriesForSupplier(supplierId: number): Pr
 		log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
 		throw err;
 	} finally {
-		supplierLoadingState.finish(operationId);
+		supplierLoadingOperations.finish(operationId);
 	}
 }
 
@@ -296,7 +304,7 @@ export async function assignCategoryToSupplier(assignmentData: {
 	link?: string;
 }): Promise<AssignmentSuccessData<WholesalerCategory>> {
 	const operationId = 'assignCategoryToSupplier';
-	supplierLoadingState.start(operationId);
+	supplierLoadingOperations.start(operationId);
 	try {
 		const requestBody: AssignmentRequest<Wholesaler, ProductCategory, { comment?: string; link?: string }> = {
 			parentId: assignmentData.supplierId,
@@ -315,7 +323,7 @@ export async function assignCategoryToSupplier(assignmentData: {
 		log.error(`[${operationId}] Failed.`, { assignmentData, error: getErrorMessage(err) });
 		throw err;
 	} finally {
-		supplierLoadingState.finish(operationId);
+		supplierLoadingOperations.finish(operationId);
 	}
 }
 
@@ -332,7 +340,7 @@ export async function removeCategoryFromSupplier(removalData: {
 	cascade?: boolean;
 }): Promise<SupplierCategoryDeleteResponse> {
 	const operationId = 'removeCategoryFromSupplier';
-	supplierLoadingState.start(operationId);
+	supplierLoadingOperations.start(operationId);
 	try {
 		const requestBody: RemoveAssignmentRequest<Wholesaler, ProductCategory> = {
 			parentId: removalData.supplierId,
@@ -346,7 +354,7 @@ export async function removeCategoryFromSupplier(removalData: {
 			{ context: operationId }
 		);
 	} finally {
-		supplierLoadingState.finish(operationId);
+		supplierLoadingOperations.finish(operationId);
 	}
 }
 

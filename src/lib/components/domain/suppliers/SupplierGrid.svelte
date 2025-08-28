@@ -17,7 +17,7 @@
     executeDelete, // (ids) => Promise<void>
     onRowClick,
   } = $props<{
-    rows?: Wholesaler[];
+    rows?: Wholesaler[] | null;
     loading?: boolean;
     executeDelete: (ids: ID[]) => Promise<void>;
     onRowClick?: (supplier: Wholesaler) => void;

@@ -25,23 +25,19 @@
     WholesalerItemOffering_ProductDef_Category,
   } from "$lib/domain/types";
 
-  // Import API client functions - CORRECTED IMPORTS
+  // Import API client functions
   import { 
     loadSuppliers, 
     loadSupplier,
     updateSupplier,
     deleteSupplier,
-    DEFAULT_SUPPLIER_QUERY,
-    // CORRECTED: These functions are in supplier.ts, not category.ts
-    loadCategoriesForSupplier,
+    DEFAULT_SUPPLIER_QUERY 
+  } from "$lib/api/client/supplier";
+  import { 
+    loadSupplierCategories, 
     assignCategoryToSupplier, 
     removeCategoryFromSupplier,
-    loadAvailableCategoriesForSupplier,
-    supplierLoadingState
-  } from "$lib/api/client/supplier";
-
-  import { 
-    categoryLoadingState
+    getAvailableCategoriesForSupplier
   } from "$lib/api/client/category";
 
   import { addNotification } from "$lib/stores/notifications";
@@ -52,11 +48,16 @@
   // ===== STATE (Svelte 5 Runes) =====
   
   // Real data from API
-  let suppliers = $state<Wholesaler[] | null>(null);
+  let suppliers = $state<Wholesaler[]>([]);
   let selectedSupplierData = $state<Wholesaler | null>(null);
   let supplierCategories = $state<WholesalerCategory_Category[]>([]);
   let availableCategories = $state<ProductCategory[]>([]);
   
+  // Loading states
+  let loadingSuppliers = $state(false);
+  let loadingSupplierData = $state(false);
+  let loadingCategories = $state(false);
+  let loadingAvailableCategories = $state(false);
 
   // Mock data for Level 3-5 (still using mocks)
   const mockOfferingsData = constMockData.wholesalerItemOfferings;
@@ -74,9 +75,9 @@
 
   // ===== DERIVED STATE =====
   const selectedSupplier = $derived(
-    selectedSupplierId && suppliers
+    selectedSupplierId
       ? suppliers.find(s => s.wholesaler_id === selectedSupplierId) || selectedSupplierData
-      : selectedSupplierData,
+      : null,
   );
 
   const selectedCategory = $derived(
@@ -97,7 +98,7 @@
 
   // Sidebar data with real counts
   const counts = $derived({
-    wholesalers: suppliers?.length || 0,
+    wholesalers: suppliers.length,
     categories: supplierCategories.length,
     offerings: offeringsForSupplierAndCategory.length,
     attributes: 0, // Not implemented yet
@@ -144,8 +145,7 @@
    */
   async function loadSuppliersData() {
     try {
-      // REMOVED: Manual loading state management - API client handles this
-      // loadingSuppliers = true;
+      loadingSuppliers = true;
       log.info("Loading suppliers from API");
       
       suppliers = await loadSuppliers({
@@ -158,11 +158,9 @@
       log.error("Failed to load suppliers", { error });
       addNotification("Failed to load suppliers", "error");
       suppliers = [];
+    } finally {
+      loadingSuppliers = false;
     }
-    // REMOVED: Manual loading state management
-    // finally {
-    //   loadingSuppliers = false;
-    // }
   }
 
   /**
@@ -170,8 +168,7 @@
    */
   async function loadSupplierData(supplierId: number) {
     try {
-      // REMOVED: Manual loading state management
-      // loadingSupplierData = true;
+      loadingSupplierData = true;
       log.info("Loading supplier details", { supplierId });
       
       selectedSupplierData = await loadSupplier(supplierId);
@@ -184,11 +181,9 @@
       log.error("Failed to load supplier details", { supplierId, error });
       addNotification("Failed to load supplier details", "error");
       selectedSupplierData = null;
+    } finally {
+      loadingSupplierData = false;
     }
-    // REMOVED: Manual loading state management
-    // finally {
-    //   loadingSupplierData = false;
-    // }
   }
 
   /**
@@ -196,12 +191,12 @@
    */
   async function loadSupplierCategoriesData(supplierId: number) {
     try {
-      // REMOVED: Manual loading state management
-      // loadingCategories = true;
+      loadingCategories = true;
       log.info("Loading supplier categories", { supplierId });
       
-      // CORRECTED: Function name and removed includeOfferingCounts parameter
-      supplierCategories = await loadCategoriesForSupplier(supplierId);
+      supplierCategories = await loadSupplierCategories(supplierId, {
+        includeOfferingCounts: true
+      });
       
       log.info("Supplier categories loaded", { 
         supplierId, 
@@ -211,11 +206,9 @@
       log.error("Failed to load supplier categories", { supplierId, error });
       addNotification("Failed to load supplier categories", "error");
       supplierCategories = [];
+    } finally {
+      loadingCategories = false;
     }
-    // REMOVED: Manual loading state management
-    // finally {
-    //   loadingCategories = false;
-    // }
   }
 
   /**
@@ -223,12 +216,10 @@
    */
   async function loadAvailableCategoriesData(supplierId: number) {
     try {
-      // REMOVED: Manual loading state management
-      // loadingAvailableCategories = true;
+      loadingAvailableCategories = true;
       log.info("Loading available categories", { supplierId });
       
-      // CORRECTED: Function name
-      availableCategories = await loadAvailableCategoriesForSupplier(supplierId);
+      availableCategories = await getAvailableCategoriesForSupplier(supplierId);
       
       log.info("Available categories loaded", { 
         supplierId, 
@@ -238,11 +229,9 @@
       log.error("Failed to load available categories", { supplierId, error });
       addNotification("Failed to load available categories", "error");
       availableCategories = [];
+    } finally {
+      loadingAvailableCategories = false;
     }
-    // REMOVED: Manual loading state management
-    // finally {
-    //   loadingAvailableCategories = false;
-    // }
   }
 
   // ===== REACTIVE DATA LOADING =====
@@ -389,7 +378,7 @@
             }
           }
         } else if (result.success) {
-          addNotification(`Supplier "${result.data.deleted_resource.name}" deleted successfully`, "success");
+          addNotification(`Supplier "${result.deleted_supplier?.name}" deleted successfully`, "success");
         }
       } catch (error) {
         log.error("Failed to delete supplier", { id, error });
@@ -448,14 +437,14 @@
             });
             if (cascadeResult.success) {
               addNotification(
-                `Category and ${cascadeResult.data.dependencies_cleared || 0} offerings removed successfully`,
+                `Category and ${cascadeResult.offerings_removed || 0} offerings removed successfully`,
                 "success"
               );
             }
           }
         } else if (result.success) {
           addNotification(
-            `Category "${result.data.deleted_resource.category_name}" removed successfully`,
+            `Category "${result.removed_assignment?.category_name}" removed successfully`,
             "success"
           );
         }
@@ -505,11 +494,9 @@
       selectedSupplierData = updatedSupplier;
       
       // Update suppliers list if needed
-      if (suppliers) {
-        const supplierIndex = suppliers.findIndex(s => s.wholesaler_id === selectedSupplierId);
-        if (supplierIndex >= 0) {
-          suppliers[supplierIndex] = { ...suppliers[supplierIndex], ...updatedSupplier };
-        }
+      const supplierIndex = suppliers.findIndex(s => s.wholesaler_id === selectedSupplierId);
+      if (supplierIndex >= 0) {
+        suppliers[supplierIndex] = { ...suppliers[supplierIndex], ...updatedSupplier };
       }
       
     } catch (error) {
@@ -581,7 +568,12 @@
     return "Supplier Browser";
   });
 
-const isLoading = $derived($supplierLoadingState || $categoryLoadingState);
+  const isLoading = $derived(
+    loadingSuppliers || 
+    loadingSupplierData || 
+    loadingCategories || 
+    loadingAvailableCategories
+  );
 </script>
 
 <svelte:head>
@@ -622,7 +614,7 @@ const isLoading = $derived($supplierLoadingState || $categoryLoadingState);
         <div class="master-form-section">
           <SupplierForm
             initial={selectedSupplier}
-            disabled={$supplierLoadingState}
+            disabled={loadingSupplierData}
             onSubmitted={handleSupplierUpdate}
             onCancelled={handleFormCancel}
           />
@@ -631,7 +623,7 @@ const isLoading = $derived($supplierLoadingState || $categoryLoadingState);
         <CategoryAssignment
           supplierId={selectedSupplier.wholesaler_id}
           availableCategories={availableCategories}
-          loading={$categoryLoadingState}
+          loading={loadingAvailableCategories}
           onAssigned={handleCategoryAssigned}
           onError={handleCategoryError}
         />
@@ -641,15 +633,15 @@ const isLoading = $derived($supplierLoadingState || $categoryLoadingState);
       <div class="grid-section">
         {#if currentLevel === "wholesalers"}
           <SupplierGrid
-            rows={suppliers || []}
-            loading={$supplierLoadingState}
+            rows={suppliers}
+            loading={loadingSuppliers}
             executeDelete={handleSupplierDelete}
             onRowClick={handleSupplierSelect}
           />
         {:else if currentLevel === "categories"}
           <CategoryGrid
             rows={supplierCategories}
-            loading={$categoryLoadingState}
+            loading={loadingCategories}
             showOfferingCount={true}
             executeDelete={handleCategoryDelete}
             onRowClick={handleCategorySelect}

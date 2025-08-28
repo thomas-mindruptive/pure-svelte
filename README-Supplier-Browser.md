@@ -468,4 +468,11 @@ assign{Child}To{Parent}(data: {
 
 ---
 
-*Current focus: Frontend integration of Level 4/5 components and complete mock data replacement.*
+## Svelte 5 Runes Integration - LoadingState Architecture
+Erkenntnisse aus der Frontend-Integration
+Bei der Integration der API-Clients mit Svelte 5 Runes traten wichtige architektonische Erkenntnisse auf, die für alle zukünftigen Implementierungen relevant sind:
+Runes-Kompatibilität: Svelte 5 Runes ($state, $derived) funktionieren ausschließlich in .svelte-Dateien. Die ursprüngliche LoadingState-Klasse in lib/api/client/common.ts musste von Runes auf Svelte Stores umgestellt werden, um "rune_outside_svelte" Fehler zu vermeiden.
+Store-basierte LoadingState (Finalized): Die LoadingState-Klasse verwendet jetzt writable() und derived() stores anstelle von Runes. Dies ermöglicht reactivity zwischen TypeScript-Modulen und Svelte-Komponenten. Der korrekte Zugriff erfolgt über $loadingState.isLoadingStore anstelle des non-reactive getters loadingState.isLoading.
+Initial State Pattern: Für optimale Loading-UX wurde das "null initial state" Pattern implementiert. Data-Arrays starten als null (nicht []), wodurch Grid-Komponenten zwischen "loading" (null + loading=true) und "no data" ([] + loading=false) unterscheiden können. Dies verhindert das kurze "No data"-Flash beim ersten Laden.
+Integration Pattern: Frontend-Komponenten konsumieren LoadingStates über $derived($apiClient.isLoadingStore), wodurch automatische Reaktivität auf API-Operationen gewährleistet ist. Der zentrale isLoading state kombiniert alle relevanten LoadingStates für globale UI-Feedback.
+Diese Lösung eliminiert Race-Conditions zwischen Component-Mounting und API-Initialisierung und bietet konsistente Loading-UX für alle Hierarchie-Level.RetryClaude can make mistakes. Please double-check responses.

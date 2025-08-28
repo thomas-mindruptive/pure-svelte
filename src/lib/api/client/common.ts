@@ -186,27 +186,3 @@ export function getErrorMessage(error: unknown): string {
 	return 'An unexpected error occurred.';
 }
 
-/**
- * A generic class to manage loading states for multiple concurrent API operations.
- * This allows the UI to show loading indicators for specific actions (e.g., deleting a specific row)
- * or for any ongoing operation.
- */
-export class LoadingState {
-	private loadingOperations = new Set<string>();
-	private callbacks = new Set<() => void>();
-
-	/** Marks an operation as started. */
-	start(operationId: string) { this.loadingOperations.add(operationId); this.notifyCallbacks(); }
-	/** Marks an operation as finished. */
-	finish(operationId: string) { this.loadingOperations.delete(operationId); this.notifyCallbacks(); }
-	/** Returns true if any operation is currently in progress. */
-	get isLoading(): boolean { return this.loadingOperations.size > 0; }
-	/** Returns true if a specific operation is in progress. */
-	isOperationLoading(operationId: string): boolean { return this.loadingOperations.has(operationId); }
-	/** Subscribes to changes in the loading state. Returns an unsubscribe function. */
-	subscribe(callback: () => void): () => void {
-		this.callbacks.add(callback);
-		return () => this.callbacks.delete(callback);
-	}
-	private notifyCallbacks() { this.callbacks.forEach((cb) => cb()); }
-}

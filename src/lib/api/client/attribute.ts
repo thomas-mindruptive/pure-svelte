@@ -7,7 +7,7 @@
  * Composition-Prinzip. Offering-attribute assignments are managed by offering.ts.
  */
 
-import { apiFetch, apiFetchUnion, createPostBody, createQueryBody, getErrorMessage, LoadingState } from './common';
+import { apiFetch, apiFetchUnion, createPostBody, createQueryBody, getErrorMessage } from './common';
 import { log } from '$lib/utils/logger';
 import { ComparisonOperator, LogicalOperator, type QueryPayload, type Condition, type ConditionGroup } from '$lib/clientAndBack/queryGrammar';
 import type { Attribute } from '$lib/domain/types';
@@ -17,9 +17,12 @@ import type {
     DeleteApiResponse,
     QueryResponseData
 } from '$lib/api/types/common';
+import { LoadingState } from './loadingState';
 
 // A dedicated loading state manager for all attribute master-data operations.
-export const attributeLoadingState = new LoadingState();
+const attributeLoadingManager = new LoadingState();
+export const attributeLoadingState = attributeLoadingManager.isLoadingStore; // Store für $-Syntax
+export const attributeLoadingOperations = attributeLoadingManager;
 
 /**
  * The default query payload used when fetching attributes.
@@ -42,7 +45,7 @@ export const DEFAULT_ATTRIBUTE_QUERY: QueryPayload<Attribute> = {
  */
 export async function loadAttributes(query: Partial<QueryPayload<Attribute>> = {}): Promise<Attribute[]> {
     const operationId = 'loadAttributes';
-    attributeLoadingState.start(operationId);
+    attributeLoadingOperations.start(operationId);
     try {
         const fullQuery: QueryPayload<Attribute> = { ...DEFAULT_ATTRIBUTE_QUERY, ...query };
 
@@ -64,7 +67,7 @@ export async function loadAttributes(query: Partial<QueryPayload<Attribute>> = {
         });
         throw err;
     } finally {
-        attributeLoadingState.finish(operationId);
+        attributeLoadingOperations.finish(operationId);
     }
 }
 
@@ -77,7 +80,7 @@ export async function loadAttributes(query: Partial<QueryPayload<Attribute>> = {
  */
 export async function loadAttribute(attributeId: number): Promise<Attribute> {
     const operationId = `loadAttribute-${attributeId}`;
-    attributeLoadingState.start(operationId);
+    attributeLoadingOperations.start(operationId);
     try {
         const responseData = await apiFetch<{ attribute: Attribute }>(
             `/api/attributes/${attributeId}`,
@@ -98,7 +101,7 @@ export async function loadAttribute(attributeId: number): Promise<Attribute> {
         });
         throw err;
     } finally {
-        attributeLoadingState.finish(operationId);
+        attributeLoadingOperations.finish(operationId);
     }
 }
 
@@ -113,7 +116,7 @@ export async function createAttribute(
     attributeData: Partial<Omit<Attribute, 'attribute_id'>>
 ): Promise<Attribute> {
     const operationId = 'createAttribute';
-    attributeLoadingState.start(operationId);
+    attributeLoadingOperations.start(operationId);
     try {
         const responseData = await apiFetch<{ attribute: Attribute }>(
             '/api/attributes/new',
@@ -134,7 +137,7 @@ export async function createAttribute(
         });
         throw err;
     } finally {
-        attributeLoadingState.finish(operationId);
+        attributeLoadingOperations.finish(operationId);
     }
 }
 
@@ -148,7 +151,7 @@ export async function createAttribute(
  */
 export async function updateAttribute(attributeId: number, updates: Partial<Attribute>): Promise<Attribute> {
     const operationId = `updateAttribute-${attributeId}`;
-    attributeLoadingState.start(operationId);
+    attributeLoadingOperations.start(operationId);
     try {
         const responseData = await apiFetch<{ attribute: Attribute }>(
             `/api/attributes/${attributeId}`,
@@ -171,7 +174,7 @@ export async function updateAttribute(attributeId: number, updates: Partial<Attr
         });
         throw err;
     } finally {
-        attributeLoadingState.finish(operationId);
+        attributeLoadingOperations.finish(operationId);
     }
 }
 
@@ -189,7 +192,7 @@ export async function deleteAttribute(
     cascade = false
 ): Promise<DeleteApiResponse<{ attribute_id: number; name: string }, string[]>> {
     const operationId = `deleteAttribute-${attributeId}`;
-    attributeLoadingState.start(operationId);
+    attributeLoadingOperations.start(operationId);
     try {
         const url = `/api/attributes/${attributeId}${cascade ? '?cascade=true' : ''}`;
         const result = await apiFetchUnion<DeleteApiResponse<{ attribute_id: number; name: string }, string[]>>(
@@ -221,7 +224,7 @@ export async function deleteAttribute(
         });
         throw err;
     } finally {
-        attributeLoadingState.finish(operationId);
+        attributeLoadingOperations.finish(operationId);
     }
 }
 
@@ -236,7 +239,7 @@ export async function deleteAttribute(
  */
 export async function searchAttributes(searchTerm: string, limit = 20): Promise<Attribute[]> {
     const operationId = `searchAttributes-${searchTerm}`;
-    attributeLoadingState.start(operationId);
+    attributeLoadingOperations.start(operationId);
     try {
         if (!searchTerm.trim()) {
             log.warn(`[${operationId}] Empty search term provided.`);
@@ -275,7 +278,7 @@ export async function searchAttributes(searchTerm: string, limit = 20): Promise<
         });
         throw err;
     } finally {
-        attributeLoadingState.finish(operationId);
+        attributeLoadingOperations.finish(operationId);
     }
 }
 
@@ -289,7 +292,7 @@ export async function searchAttributes(searchTerm: string, limit = 20): Promise<
  */
 export async function loadPopularAttributes(limit = 10): Promise<Attribute[]> {
     const operationId = 'loadPopularAttributes';
-    attributeLoadingState.start(operationId);
+    attributeLoadingOperations.start(operationId);
     try {
         // This would use a predefined query that JOINs with assignment counts
         // For now, we'll load recent attributes as a placeholder
@@ -316,7 +319,7 @@ export async function loadPopularAttributes(limit = 10): Promise<Attribute[]> {
         });
         throw err;
     } finally {
-        attributeLoadingState.finish(operationId);
+        attributeLoadingOperations.finish(operationId);
     }
 }
 
@@ -331,7 +334,7 @@ export async function loadPopularAttributes(limit = 10): Promise<Attribute[]> {
  */
 export async function isAttributeNameAvailable(name: string, excludeId?: number): Promise<boolean> {
     const operationId = `isAttributeNameAvailable-${name}`;
-    attributeLoadingState.start(operationId);
+    attributeLoadingOperations.start(operationId);
     try {
         if (!name.trim()) {
             log.warn(`[${operationId}] Empty name provided.`);
@@ -388,6 +391,6 @@ export async function isAttributeNameAvailable(name: string, excludeId?: number)
         });
         throw err;
     } finally {
-        attributeLoadingState.finish(operationId);
+        attributeLoadingOperations.finish(operationId);
     }
 }

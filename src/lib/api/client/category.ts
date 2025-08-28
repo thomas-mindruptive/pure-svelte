@@ -7,7 +7,7 @@
  * (Offerings) according to the Composition-Prinzip.
  */
 
-import { apiFetch, apiFetchUnion, createPostBody, createQueryBody, getErrorMessage, LoadingState } from './common';
+import { apiFetch, apiFetchUnion, createPostBody, createQueryBody, getErrorMessage } from './common';
 import { log } from '$lib/utils/logger';
 import { ComparisonOperator, LogicalOperator, type QueryPayload } from '$lib/clientAndBack/queryGrammar';
 import type {
@@ -23,9 +23,12 @@ import type {
     PredefinedQueryRequest,
     QueryResponseData
 } from '$lib/api/types/common';
+import { LoadingState } from './loadingState';
 
 // A dedicated loading state manager for all category-related operations.
-export const categoryLoadingState = new LoadingState();
+const categoryLoadingManager = new LoadingState();
+export const categoryLoadingState = categoryLoadingManager.isLoadingStore; // Store für $-Syntax
+export const categoryLoadingOperations = categoryLoadingManager;
 
 // Type aliases for better readability
 export type OfferingWithDetails = WholesalerItemOffering_ProductDef_Category;
@@ -59,7 +62,7 @@ export const DEFAULT_OFFERING_QUERY: QueryPayload<WholesalerItemOffering> = {
  */
 export async function loadCategories(query: Partial<QueryPayload<ProductCategory>> = {}): Promise<ProductCategory[]> {
     const operationId = 'loadCategories';
-    categoryLoadingState.start(operationId);
+    categoryLoadingOperations.start(operationId);
     try {
         const fullQuery: QueryPayload<ProductCategory> = { ...DEFAULT_CATEGORY_QUERY, ...query };
 
@@ -74,7 +77,7 @@ export async function loadCategories(query: Partial<QueryPayload<ProductCategory
         log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
         throw err;
     } finally {
-        categoryLoadingState.finish(operationId);
+        categoryLoadingOperations.finish(operationId);
     }
 }
 
@@ -87,7 +90,7 @@ export async function loadCategories(query: Partial<QueryPayload<ProductCategory
  */
 export async function loadCategory(categoryId: number): Promise<ProductCategory> {
     const operationId = `loadCategory-${categoryId}`;
-    categoryLoadingState.start(operationId);
+    categoryLoadingOperations.start(operationId);
     try {
         const responseData = await apiFetch<{ category: ProductCategory }>(
             `/api/categories/${categoryId}`,
@@ -100,7 +103,7 @@ export async function loadCategory(categoryId: number): Promise<ProductCategory>
         log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
         throw err;
     } finally {
-        categoryLoadingState.finish(operationId);
+        categoryLoadingOperations.finish(operationId);
     }
 }
 
@@ -115,7 +118,7 @@ export async function createCategory(
     categoryData: Omit<ProductCategory, 'category_id'>
 ): Promise<ProductCategory> {
     const operationId = 'createCategory';
-    categoryLoadingState.start(operationId);
+    categoryLoadingOperations.start(operationId);
     try {
         const responseData = await apiFetch<{ category: ProductCategory }>(
             '/api/categories/new',
@@ -127,7 +130,7 @@ export async function createCategory(
         log.error(`[${operationId}] Failed.`, { categoryData, error: getErrorMessage(err) });
         throw err;
     } finally {
-        categoryLoadingState.finish(operationId);
+        categoryLoadingOperations.finish(operationId);
     }
 }
 
@@ -141,7 +144,7 @@ export async function createCategory(
  */
 export async function updateCategory(categoryId: number, updates: Partial<ProductCategory>): Promise<ProductCategory> {
     const operationId = `updateCategory-${categoryId}`;
-    categoryLoadingState.start(operationId);
+    categoryLoadingOperations.start(operationId);
     try {
         const responseData = await apiFetch<{ category: ProductCategory }>(
             `/api/categories/${categoryId}`,
@@ -153,7 +156,7 @@ export async function updateCategory(categoryId: number, updates: Partial<Produc
         log.error(`[${operationId}] Failed.`, { updates, error: getErrorMessage(err) });
         throw err;
     } finally {
-        categoryLoadingState.finish(operationId);
+        categoryLoadingOperations.finish(operationId);
     }
 }
 
@@ -170,7 +173,7 @@ export async function deleteCategory(
     cascade = false
 ): Promise<DeleteApiResponse<{ category_id: number; name: string }, string[]>> {
     const operationId = `deleteCategory-${categoryId}`;
-    categoryLoadingState.start(operationId);
+    categoryLoadingOperations.start(operationId);
     try {
         const url = `/api/categories/${categoryId}${cascade ? '?cascade=true' : ''}`;
         return await apiFetchUnion<DeleteApiResponse<{ category_id: number; name: string }, string[]>>(
@@ -179,7 +182,7 @@ export async function deleteCategory(
             { context: operationId }
         );
     } finally {
-        categoryLoadingState.finish(operationId);
+        categoryLoadingOperations.finish(operationId);
     }
 }
 
@@ -196,7 +199,7 @@ export async function deleteCategory(
  */
 export async function loadOfferingsForCategory(supplierId: number, categoryId: number): Promise<OfferingWithDetails[]> {
     const operationId = `loadOfferingsForCategory-${supplierId}-${categoryId}`;
-    categoryLoadingState.start(operationId);
+    categoryLoadingOperations.start(operationId);
     try {
         const request: PredefinedQueryRequest = {
             namedQuery: 'category_offerings',
@@ -237,7 +240,7 @@ export async function loadOfferingsForCategory(supplierId: number, categoryId: n
         log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
         throw err;
     } finally {
-        categoryLoadingState.finish(operationId);
+        categoryLoadingOperations.finish(operationId);
     }
 }
 
@@ -254,7 +257,7 @@ export async function createOfferingForCategory(
     offeringData: Omit<WholesalerItemOffering, 'offering_id'>
 ): Promise<WholesalerItemOffering> {
     const operationId = 'createOfferingForCategory';
-    categoryLoadingState.start(operationId);
+    categoryLoadingOperations.start(operationId);
     try {
         const requestBody: CreateChildRequest<ProductCategory, Omit<WholesalerItemOffering, 'offering_id'>> = {
             parentId: categoryId,
@@ -270,7 +273,7 @@ export async function createOfferingForCategory(
         log.error(`[${operationId}] Failed.`, { offeringData, error: getErrorMessage(err) });
         throw err;
     } finally {
-        categoryLoadingState.finish(operationId);
+        categoryLoadingOperations.finish(operationId);
     }
 }
 
@@ -284,7 +287,7 @@ export async function createOfferingForCategory(
  */
 export async function updateOffering(offeringId: number, updates: Partial<WholesalerItemOffering>): Promise<WholesalerItemOffering> {
     const operationId = `updateOffering-${offeringId}`;
-    categoryLoadingState.start(operationId);
+    categoryLoadingOperations.start(operationId);
     try {
         const responseData = await apiFetch<{ offering: WholesalerItemOffering }>(
             `/api/category-offerings`,
@@ -296,7 +299,7 @@ export async function updateOffering(offeringId: number, updates: Partial<Wholes
         log.error(`[${operationId}] Failed.`, { updates, error: getErrorMessage(err) });
         throw err;
     } finally {
-        categoryLoadingState.finish(operationId);
+        categoryLoadingOperations.finish(operationId);
     }
 }
 
@@ -313,7 +316,7 @@ export async function deleteOffering(
     cascade = false
 ): Promise<DeleteApiResponse<{ offering_id: number }, string[]>> {
     const operationId = `deleteOffering-${offeringId}`;
-    categoryLoadingState.start(operationId);
+    categoryLoadingOperations.start(operationId);
     try {
         const url = `/api/category-offerings`;
         const body = createPostBody({ offering_id: offeringId, cascade });
@@ -324,6 +327,6 @@ export async function deleteOffering(
 
         );
     } finally {
-        categoryLoadingState.finish(operationId);
+        categoryLoadingOperations.finish(operationId);
     }
 }

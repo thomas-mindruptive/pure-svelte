@@ -26,37 +26,35 @@
   } from "$lib/domain/types";
 
   // Import API client functions - CORRECTED IMPORTS
-  import { 
-    loadSuppliers, 
+  import {
+    loadSuppliers,
     loadSupplier,
     updateSupplier,
     deleteSupplier,
     DEFAULT_SUPPLIER_QUERY,
     // CORRECTED: These functions are in supplier.ts, not category.ts
     loadCategoriesForSupplier,
-    assignCategoryToSupplier, 
+    assignCategoryToSupplier,
     removeCategoryFromSupplier,
     loadAvailableCategoriesForSupplier,
-    supplierLoadingState
+    supplierLoadingState,
   } from "$lib/api/client/supplier";
 
-  import { 
-    categoryLoadingState
-  } from "$lib/api/client/category";
+  import { categoryLoadingState } from "$lib/api/client/category";
 
   import { addNotification } from "$lib/stores/notifications";
 
   // Mock data only for Level 3-5 (offerings, attributes, links)
   import { mockData as constMockData } from "./mockData";
+  import { requestConfirmation } from "$lib/stores/confirmation";
 
   // ===== STATE (Svelte 5 Runes) =====
-  
+
   // Real data from API
   let suppliers = $state<Wholesaler[] | null>(null);
   let selectedSupplierData = $state<Wholesaler | null>(null);
   let supplierCategories = $state<WholesalerCategory_Category[]>([]);
   let availableCategories = $state<ProductCategory[]>([]);
-  
 
   // Mock data for Level 3-5 (still using mocks)
   const mockOfferingsData = constMockData.wholesalerItemOfferings;
@@ -75,13 +73,15 @@
   // ===== DERIVED STATE =====
   const selectedSupplier = $derived(
     selectedSupplierId && suppliers
-      ? suppliers.find(s => s.wholesaler_id === selectedSupplierId) || selectedSupplierData
+      ? suppliers.find((s) => s.wholesaler_id === selectedSupplierId) ||
+          selectedSupplierData
       : selectedSupplierData,
   );
 
   const selectedCategory = $derived(
     selectedCategoryId
-      ? supplierCategories.find(c => c.category_id === selectedCategoryId) || null
+      ? supplierCategories.find((c) => c.category_id === selectedCategoryId) ||
+          null
       : null,
   );
 
@@ -144,25 +144,19 @@
    */
   async function loadSuppliersData() {
     try {
-      // REMOVED: Manual loading state management - API client handles this
-      // loadingSuppliers = true;
       log.info("Loading suppliers from API");
-      
+
       suppliers = await loadSuppliers({
         ...DEFAULT_SUPPLIER_QUERY,
-        orderBy: [{ key: 'name', direction: 'asc' }]
+        orderBy: [{ key: "name", direction: "asc" }],
       });
-      
+
       log.info("Suppliers loaded successfully", { count: suppliers.length });
     } catch (error) {
       log.error("Failed to load suppliers", { error });
       addNotification("Failed to load suppliers", "error");
       suppliers = [];
     }
-    // REMOVED: Manual loading state management
-    // finally {
-    //   loadingSuppliers = false;
-    // }
   }
 
   /**
@@ -173,12 +167,12 @@
       // REMOVED: Manual loading state management
       // loadingSupplierData = true;
       log.info("Loading supplier details", { supplierId });
-      
+
       selectedSupplierData = await loadSupplier(supplierId);
-      
-      log.info("Supplier details loaded", { 
-        supplierId, 
-        name: selectedSupplierData.name 
+
+      log.info("Supplier details loaded", {
+        supplierId,
+        name: selectedSupplierData.name,
       });
     } catch (error) {
       log.error("Failed to load supplier details", { supplierId, error });
@@ -199,13 +193,13 @@
       // REMOVED: Manual loading state management
       // loadingCategories = true;
       log.info("Loading supplier categories", { supplierId });
-      
+
       // CORRECTED: Function name and removed includeOfferingCounts parameter
       supplierCategories = await loadCategoriesForSupplier(supplierId);
-      
-      log.info("Supplier categories loaded", { 
-        supplierId, 
-        count: supplierCategories.length 
+
+      log.info("Supplier categories loaded", {
+        supplierId,
+        count: supplierCategories.length,
       });
     } catch (error) {
       log.error("Failed to load supplier categories", { supplierId, error });
@@ -226,13 +220,14 @@
       // REMOVED: Manual loading state management
       // loadingAvailableCategories = true;
       log.info("Loading available categories", { supplierId });
-      
+
       // CORRECTED: Function name
-      availableCategories = await loadAvailableCategoriesForSupplier(supplierId);
-      
-      log.info("Available categories loaded", { 
-        supplierId, 
-        count: availableCategories.length 
+      availableCategories =
+        await loadAvailableCategoriesForSupplier(supplierId);
+
+      log.info("Available categories loaded", {
+        supplierId,
+        count: availableCategories.length,
       });
     } catch (error) {
       log.error("Failed to load available categories", { supplierId, error });
@@ -256,13 +251,16 @@
   $effect(() => {
     if (selectedSupplierId && currentLevel !== "wholesalers") {
       // Load detailed supplier data if not already loaded or different supplier
-      if (!selectedSupplierData || selectedSupplierData.wholesaler_id !== selectedSupplierId) {
+      if (
+        !selectedSupplierData ||
+        selectedSupplierData.wholesaler_id !== selectedSupplierId
+      ) {
         loadSupplierData(selectedSupplierId);
       }
-      
+
       // Load supplier categories
       loadSupplierCategoriesData(selectedSupplierId);
-      
+
       // Load available categories for assignment
       loadAvailableCategoriesData(selectedSupplierId);
     } else {
@@ -352,7 +350,9 @@
     });
   }
 
-  function handleOfferingSelect(offering: WholesalerItemOffering_ProductDef_Category) {
+  function handleOfferingSelect(
+    offering: WholesalerItemOffering_ProductDef_Category,
+  ) {
     log.info("Offering selected", {
       offeringId: offering.offering_id,
       offering_name: offering.product_def_title,
@@ -364,42 +364,55 @@
   }
 
   // ===== DELETE HANDLERS (Real API) =====
-  
+
   /**
    * Handle supplier deletion via API
    */
   async function handleSupplierDelete(ids: (string | number)[]) {
     log.info("Deleting suppliers via API", { ids });
-    
+
     for (const id of ids) {
       try {
         const result = await deleteSupplier(Number(id), false);
-        
-        if (!result.success && 'cascade_available' in result && result.cascade_available) {
+
+        if (
+          !result.success &&
+          "cascade_available" in result &&
+          result.cascade_available
+        ) {
           // Supplier has dependencies, ask for cascade delete
-          const dependencies = result.dependencies as string[] || [];
-          const confirmed = confirm(
-            `Supplier has dependencies: ${dependencies.join(', ')}. Delete anyway with all related data?`
+          const dependencies = (result.dependencies as string[]) || [];
+          const confirmed = await requestConfirmation(
+            `Supplier has dependencies: ${dependencies.join(", ")}. Delete anyway with all related data?`,
+            "Delete with Dependencies",
           );
-          
+
           if (confirmed) {
             const cascadeResult = await deleteSupplier(Number(id), true);
             if (cascadeResult.success) {
-              addNotification("Supplier and all related data deleted successfully", "success");
+              addNotification(
+                "Supplier and all related data deleted successfully",
+                "success",
+              );
             }
+          } else {
+            throw new Error("User cancelled supplier cascade delete");
           }
         } else if (result.success) {
-          addNotification(`Supplier "${result.data.deleted_resource.name}" deleted successfully`, "success");
+          addNotification(
+            `Supplier "${result.data.deleted_resource.name}" deleted successfully`,
+            "success",
+          );
         }
       } catch (error) {
         log.error("Failed to delete supplier", { id, error });
         addNotification("Failed to delete supplier", "error");
       }
     }
-    
+
     // Reload suppliers list
     await loadSuppliersData();
-    
+
     // Clear selection if current supplier was deleted
     if (selectedSupplierId && ids.includes(selectedSupplierId)) {
       updateURL({ level: "wholesalers", supplierId: null, categoryId: null });
@@ -411,52 +424,62 @@
    */
   async function handleCategoryDelete(ids: (string | number)[]) {
     if (!selectedSupplierId) return;
-    
+
     log.info("Removing category assignments via API", { ids });
-    
+
     for (const id of ids) {
       // Parse compound ID: "supplierId-categoryId"
-      const [supplierIdStr, categoryIdStr] = String(id).split('-');
+      const [supplierIdStr, categoryIdStr] = String(id).split("-");
       const supplierId = Number(supplierIdStr);
       const categoryId = Number(categoryIdStr);
-      
+
       if (!supplierId || !categoryId) continue;
-      
+
       try {
         const result = await removeCategoryFromSupplier({
           supplierId,
           categoryId,
-          cascade: false
+          cascade: false,
         });
-        
-        if (!result.success && 'cascade_available' in result && result.cascade_available) {
+
+        if (
+          !result.success &&
+          "cascade_available" in result &&
+          result.cascade_available
+        ) {
           // Category has offerings, ask for cascade delete
-          const offeringCount = 'dependencies' in result && result.dependencies && 
-            typeof result.dependencies === 'object' && 'offering_count' in result.dependencies
-            ? result.dependencies.offering_count as number
-            : 0;
-          
-          const confirmed = confirm(
-            `Category has ${offeringCount} offerings. Delete them too?`
+          const offeringCount =
+            "dependencies" in result &&
+            result.dependencies &&
+            typeof result.dependencies === "object" &&
+            "offering_count" in result.dependencies
+              ? (result.dependencies.offering_count as number)
+              : 0;
+
+          const confirmed = await requestConfirmation(
+            `Category has ${offeringCount} offerings. Delete them too?`,
+            "Delete Category with Offerings",
           );
-          
+
           if (confirmed) {
             const cascadeResult = await removeCategoryFromSupplier({
               supplierId,
               categoryId,
-              cascade: true
+              cascade: true,
             });
             if (cascadeResult.success) {
               addNotification(
                 `Category and ${cascadeResult.data.dependencies_cleared || 0} offerings removed successfully`,
-                "success"
+                "success",
               );
             }
+          } else {
+            throw new Error("User cancelled ctagory cascade delete");
           }
         } else if (result.success) {
           addNotification(
             `Category "${result.data.deleted_resource.category_name}" removed successfully`,
-            "success"
+            "success",
           );
         }
       } catch (error) {
@@ -464,7 +487,7 @@
         addNotification("Failed to remove category assignment", "error");
       }
     }
-    
+
     // Reload supplier categories
     if (selectedSupplierId) {
       await loadSupplierCategoriesData(selectedSupplierId);
@@ -477,45 +500,55 @@
    */
   async function handleOfferingDelete(ids: (string | number)[]) {
     log.info("Mock: Delete offerings", { ids });
-    addNotification(`MOCK: Would delete offerings with IDs: ${ids.join(", ")}`, "info");
+    addNotification(
+      `MOCK: Would delete offerings with IDs: ${ids.join(", ")}`,
+      "info",
+    );
   }
 
   // ===== CATEGORY ASSIGNMENT HANDLERS =====
-  
+
   /**
    * Handle supplier form submission via API
    */
-  async function handleSupplierUpdate(p: { data: Record<string, any>; result: unknown }) {
+  async function handleSupplierUpdate(p: {
+    data: Record<string, any>;
+    result: unknown;
+  }) {
     if (!selectedSupplierId) return;
-    
+
     try {
-      log.info("Updating supplier via API", { 
+      log.info("Updating supplier via API", {
         supplierId: selectedSupplierId,
-        data: p.data 
+        data: p.data,
       });
-      
+
       const updatedSupplier = await updateSupplier(selectedSupplierId, p.data);
-      
+
       addNotification(
         `Supplier "${updatedSupplier.name}" updated successfully`,
-        "success"
+        "success",
       );
-      
+
       // Update local data
       selectedSupplierData = updatedSupplier;
-      
+
       // Update suppliers list if needed
       if (suppliers) {
-        const supplierIndex = suppliers.findIndex(s => s.wholesaler_id === selectedSupplierId);
+        const supplierIndex = suppliers.findIndex(
+          (s) => s.wholesaler_id === selectedSupplierId,
+        );
         if (supplierIndex >= 0) {
-          suppliers[supplierIndex] = { ...suppliers[supplierIndex], ...updatedSupplier };
+          suppliers[supplierIndex] = {
+            ...suppliers[supplierIndex],
+            ...updatedSupplier,
+          };
         }
       }
-      
     } catch (error) {
-      log.error("Failed to update supplier", { 
-        supplierId: selectedSupplierId, 
-        error 
+      log.error("Failed to update supplier", {
+        supplierId: selectedSupplierId,
+        error,
       });
       addNotification("Failed to update supplier", "error");
     }
@@ -534,34 +567,33 @@
    */
   async function handleCategoryAssigned(category: ProductCategory) {
     if (!selectedSupplierId) return;
-    
+
     try {
-      log.info("Assigning category via API", { 
-        supplierId: selectedSupplierId, 
-        categoryId: category.category_id 
+      log.info("Assigning category via API", {
+        supplierId: selectedSupplierId,
+        categoryId: category.category_id,
       });
-      
+
       await assignCategoryToSupplier({
         supplierId: selectedSupplierId,
         categoryId: category.category_id,
         comment: "",
-        link: ""
+        link: "",
       });
-      
+
       addNotification(
         `Category "${category.name}" assigned successfully`,
-        "success"
+        "success",
       );
-      
+
       // Reload data
       await loadSupplierCategoriesData(selectedSupplierId);
       await loadAvailableCategoriesData(selectedSupplierId);
-      
     } catch (error) {
-      log.error("Failed to assign category", { 
-        supplierId: selectedSupplierId, 
-        categoryId: category.category_id, 
-        error 
+      log.error("Failed to assign category", {
+        supplierId: selectedSupplierId,
+        categoryId: category.category_id,
+        error,
       });
       addNotification("Failed to assign category", "error");
     }
@@ -581,7 +613,7 @@
     return "Supplier Browser";
   });
 
-const isLoading = $derived($supplierLoadingState || $categoryLoadingState);
+  const isLoading = $derived($supplierLoadingState || $categoryLoadingState);
 </script>
 
 <svelte:head>
@@ -627,10 +659,10 @@ const isLoading = $derived($supplierLoadingState || $categoryLoadingState);
             onCancelled={handleFormCancel}
           />
         </div>
-        
+
         <CategoryAssignment
           supplierId={selectedSupplier.wholesaler_id}
-          availableCategories={availableCategories}
+          {availableCategories}
           loading={$categoryLoadingState}
           onAssigned={handleCategoryAssigned}
           onError={handleCategoryError}
@@ -656,7 +688,9 @@ const isLoading = $derived($supplierLoadingState || $categoryLoadingState);
           />
         {:else if currentLevel === "offerings"}
           <div class="mock-notice">
-            <p><strong>🚧 Mock Data:</strong> Offerings are still using mock data</p>
+            <p>
+              <strong>🚧 Mock Data:</strong> Offerings are still using mock data
+            </p>
           </div>
           <OfferingGrid
             rows={offeringsForSupplierAndCategory}
@@ -809,7 +843,8 @@ const isLoading = $derived($supplierLoadingState || $categoryLoadingState);
   }
 
   @keyframes pulse {
-    0%, 100% {
+    0%,
+    100% {
       opacity: 1;
     }
     50% {

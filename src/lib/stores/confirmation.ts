@@ -24,7 +24,6 @@ export function reset() {
 }
 
 /**
- * Dies ist die Funktion, die Sie von überall in Ihrer App aufrufen werden.
  * Sie gibt eine Promise zurück, die auf die Benutzeraktion wartet.
  * @param message Die Frage, die dem Benutzer angezeigt wird.
  * @param title (Optional) Ein Titel für den Dialog.

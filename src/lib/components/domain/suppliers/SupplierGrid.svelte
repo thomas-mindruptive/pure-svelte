@@ -34,7 +34,7 @@
     { key: "country", header: "Country", accessor: DUMMY_ACCESSOR },
   ];
 
-  const getId = (r: Wholesaler): ID => (r as any).id as ID;
+  const getId = (r: Wholesaler): ID => r.wholesaler_id;
 
   const deleteStrategy: DeleteStrategy<Wholesaler> = {
     execute: async (ids: ID[]) => {

@@ -1,5 +1,4 @@
 <script lang="ts">
- 
   // DataGrid (Svelte 5 + Runes)
   //
   // MAIN PURPOSE:
@@ -15,16 +14,20 @@
 
   import { onMount } from "svelte";
   import type { Snippet } from "svelte";
-  import { log } from "$lib/utils/logger.ts";
+  import { log } from "$lib/utils/logger";
   import { requestConfirmation } from "$lib/stores/confirmation";
-    import type { ColumnDef, DeleteStrategy, RowActionStrategy, DryRunResult, ConfirmResult, ID } from "./Datagrid.types";
+  import type {
+    ColumnDef,
+    DeleteStrategy,
+    RowActionStrategy,
+    DryRunResult,
+    ConfirmResult,
+    ID,
+  } from "./Datagrid.types";
 
   export const HUGO = "hugo";
- 
 
   // ===== TYPE DEFINITIONS =====
-
-
 
   // // Column definition - describes how to display and interact with a data column
   // export type ColumnDef<T = any> = {
@@ -37,8 +40,6 @@
   // };
 
   // Type-safe ColumnDef - nur gültige Properties oder mit accessor
-
-
 
   // ===== SNIPPET PROP TYPES =====
   // These define the data passed to customizable snippets
@@ -280,7 +281,14 @@
    */
   function rowIsDeleting(row: any): boolean {
     const id = safeGetId(row);
-    return id != null && isDeleting(id);
+    const result = id != null && isDeleting(id);
+    log.info("rowIsDeleting:", {
+      id,
+      idType: typeof id,
+      setHas: deletingObjectIds.has(id),
+      result,
+    });
+    return result;
   }
 
   /**
@@ -315,6 +323,14 @@
    * @param on - true to add to set, false to remove from set
    */
   function markDeleting(ids: ID[], on: boolean): void {
+    log.info("markDeleting called:", {
+      ids,
+      on,
+      idTypes: ids.map((id) => typeof id),
+      currentSet: Array.from(deletingObjectIds),
+      currentSetTypes: Array.from(deletingObjectIds).map((id) => typeof id),
+    });
+
     ids.forEach((id: ID) =>
       on ? deletingObjectIds.add(id) : deletingObjectIds.delete(id),
     );
@@ -686,8 +702,13 @@
       );
       // Note: We don't re-throw here - the parent grid should handle UI error feedback
     } finally {
+      log.info("FINALLY: Clearing deleting state for IDs:", pendingIds);
       // Always remove loading indicators, even if delete failed
       markDeleting(pendingIds, false);
+      log.info(
+        "\n##########\nFINALLY: deletingObjectIds after clear:",
+        Array.from(deletingObjectIds),
+      );
     }
   }
 
@@ -765,6 +786,7 @@
     Uses flexbox layout for responsive arrangement
   -->
   <div class="pc-grid__toolbar">
+    <h3>Loading: {loading}</h3>
     {#if toolbar}
       <!-- Custom toolbar provided via snippet -->
       {@render toolbar({ selectedIds, deletingObjectIds, deleteSelected })}

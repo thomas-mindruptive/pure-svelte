@@ -23,7 +23,7 @@ import { v4 as uuidv4 } from 'uuid';
  */
 export const POST: RequestHandler = async (event) => {
 	const operationId = uuidv4();
-	log.info(`\n\n*********************************************\n[${operationId}] POST /suppliers: FN_START\n****************************\n`);
+	log.info(`POST suppliers: FN_START`);
 
 	try {
 		// 1. Expect the standard QueryRequest envelope and extract the payload.

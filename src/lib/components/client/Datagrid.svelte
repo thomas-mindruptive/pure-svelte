@@ -285,7 +285,7 @@
     log.info("rowIsDeleting:", {
       id,
       idType: typeof id,
-      setHas: deletingObjectIds.has(id),
+      setHas: deletingObjectIds.has(id!),
       result,
     });
     return result;

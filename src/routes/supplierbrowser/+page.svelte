@@ -47,6 +47,7 @@
   // Mock data only for Level 3-5 (offerings, attributes, links)
   import { mockData as constMockData } from "./mockData";
   import { requestConfirmation } from "$lib/stores/confirmation";
+    import type { DeleteStrategy, RowActionStrategy } from "$lib/components/client/Datagrid.types";
 
   // ===== STATE (Svelte 5 Runes) =====
 
@@ -363,6 +364,27 @@
     });
   }
 
+  // ===== STRATEGY DEFINITIONS (NEW) =====
+
+  // Define strategies once, making the template cleaner
+  const supplierDeleteStrategy: DeleteStrategy<Wholesaler> = {
+    execute: handleSupplierDelete,
+  };
+
+  const supplierRowActionStrategy: RowActionStrategy<Wholesaler> = {
+    click: handleSupplierSelect,
+  };
+
+  const categoryDeleteStrategy: DeleteStrategy<WholesalerCategory_Category> = {
+    execute: handleCategoryDelete,
+  };
+
+  const categoryRowActionStrategy: RowActionStrategy<WholesalerCategory_Category> =
+    {
+      click: handleCategorySelect,
+    };
+
+
   // ===== DELETE HANDLERS (Real API) =====
 
   /**
@@ -370,6 +392,7 @@
    */
   async function handleSupplierDelete(ids: (string | number)[]) {
     log.info("Deleting suppliers via API", { ids });
+    let dataChanged = false;
 
     for (const id of ids) {
       try {
@@ -390,13 +413,12 @@
           if (confirmed) {
             const cascadeResult = await deleteSupplier(Number(id), true);
             if (cascadeResult.success) {
+              dataChanged = true;
               addNotification(
                 "Supplier and all related data deleted successfully",
                 "success",
               );
             }
-          } else {
-            throw new Error("User cancelled supplier cascade delete");
           }
         } else if (result.success) {
           addNotification(
@@ -410,8 +432,33 @@
       }
     }
 
-    // Reload suppliers list
-    await loadSuppliersData();
+    // --- Race Condition Fix: Decoupling Data Reload from Deletion Completion ---
+    // Problem: Previously, 'await loadSuppliersData()' here created a race condition.
+    // The `orchestrateDelete` function in DataGrid.svelte was blocked, preventing
+    // its `finally` block from clearing the `deletingObjectIds` state immediately.
+    // Meanwhile, `loadSuppliersData` would trigger a re-render of the grid
+    // with the `deletingObjectIds` still active, causing the row to visually stick
+    // in the 'deleting' state even after the operation was effectively done.
+    //
+    // Solution: We now use a "Fire and Forget" pattern for data reloading.
+    // By removing 'await', this function returns immediately to the `DataGrid`'s
+    // `orchestrateDelete` function. This allows `orchestrateDelete` to execute
+    // its `finally` block and clear the `deletingObjectIds` state *before*
+    // the `loadSuppliersData` (running in the background) can trigger a new render.
+    // This ensures the UI state is cleaned up first, then data is refreshed reactively.
+    // The `then()` block handles any post-reload navigation or actions.
+    if (dataChanged) {
+      loadSuppliersData().then(() => {
+        // Diese Logik wird ausgeführt, NACHDEM die Daten neu geladen wurden.
+        if (selectedSupplierId && ids.includes(selectedSupplierId)) {
+          updateURL({
+            level: "wholesalers",
+            supplierId: null,
+            categoryId: null,
+          });
+        }
+      });
+    }
 
     // Clear selection if current supplier was deleted
     if (selectedSupplierId && ids.includes(selectedSupplierId)) {
@@ -473,8 +520,6 @@
                 "success",
               );
             }
-          } else {
-            throw new Error("User cancelled ctagory cascade delete");
           }
         } else if (result.success) {
           addNotification(
@@ -675,16 +720,16 @@
           <SupplierGrid
             rows={suppliers || []}
             loading={$supplierLoadingState}
-            executeDelete={handleSupplierDelete}
-            onRowClick={handleSupplierSelect}
+            deleteStrategy={supplierDeleteStrategy}
+            rowActionStrategy={supplierRowActionStrategy}
           />
         {:else if currentLevel === "categories"}
           <CategoryGrid
             rows={supplierCategories}
             loading={$categoryLoadingState}
             showOfferingCount={true}
-            executeDelete={handleCategoryDelete}
-            onRowClick={handleCategorySelect}
+            deleteStrategy={categoryDeleteStrategy}
+            rowActionStrategy={categoryRowActionStrategy}
           />
         {:else if currentLevel === "offerings"}
           <div class="mock-notice">

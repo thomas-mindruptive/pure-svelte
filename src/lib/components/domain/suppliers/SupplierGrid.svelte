@@ -11,16 +11,19 @@
 
   const DUMMY_ACCESSOR = (r: any) => "DUMYY*************";
 
-  const {
-    rows = [] as Wholesaler[],
+ const {
+    rows = null, // Can accept null from parent
     loading = false,
-    executeDelete, // (ids) => Promise<void>
-    onRowClick,
+    deleteStrategy,
+    rowActionStrategy,
+    showContactInfo = false,
+
   } = $props<{
     rows?: Wholesaler[] | null;
     loading?: boolean;
-    executeDelete: (ids: ID[]) => Promise<void>;
-    onRowClick?: (supplier: Wholesaler) => void;
+    deleteStrategy: DeleteStrategy<Wholesaler>;
+    rowActionStrategy?: RowActionStrategy<Wholesaler>;
+    showContactInfo?: boolean;
   }>();
 
   const columns: ColumnDef<Wholesaler>[] = [
@@ -36,15 +39,15 @@
 
   const getId = (r: Wholesaler): ID => r.wholesaler_id;
 
-  const deleteStrategy: DeleteStrategy<Wholesaler> = {
-    execute: async (ids: ID[]) => {
-      await executeDelete(ids);
-    },
-  };
+  // const deleteStrategy: DeleteStrategy<Wholesaler> = {
+  //   execute: async (ids: ID[]) => {
+  //     await executeDelete(ids);
+  //   },
+  // };
 
-  const rowActionStrategy: RowActionStrategy<Wholesaler> = {
-    click: onRowClick,
-  };
+  // const rowActionStrategy: RowActionStrategy<Wholesaler> = {
+  //   click: onRowClick,
+  // };
 
   // Silence "declared but never read" in some TS setups (harmless)
   void rows;

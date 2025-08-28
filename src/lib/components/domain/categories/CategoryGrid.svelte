@@ -17,17 +17,18 @@
 
 
   const {
-    rows = [] as WholesalerCategory_Category[],
+    rows = null, // Can accept null from parent
     loading = false,
     showOfferingCount = true,
-    executeDelete, // (ids) => Promise<void>
-    onRowClick,
+    deleteStrategy,
+    rowActionStrategy,
+
   } = $props<{
-    rows?: WholesalerCategory_Category[];
+    rows?: WholesalerCategory_Category[] | null;
     loading?: boolean;
     showOfferingCount?: boolean;
-    executeDelete: (ids: ID[]) => Promise<void>;
-    onRowClick?: (category: WholesalerCategory_Category) => void;
+    deleteStrategy: DeleteStrategy<WholesalerCategory_Category>;
+    rowActionStrategy?: RowActionStrategy<WholesalerCategory_Category>;
   }>();
 
 
@@ -62,20 +63,20 @@
   const getId = (r: WholesalerCategory_Category): ID =>
     `${r.wholesaler_id}-${r.category_id}`;
 
-  const deleteStrategy: DeleteStrategy<WholesalerCategory_Category> = {
-    execute: async (ids: ID[]) => {
-      await executeDelete(ids);
-    },
-  };
+  // const deleteStrategy: DeleteStrategy<WholesalerCategory_Category> = {
+  //   execute: async (ids: ID[]) => {
+  //     await executeDelete(ids);
+  //   },
+  // };
 
-  /**
-   * Configure row interaction behavior.
-   * Primary click typically navigates to category detail view.
-   * Uses optional callback pattern to avoid forcing navigation behavior.
-   */
-  const rowActionStrategy: RowActionStrategy<WholesalerCategory_Category> = {
-    click: onRowClick,
-  };
+  // /**
+  //  * Configure row interaction behavior.
+  //  * Primary click typically navigates to category detail view.
+  //  * Uses optional callback pattern to avoid forcing navigation behavior.
+  //  */
+  // const rowActionStrategy: RowActionStrategy<WholesalerCategory_Category> = {
+  //   click: onRowClick,
+  // };
 
   // Silence "declared but never read" in some TS setups (harmless)
   void rows;

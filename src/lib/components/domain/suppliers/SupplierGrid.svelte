@@ -9,21 +9,16 @@
   } from "$lib/components/client/Datagrid.types";
   import type { Wholesaler } from "$lib/domain/types";
 
-  const DUMMY_ACCESSOR = (r: any) => "DUMYY*************";
-
  const {
     rows = null, // Can accept null from parent
     loading = false,
     deleteStrategy,
-    rowActionStrategy,
-    showContactInfo = false,
-
+    rowActionStrategy
   } = $props<{
     rows?: Wholesaler[] | null;
     loading?: boolean;
     deleteStrategy: DeleteStrategy<Wholesaler>;
     rowActionStrategy?: RowActionStrategy<Wholesaler>;
-    showContactInfo?: boolean;
   }>();
 
   const columns: ColumnDef<Wholesaler>[] = [
@@ -33,8 +28,8 @@
       header: "Dropship",
       accessor: (r) => (r.dropship ? "Yes" : "No"),
     },
-    { key: "email", header: "Email", accessor: DUMMY_ACCESSOR },
-    { key: "country", header: "Country", accessor: DUMMY_ACCESSOR },
+    { key: "email", header: "Email", accessor: null },
+    { key: "country", header: "Country", accessor: null },
   ];
 
   const getId = (r: Wholesaler): ID => r.wholesaler_id;

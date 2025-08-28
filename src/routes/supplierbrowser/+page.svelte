@@ -404,6 +404,8 @@
           result.cascade_available
         ) {
           // Supplier has dependencies, ask for cascade delete
+          // NOTE: The first confirmation, if user wants to delete in the first place, is done
+          // by the DataGrid id we don't provide a "deleteStrategy.confirm" callback.
           const dependencies = (result.dependencies as string[]) || [];
           const confirmed = await requestConfirmation(
             `Supplier has dependencies: ${dependencies.join(", ")}. Delete anyway with all related data?`,

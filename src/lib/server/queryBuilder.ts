@@ -289,7 +289,7 @@ export function buildQuery<T>(
  */
 export async function executeQuery(sql: string, parameters: Record<string, SqlParameterValue>): Promise<QueryResultRow[]> {
 	const startTime = Date.now();
-	log.info("Executing query...", { parameterCount: Object.keys(parameters).length });
+	log.info("Executing query...", { sql, parameters});
 
 	try {
 		const request = db.request();

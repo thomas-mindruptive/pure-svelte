@@ -18,7 +18,7 @@
     // - Handles loading states and error feedback
     // - Integrates with existing CSS design system
 
-    import { log } from "$lib/utils/logger";
+    import { log } from "$lib/utils/logger.ts";
     import type { ProductCategory } from "$lib/domain/types";
     import "$lib/components/styles/form.css";
 

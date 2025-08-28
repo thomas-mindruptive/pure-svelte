@@ -15,7 +15,7 @@
 
   import { onMount } from "svelte";
   import type { Snippet } from "svelte";
-  import { log } from "$lib/utils/logger";
+  import { log } from "$lib/utils/logger.ts";
   import { requestConfirmation } from "$lib/stores/confirmation";
     import type { ColumnDef, DeleteStrategy, RowActionStrategy, DryRunResult, ConfirmResult, ID } from "./Datagrid.types";
 

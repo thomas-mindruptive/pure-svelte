@@ -1,162 +1,218 @@
 // src/lib/utils/logger.ts
 import { browser, dev } from '$app/environment';
 
-// ✅ STRIKTE TYPES statt any
+// --- KONFIGURATION ---
+const loggerConfig = {
+	/**
+	 * Legt fest, wie Dateipfade in den Logs angezeigt werden.
+	 * 'full':  Zeigt den Pfad relativ zum 'src'-Verzeichnis (z.B. 'src/routes/browser/+page.svelte:25').
+	 * 'short': Zeigt nur den Eltern-Ordner und den Dateinamen (z.B. 'browser/+page.svelte:25').
+	 */
+	pathDisplayMode: 'short' as 'full' | 'short'
+};
+// --------------------
+
+// --- TYPEN ---
 type LogValue = string | number | boolean | null | undefined | Record<string, unknown> | unknown[] | Error | unknown;
 type LogArgs = LogValue[];
 
-interface Logger {
-  debug: (...args: LogArgs) => void;
-  info: (...args: LogArgs) => void;
-  warn: (...args: LogArgs) => void;
-  error: (...args: LogArgs) => void;
+export interface Logger {
+	debug: (...args: LogArgs) => void;
+	info: (...args: LogArgs) => void;
+	warn: (...args: LogArgs) => void;
+	error: (...args: LogArgs) => void;
 }
+
+interface CallerInfo {
+	functionName: string;
+	filePath: string;
+	lineNumber: number;
+	columnNumber: number;
+	displayPath: string; // Bereinigter, relativer Pfad für die Anzeige
+}
+
+// --- HILFSFUNKTIONEN ---
+
+/**
+ * Extrahiert detaillierte Aufrufer-Informationen aus dem Call-Stack.
+ * @param skipLevels - Anzahl der zu überspringenden Stack-Ebenen.
+ */
+function getCallerInfo(skipLevels: number = 0): CallerInfo | null {
+	try {
+		const stack = new Error().stack;
+		if (!stack) return null;
+
+		const lines = stack.split('\n');
+		const initialIndex = 2 + skipLevels;
+
+		for (let i = initialIndex; i < Math.min(lines.length, 10); i++) {
+			const line = lines[i].trim();
+			let match = line.match(/at\s+(?:(.*)\s+\()?(.*):(\d+):(\d+)\)?/);
+			if (!match) match = line.match(/(.*)@(.*):(\d+):(\d+)/);
+
+			if (match) {
+				const functionName = match[1] || '<anonymous>';
+				let rawFilePath = match[2];
+
+				if (isInternalFunction(functionName) || rawFilePath.includes('logger.ts')) {
+					continue;
+				}
+
+				const queryParamIndex = rawFilePath.indexOf('?');
+				if (queryParamIndex > -1) {
+					rawFilePath = rawFilePath.substring(0, queryParamIndex);
+				}
+
+				let displayPath = rawFilePath;
+				if (rawFilePath.startsWith('file://')) {
+					displayPath = new URL(rawFilePath).pathname;
+				}
+
+				const projectRootMarker = 'src/';
+				const projectRootIndex = displayPath.indexOf(projectRootMarker);
+				if (projectRootIndex > -1) {
+					displayPath = displayPath.substring(projectRootIndex);
+				}
+
+				const lineNumber = parseInt(match[3], 10);
+				let finalDisplayPath = `${displayPath}:${lineNumber}`;
+
+				// --- NEUE ÄNDERUNG: Pfadanzeige basierend auf Konfiguration anpassen ---
+				if (loggerConfig.pathDisplayMode === 'short') {
+					const pathSegments = displayPath.split('/');
+					if (pathSegments.length > 2) {
+						// Nimm die letzten beiden Teile (Eltern-Ordner/Datei)
+						const shortPath = pathSegments.slice(-2).join('/');
+						finalDisplayPath = `${shortPath}:${lineNumber}`;
+					}
+				}
+				// -------------------------------------------------------------------
+
+				return {
+					functionName,
+					filePath: rawFilePath,
+					lineNumber: lineNumber,
+					columnNumber: parseInt(match[4], 10),
+					displayPath: finalDisplayPath
+				};
+			}
+		}
+		return null;
+	} catch (e) {
+		if (!browser) throw e;
+		return null;
+	}
+}
+
+function isInternalFunction(name: string): boolean {
+	const internalNames = [
+		'Object', 'Function', 'global', 'process', 'getCallerInfo', 'createLogger', 'createLoggerAuto',
+		'withLogging', 'anonymous', '__awaiter', 'GenericLogger', 'createPinoWrapper', 'createBrowserWrapper'
+	];
+	return internalNames.includes(name);
+}
+
+// --- IMPLEMENTIERUNG ---
 
 let logger: Logger;
 
 if (browser) {
-  // --- BROWSER IMPLEMENTATION ---
-  logger = {
-    debug: (...args) => console.debug(...args),
-    info: (...args) => console.info(...args),
-    warn: (...args) => console.warn(...args),
-    error: (...args) => console.error(...args),
-  };
+	// --- BROWSER IMPLEMENTATION ---
+	const createBrowserWrapper = (consoleMethod: (...args: any[]) => void) => {
+		return (...args: LogArgs): void => {
+			const caller = getCallerInfo(1);
+			if (caller) {
+				const style = 'color: #888;';
+				consoleMethod(`%c<${caller.functionName}> (${caller.displayPath})`, style, ...args);
+			} else {
+				consoleMethod(...args);
+			}
+		};
+	};
 
+	logger = {
+		debug: createBrowserWrapper(console.debug.bind(console)),
+		info: createBrowserWrapper(console.info.bind(console)),
+		warn: createBrowserWrapper(console.warn.bind(console)),
+		error: createBrowserWrapper(console.error.bind(console)),
+	};
 } else {
-  // --- SERVER IMPLEMENTATION ---
-  const createServerLogger = async (): Promise<Logger> => {
-    const { createRequire } = await import('module');
-    const pino = (await import('pino')).default;
+	// --- SERVER IMPLEMENTATION ---
+	const placeholderLogger: Logger = {
+		debug: (...args) => console.debug('[TEMP] ', ...args),
+		info: (...args) => console.info('[TEMP] ', ...args),
+		warn: (...args) => console.warn('[TEMP] ', ...args),
+		error: (...args) => console.error('[TEMP] ', ...args)
+	};
+	logger = placeholderLogger;
 
-    const require = createRequire(import.meta.url);
+	const createServerLogger = async (): Promise<Logger> => {
+		const { createRequire } = await import('module');
+		const pino = (await import('pino')).default;
+		const require = createRequire(import.meta.url);
 
-    const serverLogger = dev
-      ? pino({
-        level: 'debug',
-        transport: {
-          target: require.resolve('pino-pretty'),
-          options: {
-            colorize: true,
-            translateTime: 'SYS:yyyy-mm-dd HH:MM:ss.l',
-            ignore: 'pid,hostname',
-          }
-        }
-      })
-      : pino({
-        level: 'info'
-      });
+		const pinoInstance = dev
+			? pino({
+					level: 'debug',
+					transport: {
+						target: require.resolve('pino-pretty'),
+						options: { colorize: true, ignore: 'pid,hostname,time' }
+					}
+			  })
+			: pino({
+					level: 'info',
+					base: { pid: undefined, hostname: undefined },
+					timestamp: false
+			  });
 
-    const createPinoLogFn = (pinoMethod: (obj: Record<string, unknown>, msg?: string) => void) => {
-      return (...args: LogArgs): void => {
-        const logObject: Record<string, unknown> = {};
-        const messageParts: string[] = [];
+		const createPinoWrapper = (pinoMethod: (...args: any[]) => void) => {
+			return (...args: LogArgs): void => {
+				const caller = getCallerInfo(1);
+				const callerMeta = caller ? { caller: `${caller.functionName} (${caller.displayPath})` } : {};
+				
+				if (typeof args[0] === 'object' && args[0] !== null && !Array.isArray(args[0])) {
+					pinoMethod({ ...callerMeta, ...args[0] }, ...args.slice(1));
+					return;
+				}
+				
+				const msg = args[0];
+				const potentialObject = args.length > 1 ? args[1] : undefined;
+				if (
+					typeof msg === 'string' &&
+					!msg.includes('%o') &&
+					!msg.includes('%O') &&
+					typeof potentialObject === 'object' &&
+					potentialObject !== null &&
+					!Array.isArray(potentialObject)
+				) {
+					pinoMethod({ ...callerMeta, ...potentialObject }, msg, ...args.slice(2));
+					return;
+				}
+				
+				pinoMethod(callerMeta, ...args);
+			};
+		};
 
-        // First arg als object behandeln mit Type-Guards
-        if (args.length > 0 && typeof args[0] === 'object' && args[0] !== null && !Array.isArray(args[0])) {
-          const firstArg = args.shift();
-          if (firstArg instanceof FormData) {
-            // Type-safe FormData handling
-            Object.assign(logObject, Object.fromEntries(firstArg.entries()));
-          } else {
-            // Safe object handling
-            Object.assign(logObject, firstArg as Record<string, unknown>);
-          }
-        }
+		return {
+			debug: createPinoWrapper(pinoInstance.debug.bind(pinoInstance)),
+			info: createPinoWrapper(pinoInstance.info.bind(pinoInstance)),
+			warn: createPinoWrapper(pinoInstance.warn.bind(pinoInstance)),
+			error: createPinoWrapper(pinoInstance.error.bind(pinoInstance))
+		};
+	};
 
-        // Remaining args verarbeiten mit Type-Guards
-        for (const arg of args) {
-          if (typeof arg === 'object' && arg !== null && !Array.isArray(arg)) {
-            if (arg instanceof FormData) {
-              // Type-safe FormData entries
-              const formDataObj = Object.fromEntries(arg.entries());
-              logObject.extra_data = {
-                ...(logObject.extra_data as Record<string, unknown> || {}),
-                ...formDataObj
-              };
-            } else {
-              // Safe object merge
-              logObject.extra_data = {
-                ...(logObject.extra_data as Record<string, unknown> || {}),
-                ...(arg as Record<string, unknown>)
-              };
-            }
-          } else {
-            // Convert to string safely
-            messageParts.push(String(arg ?? ''));
-          }
-        }
-
-        pinoMethod.call(serverLogger, logObject, messageParts.join(' '));
-      };
-    };
-
-    return {
-      debug: createPinoLogFn(serverLogger.debug.bind(serverLogger)),
-      info: createPinoLogFn(serverLogger.info.bind(serverLogger)),
-      warn: createPinoLogFn(serverLogger.warn.bind(serverLogger)),
-      error: createPinoLogFn(serverLogger.error.bind(serverLogger)),
-    };
-  };
-
-  logger = await createServerLogger();
-}
-
-/**
- * Get the caller function name from call stack
- * Works in Node.js, Browser, Azure Functions, etc.
- * @param skipLevels - Number of additional stack levels to skip (default: 0)
- */
-export function getCurrentFunctionName(skipLevels: number = 0): string {
-  try {
-    const stack = new Error().stack;
-    if (!stack) return 'unknown';
-
-    const lines = stack.split('\n');
-
-    // Skip: Error message (0), getCurrentFunctionName (1), caller (2), + additional levels
-    const startIndex = 2 + skipLevels;
-    for (let i = startIndex; i < Math.min(lines.length, 10); i++) {
-      const line = lines[i];
-
-      // Try different stack trace formats
-      const match =
-        // V8 (Node.js, Chrome): "at functionName ..."
-        line.match(/at\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/) ||
-        // V8 arrow functions: "at Object.functionName"  
-        line.match(/at\s+Object\.([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/) ||
-        // V8 async: "at async functionName"
-        line.match(/at\s+async\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/) ||
-        // Firefox: "functionName@"
-        line.match(/^([a-zA-Z_$][a-zA-Z0-9_$]*)@/) ||
-        // Safari: "functionName@file"
-        line.match(/([a-zA-Z_$][a-zA-Z0-9_$]*)@.*?:\d+:\d+/);
-
-      if (match && match[1]) {
-        const name = match[1];
-        // Filter out internal/framework names
-        if (!isInternalFunction(name)) {
-          return name;
-        }
-      }
-    }
-    return '<cannot extract function name>';
-  } catch (e) {
-    console.error('logger: Failed to get current function name:', e);
-    throw e
-  }
-}
-
-/**
-* Checks if function name is internal/framework function
-*/
-function isInternalFunction(name: string): boolean {
-  const internalNames = [
-    'Object', 'Function', 'global', 'process',
-    'getCurrentFunctionName', 'createLogger', 'createLoggerAuto',
-    'withLogging', 'anonymous', '__awaiter', 'GenericLogger'
-  ];
-  return internalNames.includes(name);
+	(async () => {
+		try {
+			const realLogger = await createServerLogger();
+			logger.debug = realLogger.debug;
+			logger.info = realLogger.info;
+			logger.warn = realLogger.warn;
+			logger.error = realLogger.error;
+			logger.info('Logger-Proxy erfolgreich durch Pino-Instanz ersetzt.');
+		} catch (e) {
+			console.error('FATAL: Pino Logger konnte nicht initialisiert werden.', e);
+		}
+	})();
 }
 
 export const log = logger;

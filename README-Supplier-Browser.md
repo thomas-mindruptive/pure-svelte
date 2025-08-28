@@ -151,42 +151,42 @@ All relationship endpoints follow a consistent naming pattern that makes the par
 
 ## 4. Current Implementation Status
 
-| Entity/Operation | Endpoint | Generic Type | Server Status | Client Status | Notes |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **SUPPLIERS (Master Data)** |
-| Query List | `POST /api/suppliers` | `QueryRequest<Wholesaler>` | ✅ | ✅ | |
-| Read Single | `GET /api/suppliers/[id]` | - | ✅ | ✅ | |
-| Create | `POST /api/suppliers/new` | `CreateRequest<Partial<Wholesaler>>` | ✅ | ✅ | |
-| Update | `PUT /api/suppliers/[id]` | `Partial<Wholesaler>` | ✅ | ✅ | |
-| Delete | `DELETE /api/suppliers/[id]` | - | ✅ | ✅ | |
-| **ATTRIBUTES (Master Data)** |
-| Query List | `POST /api/attributes` | `QueryRequest<Attribute>` | ✅ | ✅ | |
-| Read Single | `GET /api/attributes/[id]` | - | ✅ | ✅ | |
-| Create | `POST /api/attributes/new` | `CreateRequest<Partial<Attribute>>` | ✅ | ✅ | |
-| Update | `PUT /api/attributes/[id]` | `Partial<Attribute>` | ✅ | ✅ | |
-| Delete | `DELETE /api/attributes/[id]` | - | ✅ | ✅ | |
-| **CATEGORIES (Master Data)** |
-| Query List | `POST /api/categories` | `QueryRequest<ProductCategory>` | ✅ | ✅ | For assignment dropdowns |
-| **SUPPLIER-CATEGORIES (Assignment - n:m)** |
-| Query via JOINs | `POST /api/query` | `namedQuery: 'supplier_categories'` | ✅ | ✅ | |
-| Create Assignment | `POST /api/supplier-categories` | `AssignmentRequest<Wholesaler, ProductCategory>` | ⚠️ | ⚠️ | **Needs generic update** |
-| Remove Assignment | `DELETE /api/supplier-categories` | `RemoveAssignmentRequest<Wholesaler, ProductCategory>` | ⚠️ | ⚠️ | **Needs generic update** |
-| **CATEGORY-OFFERINGS (Hierarchical - 1:n)** |
-| Query via JOINs | `POST /api/query` | `namedQuery: 'category_offerings'` | ✅ | ✅ | |
-| Create | `POST /api/category-offerings` | `CreateRequest<ProductCategory, OfferingData>` | ✅ | ✅ | **Fixed** |
-| Update | `PUT /api/category-offerings` | `{offering_id, ...updates}` | ✅ | ✅ | **Fixed** |
-| Delete | `DELETE /api/category-offerings` | `DeleteRequest<WholesalerItemOffering>` | ✅ | ✅ | **Fixed** |
-| **OFFERING-ATTRIBUTES (Assignment - n:m Attributed)** |
-| Query via JOINs | `POST /api/query` | `namedQuery: 'offering_attributes'` | ✅ | ✅ | |
-| Create Assignment | `POST /api/offering-attributes` | `AssignmentRequest<WholesalerItemOffering, Attribute>` | ⚠️ | ⚠️ | **Needs generic update** |
-| Update Assignment | `PUT /api/offering-attributes` | `AssignmentRequest<WholesalerItemOffering, Attribute>` | ⚠️ | ⚠️ | **Needs generic update** |
-| Delete Assignment | `DELETE /api/offering-attributes` | `RemoveAssignmentRequest<WholesalerItemOffering, Attribute>` | ⚠️ | ⚠️ | **Needs generic update** |
-| **OFFERING-LINKS (Composition - 1:n)** |
-| Query via JOINs | `POST /api/query` | `namedQuery: 'offering_links'` | ✅ | ✅ | |
-| Read Single | `GET /api/offering-links/[id]` | - | ✅ | ✅ | For forms only |
-| Create | `POST /api/offering-links` | `CreateRequest<WholesalerItemOffering, LinkData>` | ⚠️ | ⚠️ | **Needs generic update** |
-| Update | `PUT /api/offering-links` | Update pattern | ⚠️ | ⚠️ | **Needs generic update** |
-| Delete | `DELETE /api/offering-links` | `DeleteRequest<WholesalerOfferingLink>` | ⚠️ | ⚠️ | **Needs generic update** |
+| Entity/Operation                                      | Endpoint                          | Generic Type                                                 | Server Status | Client Status | Notes                    |
+|-------------------------------------------------------|-----------------------------------|--------------------------------------------------------------|---------------|---------------|--------------------------|
+| **SUPPLIERS (Master Data)**                           |                                   |                                                              |               |               |                          |
+| Query List                                            | `POST /api/suppliers`             | `QueryRequest<Wholesaler>`                                   | ✅             | ✅             |                          |
+| Read Single                                           | `GET /api/suppliers/[id]`         | -                                                            | ✅             | ✅             |                          |
+| Create                                                | `POST /api/suppliers/new`         | `CreateRequest<Partial<Wholesaler>>`                         | ✅             | ✅             |                          |
+| Update                                                | `PUT /api/suppliers/[id]`         | `Partial<Wholesaler>`                                        | ✅             | ✅             |                          |
+| Delete                                                | `DELETE /api/suppliers/[id]`      | -                                                            | ✅             | ✅             |                          |
+| **ATTRIBUTES (Master Data)**                          |                                   |                                                              |               |               |                          |
+| Query List                                            | `POST /api/attributes`            | `QueryRequest<Attribute>`                                    | ✅             | ✅             |                          |
+| Read Single                                           | `GET /api/attributes/[id]`        | -                                                            | ✅             | ✅             |                          |
+| Create                                                | `POST /api/attributes/new`        | `CreateRequest<Partial<Attribute>>`                          | ✅             | ✅             |                          |
+| Update                                                | `PUT /api/attributes/[id]`        | `Partial<Attribute>`                                         | ✅             | ✅             |                          |
+| Delete                                                | `DELETE /api/attributes/[id]`     | -                                                            | ✅             | ✅             |                          |
+| **CATEGORIES (Master Data)**                          |                                   |                                                              |               |               |                          |
+| Query List                                            | `POST /api/categories`            | `QueryRequest<ProductCategory>`                              | ✅             | ✅             | For assignment dropdowns |
+| **SUPPLIER-CATEGORIES (Assignment - n:m)**            |                                   |                                                              |               |               |                          |
+| Query via JOINs                                       | `POST /api/query`                 | `namedQuery: 'supplier_categories'`                          | ✅             | ✅             |                          |
+| Create Assignment                                     | `POST /api/supplier-categories`   | `AssignmentRequest<Wholesaler, ProductCategory>`             | ⚠️            | ⚠️            | **Needs generic update** |
+| Remove Assignment                                     | `DELETE /api/supplier-categories` | `RemoveAssignmentRequest<Wholesaler, ProductCategory>`       | ⚠️            | ⚠️            | **Needs generic update** |
+| **CATEGORY-OFFERINGS (Hierarchical - 1:n)**           |                                   |                                                              |               |               |                          |
+| Query via JOINs                                       | `POST /api/query`                 | `namedQuery: 'category_offerings'`                           | ✅             | ✅             |                          |
+| Create                                                | `POST /api/category-offerings`    | `CreateRequest<ProductCategory, OfferingData>`               | ✅             | ✅             | **Fixed**                |
+| Update                                                | `PUT /api/category-offerings`     | `{offering_id, ...updates}`                                  | ✅             | ✅             | **Fixed**                |
+| Delete                                                | `DELETE /api/category-offerings`  | `DeleteRequest<WholesalerItemOffering>`                      | ✅             | ✅             | **Fixed**                |
+| **OFFERING-ATTRIBUTES (Assignment - n:m Attributed)** |                                   |                                                              |               |               |                          |
+| Query via JOINs                                       | `POST /api/query`                 | `namedQuery: 'offering_attributes'`                          | ✅             | ✅             |                          |
+| Create Assignment                                     | `POST /api/offering-attributes`   | `AssignmentRequest<WholesalerItemOffering, Attribute>`       | ⚠️            | ⚠️            | **Needs generic update** |
+| Update Assignment                                     | `PUT /api/offering-attributes`    | `AssignmentRequest<WholesalerItemOffering, Attribute>`       | ⚠️            | ⚠️            | **Needs generic update** |
+| Delete Assignment                                     | `DELETE /api/offering-attributes` | `RemoveAssignmentRequest<WholesalerItemOffering, Attribute>` | ⚠️            | ⚠️            | **Needs generic update** |
+| **OFFERING-LINKS (Composition - 1:n)**                |                                   |                                                              |               |               |                          |
+| Query via JOINs                                       | `POST /api/query`                 | `namedQuery: 'offering_links'`                               | ✅             | ✅             |                          |
+| Read Single                                           | `GET /api/offering-links/[id]`    | -                                                            | ✅             | ✅             | For forms only           |
+| Create                                                | `POST /api/offering-links`        | `CreateRequest<WholesalerItemOffering, LinkData>`            | ⚠️            | ⚠️            | **Needs generic update** |
+| Update                                                | `PUT /api/offering-links`         | Update pattern                                               | ⚠️            | ⚠️            | **Needs generic update** |
+| Delete                                                | `DELETE /api/offering-links`      | `DeleteRequest<WholesalerOfferingLink>`                      | ⚠️            | ⚠️            | **Needs generic update** |
 
 ---
 

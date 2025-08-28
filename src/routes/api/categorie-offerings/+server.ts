@@ -12,12 +12,13 @@ import { db } from '$lib/server/db';
 import { log } from '$lib/utils/logger';
 import { validateOffering } from '$lib/server/validation/domainValidator';
 import { mssqlErrorMapper } from '$lib/server/errors/mssqlErrorMapper';
-import type { WholesalerItemOffering } from '$lib/domain/types';
+import type { ProductCategory, WholesalerItemOffering } from '$lib/domain/types';
 import { v4 as uuidv4 } from 'uuid';
 
 import type {
     ApiErrorResponse,
     ApiSuccessResponse,
+    CreateChildRequest,
     DeleteConflictResponse,
     DeleteSuccessResponse,
     RemoveAssignmentRequest
@@ -60,20 +61,50 @@ async function checkOfferingDependencies(offeringId: number): Promise<string[]> 
 
 /**
  * POST /api/category-offerings
- * @description Creates a new offering within a category context (replaces /api/offerings/new).
+ * @description Creates a new offering within a category context.
  */
 export const POST: RequestHandler = async ({ request }) => {
     const operationId = uuidv4();
     log.info(`[${operationId}] POST /category-offerings: FN_START`);
 
     try {
-        // 1. Expect the request body to be the new offering data.
-        const requestData = (await request.json()) as Partial<Omit<WholesalerItemOffering, 'offering_id'>>;
-        //const requestData = (await request.json()) as Partial<WholesalerItemOffering>;
-        log.info(`[${operationId}] Parsed request body`, { fields: Object.keys(requestData) });
+        // 1. Expect the request body to be CreateChildRequest.
+        const chilRequestData = (await request.json()) as CreateChildRequest<ProductCategory, Omit<WholesalerItemOffering, 'offering_id'>>;
+        const categoryId = chilRequestData.id;
+        const offeringData = chilRequestData.data;
+        log.info(`[${operationId}] Parsed request body`, { fields: Object.keys(chilRequestData) });
+
+        // The parent must be defined
+        if (!categoryId) {
+            const errRes: ApiErrorResponse = {
+                success: false,
+                message: 'Parent ID (==Category ID) is required.',
+                status_code: 400,
+                error_code: 'CATEGORY_ID_REQUIRED',
+                meta: { timestamp: new Date().toISOString() }
+            };
+            log.warn(`[${operationId}] FN_FAILURE: Category ID is required.`, { categoryId });
+            return json(errRes, { status: 400 });
+        }
+        // Check for category ID mismatch
+        if (offeringData.category_id) {
+            if (offeringData.category_id !== categoryId) {
+                const errRes: ApiErrorResponse = {
+                    success: false,
+                    message: `Category ID mismatch. Expected ${categoryId}, got ${offeringData.category_id}.`,
+                    status_code: 400,
+                    error_code: 'CATEGORY_ID_MISMATCH',
+                    meta: { timestamp: new Date().toISOString() }
+                };
+                log.warn(`[${operationId}] FN_FAILURE: Category ID mismatch.`, { categoryId, offeringData });
+                return json(errRes, { status: 400 });
+            }
+        } else {
+            offeringData.category_id = categoryId;
+        }
 
         // 2. Validate the incoming data in 'create' mode.
-        const validation = validateOffering(requestData, { mode: 'create' });
+        const validation = validateOffering(offeringData, { mode: 'create' });
         if (!validation.isValid) {
             const errRes: ApiErrorResponse = {
                 success: false,
@@ -88,15 +119,15 @@ export const POST: RequestHandler = async ({ request }) => {
         }
 
         // 3. Use the sanitized data from the validator for the database operation.
-        const { 
-            wholesaler_id, 
-            category_id, 
-            product_def_id, 
-            size, 
-            dimensions, 
-            price, 
-            currency, 
-            comment 
+        const {
+            wholesaler_id,
+            category_id,
+            product_def_id,
+            size,
+            dimensions,
+            price,
+            currency,
+            comment
         } = validation.sanitized as Partial<Omit<WholesalerItemOffering, 'offering_id'>>
 
         // 4. Verify that supplier and category exist and are related
@@ -145,9 +176,9 @@ export const POST: RequestHandler = async ({ request }) => {
                 error_code: 'BAD_REQUEST',
                 meta: { timestamp: new Date().toISOString() }
             };
-            log.warn(`[${operationId}] FN_FAILURE: Category not assigned to supplier.`, { 
-                wholesaler_id, 
-                category_id 
+            log.warn(`[${operationId}] FN_FAILURE: Category not assigned to supplier.`, {
+                wholesaler_id,
+                category_id
             });
             return json(errRes, { status: 400 });
         }
@@ -238,7 +269,7 @@ export const PUT: RequestHandler = async ({ request }) => {
             return json(errRes, { status: 400 });
         }
 
-        const { wholesaler_id, category_id, product_def_id, size, dimensions, price, currency, comment } = 
+        const { wholesaler_id, category_id, product_def_id, size, dimensions, price, currency, comment } =
             validation.sanitized as Partial<WholesalerItemOffering>;
 
         // Verify the offering exists and get current context
@@ -321,7 +352,7 @@ export const DELETE: RequestHandler = async ({ request }) => {
     log.info(`[${operationId}] DELETE /category-offerings: FN_START`);
 
     try {
-        const body = (await request.json()) as RemoveAssignmentRequest<number, number> & { offering_id: number };
+        const body = (await request.json()) as RemoveAssignmentRequest<ProductCategory, WholesalerItemOffering> & { offering_id: number };
         const { offering_id, cascade = false } = body;
         log.info(`[${operationId}] Parsed request body`, { offering_id, cascade });
 
@@ -359,12 +390,12 @@ export const DELETE: RequestHandler = async ({ request }) => {
         try {
             if (cascade && dependencies.length > 0) {
                 log.info(`[${operationId}] Performing cascade delete.`);
-                
+
                 // Delete offering attributes
                 await transaction.request()
                     .input('offeringId', offering_id)
                     .query('DELETE FROM dbo.wholesaler_offering_attributes WHERE offering_id = @offeringId');
-                
+
                 // Delete offering links
                 await transaction.request()
                     .input('offeringId', offering_id)
@@ -407,8 +438,8 @@ export const DELETE: RequestHandler = async ({ request }) => {
             await transaction.commit();
             log.info(`[${operationId}] Transaction committed.`);
 
-            const response: DeleteSuccessResponse<{ 
-                offering_id: number; 
+            const response: DeleteSuccessResponse<{
+                offering_id: number;
                 product_def_title: string;
                 supplier_name: string;
                 category_name: string;

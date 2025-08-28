@@ -19,6 +19,7 @@ import type {
     ApiErrorResponse,
     AssignmentRequest,
     AssignmentSuccessResponse,
+    AssignmentUpdateRequest,
     DeleteSuccessResponse,
     RemoveAssignmentRequest
 } from '$lib/api/types/common';
@@ -138,7 +139,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
 /**
  * PUT /api/offering-attributes
- * @description Updates an existing offering-attribute assignment (ADDED - was missing).
+ * @description Updates an existing offering-attribute assignment.
  */
 export const PUT: RequestHandler = async ({ request }) => {
     const operationId = uuidv4();
@@ -150,7 +151,7 @@ export const PUT: RequestHandler = async ({ request }) => {
             childId: number;  // attributeId  
             value?: string;
         };
-        const { parentId: offeringId, childId: attributeId, value } = body;
+        const { parentId: offeringId, childId: attributeId, value } = body as AssignmentUpdateRequest<WholesalerItemOffering, Attribute, { value?: string }>;
         log.info(`[${operationId}] Parsed request body`, { offeringId, attributeId, value });
 
         if (!offeringId || !attributeId) {
@@ -254,7 +255,7 @@ export const DELETE: RequestHandler = async ({ request }) => {
     log.info(`[${operationId}] DELETE /offering-attributes: FN_START`);
 
     try {
-        const body = (await request.json()) as RemoveAssignmentRequest<number, number>;
+        const body = (await request.json()) as RemoveAssignmentRequest<WholesalerItemOffering, Attribute>;
         const { parentId: offeringId, childId: attributeId, cascade = false } = body;
         log.info(`[${operationId}] Parsed request body`, { offeringId, attributeId, cascade });
 

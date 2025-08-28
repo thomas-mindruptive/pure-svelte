@@ -14,7 +14,6 @@ import type { Attribute } from '$lib/domain/types';
 
 // Import generic types from the single source of truth: common.ts
 import type {
-    CreateRequest,
     DeleteApiResponse,
     QueryResponseData
 } from '$lib/api/types/common';
@@ -111,7 +110,7 @@ export async function loadAttribute(attributeId: number): Promise<Attribute> {
  * @throws {ApiError} If validation fails (400) or another server error occurs.
  */
 export async function createAttribute(
-    attributeData: CreateRequest<Partial<Omit<Attribute, 'attribute_id'>>>
+    attributeData: Partial<Omit<Attribute, 'attribute_id'>>
 ): Promise<Attribute> {
     const operationId = 'createAttribute';
     attributeLoadingState.start(operationId);

@@ -13,13 +13,13 @@ import { db } from '$lib/server/db';
 import { log } from '$lib/utils/logger';
 import { validateOfferingLink } from '$lib/server/validation/domainValidator';
 import { mssqlErrorMapper } from '$lib/server/errors/mssqlErrorMapper';
-import type { WholesalerOfferingLink } from '$lib/domain/types';
+import type { WholesalerItemOffering, WholesalerOfferingLink } from '$lib/domain/types';
 import { v4 as uuidv4 } from 'uuid';
 
 import type {
     ApiErrorResponse,
     ApiSuccessResponse,
-    CreateRequest,
+    CreateChildRequest,
     DeleteSuccessResponse
 } from '$lib/api/types/common';
 
@@ -33,11 +33,43 @@ export const POST: RequestHandler = async ({ request }) => {
 
     try {
         // 1. Expect the request body to be the new offering link data.
-        const requestData = (await request.json()) as CreateRequest<Partial<WholesalerOfferingLink>>;
-        log.info(`[${operationId}] Parsed request body`, { fields: Object.keys(requestData) });
+        const childRequestData = (await request.json()) as CreateChildRequest<WholesalerItemOffering, Omit<WholesalerOfferingLink, 'link_id'>>;
+        const offeringId = childRequestData.id;
+        const linkData = childRequestData.data;
+        log.info(`[${operationId}] Parsed request body`, { fields: Object.keys(childRequestData) });
+
+        // The parent must be defined
+        if (!offeringId) {
+            const errRes: ApiErrorResponse = {
+                success: false,
+                message: 'Parent ID (==Offering ID) is required.',
+                status_code: 400,
+                error_code: 'OFFERING_ID_REQUIRED',
+                meta: { timestamp: new Date().toISOString() }
+            };
+            log.warn(`[${operationId}] FN_FAILURE: Offering ID is required.`, { offeringId });
+            return json(errRes, { status: 400 });
+        }
+        // Check for offering_id ID mismatch
+        if (linkData.offering_id) {
+            if (linkData.offering_id !== offeringId) {
+                const errRes: ApiErrorResponse = {
+                    success: false,
+                    message: `Offering ID mismatch. Expected ${offeringId}, got ${linkData.offering_id}.`,
+                    status_code: 400,
+                    error_code: 'OFFERING_ID_MISMATCH',
+                    meta: { timestamp: new Date().toISOString() }
+                };
+                log.warn(`[${operationId}] FN_FAILURE: Offering ID mismatch.`, { offeringId, linkData });
+                return json(errRes, { status: 400 });
+            }
+        } else {
+            linkData.offering_id = offeringId;
+        }
+
 
         // 2. Validate the incoming data in 'create' mode.
-        const validation = validateOfferingLink(requestData, { mode: 'create' });
+        const validation = validateOfferingLink(linkData, { mode: 'create' });
         if (!validation.isValid) {
             const errRes: ApiErrorResponse = {
                 success: false,
@@ -300,8 +332,8 @@ export const DELETE: RequestHandler = async ({ request }) => {
             return json(errRes, { status: 404 });
         }
 
-        const response: DeleteSuccessResponse<{ 
-            link_id: number; 
+        const response: DeleteSuccessResponse<{
+            link_id: number;
             url: string;
             offering_title: string;
         }> = {

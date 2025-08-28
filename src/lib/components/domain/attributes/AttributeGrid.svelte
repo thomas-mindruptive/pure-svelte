@@ -22,7 +22,7 @@
 
   } from '$lib/components/client/Datagrid.svelte';
     import type { ColumnDef, DeleteStrategy, RowActionStrategy } from '$lib/components/client/Datagrid.types';
-  import type { AttributeWithDetails } from '$lib/domain/types';
+  import type { WholesalerOfferingAttribute_Attribute } from '$lib/domain/types';
 
   // Universal ID type for consistency across grid components
   type ID = string | number;
@@ -31,7 +31,7 @@
 
   const {
     // Core data
-    rows = [] as AttributeWithDetails[],    // Array of attribute objects with JOIN data (name, description)
+    rows = [] as WholesalerOfferingAttribute_Attribute[],    // Array of attribute objects with JOIN data (name, description)
     loading = false,                        // Whether grid is in loading state
     
     // Delete handling (required by Datagrid)
@@ -40,10 +40,10 @@
     // Row interaction (optional)
     onRowClick                             // Handler for row clicks (typically navigation to edit form)
   } = $props<{
-    rows?: AttributeWithDetails[];
+    rows?: WholesalerOfferingAttribute_Attribute[];
     loading?: boolean;
     executeDelete: (ids: ID[]) => Promise<void>;
-    onRowClick?: (attribute: AttributeWithDetails) => void;
+    onRowClick?: (attribute: WholesalerOfferingAttribute_Attribute) => void;
   }>();
 
   // ===== COLUMN DEFINITIONS =====
@@ -51,14 +51,14 @@
   // Define how attribute data should be displayed in the grid
   // Column order optimized for attribute key-value display patterns
   // Uses JOIN data (attribute_name, attribute_description)
-  const columns: ColumnDef<AttributeWithDetails>[] = [
+  const columns: ColumnDef<WholesalerOfferingAttribute_Attribute>[] = [
     // Attribute name - primary identification, makes first column clickable
     { 
       key: 'attribute_name', 
       header: 'Attribute', 
       sortable: true, 
       width: '2fr',
-      accessor: (attr: AttributeWithDetails) => 
+      accessor: (attr: WholesalerOfferingAttribute_Attribute) => 
         attr.attribute_name || `Attribute #${attr.attribute_id}`
     },
     
@@ -68,7 +68,7 @@
       header: 'Value', 
       sortable: true, 
       width: '2fr',
-      accessor: (attr: AttributeWithDetails) => 
+      accessor: (attr: WholesalerOfferingAttribute_Attribute) => 
         attr.value || '—'
     },
     
@@ -78,7 +78,7 @@
       header: 'Description', 
       sortable: false, 
       width: '3fr',
-      accessor: (attr: AttributeWithDetails) => 
+      accessor: (attr: WholesalerOfferingAttribute_Attribute) => 
         attr.attribute_description || '—'
     },
     
@@ -88,7 +88,7 @@
       header: 'ID', 
       sortable: true, 
       width: '0.5fr',
-      accessor: (attr: AttributeWithDetails) => 
+      accessor: (attr: WholesalerOfferingAttribute_Attribute) => 
         attr.attribute_id.toString()
     }
   ];
@@ -103,7 +103,7 @@
    * @param attribute - The attribute object to extract ID from
    * @returns Compound ID as string: "offering_id-attribute_id"
    */
-  const getId = (attribute: AttributeWithDetails): ID => 
+  const getId = (attribute: WholesalerOfferingAttribute_Attribute): ID => 
     `${attribute.offering_id}-${attribute.attribute_id}`;
 
   // ===== DELETE STRATEGY =====
@@ -114,7 +114,7 @@
    * This keeps the grid component pure and allows parent to handle business logic.
    * Parent will need to parse compound IDs back to offering_id + attribute_id.
    */
-  const deleteStrategy: DeleteStrategy<AttributeWithDetails> = {
+  const deleteStrategy: DeleteStrategy<WholesalerOfferingAttribute_Attribute> = {
     execute: async (ids: ID[]) => {
       await executeDelete(ids);
     }
@@ -127,7 +127,7 @@
    * Primary click typically opens attribute edit form or detail view.
    * Uses optional callback pattern to avoid forcing interaction behavior.
    */
-  const rowActionStrategy: RowActionStrategy<AttributeWithDetails> = {
+  const rowActionStrategy: RowActionStrategy<WholesalerOfferingAttribute_Attribute> = {
     click: onRowClick
   };
 

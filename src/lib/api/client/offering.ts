@@ -31,7 +31,7 @@ import type {
     AssignmentRequest,
     AssignmentUpdateRequest,
     RemoveAssignmentRequest,
-    CreateRequest,
+    CreateChildRequest,
     DeleteRequest
 } from '$lib/api/types/common';
 
@@ -430,20 +430,15 @@ export async function loadOfferingLinks(offeringId: number): Promise<WholesalerO
  * @throws {ApiError} If validation fails or another server error occurs.
  */
 export async function createOfferingLink(
-    linkData: {
-        offering_id: number;
-        url: string;
-        notes?: string;
-    }
+    linkData: Omit<WholesalerOfferingLink, 'link_id'>
 ): Promise<WholesalerOfferingLink> {
     const operationId = 'createOfferingLink';
     offeringLoadingState.start(operationId);
     try {
         // Use type-safe create request
-        const requestBody: CreateRequest<WholesalerItemOffering, { url: string; notes?: string }> = {
+        const requestBody: CreateChildRequest<WholesalerItemOffering, Omit<WholesalerOfferingLink, 'link_id'>> = {
             id: linkData.offering_id,  // Parent-ID
-            url: linkData.url,         // Link-Daten
-            ...(linkData.notes !== undefined && { notes: linkData.notes })
+            data: linkData
         };
 
         const responseData = await apiFetch<{ link: WholesalerOfferingLink }>(

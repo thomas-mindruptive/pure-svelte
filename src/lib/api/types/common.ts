@@ -85,9 +85,10 @@ export type RemoveAssignmentRequest<TParent, TChild> = {
 /**
  * Create child entity in parent context (1:n compositions)
  */
-export type CreateRequest<TParent, TMetadata = object> = {
+export type CreateChildRequest<TParent, TChild> = {
   id: TParent[IdField<TParent>];
-} & TMetadata;
+  data: TChild;
+} 
 
 /**
  * Delete entity by its ID
@@ -97,13 +98,13 @@ export type DeleteRequest<T> = {
   cascade?: boolean;
 };
 
-/**
- * Update existing entity
- */
-export interface UpdateRequest<TId, TData> {
-    id: TId;
-    data: TData;
-}
+// /**
+//  * Update existing entity
+//  */
+// export interface UpdateRequest<TId, TData> {
+//     id: TId;
+//     data: TData;
+// }
 
 // ===== 4. REQUEST ENVELOPES =====
 

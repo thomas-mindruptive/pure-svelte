@@ -16,8 +16,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 import type {
 	ApiErrorResponse,
-	ApiSuccessResponse,
-	CreateRequest
+	ApiSuccessResponse
 } from '$lib/api/types/common';
 
 /**
@@ -30,7 +29,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
 	try {
 		// 1. Expect the request body to be the new supplier data.
-		const requestData = (await request.json()) as CreateRequest<Partial<Wholesaler>>;
+		const requestData = (await request.json()) as Partial<Omit<Wholesaler, 'wholesaler_id'>>;
 		log.info(`[${operationId}] Parsed request body`, { fields: Object.keys(requestData) });
 
 		// 2. Validate the incoming data in 'create' mode.

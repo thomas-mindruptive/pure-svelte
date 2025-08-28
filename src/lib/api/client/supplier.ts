@@ -14,7 +14,6 @@ import type { Wholesaler, WholesalerCategoryWithCount, ProductCategory, Wholesal
 
 // Import generic types from the single source of truth: common.ts
 import type {
-	CreateRequest,
 	DeleteApiResponse,
 	PredefinedQueryRequest,
 	QueryResponseData,
@@ -105,7 +104,7 @@ export async function loadSupplier(supplierId: number): Promise<Wholesaler> {
  * @throws {ApiError} If validation fails (400) or another server error occurs.
  */
 export async function createSupplier(
-	supplierData: CreateRequest<Partial<Omit<Wholesaler, 'wholesaler_id'>>>
+	supplierData: Partial<Omit<Wholesaler, 'wholesaler_id'>>
 ): Promise<Wholesaler> {
 	const operationId = 'createSupplier';
 	supplierLoadingState.start(operationId);

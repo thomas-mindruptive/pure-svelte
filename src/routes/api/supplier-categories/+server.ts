@@ -12,7 +12,7 @@ import { db } from '$lib/server/db';
 import { log } from '$lib/utils/logger';
 import { mssqlErrorMapper } from '$lib/server/errors/mssqlErrorMapper';
 import { checkCategoryDependencies } from '$lib/dataModel/dependencyChecks';
-import type { WholesalerCategory } from '$lib/domain/types';
+import type { ProductCategory, Wholesaler, WholesalerCategory } from '$lib/domain/types';
 import { v4 as uuidv4 } from 'uuid';
 
 import type {
@@ -33,7 +33,7 @@ export const POST: RequestHandler = async ({ request }) => {
     log.info(`[${operationId}] POST /supplier-categories: FN_START`);
 
     try {
-        const body = (await request.json()) as AssignmentRequest<number, number>;
+        const body = (await request.json()) as AssignmentRequest<Wholesaler, ProductCategory, { comment?: string; link?: string }>;
         const { parentId: supplierId, childId: categoryId, comment, link } = body;
         log.info(`[${operationId}] Parsed request body`, { supplierId, categoryId });
 
@@ -98,7 +98,7 @@ export const DELETE: RequestHandler = async ({ request }) => {
     log.info(`[${operationId}] DELETE /supplier-categories: FN_START`);
 
     try {
-        const body = (await request.json()) as RemoveAssignmentRequest<number, number>;
+        const body = (await request.json()) as RemoveAssignmentRequest<Wholesaler, ProductCategory>;
         const { parentId: supplierId, childId: categoryId, cascade = false } = body;
         log.info(`[${operationId}] Parsed request body`, { supplierId, categoryId, cascade });
 

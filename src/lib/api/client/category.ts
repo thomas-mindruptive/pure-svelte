@@ -18,7 +18,7 @@ import type {
 
 // Import generic types from the single source of truth: common.ts
 import type {
-    CreateRequest,
+    CreateChildRequest,
     DeleteApiResponse,
     PredefinedQueryRequest,
     QueryResponseData
@@ -112,7 +112,7 @@ export async function loadCategory(categoryId: number): Promise<ProductCategory>
  * @throws {ApiError} If validation fails (400) or another server error occurs.
  */
 export async function createCategory(
-    categoryData: CreateRequest<Partial<Omit<ProductCategory, 'category_id'>>>
+    categoryData: Omit<ProductCategory, 'category_id'>
 ): Promise<ProductCategory> {
     const operationId = 'createCategory';
     categoryLoadingState.start(operationId);
@@ -183,7 +183,7 @@ export async function deleteCategory(
     }
 }
 
-// ===== OFFERING CRUD (Category Compositions) =====
+// ===== OFFERING (Category Compositions) =====
 
 /**
  * Loads all offerings for a specific supplier and category using a predefined named query.
@@ -242,7 +242,6 @@ export async function loadOfferingsForCategory(supplierId: number, categoryId: n
 }
 
 
-
 /**
  * Creates a new offering for a category.
  *
@@ -251,14 +250,19 @@ export async function loadOfferingsForCategory(supplierId: number, categoryId: n
  * @throws {ApiError} If validation fails or another server error occurs.
  */
 export async function createOfferingForCategory(
-    offeringData: CreateRequest<Partial<Omit<WholesalerItemOffering, 'offering_id'>>>
+    categoryId: number,
+    offeringData: Omit<WholesalerItemOffering, 'offering_id'>
 ): Promise<WholesalerItemOffering> {
     const operationId = 'createOfferingForCategory';
     categoryLoadingState.start(operationId);
     try {
+        const requestBody: CreateChildRequest<ProductCategory, Omit<WholesalerItemOffering, 'offering_id'>> = {
+            id: categoryId,
+            data: offeringData
+        };
         const responseData = await apiFetch<{ offering: WholesalerItemOffering }>(
             '/api/category-offerings',
-            { method: 'POST', body: createPostBody(offeringData) },
+            { method: 'POST', body: createPostBody(requestBody) },
             { context: operationId }
         );
         return responseData.offering;

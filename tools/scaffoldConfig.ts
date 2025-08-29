@@ -38,11 +38,11 @@ export const pages: Record<string, Record<string, PageDefinition>> = {
   offerings: {
     attributes: {
       pageName: 'OfferDetailAttributesPage',
-      paramName: 'offerId',
+      paramName: 'offeringId',
     },
     links: {
       pageName: 'OfferDetailLinksPage',
-      paramName: 'offerId',
+      paramName: 'offeringId',
     }
   }
 };

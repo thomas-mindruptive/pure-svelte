@@ -1,18 +1,8 @@
-Ja, absolut. Ich verstehe die Anweisung zu 100%.
-
-Ich werde das `README-Supplier-Browser.md` aktualisieren, um das "Optimistic Delete Pattern" mit der zweistufigen Bestätigung als offizielles architektonisches Prinzip zu dokumentieren. Alle vorhandenen Informationen bleiben erhalten. Die Ergänzung wird nahtlos in die bestehende Struktur integriert, um die Logik und die Gründe für diese Design-Entscheidung klar darzulegen.
-
-Hier ist die aktualisierte Version des Dokuments. Die Ergänzung befindet sich unter dem neuen Punkt **`5.2.d) Deletion Pattern`**.
-
----
-
-### README-Supplier-Browser.md (Aktualisierte Version)
-
 # SupplierBrowser - Architectural Specification & Developer Guide
 
 **Single source of truth for the project's architecture. All development must adhere to the patterns and principles defined herein.**
 
-*Updated: 28. August 2025 - Generic Type System & Hierarchical Patterns Finalized*
+*Updated: 29. August 2025 - Frontend Architecture & Scaffolding Finalized*
 
 ---
 
@@ -56,13 +46,9 @@ The application's logic is built around a clear, five-level data model. Understa
 - **Purpose**: Links that belong to specific offerings
 - **API Pattern**: `/api/offering-links` CREATE/UPDATE/DELETE with CreateChildRequest
 
-### 1.2. The User Experience: A URL-Driven Single-Page Application
+### 1.2. The User Experience: A SvelteKit-Powered Application
 
-The entire application exists on a single route (`/supplierbrowser`) and creates a seamless, app-like experience.
-
-- **URL-Driven State**: The UI is a direct, reactive reflection of the URL's search parameters (`level`, `supplierId`, `categoryId`, `offeringId`). We use Svelte 5 Runes (`$derived`) to listen to URL changes.
-- **Hierarchical Sidebar**: A persistent sidebar creates a guided, foolproof workflow.
-- **Dynamic Content Pane**: The main content area renders different grids and forms based on the current `level`.
+The application leverages SvelteKit's file-based routing to provide a robust and bookmarkable user experience. The state of the application is primarily driven by the URL's path, creating a seamless, app-like feel with client-side navigation. This approach replaces the previous query-parameter-based state management. See Section 5.3 for a detailed breakdown of the frontend architecture.
 
 ---
 
@@ -114,8 +100,7 @@ export type AssignmentRequest<TParent, TChild> = {
   parentId: TParent[IdField<TParent>];
   childId: TChild[IdField<TChild>];
   data?: object // "Attributes" oder additonalData for the relationship.
-};
-```
+};```
 
 
 ### 2.2. Request Pattern Decision Matrix
@@ -336,7 +321,7 @@ Due to the backend API design, information about cascading dependencies is only 
 
 1.  **Step 1: Initial, Generic Confirmation (Intent)**
     -   **Trigger**: The user clicks a "Delete" button.
-    -   **Action**: The generic `DataGrid` component displays a first, simple confirmation dialog (`"Are you sure you want to delete this item?"`). Or, if callback property "deleteStrategy.confirm" is defined, it is called. => Customize the confirmation.
+    -   **Action**: The generic `DataGrid` component displays a first, simple confirmation dialog (`"Are you sure you want to delete this item?"`). This can be customized via the `deleteStrategy.confirm` property.
     -   **Purpose**: To confirm the user's basic *intent* to delete, preventing accidental clicks.
 
 2.  **Step 2: The Optimistic API Call**
@@ -365,6 +350,66 @@ if (dataChanged) {
 }
 ```
 
+### 5.3. Frontend Architecture: Page Delegation Pattern
+
+To support multiple, complex navigation hierarchies while avoiding code duplication, the frontend follows a powerful **Page Delegation Pattern**. This SvelteKit-idiomatic approach separates the concerns of routing, data loading, and UI rendering.
+
+#### The Core Principle
+A SvelteKit **Route** is a simple "delegator" that connects a URL to a reusable **Page Module**. This Page Module contains both the UI and the data-loading logic for that specific view.
+
+#### Concrete Application: Pages & Hierarchies
+The application is composed of several reusable "Page" components that can be arranged in different navigation hierarchies.
+
+**Reusable Pages:**
+- `[supplier-list]`: list + create supplier
+- `[cat-list]`: list + create cat
+- `[supplier-detail]`: form + cat-grid
+- `[cat-detail readonly-cat]`: readonly cat-info + offers-grid
+- `[cat-detail editable-cat]`: cat-form + offers-grid
+- `[offer-detail/attributes]`: form + attribute-grid + create attribute (inline)
+- `[offer-detail/links]`: form + link-grid + create link (inline)
+
+**Example Navigation Hierarchies:**
+- **Supplier-centric Path:**
+  - 1) `[supplier-list]`
+    - 2) `[supplier-detail]`
+      - 3) `[cat-detail readonly-cat]`
+        - 4a) `[offer-detail/attributes]`
+        - 4b) `[offer-detail/links]`
+- **Category-centric Path:**
+  - 1) `[cat-list]`
+    - 2) `[cat-detail editable-cat]`
+      - 3a) `[offer-detail/attributes]`
+      - 3b) `[offer-detail/links]`
+        - 4) `[supplier-detail]` 
+
+#### Example Implementation: File Structure & Reuse Pattern
+This pattern is realized by separating Page Modules from the Routes that use them.
+
+- `src/`
+  - `lib/`
+    - `pages/`
+      - `categories/`
+        - `CategoryDetailPage.svelte`: UI (form + grid)
+        - `categoryDetailPage.ts`: `load()` and other logic
+  - `routes/`
+    - `categories/`
+      - `[categoryId]/`
+        - `+page.ts`: [DELEGATOR] `import { load } from '$lib/pages/categories/categoryDetailPage.ts'`
+        - `+page.svelte`: [RENDERER] `import CategoryDetailPage from '$lib/pages/categories/CategoryDetailPage.svelte'`
+    - `suppliers/`
+      - `[supplierId]/`
+        - `categories/`
+          - `[categoryId]/`
+            - `+page.ts`: [DELEGATOR] `import { load } from '$lib/pages/categories/categoryDetailPage.ts'`
+            - `+page.svelte`: [RENDERER] `import CategoryDetailPage from '$lib/pages/categories/CategoryDetailPage.svelte'`
+
+**Benefits:**
+- **DRY (Don't Repeat Yourself):** UI and data logic for a view like "Category Detail" exist only once.
+- **n:m Routing:** Multiple, different URLs can all delegate to the same Page Module, rendering the same UI with different contexts.
+- **Separation of Concerns:** Routes handle *what* to show, Pages handle *how* to show it.
+- **Maintainability:** The architecture is predictable, scalable, and easy to navigate.
+
 ---
 
 ## 6. Architecture Validation Checklist
@@ -375,7 +420,7 @@ if (dataChanged) {
 - [x] All client endpoints use correct generic patterns  
 - [x] CreateChildRequest handles redundancy appropriately
 
-### Optional: Adjust Typesyste
+### Optional: Adjust Typesystem
 - See 2.1. a): Adjust "AssignmentRequest" and related types.
 
 ### API Consistency 
@@ -489,78 +534,59 @@ assign{Child}To{Parent}(data: {
 
 ---
 
-## Current Status Summary
+## 9. Developer Tooling: Automated Page Scaffolding
 
-### ✅ Completed
-- Generic type system with pattern-specific structures
-- All Master Data endpoints (suppliers, attributes, categories)
-- All Assignment endpoints (supplier-categories, offering-attributes)
-- All Hierarchical endpoints (category-offerings, offering-links)
-- QueryBuilder and security framework
-- Complete client-server type alignment
-- Redundancy handling for hierarchical relationships
+To enforce the Page Delegation Pattern and accelerate development, a command-line scaffolding tool is provided. It automatically generates the required file structure for a new page based on a central configuration.
 
-### ⚠️ In Progress  
-- Frontend completion with Level 4/5 (Attributes/Links) UI
-- Complete removal of mock data in favor of real API integration
+### 9.1. The Configuration (`tools/scaffoldConfig.ts`)
 
-### ✌ Completed Recent Fixes
-- Removed `/api/offerings/new` - maintains hierarchical principle
-- Finalized CreateChildRequest vs AssignmentRequest distinction
-- Fixed all Master Data creation to use direct entity data
-- Implemented controlled redundancy handling in hierarchical creation
+This file is the single source of truth for the application's page structure. It defines root directories and a nested map of all available pages.
+
+```typescript
+// tools/scaffoldConfig.ts
+
+// Defines root paths for all generated files
+export const scaffoldingConfig = {
+  pagesRoot: 'generated/src/lib/pages',
+  routesRoot: 'generated/src/routes',
+  overwriteExisting: true,
+  // ... other options
+};
+
+// Defines the pages, grouped by their base directory
+export const pages: Record<string, Record<string, PageDefinition>> = {
+  suppliers: {
+    list: { pageName: 'SupplierListPage', paramName: '' },
+    detail: { pageName: 'SupplierDetailPage', paramName: 'supplierId' }
+  },
+  // ... other pages
+};
+```
+
+### 9.2. The Templates (`tools/templates/`)
+
+The tool uses template files for each generated file type (`page.svelte`, `page.ts`, `+page.svelte`, `+page.ts`). These templates contain Svelte 5-compliant boilerplate code and placeholders (e.g., `PageName$PlaceHolder`) that are filled in by the script.
+
+To ensure a good developer experience when editing the templates, they are valid Svelte/TypeScript files themselves, using special comments (`SCAFFOLD-REMOVE-BEGIN/END`) to handle expected linter errors.
+
+### 9.3. Usage
+
+To generate all pages defined in the configuration, run the following command from the project root:
+
+```bash
+npm run generate:pages
+```
+
+The script will:
+1.  Optionally clean the output directory.
+2.  Iterate through every page defined in `scaffoldConfig.ts`.
+3.  Generate the corresponding Page Module (`.svelte` and `.ts` files) in the `pagesRoot`.
+4.  Generate the SvelteKit Route (`+page.svelte` and `+page.ts` files) in the `routesRoot`.
+5.  Handle existing files based on the `overwriteExisting` flag.
 
 ---
 
-## Supplier-Browser pages & navigation hierarchies
-**Pages:**
-* [supplier-list]: list + create supplier
-* [cat-list]: list + create cat
-* [supplier-detail]: form + cat-grid
-* [cat-detail readonly-cat]: readonly cat-info + offers-grid
-* [cat-detail editable-cat]: cat-form + offers-grid
-* [offer-detail/attributes]: form + attribut-grid + create attribute (inline)
-* [offer-detail/links:] form + link-grid + create link (inline)
-
-**Potential "browser" hierarchies in sidebar:**
-* 1) [supplier-list]
-  * 2) [supplier-detail]
-    * 3) [cat-detail readonly-cat]
-      * 4a) [offer-detail/attributes]
-      * 4b) [offer-detail/links]
-
-* 1) [cat-list]
-  * 2)  [cat-detail editable-cat]
-    * 3a) [offer-detail/attributes]
-    * 3b) [offer-detail/links]
-      * 4)  [supplier-detail] 
-
-## File & Routing Structure and Resuse-Pattern
-
-- src/
-  - lib/
-    - api/
-      - client/
-        - category.ts
-        - supplier.ts
-    - pages/
-      - categories/
-        - CategoryDetailPage.svelte:  UI (form + grid)
-        - categoryDetialPage.ts:      load() and other logic
-  - routes/
-    - categories/
-      - [categoryId]/
-        - +page.ts:                   [DELEGATOR] import categoryDetialPage.ts
-        - +page.svelte:               import CategoryDetailPage.svelte
-    - suppliers/
-      - [supplierId]/
-        - categories/
-          - [categoryId]/
-            - +page.ts:               [DELEGATOR] import categoryDetialPage.ts
-            - +page.svelte:           import CategoryDetailPage.svelte
-
-
-## Svelte 5 Runes Integration - LoadingState Architecture
+## 10. Svelte 5 Runes Integration - LoadingState Architecture
 
 *Insights from Frontend Integration*
 

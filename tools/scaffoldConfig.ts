@@ -1,73 +1,48 @@
-// tools/scaffoldConfig.ts
-
 const generatedRoot = "scaffolding-generated";
 
-/**
- * Defines the root directories for scaffolding.
- * Change these values if you decide to restructure your project.
- */
 export const scaffoldingConfig = {
-
-  generatedRoot,
-
-  /** The root directory for reusable page components. */
+  generatedRoot: generatedRoot,
   pagesRoot: `${generatedRoot}/src/lib/pages`,
-
-  /** The root directory for SvelteKit routes. */
   routesRoot: `${generatedRoot}/src/routes`,
-
   overwriteExisting: true,
-
   deleteGeneratedFolderBeforeGeneration: true
 };
 
-export interface PageConfig {
-  /** The base directory within the root directories.
-   * Example: 'categories' */
-  baseDir: string;
-  
-  /** The full component name.
-   * Example: 'CategoryDetailPage' */
+// Die innere Konfiguration braucht jetzt kein `baseDir` mehr.
+export interface PageDefinition {
   pageName: string;
-  
-  /** The dynamic parameter for the route.
-   * Example: 'categoryId' */
   paramName: string;
 }
 
-/**
- * This is the single source of truth for all scaffoldable pages.
- * The key (e.g., 'categoryDetail') is the short name you'll use in the CLI.
- */
-export const pages: Record<string, PageConfig> = {
+// Der äußere Schlüssel (z.B. "suppliers") ist jetzt der baseDir.
+export const pages: Record<string, Record<string, PageDefinition>> = {
   
-  supplierList: {
-    baseDir: 'suppliers',
-    pageName: 'SupplierListPage',
-    paramName: '', // No dynamic parameter for a list page
+  suppliers: {
+    list: {
+      pageName: 'SupplierListPage',
+      paramName: '',
+    },
+    detail: {
+      pageName: 'SupplierDetailPage',
+      paramName: 'supplierId',
+    }
   },
 
-  supplierDetail: {
-    baseDir: 'suppliers',
-    pageName: 'SupplierDetailPage',
-    paramName: 'supplierId',
+  categories: {
+    detail: {
+      pageName: 'CategoryDetailPage',
+      paramName: 'categoryId',
+    }
   },
 
-  categoryDetail: {
-    baseDir: 'categories',
-    pageName: 'CategoryDetailPage',
-    paramName: 'categoryId',
-  },
-
-  offerDetailAttributes: {
-    baseDir: 'offerings',
-    pageName: 'OfferDetailAttributesPage',
-    paramName: 'offerId',
-  },
-
-  offerDetailLinks: {
-    baseDir: 'offerings',
-    pageName: 'OfferDetailLinksPage',
-    paramName: 'offerId',
+  offerings: {
+    attributes: {
+      pageName: 'OfferDetailAttributesPage',
+      paramName: 'offerId',
+    },
+    links: {
+      pageName: 'OfferDetailLinksPage',
+      paramName: 'offerId',
+    }
   }
 };

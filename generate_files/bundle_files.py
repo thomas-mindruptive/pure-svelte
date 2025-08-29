@@ -24,6 +24,7 @@ EXCLUDE_PATTERNS = [
     "playwright-report",
     "generated_data",
     "generate_files",
+    "scaffolding-generated",
     "input_data",
     "output",
     "bin",

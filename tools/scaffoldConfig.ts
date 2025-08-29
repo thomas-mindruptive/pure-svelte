@@ -1,6 +1,6 @@
 // tools/scaffoldConfig.ts
 
-const generatedRoot = "generated";
+const generatedRoot = "scaffolding-generated";
 
 /**
  * Defines the root directories for scaffolding.
@@ -9,7 +9,7 @@ const generatedRoot = "generated";
 export const scaffoldingConfig = {
 
   generatedRoot,
-  
+
   /** The root directory for reusable page components. */
   pagesRoot: `${generatedRoot}/src/lib/pages`,
 

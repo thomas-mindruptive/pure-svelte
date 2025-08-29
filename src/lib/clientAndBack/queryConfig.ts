@@ -41,7 +41,7 @@ export const supplierQueryConfig: QueryConfig = {
     ],
     'category_offerings': [
       'pc.category_id', 'pc.name AS category_name', 'pc.description AS category_description',
-      'wio.offering_id', 'wio.price',
+      'wio.category_id', 'wio.offering_id', 'wio.price', 'wio.created_at',
       'wio.wholesaler_id'
     ],
     'offering_attributes': [

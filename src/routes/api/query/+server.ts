@@ -55,7 +55,6 @@ export const POST: RequestHandler = async (event) => {
 				data: { 
 					results, 
 					meta: { 
-						// KORREKTES MAPPING der Property-Namen
 						retrieved_at: new Date().toISOString(),
 						result_count: results.length,
 						columns_selected: metadata.selectColumns,

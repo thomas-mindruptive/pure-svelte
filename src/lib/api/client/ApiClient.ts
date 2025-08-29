@@ -8,7 +8,7 @@ import {
 	ApiError,
 	type ApiRequestOptions,
 } from './common';
-import { HTTP_STATUS, type ApiErrorResponse, type ApiSuccessResponse } from '../types';
+import { type ApiSuccessResponse } from '../types';
 
 type SvelteKitFetch = typeof fetch;
 
@@ -57,31 +57,40 @@ export class ApiClient {
 				headers: { 'content-type': 'application/json', ...init.headers },
 				signal: controller.signal
 			});
+			log.info('ApiClient response', response, response.status, response.statusText, response.ok);
 			clearTimeout(timeoutId);
 
-			const data: unknown = await response
-				.json()
-				.catch(() => ({ message: 'Invalid JSON response from server' }));
-
-			if (response.ok) {
+			if (!response.ok) {
+				const text = await response.text().catch(() => '');
+				let details: unknown = text;
+				try { details = text ? JSON.parse(text) : text; } catch {
+					log.info('response != OK => try to parse response.text => Failed to parse error response JSON:', text);
+				}
+				const err = new ApiError(
+					`${response.status} ${response.statusText}`,
+					response.status
+				);
+				(err as any).response = {
+					status:response.status, statusText: response.statusText, details
+				};
+				throw err;
+			} else {
+				const data: unknown = await response
+					.json()
+					.catch(() => ({ message: 'Invalid JSON response from server' }));
 				return (data as ApiSuccessResponse<TSuccessData>).data;
 			}
 
-			const errorData = data as ApiErrorResponse;
-			throw new ApiError(
-				errorData.message || `Request failed with status ${response.status}`,
-				response.status,
-				errorData.errors,
-				errorData
-			);
 		} catch (error) {
-			clearTimeout(timeoutId);
 			if (error instanceof ApiError) throw error;
 			const errorMessage = error instanceof Error ? error.message : String(error);
 			log.error(`API Fetch failed: ${context}`, { url, error: errorMessage });
 			throw new ApiError(`Network error: ${errorMessage}`, 0);
+		} finally {
+			clearTimeout(timeoutId);
 		}
 	}
+
 
 	/**
 	 * A specialized fetch wrapper for operations that can return a union of success
@@ -100,45 +109,66 @@ export class ApiClient {
 		init: RequestInit = {},
 		options: ApiRequestOptions = {}
 	): Promise<TUnion> {
-		const { timeout = 30000, context = 'API Request' } = options;
-		const controller = new AbortController();
-		const timeoutId = setTimeout(() => controller.abort(), timeout);
+		return this.apiFetch(url, init, options) as Promise<TUnion>;
 
-		try {
-			log.info(`API Union Request: ${context}`, { url, method: init.method || 'GET' });
 
-			const response = await this.fetcher(url, {
-				...init,
-				headers: { 'content-type': 'application/json', ...init.headers },
-				signal: controller.signal
-			});
-			clearTimeout(timeoutId);
+		// const { timeout = 30000, context = 'API Request' } = options;
+		// const controller = new AbortController();
+		// const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-			const data: unknown = await response
-				.json()
-				.catch(() => ({ message: 'Invalid JSON response from server' }));
 
-			if (
-				response.ok ||
-				response.status === HTTP_STATUS.CONFLICT ||
-				response.status === HTTP_STATUS.BAD_REQUEST
-			) {
-				return data as TUnion;
-			}
 
-			const errorData = data as ApiErrorResponse;
-			throw new ApiError(
-				errorData.message || `Request failed with status ${response.status}`,
-				response.status,
-				errorData.errors,
-				errorData
-			);
-		} catch (error) {
-			clearTimeout(timeoutId);
-			if (error instanceof ApiError) throw error;
-			const errorMessage = error instanceof Error ? error.message : String(error);
-			log.error(`API Union Fetch failed: ${context}`, { url, error: errorMessage });
-			throw new ApiError(`Network error: ${errorMessage}`, 0);
-		}
+		// try {
+		// 	log.info(`API Union Request: ${context}`, { url, method: init.method || 'GET' });
+
+		// 	const response = await this.fetcher(url, {
+		// 		...init,
+		// 		headers: { 'content-type': 'application/json', ...init.headers },
+		// 		signal: controller.signal
+		// 	});
+		// 	log.info('ApiClient response', response.status, response.statusText, response.ok);
+		// 	clearTimeout(timeoutId);
+
+		// 	if (!response.ok) {
+		// 		const text = await response.text().catch(() => '');
+		// 		let details: unknown = text;
+		// 		try { details = text ? JSON.parse(text) : text; } catch {
+		// 			log.info('Failed to parse error response JSON:', text);
+		// 		}
+		// 		const err = new Error(`${response.status} ${response.statusText}`);
+		// 		(err as any).response = {
+		// 			status: response.status, statusText: response.statusText, details
+		// 		};
+		// 		throw err;
+		// 	}
+
+		// 	const data: unknown = await response
+		// 		.json()
+		// 		.catch(() => ({
+		// 			message: 'Invalid JSON response from server **'
+		// 		}));
+
+		// 	if (
+		// 		response.ok ||
+		// 		response.status === HTTP_STATUS.CONFLICT ||
+		// 		response.status === HTTP_STATUS.BAD_REQUEST
+		// 	) {
+		// 		return data as TUnion;
+		// 	}
+
+		// 	const errorData = data as ApiErrorResponse;
+		// 	throw new ApiError(
+		// 		errorData.message || `Request failed with status ${response.status}`,
+		// 		response.status,
+		// 		errorData.errors,
+		// 		errorData
+		// 	);
+		// } catch (error) {
+		// 	clearTimeout(timeoutId);
+		// 	if (error instanceof ApiError) throw error;
+		// 	const errorMessage = error instanceof Error ? error.message : String(error);
+		// 	log.error(`API Union Fetch failed: ${context}`, { url, error: errorMessage });
+		// 	throw new ApiError(`Network error: ${errorMessage}`, 0);
+		// }
 	}
 }

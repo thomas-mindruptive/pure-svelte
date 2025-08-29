@@ -9,14 +9,17 @@
   import SupplierGrid from "$lib/components/domain/suppliers/SupplierGrid.svelte";
 
   // API & Typen
-  import { getSupplierApi, supplierLoadingState } from "$lib/api/client/supplier";
+  import {
+    getSupplierApi,
+    supplierLoadingState,
+  } from "$lib/api/client/supplier";
   import type { Wholesaler } from "$lib/domain/types";
   import type {
     DeleteStrategy,
     RowActionStrategy,
     ID,
   } from "$lib/components/client/Datagrid.types";
-    import { ApiClient } from "$lib/api/client/ApiClient";
+  import { ApiClient } from "$lib/api/client/ApiClient";
 
   // Die `load`-Funktion aus `supplierListPage.ts` übergibt ihre Daten hierher.
   let { data } = $props<{ data: { suppliers: Wholesaler[] } }>();
@@ -68,7 +71,10 @@
         );
 
         if (confirmed) {
-          const cascadeResult = await supplierApi.deleteSupplier(numericId, true);
+          const cascadeResult = await supplierApi.deleteSupplier(
+            numericId,
+            true,
+          );
           if (cascadeResult.success) {
             addNotification("Supplier and related data deleted.", "success");
             dataChanged = true;

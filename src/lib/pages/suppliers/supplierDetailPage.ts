@@ -38,9 +38,10 @@ export async function load({ params, fetch: loadEventFetch }: LoadEvent) {
       availableCategories
     };
 
-  } catch (err) {
+  } catch (err: any) {
     log.error(`(SupplierDetailPage) Failed to load data for supplierId: ${supplierId}`, { err });
-    // Wenn der Lieferant nicht gefunden wird (oft ein 404), oder ein anderer Fehler auftritt.
-    throw error(404, `Supplier with ID ${supplierId} not found.`);
+    const status = err.status ?? err?.response?.status ?? 500;
+    const msg = err?.response?.details || err?.message || 'Failed to load category';
+    throw error(status, msg);
   }
 }

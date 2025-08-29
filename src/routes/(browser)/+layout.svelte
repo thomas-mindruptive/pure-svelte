@@ -4,6 +4,9 @@
   import { goto } from '$app/navigation';
   import { log } from '$lib/utils/logger'; // Log hinzugefügt für besseres Debugging
 
+  // import '$lib/components/styles/grid.css';
+  // import '$lib/components/styles/form.css'; 
+
   let { data, children } = $props();
 
   // Die Daten (sidebarItems, activeLevel) kommen aus der +layout.ts

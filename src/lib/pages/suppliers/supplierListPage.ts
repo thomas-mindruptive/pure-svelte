@@ -31,9 +31,11 @@ export async function load({ fetch }: LoadEvent) {
     return {
       suppliers
     };
-  } catch (err) {
+  } catch (err: any) {
     log.error(`(SupplierListPage) Failed to load suppliers`, { err });
     // Throws a SvelteKit-specific error, which displays a proper error page.
-    throw error(500, 'Could not load suppliers. Please try again later.');
+    const status = err.status ?? err?.response?.status ?? 500;
+    const msg = err?.response?.details || err?.message || 'Failed to load category';
+    throw error(status, msg);
   }
 }

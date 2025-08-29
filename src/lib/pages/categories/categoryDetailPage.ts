@@ -11,7 +11,7 @@ import { ApiClient } from '$lib/api/client/ApiClient';
  *
  * @param parent - Ermöglicht den Zugriff auf die bereits geladenen Daten aus dem Layout.
  */
-export async function load({ params, parent, fetch:loadEventFetch }: LoadEvent) {
+export async function load({ params, parent, fetch: loadEventFetch }: LoadEvent) {
   const supplierId = Number(params.supplierId);
   const categoryId = Number(params.categoryId);
 
@@ -23,17 +23,17 @@ export async function load({ params, parent, fetch:loadEventFetch }: LoadEvent) 
   const layoutData = await parent();
   log.info(`(CategoryDetailPage) loading data for supplierId: ${supplierId}, categoryId: ${categoryId}`);
 
-    // 1. Create an ApiClient instance with the context-aware `fetch`.
-    const client = new ApiClient(loadEventFetch);
-  
-    // 2. Get the supplier-specific API methods from the factory.
-    const categoryApi = getCategoryApi(client);
+  // 1. Create an ApiClient instance with the context-aware `fetch`.
+  const client = new ApiClient(loadEventFetch);
+
+  // 2. Get the supplier-specific API methods from the factory.
+  const categoryApi = getCategoryApi(client);
 
   try {
     // Führe die spezifischen API-Aufrufe für diese Seite parallel aus.
     const [category, offerings] = await Promise.all([
       categoryApi.loadCategory(categoryId),
-      categoryApi.loadOfferingsForCategory(supplierId,categoryId)
+      categoryApi.loadOfferingsForCategory(supplierId, categoryId)
     ]);
 
     // Finde die spezifische "Zuweisungsinformation" (Kommentar, Link) aus den Layout-Daten.
@@ -45,8 +45,10 @@ export async function load({ params, parent, fetch:loadEventFetch }: LoadEvent) 
       assignmentComment: assignmentInfo?.comment,
       assignmentLink: assignmentInfo?.link
     };
-  } catch (err) {
-    log.error(`(CategoryDetailPage) Failed to load data`, { supplierId, categoryId, err });
-    throw error(404, `Category or offerings not found for supplier ${supplierId} and category ${categoryId}.`);
+  } catch (err: any) {
+    log.error(`Failed to load data`, { supplierId, categoryId, err });
+    const status = err.status ?? err?.response?.status ?? 500;
+    const msg = err?.response?.details || err?.message || 'Failed to load category';
+    throw error(status, msg);
   }
 }

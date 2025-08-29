@@ -35,8 +35,10 @@ export async function load({ params, fetch: fetchLoad }: LoadEvent) {
       offering,
       links
     };
-  } catch (err) {
-    log.error(`(OfferDetailLinksPage) Failed to load data`, { offeringId, err });
-    throw error(404, `Offering with ID ${offeringId} not found.`);
+  } catch (err: any) {
+    log.error(`Failed to load data for offeringId: ${offeringId}`, err);
+    const status = err.status ?? err?.response?.status ?? 500;
+    const msg = err?.response?.details || err?.message || 'Failed to load category';
+    throw error(status, msg);
   }
 }

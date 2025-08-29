@@ -20,6 +20,7 @@ EXCLUDE_PATTERNS = [
     "node_modules",
     "routes/api",
     "lib/server",
+    "tools/dist",
     ".git",
     ".venv",
     ".vscode",

@@ -25,7 +25,7 @@
     ID,
   } from "./Datagrid.types";
 
-  export const HUGO = "hugo";
+    import "$lib/components/styles/grid.css";
 
   // ===== TYPE DEFINITIONS =====
 

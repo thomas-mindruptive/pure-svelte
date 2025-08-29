@@ -1,47 +1,39 @@
-// src/routes/(browser)/+layout.ts
+// src/routes/(browser)/+layout.ts - SIMPLIFIED (NO COUNTS)
 
-import { log } from '$lib/utils/logger';
 import type { LoadEvent } from '@sveltejs/kit';
-import { loadSuppliers, loadCategoriesForSupplier } from '$lib/api/client/supplier';
 
-/**
- * Lädt die Daten, die für das gesamte Browser-Layout (insb. die Sidebar) benötigt werden.
- * Diese Funktion wird bei jeder Navigation innerhalb der (browser)-Gruppe ausgeführt.
- */
-export async function load({ url, params, depends }: LoadEvent) {
-  log.info(`(Layout) Loading data for URL: ${url.pathname}`);
-  
-  // Wir verwenden 'depends' um SvelteKit mitzuteilen, dass diese load-Funktion
-  // neu ausgeführt werden soll, wenn sich die angegebene URL ändert.
-  depends('app:browser');
-
+export async function load({ url, params }: LoadEvent) {
   const supplierId = params.supplierId ? Number(params.supplierId) : null;
   const categoryId = params.categoryId ? Number(params.categoryId) : null;
+  const offeringId = params.offeringId ? Number(params.offeringId) : null;
 
-  // Bestimme das aktive "Level" basierend auf der URL-Struktur.
+  // Bestimme das aktive "Level"
   let activeLevel = 'suppliers';
   if (supplierId && !categoryId) activeLevel = 'categories';
-  if (supplierId && categoryId) activeLevel = 'offerings';
-  
-  // Lade die Daten für die Sidebar-Zähler parallel
-  const [suppliers, assignedCategories] = await Promise.all([
-    loadSuppliers({ select: ['wholesaler_id'] }), // Nur IDs für den Zähler laden
-    supplierId ? loadCategoriesForSupplier(supplierId) : Promise.resolve([])
-  ]);
+  if (categoryId && !offeringId) activeLevel = 'offerings';
+  if (offeringId) {
+    activeLevel = url.pathname.endsWith('/links') ? 'links' : 'attributes';
+  }
 
+  // Baue die Basis-Pfade für die Navigation
+  const supplierPath = supplierId ? `/suppliers/${supplierId}` : '#';
+  const categoryPath = categoryId ? `${supplierPath}/categories/${categoryId}` : '#';
+  const offeringPath = offeringId ? `${categoryPath}/offerings/${offeringId}` : '#';
+
+  // Erstelle die Sidebar-Items OHNE Zähler
   const sidebarItems = [
-    { key: "suppliers", label: `Suppliers`, count: suppliers.length, level: 0 },
-    { key: "categories", label: `Categories`, count: assignedCategories.length, disabled: !supplierId, level: 1 },
-    // Platzhalter für zukünftige Level
-    { key: "offerings", label: `Offerings`, count: 0, disabled: !categoryId, level: 2 }, 
+    { key: "suppliers", label: `Suppliers`, disabled: false, level: 0, href: '/suppliers' },
+    { key: "categories", label: `Categories`, disabled: !supplierId, level: 1, href: supplierPath },
+    { key: "offerings", label: `Offerings`, disabled: !categoryId, level: 2, href: categoryPath },
+    { key: "attributes", label: `Attributes`, disabled: !offeringId, level: 3, href: `${offeringPath}/attributes` },
+    { key: "links", label: `Links`, disabled: !offeringId, level: 3, href: `${offeringPath}/links` },
   ];
+
+  // count-Eigenschaft wird nicht mehr benötigt
+  // Die 'disabled' Logik bleibt, um ungültige Navigation zu verhindern
 
   return {
     sidebarItems,
     activeLevel,
-    context: { // Kontext an Kind-Seiten weitergeben
-      supplierId,
-      categoryId
-    }
   };
 }

@@ -21,7 +21,9 @@ import { v4 as uuidv4 } from 'uuid';
 import type {
     ApiErrorResponse,
     ApiSuccessResponse,
+    DeleteApiResponse,
     DeleteConflictResponse,
+    DeleteSuccessData,
     DeleteSuccessResponse,
     QueryRequest,
     QuerySuccessResponse
@@ -64,7 +66,7 @@ export const GET: RequestHandler = async ({ params }) => {
 
     } catch (err: unknown) {
         // Wenn es kein 404-Fehler war, den Mapper nutzen
-        if ((err as {status: number})?.status !== 404) {
+        if ((err as { status: number })?.status !== 404) {
             const { status, message } = mssqlErrorMapper.mapToHttpError(err);
             log.error(`[${operationId}] FN_EXCEPTION: Unhandled error.`, { error: err });
             throw error(status, message);
@@ -202,8 +204,12 @@ export const DELETE: RequestHandler = async ({ params, url }) => {
         const dependencies = await checkWholesalerDependencies(id);
         if (dependencies.length > 0 && !cascade) {
             const conflictResponse: DeleteConflictResponse<string[]> = {
-                success: false, message: 'Cannot delete supplier: dependencies exist.', status_code: 409,
-                error_code: 'DEPENDENCY_CONFLICT', dependencies: dependencies, cascade_available: true,
+                success: false,
+                message: 'Cannot delete supplier: dependencies exist.',
+                status_code: 409,
+                error_code: 'DEPENDENCY_CONFLICT',
+                dependencies: dependencies,
+                cascade_available: true,
                 meta: { timestamp: new Date().toISOString() }
             };
             log.warn(`[${operationId}] FN_FAILURE: Deletion blocked by dependencies.`, { dependencies });
@@ -232,12 +238,18 @@ export const DELETE: RequestHandler = async ({ params, url }) => {
                 return json(errRes, { status: 404 });
             }
 
+            type DeletedSupplierData = Pick<Wholesaler, 'wholesaler_id' | 'name'>;
+            type DeleteSupplierSuccessResponse = DeleteSuccessResponse<DeletedSupplierData>;
+
+
             const deleted = result.recordset[0];
-            const response: DeleteSuccessResponse<{ wholesaler_id: number; name: string }> = {
-                success: true, message: `Supplier "${deleted.name}" deleted successfully.`,
+            const response: DeleteSupplierSuccessResponse = {
+                success: true,
+                message: `Supplier "${deleted.name}" deleted successfully.`,
                 data: {
                     deleted_resource: { wholesaler_id: deleted.wholesaler_id, name: deleted.name },
-                    cascade_performed: cascade, dependencies_cleared: dependencies.length
+                    cascade_performed: cascade, 
+                    dependencies_cleared: dependencies.length
                 },
                 meta: { timestamp: new Date().toISOString() }
             };

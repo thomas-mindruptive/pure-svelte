@@ -7,6 +7,7 @@
  */
 
 import type { QueryPayload } from '$lib/clientAndBack/queryGrammar';
+import type { WholesalerCategory } from '$lib/domain/types';
 
 // ===== 1. BASE CONSTANTS & UTILITIES =====
 

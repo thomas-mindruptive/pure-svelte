@@ -7,8 +7,7 @@
  * of the client-side data fetching strategy.
  */
 
-import { log } from '$lib/utils/logger';
-import { type ApiErrorResponse, type ApiSuccessResponse, type ValidationErrors, HTTP_STATUS, type QueryRequest } from '../types/common';
+import { type ValidationErrors, type QueryRequest } from '../types/common';
 import type { QueryPayload } from '$lib/clientAndBack/queryGrammar';
 
 /**
@@ -38,119 +37,119 @@ export interface ApiRequestOptions {
 	context?: string;
 }
 
-/**
- * The standard fetch wrapper for API calls that are expected to succeed.
- * It directly returns the `data` payload from a successful (2xx) response.
- * For any non-2xx server response or network failure, it throws a structured `ApiError`.
- *
- * @template TSuccessData The expected type of the `data` property within a successful `ApiSuccessResponse`.
- * @param url The API endpoint URL.
- * @param init Standard `RequestInit` options (e.g., method, body).
- * @param options Custom options for the API request, like `context`.
- * @returns A promise that resolves with the `data` object from the successful API response.
- * @throws {ApiError} If the fetch fails or the server returns a non-2xx status.
- */
-export async function apiFetch<TSuccessData extends Record<string, unknown>>(
-	url: string,
-	init: RequestInit = {},
-	options: ApiRequestOptions = {}
-): Promise<TSuccessData> {
-	const { timeout = 30000, context = 'API Request' } = options;
-	const controller = new AbortController();
-	const timeoutId = setTimeout(() => controller.abort(), timeout);
+// /**
+//  * The standard fetch wrapper for API calls that are expected to succeed.
+//  * It directly returns the `data` payload from a successful (2xx) response.
+//  * For any non-2xx server response or network failure, it throws a structured `ApiError`.
+//  *
+//  * @template TSuccessData The expected type of the `data` property within a successful `ApiSuccessResponse`.
+//  * @param url The API endpoint URL.
+//  * @param init Standard `RequestInit` options (e.g., method, body).
+//  * @param options Custom options for the API request, like `context`.
+//  * @returns A promise that resolves with the `data` object from the successful API response.
+//  * @throws {ApiError} If the fetch fails or the server returns a non-2xx status.
+//  */
+// export async function apiFetch<TSuccessData extends Record<string, unknown>>(
+// 	url: string,
+// 	init: RequestInit = {},
+// 	options: ApiRequestOptions = {}
+// ): Promise<TSuccessData> {
+// 	const { timeout = 30000, context = 'API Request' } = options;
+// 	const controller = new AbortController();
+// 	const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-	try {
-		log.info(`API Request: ${context}`, { url, method: init.method || 'GET' });
+// 	try {
+// 		log.info(`API Request: ${context}`, { url, method: init.method || 'GET' });
 
-		const response = await fetch(url, {
-			...init,
-			headers: { 'content-type': 'application/json', ...init.headers },
-			signal: controller.signal
-		});
-		clearTimeout(timeoutId);
+// 		const response = await fetch(url, {
+// 			...init,
+// 			headers: { 'content-type': 'application/json', ...init.headers },
+// 			signal: controller.signal
+// 		});
+// 		clearTimeout(timeoutId);
 
-		// Attempt to parse JSON, even for errors, to get structured error messages.
-		const data: unknown = await response.json().catch(() => ({ message: 'Invalid JSON response from server' }));
+// 		// Attempt to parse JSON, even for errors, to get structured error messages.
+// 		const data: unknown = await response.json().catch(() => ({ message: 'Invalid JSON response from server' }));
 
-		if (response.ok) {
-			// On success, return only the nested `data` payload, as defined by the architecture.
-			return (data as ApiSuccessResponse<TSuccessData>).data;
-		}
+// 		if (response.ok) {
+// 			// On success, return only the nested `data` payload, as defined by the architecture.
+// 			return (data as ApiSuccessResponse<TSuccessData>).data;
+// 		}
 
-		// Any non-ok response is treated as an exception to be thrown.
-		const errorData = data as ApiErrorResponse;
-		throw new ApiError(
-			errorData.message || `Request failed with status ${response.status}`,
-			response.status,
-			errorData.errors,
-			errorData
-		);
-	} catch (error) {
-		clearTimeout(timeoutId);
-		// Re-throw known API errors to be caught by the calling function.
-		if (error instanceof ApiError) throw error;
+// 		// Any non-ok response is treated as an exception to be thrown.
+// 		const errorData = data as ApiErrorResponse;
+// 		throw new ApiError(
+// 			errorData.message || `Request failed with status ${response.status}`,
+// 			response.status,
+// 			errorData.errors,
+// 			errorData
+// 		);
+// 	} catch (error) {
+// 		clearTimeout(timeoutId);
+// 		// Re-throw known API errors to be caught by the calling function.
+// 		if (error instanceof ApiError) throw error;
 
-		// Wrap unknown errors (network issues, etc.) in a standard ApiError.
-		const errorMessage = error instanceof Error ? error.message : String(error);
-		log.error(`API Fetch failed: ${context}`, { url, error: errorMessage });
-		throw new ApiError(`Network error: ${errorMessage}`, 0);
-	}
-}
+// 		// Wrap unknown errors (network issues, etc.) in a standard ApiError.
+// 		const errorMessage = error instanceof Error ? error.message : String(error);
+// 		log.error(`API Fetch failed: ${context}`, { url, error: errorMessage });
+// 		throw new ApiError(`Network error: ${errorMessage}`, 0);
+// 	}
+// }
 
-/**
- * A specialized fetch wrapper for operations that can return a union of success
- * and expected, structured error types (e.g., DeleteApiResponse which includes DeleteConflictResponse).
- * This function returns the entire response object for type guarding, instead of throwing on handled errors like 409 or 400.
- *
- * @template TUnion The expected union type of the API response (e.g., `DeleteApiResponse<...>` or `AssignmentApiResponse<...>`).
- * @param url The API endpoint URL.
- * @param init Standard `RequestInit` options.
- * @param options Custom options for the API request.
- * @returns A promise that resolves with the full API response object (success or handled error).
- * @throws {ApiError} Only for unexpected server errors (e.g., 500) or network failures.
- */
-export async function apiFetchUnion<TUnion>(
-	url: string,
-	init: RequestInit = {},
-	options: ApiRequestOptions = {}
-): Promise<TUnion> {
-	const { timeout = 30000, context = 'API Request' } = options;
-	const controller = new AbortController();
-	const timeoutId = setTimeout(() => controller.abort(), timeout);
+// /**
+//  * A specialized fetch wrapper for operations that can return a union of success
+//  * and expected, structured error types (e.g., DeleteApiResponse which includes DeleteConflictResponse).
+//  * This function returns the entire response object for type guarding, instead of throwing on handled errors like 409 or 400.
+//  *
+//  * @template TUnion The expected union type of the API response (e.g., `DeleteApiResponse<...>` or `AssignmentApiResponse<...>`).
+//  * @param url The API endpoint URL.
+//  * @param init Standard `RequestInit` options.
+//  * @param options Custom options for the API request.
+//  * @returns A promise that resolves with the full API response object (success or handled error).
+//  * @throws {ApiError} Only for unexpected server errors (e.g., 500) or network failures.
+//  */
+// export async function apiFetchUnion<TUnion>(
+// 	url: string,
+// 	init: RequestInit = {},
+// 	options: ApiRequestOptions = {}
+// ): Promise<TUnion> {
+// 	const { timeout = 30000, context = 'API Request' } = options;
+// 	const controller = new AbortController();
+// 	const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-	try {
-		log.info(`API Union Request: ${context}`, { url, method: init.method || 'GET' });
+// 	try {
+// 		log.info(`API Union Request: ${context}`, { url, method: init.method || 'GET' });
 
-		const response = await fetch(url, {
-			...init,
-			headers: { 'content-type': 'application/json', ...init.headers },
-			signal: controller.signal
-		});
-		clearTimeout(timeoutId);
+// 		const response = await fetch(url, {
+// 			...init,
+// 			headers: { 'content-type': 'application/json', ...init.headers },
+// 			signal: controller.signal
+// 		});
+// 		clearTimeout(timeoutId);
 
-		const data: unknown = await response.json().catch(() => ({ message: 'Invalid JSON response from server' }));
+// 		const data: unknown = await response.json().catch(() => ({ message: 'Invalid JSON response from server' }));
 
-		// For success OR expected, structured errors (like conflict or validation), return the full payload.
-		if (response.ok || response.status === HTTP_STATUS.CONFLICT || response.status === HTTP_STATUS.BAD_REQUEST) {
-			return data as TUnion;
-		}
+// 		// For success OR expected, structured errors (like conflict or validation), return the full payload.
+// 		if (response.ok || response.status === HTTP_STATUS.CONFLICT || response.status === HTTP_STATUS.BAD_REQUEST) {
+// 			return data as TUnion;
+// 		}
 
-		// Throw only for unexpected server errors (e.g., 500, 503).
-		const errorData = data as ApiErrorResponse;
-		throw new ApiError(
-			errorData.message || `Request failed with status ${response.status}`,
-			response.status,
-			errorData.errors,
-			errorData
-		);
-	} catch (error) {
-		clearTimeout(timeoutId);
-		if (error instanceof ApiError) throw error;
-		const errorMessage = error instanceof Error ? error.message : String(error);
-		log.error(`API Union Fetch failed: ${context}`, { url, error: errorMessage });
-		throw new ApiError(`Network error: ${errorMessage}`, 0);
-	}
-}
+// 		// Throw only for unexpected server errors (e.g., 500, 503).
+// 		const errorData = data as ApiErrorResponse;
+// 		throw new ApiError(
+// 			errorData.message || `Request failed with status ${response.status}`,
+// 			response.status,
+// 			errorData.errors,
+// 			errorData
+// 		);
+// 	} catch (error) {
+// 		clearTimeout(timeoutId);
+// 		if (error instanceof ApiError) throw error;
+// 		const errorMessage = error instanceof Error ? error.message : String(error);
+// 		log.error(`API Union Fetch failed: ${context}`, { url, error: errorMessage });
+// 		throw new ApiError(`Network error: ${errorMessage}`, 0);
+// 	}
+// }
 
 /**
  * Creates a JSON string for a standard POST or PUT request body.

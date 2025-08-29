@@ -19,7 +19,9 @@ import type {
 	QueryResponseData,
 	AssignmentRequest,
 	RemoveAssignmentRequest,
-	AssignmentSuccessData
+	AssignmentSuccessData,
+	DeleteSuccessResponse,
+	DeleteConflictResponse
 } from '$lib/api/types/common';
 import { LoadingState } from './loadingState';
 
@@ -46,6 +48,10 @@ type SupplierCategoryDeleteResponse = DeleteApiResponse<
     { supplier_id: number; category_id: number; supplier_name: string; category_name: string }, 
     { offering_count: number }
 >;
+
+type SupplierCategoryDeleteSuccessResponse = DeleteSuccessResponse<WholesalerCategory>;
+type SupplierCategoryDeleteConflictResponse = DeleteConflictResponse<string[]>;
+
 
 // ===== SUPPLIER MASTER-DATA CRUD =====
 

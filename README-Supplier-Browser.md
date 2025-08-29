@@ -489,7 +489,7 @@ assign{Child}To{Parent}(data: {
 
 ---
 
-## 9. Current Status Summary
+## Current Status Summary
 
 ### ✅ Completed
 - Generic type system with pattern-specific structures
@@ -512,7 +512,55 @@ assign{Child}To{Parent}(data: {
 
 ---
 
-## 10. Svelte 5 Runes Integration - LoadingState Architecture
+## Supplier-Browser pages & navigation hierarchies
+**Pages:**
+* [supplier-list]: list + create supplier
+* [cat-list]: list + create cat
+* [supplier-detail]: form + cat-grid
+* [cat-detail readonly-cat]: readonly cat-info + offers-grid
+* [cat-detail editable-cat]: cat-form + offers-grid
+* [offer-detail/attributes]: form + attribut-grid + create attribute (inline)
+* [offer-detail/links:] form + link-grid + create link (inline)
+
+**Potential "browser" hierarchies in sidebar:**
+* 1) [supplier-list]
+  * 2) [supplier-detail]
+    * 3) [cat-detail readonly-cat]
+      * 4a) [offer-detail/attributes]
+      * 4b) [offer-detail/links]
+
+* 1) [cat-list]
+  * 2)  [cat-detail editable-cat]
+    * 3a) [offer-detail/attributes]
+    * 3b) [offer-detail/links]
+      * 4)  [supplier-detail] 
+
+## File & Routing Structure and Resuse-Pattern
+
+- src/
+  - lib/
+    - api/
+      - client/
+        - category.ts
+        - supplier.ts
+    - pages/
+      - categories/
+        - CategoryDetailPage.svelte:  UI (form + grid)
+        - categoryDetialPage.ts:      load() and other logic
+  - routes/
+    - categories/
+      - [categoryId]/
+        - +page.ts:                   [DELEGATOR] import categoryDetialPage.ts
+        - +page.svelte:               import CategoryDetailPage.svelte
+    - suppliers/
+      - [supplierId]/
+        - categories/
+          - [categoryId]/
+            - +page.ts:               [DELEGATOR] import categoryDetialPage.ts
+            - +page.svelte:           import CategoryDetailPage.svelte
+
+
+## Svelte 5 Runes Integration - LoadingState Architecture
 
 *Insights from Frontend Integration*
 

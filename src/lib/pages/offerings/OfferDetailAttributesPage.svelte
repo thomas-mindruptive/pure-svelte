@@ -84,7 +84,7 @@
         ...(attributeValue && { value: attributeValue }), // `value` wird nur hinzugefügt, wenn es einen Wert hat
       };
 
-      await createOfferingAttribute(assignmentData);
+      await offeringApi.createOfferingAttribute(assignmentData);
 
       addNotification("Attribute assigned successfully.", "success");
       selectedAttributeId = null;

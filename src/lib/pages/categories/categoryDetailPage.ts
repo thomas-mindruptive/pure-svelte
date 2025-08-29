@@ -2,16 +2,16 @@
 
 import { log } from '$lib/utils/logger';
 import { error, type LoadEvent } from '@sveltejs/kit';
-import { loadCategory, loadOfferingsForCategory } from '$lib/api/client/category';
-import type { OfferingWithDetails } from '$lib/api/client/category';
+import { getCategoryApi, type OfferingWithDetails } from '$lib/api/client/category';
 import type { ProductCategory } from '$lib/domain/types';
+import { ApiClient } from '$lib/api/client/ApiClient';
 
 /**
  * Lädt die Daten für die Kategorie-Detailseite (Angebots-Ansicht).
  *
  * @param parent - Ermöglicht den Zugriff auf die bereits geladenen Daten aus dem Layout.
  */
-export async function load({ params, parent }: LoadEvent) {
+export async function load({ params, parent, fetch:loadEventFetch }: LoadEvent) {
   const supplierId = Number(params.supplierId);
   const categoryId = Number(params.categoryId);
 
@@ -23,11 +23,17 @@ export async function load({ params, parent }: LoadEvent) {
   const layoutData = await parent();
   log.info(`(CategoryDetailPage) loading data for supplierId: ${supplierId}, categoryId: ${categoryId}`);
 
+    // 1. Create an ApiClient instance with the context-aware `fetch`.
+    const client = new ApiClient(loadEventFetch);
+  
+    // 2. Get the supplier-specific API methods from the factory.
+    const categoryApi = getCategoryApi(client);
+
   try {
     // Führe die spezifischen API-Aufrufe für diese Seite parallel aus.
     const [category, offerings] = await Promise.all([
-      loadCategory(categoryId),
-      loadOfferingsForCategory(supplierId, categoryId)
+      categoryApi.loadCategory(categoryId),
+      categoryApi.loadOfferingsForCategory(supplierId,categoryId)
     ]);
 
     // Finde die spezifische "Zuweisungsinformation" (Kommentar, Link) aus den Layout-Daten.

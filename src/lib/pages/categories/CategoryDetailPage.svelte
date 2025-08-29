@@ -1,17 +1,28 @@
 <!-- src/lib/pages/categories/CategoryDetailPage.svelte -->
 <script lang="ts">
-  import { log } from '$lib/utils/logger';
-  import { addNotification } from '$lib/stores/notifications';
-  import { goto } from '$app/navigation';
-  import { page } from '$app/stores';
+  import { log } from "$lib/utils/logger";
+  import { addNotification } from "$lib/stores/notifications";
+  import { goto } from "$app/navigation";
+  import { page } from "$app/stores";
 
   // Komponenten
-  import OfferingGrid from '$lib/components/domain/offerings/OfferingGrid.svelte';
+  import OfferingGrid from "$lib/components/domain/offerings/OfferingGrid.svelte";
 
   // API & Typen
-  import { categoryLoadingState, deleteOffering } from '$lib/api/client/category';
-  import type { ProductCategory, WholesalerItemOffering_ProductDef_Category } from '$lib/domain/types';
-  import type { DeleteStrategy, RowActionStrategy, ID } from '$lib/components/client/Datagrid.types';
+  import {
+    categoryLoadingState,
+    getCategoryApi,
+  } from "$lib/api/client/category";
+  import type {
+    ProductCategory,
+    WholesalerItemOffering_ProductDef_Category,
+  } from "$lib/domain/types";
+  import type {
+    DeleteStrategy,
+    RowActionStrategy,
+    ID,
+  } from "$lib/components/client/Datagrid.types";
+  import { ApiClient } from "$lib/api/client/ApiClient";
 
   // Daten aus der `load`-Funktion
   type LoadData = {
@@ -29,15 +40,27 @@
     log.info(`(CategoryDetailPage) Deleting offerings`, { ids });
     let dataChanged = false;
 
+    // 1. Create an ApiClient instance with client `fetch`.
+    const client = new ApiClient(fetch);
+
+    // 2. Get the supplier-specific API methods from the factory.
+    const categoryApi = getCategoryApi(client);
+
     for (const id of ids) {
       const numericId = Number(id);
-      const result = await deleteOffering(numericId); // Kaskadierung wird hier noch nicht behandelt
-      
+      const result = await categoryApi.deleteOffering(numericId); // Kaskadierung wird hier noch nicht behandelt
+
       if (result.success) {
-        addNotification(`Offering (ID: ${numericId}) deleted successfully.`, 'success');
+        addNotification(
+          `Offering (ID: ${numericId}) deleted successfully.`,
+          "success",
+        );
         dataChanged = true;
       } else {
-        addNotification(`Failed to delete offering (ID: ${numericId}).`, 'error');
+        addNotification(
+          `Failed to delete offering (ID: ${numericId}).`,
+          "error",
+        );
       }
     }
 
@@ -50,30 +73,40 @@
   /**
    * Navigiert zur nächsten Hierarchieebene (Angebots-Details).
    */
-  function handleOfferingSelect(offering: WholesalerItemOffering_ProductDef_Category) {
-    log.info(`(CategoryDetailPage) Navigating to offering detail for offeringId: ${offering.offering_id}`);
+  function handleOfferingSelect(
+    offering: WholesalerItemOffering_ProductDef_Category,
+  ) {
+    log.info(
+      `(CategoryDetailPage) Navigating to offering detail for offeringId: ${offering.offering_id}`,
+    );
     // Hinweis: Die Ziel-URL für Angebots-Details ist im README noch nicht final definiert.
     // Wir nehmen hier eine plausible Struktur an:
     goto(`${$page.url.pathname}/offerings/${offering.offering_id}`);
   }
 
   // Strategie-Objekte für das OfferingGrid
-  const deleteStrategy: DeleteStrategy<WholesalerItemOffering_ProductDef_Category> = {
-    execute: handleOfferingDelete
-  };
+  const deleteStrategy: DeleteStrategy<WholesalerItemOffering_ProductDef_Category> =
+    {
+      execute: handleOfferingDelete,
+    };
 
-  const rowActionStrategy: RowActionStrategy<WholesalerItemOffering_ProductDef_Category> = {
-    click: handleOfferingSelect
-  };
+  const rowActionStrategy: RowActionStrategy<WholesalerItemOffering_ProductDef_Category> =
+    {
+      click: handleOfferingSelect,
+    };
 </script>
 
 <div class="page-layout">
   <div class="header-section">
     <h1>Offerings in "{data.category.name}"</h1>
-    <p>{data.category.description || 'No description available for this category.'}</p>
+    <p>
+      {data.category.description ||
+        "No description available for this category."}
+    </p>
     {#if data.assignmentComment}
       <p class="comment">
-        <strong>Supplier Notes:</strong> {data.assignmentComment}
+        <strong>Supplier Notes:</strong>
+        {data.assignmentComment}
       </p>
     {/if}
   </div>

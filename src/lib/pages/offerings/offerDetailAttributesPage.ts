@@ -1,12 +1,10 @@
 // src/lib/pages/offerings/offerDetailAttributesPage.ts
 
+import { ApiClient } from '$lib/api/client/ApiClient';
+import { getOfferingApi } from '$lib/api/client/offering';
 import { log } from '$lib/utils/logger';
 import { error, type LoadEvent } from '@sveltejs/kit';
-import { 
-    loadOffering, 
-    loadOfferingAttributes, 
-    getAvailableAttributesForOffering 
-} from '$lib/api/client/offering';
+
 
 /**
  * Lädt alle Daten für die Angebots-Detailseite (Attribute).
@@ -20,12 +18,18 @@ export async function load({ params }: LoadEvent) {
 
   log.info(`(OfferDetailAttributesPage) loading all data for offeringId: ${offeringId}`);
 
+    // 1. Create an ApiClient instance with the context-aware `fetch`.
+    const client = new ApiClient(fetch);
+  
+    // 2. Get the supplier-specific API methods from the factory.
+    const offeringApi = getOfferingApi(client);
+
   try {
     // Führe alle notwendigen Datenabrufe parallel aus.
     const [offering, assignedAttributes, availableAttributes] = await Promise.all([
-      loadOffering(offeringId),
-      loadOfferingAttributes(offeringId),
-      getAvailableAttributesForOffering(offeringId)
+      offeringApi.loadOffering(offeringId),
+      offeringApi.loadOfferingAttributes(offeringId),
+      offeringApi.getAvailableAttributesForOffering(offeringId)
     ]);
 
     return {

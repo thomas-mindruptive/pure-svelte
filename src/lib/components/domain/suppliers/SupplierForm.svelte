@@ -33,7 +33,7 @@
   import FormShell, {
     type ValidateResult,
   } from "$lib/components/forms/FormShell.svelte";
-  import { log } from "$lib/utils/logger.ts";
+  import { log } from "$lib/utils/logger";
   import type { Wholesaler } from "$lib/domain/types";
   import "$lib/components/styles/form.css";
   import "$lib/components/styles/grid.css";

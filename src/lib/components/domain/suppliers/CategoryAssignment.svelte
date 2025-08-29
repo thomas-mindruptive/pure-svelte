@@ -18,7 +18,7 @@
     // - Handles loading states and error feedback
     // - Integrates with existing CSS design system
 
-    import { log } from "$lib/utils/logger.ts";
+    import { log } from "$lib/utils/logger";
     import type { ProductCategory } from "$lib/domain/types";
     import "$lib/components/styles/form.css";
 
@@ -294,9 +294,10 @@
 
             <!-- Assign button -->
             <div class="form-group">
-                <label>&nbsp;</label>
+                <label for="assign-button">&nbsp;</label>
                 <!-- Spacer to align with select field -->
                 <button
+                    id="assign-button"
                     type="button"
                     class="primary-button"
                     onclick={handleAssign}

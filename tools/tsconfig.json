@@ -1,0 +1,20 @@
+{
+    "compilerOptions": {
+        "target": "ES2022",
+        "module": "NodeNext",
+        "moduleResolution": "NodeNext",
+        "strict": true,
+        "esModuleInterop": true,
+        "outDir": "dist",
+        "rootDir": ".",
+        "sourceMap": true
+    },
+    // KORREKTUR: Diese Zeile stellt sicher, dass ALLE .ts-Dateien
+    // im tools-Verzeichnis und seinen Unterverzeichnissen gefunden werden.
+    "include": [
+        "**/*.ts"
+    ],
+    "exclude": [
+        "node_modules"
+    ]
+}

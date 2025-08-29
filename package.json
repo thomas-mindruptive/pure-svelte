@@ -11,7 +11,12 @@
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"lint": "eslint . --ext .ts,.svelte",
-		"lint:fix": "eslint . --ext .ts,.svelte --fix"
+		"lint:fix": "eslint . --ext .ts,.svelte --fix",
+		
+		"// --- TOOL SCRIPTS ---": "",
+		"tools:build": "tsc -p tools/tsconfig.json",
+		"tools:watch": "tsc -p tools/tsconfig.json --watch",
+		"scaffold:page": "npm run tools:build && node tools/dist/scaffold-page.js"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-auto": "^6.0.0",

@@ -22,8 +22,9 @@ import { v4 as uuidv4 } from 'uuid';
  * @description Fetches a list of suppliers based on a client-provided query payload.
  */
 export const POST: RequestHandler = async (event) => {
-	const operationId = uuidv4();
-	log.info(`POST suppliers: FN_START`);
+	log.infoHeader("POST /api/suppliers");
+	const operationId = uuidv4();;
+	log.info(`POST suppliers: FN_START ******`);
 
 	try {
 		// 1. Expect the standard QueryRequest envelope and extract the payload.
@@ -54,6 +55,7 @@ export const POST: RequestHandler = async (event) => {
 		// 3. Build and execute the query.
 		const { sql, parameters, metadata } = buildQuery(securePayload, supplierQueryConfig);
 		const results = await executeQuery(sql, parameters);
+		log.info(`[${operationId}] Executed suppliers query: result: %O`, results );
 
 		// 4. Format the response using the standard `QuerySuccessResponse` type.
 		const response: QuerySuccessResponse<Wholesaler> = {

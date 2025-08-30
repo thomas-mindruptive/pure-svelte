@@ -28,16 +28,19 @@ function isStandardQuery(body: unknown): body is QueryRequest<unknown> {
  * @description Executes a query based on the provided request structure.
  */
 export const POST: RequestHandler = async (event) => {
+	log.infoHeader("POST /api/query");
 	const operationId = uuidv4();
-	log.info(`[${operationId}] POST /query: FN_START`);
+	log.info(`1 - [${operationId}] POST /query: FN_START`);
 
 	try {
 		const requestBody = await event.request.json();
 
 		if (isPredefinedQuery(requestBody)) {
+			log.debug("2 - #######################");
 			const { namedQuery, payload } = requestBody;
 			log.info(`[${operationId}] Handling PredefinedQueryRequest`, { namedQuery });
 
+			log.debug("3 - #######################");
 			if (!(namedQuery in (supplierQueryConfig.joinConfigurations || {}))) {
 				const errRes: ApiErrorResponse = {
 					success: false, message: `Predefined query '${namedQuery}' is not allowed.`,
@@ -45,16 +48,19 @@ export const POST: RequestHandler = async (event) => {
 				};
 				return json(errRes, { status: 403 });
 			}
-			
+
 			const { sql, parameters, metadata } = buildQuery(payload, supplierQueryConfig, namedQuery);
 			const results = await executeQuery(sql, parameters);
-			
+
+			log.debug("4 - ##########################################");
+			log.debug(`[${operationId}] Executed SQL: ${sql} with parameters: ${JSON.stringify(parameters)}`, {result: results});
+
 			const response: QuerySuccessResponse<unknown> = {
 				success: true,
 				message: 'Predefined query executed successfully.',
-				data: { 
-					results, 
-					meta: { 
+				data: {
+					results,
+					meta: {
 						retrieved_at: new Date().toISOString(),
 						result_count: results.length,
 						columns_selected: metadata.selectColumns,
@@ -62,8 +68,8 @@ export const POST: RequestHandler = async (event) => {
 						has_where: metadata.hasWhere,
 						parameter_count: metadata.parameterCount,
 						table_fixed: metadata.tableFixed,
-						sql_generated: sql 
-					} 
+						sql_generated: sql
+					}
 				},
 				meta: { timestamp: new Date().toISOString() }
 			};
@@ -83,7 +89,7 @@ export const POST: RequestHandler = async (event) => {
 				};
 				return json(errRes, { status: 400 });
 			}
-			
+
 			if (!(fromTable in supplierQueryConfig.allowedTables)) {
 				const errRes: ApiErrorResponse = {
 					success: false, message: `Table '${fromTable}' is not whitelisted for querying.`,
@@ -91,16 +97,21 @@ export const POST: RequestHandler = async (event) => {
 				};
 				return json(errRes, { status: 403 });
 			}
-			
+
 			const { sql, parameters, metadata } = buildQuery(payload, supplierQueryConfig);
 			const results = await executeQuery(sql, parameters);
+
+			log.debug("##########################################");
+			log.debug("##########################################");
+			log.debug("##########################################");
+			log.debug(`[${operationId}] Executed SQL: ${sql} with parameters: ${JSON.stringify(parameters)}`, results);
 
 			const response: QuerySuccessResponse<unknown> = {
 				success: true,
 				message: 'Standard query executed successfully.',
-				data: { 
-					results, 
-					meta: { 
+				data: {
+					results,
+					meta: {
 						// KORREKTES MAPPING der Property-Namen
 						retrieved_at: new Date().toISOString(),
 						result_count: results.length,
@@ -109,7 +120,7 @@ export const POST: RequestHandler = async (event) => {
 						has_where: metadata.hasWhere,
 						parameter_count: metadata.parameterCount,
 						table_fixed: metadata.tableFixed,
-						sql_generated: sql 
+						sql_generated: sql
 					}
 				},
 				meta: { timestamp: new Date().toISOString() }

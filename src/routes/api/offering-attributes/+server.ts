@@ -29,6 +29,7 @@ import type {
  * @description Creates a new offering-attribute assignment with optional value.
  */
 export const POST: RequestHandler = async ({ request }) => {
+    log.infoHeader("POST /api/offering-attributes");
     const operationId = uuidv4();
     log.info(`[${operationId}] POST /offering-attributes: FN_START`);
 

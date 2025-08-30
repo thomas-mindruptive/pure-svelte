@@ -63,6 +63,7 @@ export function getSupplierApi(client: ApiClient) {
           { method: 'POST', body: createQueryBody(fullQuery) },
           { context: operationId }
         );
+        log.info(`loadSuppliers: successful.`, responseData);
         return responseData.results as Wholesaler[];
       } catch (err) {
         log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });

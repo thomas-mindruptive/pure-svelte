@@ -26,6 +26,7 @@ import type {
  */
 export const POST: RequestHandler = async ({ request }) => {
     const operationId = uuidv4();
+    log.infoHeader("POST /api/categories/new");
     log.info(`[${operationId}] POST /categories/new: FN_START`);
 
     try {

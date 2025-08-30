@@ -21,6 +21,7 @@ import { v4 as uuidv4 } from 'uuid';
  * @description Fetches a list of product categories based on a client-provided query payload.
  */
 export const POST: RequestHandler = async (event) => {
+    log.infoHeader("POST /api/categories");
     const operationId = uuidv4();
     log.info(`[${operationId}] POST /categories: FN_START`);
 

@@ -29,6 +29,7 @@ import type {
  * @description Assigns a category to a supplier.
  */
 export const POST: RequestHandler = async ({ request }) => {
+    log.infoHeader("POST /api/supplier-categories");
     const operationId = uuidv4();
     log.info(`[${operationId}] POST /supplier-categories: FN_START`);
 
@@ -94,6 +95,7 @@ export const POST: RequestHandler = async ({ request }) => {
  * @description Removes a category assignment.
  */
 export const DELETE: RequestHandler = async ({ request }) => {
+    log.infoHeader("DELETE /api/supplier-categories");
     const operationId = uuidv4();
     log.info(`[${operationId}] DELETE /supplier-categories: FN_START`);
 

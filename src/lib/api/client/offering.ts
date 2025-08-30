@@ -253,6 +253,7 @@ export function getOfferingApi(client: ApiClient) {
           { method: 'POST', body: createPostBody(request) },
           { context: operationId }
         );
+        log.info(`[${operationId}] Loaded ${responseData.results.length} links for offering ${offeringId}.`, responseData.results);
         return responseData.results as WholesalerOfferingLink[];
       } catch (err) {
         log.error(`[${operationId}] Failed.`, { offeringId, error: getErrorMessage(err) });

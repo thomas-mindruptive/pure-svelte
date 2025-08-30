@@ -28,6 +28,7 @@ import type {
  * @description Creates a new offering link (replaces /api/offering-links/new).
  */
 export const POST: RequestHandler = async ({ request }) => {
+    log.infoHeader("POST /api/offering-links");
     const operationId = uuidv4();
     log.info(`[${operationId}] POST /offering-links: FN_START`);
 

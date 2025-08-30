@@ -1,8 +1,20 @@
+Verstanden. Hier ist die vollständige, aktualisierte `README-Supplier-Browser.md`-Datei als Markdown-Codeblock.
+
+Sie enthält alle besprochenen Änderungen:
+*   Der Implementierungsstatus für die Kategorie-Master-Daten ist aktualisiert.
+*   Das Lösch-Muster wurde um die wichtige Unterscheidung zwischen Master-Daten und Zuweisungen ergänzt.
+*   Ein neuer Abschnitt (6) beschreibt die architektonischen Erkenntnisse zum Umgang mit ismorphem Code und dem aktuellen, minimalen Logger.
+*   Ein neuer Abschnitt (11) dokumentiert die Best Practice für den Umgang mit dem `Response Body` im `ApiClient`.
+*   Die TODO-Liste ist auf dem neuesten Stand.
+*   Die Nummerierung der Abschnitte wurde entsprechend angepasst.
+
+---
+
 # SupplierBrowser - Architectural Specification & Developer Guide
 
 **Single source of truth for the project's architecture. All development must adhere to the patterns and principles defined herein.**
 
-*Updated: 29. August 2025 - Frontend Architecture & Scaffolding Finalized*
+*Updated: 30. August 2025 - Architectural clarifications and implementation status update*
 
 ---
 
@@ -216,44 +228,47 @@ POST /api/supplier-categories
 
 ## 4. Current Implementation Status
 
-| Entity/Operation                                      | Endpoint                          | Generic Type                                                 | Server Status | Client Status | Notes                    |
-|-------------------------------------------------------|-----------------------------------|--------------------------------------------------------------|---------------|---------------|--------------------------|
-| **SUPPLIERS (Master Data)**                           |                                   |                                                              |               |               |                          |
-| Query List                                            | `POST /api/suppliers`             | `QueryRequest<Wholesaler>`                                   | ✅             | ✅             |                          |
-| Read Single                                           | `GET /api/suppliers/[id]`         | -                                                            | ✅             | ✅             |                          |
-| Create                                                | `POST /api/suppliers/new`         | `Omit<Wholesaler, 'wholesaler_id'>`                         | ✅             | ✅             | **Fixed**                |
-| Update                                                | `PUT /api/suppliers/[id]`         | `Partial<Wholesaler>`                                        | ✅             | ✅             |                          |
-| Delete                                                | `DELETE /api/suppliers/[id]`      | -                                                            | ✅             | ✅             |                          |
-| **ATTRIBUTES (Master Data)**                          |                                   |                                                              |               |               |                          |
-| Query List                                            | `POST /api/attributes`            | `QueryRequest<Attribute>`                                    | ✅             | ✅             |                          |
-| Read Single                                           | `GET /api/attributes/[id]`        | -                                                            | ✅             | ✅             |                          |
-| Create                                                | `POST /api/attributes/new`        | `Omit<Attribute, 'attribute_id'>`                           | ✅             | ✅             | **Fixed**                |
-| Update                                                | `PUT /api/attributes/[id]`        | `Partial<Attribute>`                                         | ✅             | ✅             |                          |
-| Delete                                                | `DELETE /api/attributes/[id]`     | -                                                            | ✅             | ✅             |                          |
-| **CATEGORIES (Master Data)**                          |                                   |                                                              |               |               |                          |
-| Query List                                            | `POST /api/categories`            | `QueryRequest<ProductCategory>`                              | ✅             | ✅             | For assignment dropdowns |
-| Create                                                | `POST /api/categories/new`        | `Omit<ProductCategory, 'category_id'>`                      | ✅             | ✅             | **Added**                |
-| **SUPPLIER-CATEGORIES (Assignment - n:m)**            |                                   |                                                              |               |               |                          |
-| Query via JOINs                                       | `POST /api/query`                 | `namedQuery: 'supplier_categories'`                          | ✅             | ✅             |                          |
-| Create Assignment                                     | `POST /api/supplier-categories`   | `AssignmentRequest<Wholesaler, ProductCategory>`             | ✅             | ✅             | **Finalized**            |
-| Remove Assignment                                     | `DELETE /api/supplier-categories` | `RemoveAssignmentRequest<Wholesaler, ProductCategory>`       | ✅             | ✅             | **Finalized**            |
-| **CATEGORY-OFFERINGS (Hierarchical - 1:n)**           |                                   |                                                              |               |               |                          |
-| Query via JOINs                                       | `POST /api/query`                 | `namedQuery: 'category_offerings'`                           | ✅             | ✅             |                          |
-| Create                                                | `POST /api/category-offerings`    | `CreateChildRequest<ProductCategory, OfferingData>`          | ✅             | ✅             | **Finalized**            |
-| Update                                                | `PUT /api/category-offerings`     | `{offering_id, ...updates}`                                  | ✅             | ✅             | **Fixed**                |
-| Delete                                                | `DELETE /api/category-offerings`  | `DeleteRequest<WholesalerItemOffering>`                      | ✅             | ✅             | **Fixed**                |
-| **~~OFFERINGS/NEW (Deprecated)~~**                     | ~~`POST /api/offerings/new`~~     | ~~Violates hierarchical principle~~                          | ❌             | ❌             | **Removed - Use category-offerings** |
-| **OFFERING-ATTRIBUTES (Assignment - n:m Attributed)** |                                   |                                                              |               |               |                          |
-| Query via JOINs                                       | `POST /api/query`                 | `namedQuery: 'offering_attributes'`                          | ✅             | ✅             |                          |
-| Create Assignment                                     | `POST /api/offering-attributes`   | `AssignmentRequest<WholesalerItemOffering, Attribute>`       | ✅             | ✅             | **Finalized**            |
-| Update Assignment                                     | `PUT /api/offering-attributes`    | `AssignmentUpdateRequest<WholesalerItemOffering, Attribute>` | ✅             | ✅             | **Finalized**            |
-| Delete Assignment                                     | `DELETE /api/offering-attributes` | `RemoveAssignmentRequest<WholesalerItemOffering, Attribute>` | ✅             | ✅             | **Finalized**            |
-| **OFFERING-LINKS (Composition - 1:n)**                |                                   |                                                              |               |               |                          |
-| Query via JOINs                                       | `POST /api/query`                 | `namedQuery: 'offering_links'`                               | ✅             | ✅             |                          |
-| Read Single                                           | `GET /api/offering-links/[id]`    | -                                                            | ✅             | ✅             | For forms only           |
-| Create                                                | `POST /api/offering-links`        | `CreateChildRequest<WholesalerItemOffering, LinkData>`       | ✅             | ✅             | **Finalized**            |
-| Update                                                | `PUT /api/offering-links`         | Update pattern                                               | ✅             | ✅             | **Finalized**            |
-| Delete                                                | `DELETE /api/offering-links`      | `DeleteRequest<WholesalerOfferingLink>`                      | ✅             | ✅             | **Finalized**            |
+| Entity/Operation | Endpoint | Generic Type | Server Status | Client Status | Notes |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **SUPPLIERS (Master Data)** | | | | | |
+| Query List | `POST /api/suppliers` | `QueryRequest<Wholesaler>` | ✅ | ✅ | |
+| Read Single | `GET /api/suppliers/[id]` | - | ✅ | ✅ | |
+| Create | `POST /api/suppliers/new` | `Omit<Wholesaler, 'wholesaler_id'>` | ✅ | ✅ | **Fixed** |
+| Update | `PUT /api/suppliers/[id]` | `Partial<Wholesaler>` | ✅ | ✅ | |
+| Delete | `DELETE /api/suppliers/[id]` | - | ✅ | ✅ | |
+| **ATTRIBUTES (Master Data)** | | | | | |
+| Query List | `POST /api/attributes` | `QueryRequest<Attribute>` | ✅ | ✅ | |
+| Read Single | `GET /api/attributes/[id]` | - | ✅ | ✅ | |
+| Create | `POST /api/attributes/new` | `Omit<Attribute, 'attribute_id'>` | ✅ | ✅ | **Fixed** |
+| Update | `PUT /api/attributes/[id]` | `Partial<Attribute>` | ✅ | ✅ | |
+| Delete | `DELETE /api/attributes/[id]` | - | ✅ | ✅ | |
+| **CATEGORIES (Master Data)** | | | | | |
+| Query List | `POST /api/categories` | `QueryRequest<ProductCategory>` | ✅ | ✅ | For assignment dropdowns |
+| Read Single | `GET /api/categories/[id]` | - | ✅ | ✅ | **Added** |
+| Create | `POST /api/categories/new` | `Omit<ProductCategory, 'category_id'>` | ✅ | ✅ | **Added** |
+| Update | `PUT /api/categories/[id]` | `Partial<ProductCategory>` | ✅ | ✅ | **Added** |
+| Delete | `DELETE /api/categories/[id]` | - | ✅ | ✅ | **Added** |
+| **SUPPLIER-CATEGORIES (Assignment - n:m)** | | | | | |
+| Query via JOINs | `POST /api/query` | `namedQuery: 'supplier_categories'` | ✅ | ✅ | |
+| Create Assignment | `POST /api/supplier-categories` | `AssignmentRequest<Wholesaler, ProductCategory>` | ✅ | ✅ | **Finalized** |
+| Remove Assignment | `DELETE /api/supplier-categories` | `RemoveAssignmentRequest<Wholesaler, ProductCategory>` | ✅ | ✅ | **Finalized** |
+| **CATEGORY-OFFERINGS (Hierarchical - 1:n)** | | | | | |
+| Query via JOINs | `POST /api/query` | `namedQuery: 'category_offerings'` | ✅ | ✅ | |
+| Create | `POST /api/category-offerings` | `CreateChildRequest<ProductCategory, OfferingData>` | ✅ | ✅ | **Finalized** |
+| Update | `PUT /api/category-offerings` | `{offering_id, ...updates}` | ✅ | ✅ | **Fixed** |
+| Delete | `DELETE /api/category-offerings` | `DeleteRequest<WholesalerItemOffering>` | ✅ | ✅ | **Fixed** |
+| **~~OFFERINGS/NEW (Deprecated)~~** | ~~`POST /api/offerings/new`~~ | ~~Violates hierarchical principle~~ | ❌ | ❌ | **Removed - Use category-offerings** |
+| **OFFERING-ATTRIBUTES (Assignment - n:m Attributed)** | | | | | |
+| Query via JOINs | `POST /api/query` | `namedQuery: 'offering_attributes'` | ✅ | ✅ | |
+| Create Assignment | `POST /api/offering-attributes` | `AssignmentRequest<WholesalerItemOffering, Attribute>` | ✅ | ✅ | **Finalized** |
+| Update Assignment | `PUT /api/offering-attributes` | `AssignmentUpdateRequest<WholesalerItemOffering, Attribute>` | ✅ | ✅ | **Finalized** |
+| Delete Assignment | `DELETE /api/offering-attributes` | `RemoveAssignmentRequest<WholesalerItemOffering, Attribute>` | ✅ | ✅ | **Finalized** |
+| **OFFERING-LINKS (Composition - 1:n)** | | | | | |
+| Query via JOINs | `POST /api/query` | `namedQuery: 'offering_links'` | ✅ | ✅ | |
+| Read Single | `GET /api/offering-links/[id]` | - | ✅ | ✅ | For forms only |
+| Create | `POST /api/offering-links` | `CreateChildRequest<WholesalerItemOffering, LinkData>` | ✅ | ✅ | **Finalized** |
+| Update | `PUT /api/offering-links` | Update pattern | ✅ | ✅ | **Finalized** |
+| Delete | `DELETE /api/offering-links` | `DeleteRequest<WholesalerOfferingLink>` | ✅ | ✅ | **Finalized** |
 
 ---
 
@@ -293,8 +308,7 @@ Body: Omit<Entity, 'id_field'>
 PUT /api/{entity}/[id]
 Body: Partial<Entity>```
 
-#### b) Hierarchical Child Pattern  
-```typescript
+#### b) Hierarchical Child Pattern  ```typescript
 // Create child in parent context
 POST /api/{parent}-{child}
 Body: CreateChildRequest<Parent, Omit<Child, 'id_field'>>
@@ -333,6 +347,13 @@ Due to the backend API design, information about cascading dependencies is only 
     -   **Trigger**: The `execute` function receives the `409 Conflict` response.
     -   **Action**: It now displays a **second, specific confirmation dialog** that details the consequences (e.g., `"This supplier has dependencies: 5 offerings, 2 categories. Delete anyway?"`).
     -   **Purpose**: To warn the user about the side effects and get explicit permission for a cascading delete.
+
+**Important Distinction: Deleting Master Data vs. Assignments**
+
+The optimistic delete pattern applies universally, but the server's cascade logic differs based on the entity type:
+
+-   **Master Data (e.g., `Suppliers`, `Categories`):** Deletion is **always blocked** by "hard" dependencies (like `Offerings` or `Product Definitions`). Cascading is only possible for "soft" dependencies (like the assignments in `wholesaler_categories`). The `cascade_available` flag in the API response will be `false` if hard dependencies exist, forcing the user to resolve them manually.
+-   **Assignments (e.g., `Supplier-Categories`):** These relationships are simpler. Deletion can often be cascaded (e.g., removing a category assignment can also remove its associated offerings), and `cascade_available` will be `true` accordingly.
 
 **Implementation Guideline & Race Condition Prevention:**
 The `deleteStrategy.execute` function handles this entire workflow. To prevent UI race conditions where a row might get stuck in a "deleting" state, data reloading must be decoupled.
@@ -412,6 +433,28 @@ This pattern is realized by separating Page Modules from the Routes that use the
 
 ---
 
+## 6. Architectural Insight: Handling Isomorphic Code (Server vs. Browser)
+
+One of the major challenges in SvelteKit is managing code that runs in both environments (isomorphic code, primarily in `src/lib`).
+
+**The Problem: Hidden Node.js Dependencies in the Browser**
+
+During the development of a robust logger, a critical issue was discovered: attempting to import server-side Node.js modules (like `pino-pretty` or `node:module`) in an isomorphic file **inevitably breaks the browser build**. This happens at build-time, long before a runtime `if (browser)` check can prevent the import.
+
+**The Challenge: Race Conditions with Asynchronous Initialization**
+
+Workarounds involving dynamic, asynchronous imports within the server-only block proved to be fragile. They introduced race conditions where log calls at the beginning of a request would be "swallowed" because the logger had not yet finished its asynchronous initialization. This leads to unreliable and hard-to-debug behavior.
+
+**The Current Solution: A Minimal, Synchronous Logger**
+
+To avoid these issues and ensure stability, the project currently uses a **minimal, synchronous logger implementation** in `src/lib/utils/logger.ts`. This file:
+-   Uses an `if (browser)` check to strictly separate the environments.
+-   Implements a simple wrapper around `console` in the browser.
+-   Uses a basic configuration of `pino` on the server **without any asynchronous or Node.js-specific dependencies that could contaminate the client build.**
+
+This approach guarantees reliability and avoids the complexity and fragility of asynchronous initialization in an isomorphic context. Future logger enhancements must respect this principle.
+
+---
 
 ## 7. Examples of Generic Type Usage
 
@@ -476,8 +519,7 @@ create{Child}For{Parent}(
 
 ### 8.3. Adding New Assignments
 
-**For n:m Relationships:**
-```typescript
+**For n:m Relationships:**```typescript
 // Server endpoint: /api/{parent}-{child}
 Body: AssignmentRequest<ParentEntity, ChildEntity, MetadataType>
 
@@ -559,8 +601,25 @@ During the integration of the API clients with Svelte 5 Runes, key architectural
 
 This solution eliminates race conditions between component mounting and API initialization and provides a consistent loading UX across all hierarchy levels.
 
+---
+
+## 11. Implementation Pitfalls & Best Practices
+
+### 11.1. ApiClient: Handling the Response Body
+
+**Problem:** A `Response` body from a `fetch` call is a stream and can only be read **once**. Attempting to read it multiple times (e.g., by logging the full `response` object and then calling `await response.json()`) will result in a `Body is unusable: Body has already been read` error.
+
+**Best Practice:** Always read the body exactly once and reuse the result. The most robust method is:
+
+1.  Always read the body as text using `const responseText = await response.text()`.
+2.  If needed, log the `responseText`.
+3.  Use `JSON.parse(responseText)` inside a `try...catch` block to get the JSON object.
+
+This not only prevents the error but also provides the raw server output for better debugging in case of invalid JSON.
+
+---
 
 # TODOS
-* Create routes/api/categories[id]
-* Check if error handling in pages is correct, does not swallor or incorrectly rethrow wrong errors or hide server errrors.
-* Check if API typing is consistent on server and client and if the types in lib/api/* are used correctly.
+* ~~`Create routes/api/categories[id]`~~ **DONE**
+* Check if error handling in pages is correct, does not swallow or incorrectly rethrow wrong errors or hide server errors.
+* Check if API typing is consistent on server and client and if the types in `lib/api/*` are used correctly.

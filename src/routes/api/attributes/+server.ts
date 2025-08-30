@@ -23,6 +23,7 @@ import { v4 as uuidv4 } from 'uuid';
  */
 export const POST: RequestHandler = async (event) => {
     const operationId = uuidv4();
+    log.infoHeader("POST /api/attributes");
     log.info(`[${operationId}] POST /attributes: FN_START`);
 
     try {

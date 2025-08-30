@@ -24,6 +24,7 @@ import { v4 as uuidv4 } from 'uuid';
  * sorting, and pagination capabilities.
  */
 export const POST: RequestHandler = async (event) => {
+    log.infoHeader("POST /api/offerings/");
     const operationId = uuidv4();
     log.info(`[${operationId}] POST /offerings: FN_START`);
 
@@ -88,15 +89,15 @@ export const POST: RequestHandler = async (event) => {
             hasJoins: metadata.hasJoins,
             executionTime: metadata.parameterCount
         });
-        
+
         return json(response);
 
     } catch (err: unknown) {
         const { status, message } = mssqlErrorMapper.mapToHttpError(err);
-        log.error(`[${operationId}] FN_EXCEPTION: Unhandled error during offerings query.`, { 
-            error: err, 
-            mappedStatus: status, 
-            mappedMessage: message 
+        log.error(`[${operationId}] FN_EXCEPTION: Unhandled error during offerings query.`, {
+            error: err,
+            mappedStatus: status,
+            mappedMessage: message
         });
         // Only THROW for unexpected server errors.
         throw error(status, message);

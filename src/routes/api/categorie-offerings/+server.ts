@@ -64,6 +64,7 @@ async function checkOfferingDependencies(offeringId: number): Promise<string[]> 
  * @description Creates a new offering within a category context.
  */
 export const POST: RequestHandler = async ({ request }) => {
+    log.infoHeader("POST /api/category-offerings");
     const operationId = uuidv4();
     log.info(`[${operationId}] POST /category-offerings: FN_START`);
 
@@ -234,6 +235,7 @@ export const POST: RequestHandler = async ({ request }) => {
  * @description Updates an existing offering within category context.
  */
 export const PUT: RequestHandler = async ({ request }) => {
+    log.infoHeader("PUT /api/offerings/[id]");
     const operationId = uuidv4();
     log.info(`[${operationId}] PUT /category-offerings: FN_START`);
 
@@ -348,6 +350,7 @@ export const PUT: RequestHandler = async ({ request }) => {
  * @description Deletes an offering from a category context with dependency checks.
  */
 export const DELETE: RequestHandler = async ({ request }) => {
+    log.infoHeader("DELETE /api/offerings/[id]");
     const operationId = uuidv4();
     log.info(`[${operationId}] DELETE /category-offerings: FN_START`);
 

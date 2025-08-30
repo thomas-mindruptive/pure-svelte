@@ -31,6 +31,7 @@ import type {
  * @description Retrieves a single category master data record.
  */
 export const GET: RequestHandler = async ({ params }) => {
+    log.infoHeader("GET /api/categories/[id]");
     const operationId = uuidv4();
     const id = parseInt(params.id ?? '', 10);
     log.info(`[${operationId}] GET /categories/${id}: FN_START`);
@@ -71,6 +72,7 @@ export const GET: RequestHandler = async ({ params }) => {
  * @description Updates an existing category master data record.
  */
 export const PUT: RequestHandler = async ({ params, request }) => {
+    log.infoHeader("PUT /api/categories/[id]");
     const operationId = uuidv4();
     const id = parseInt(params.id ?? '', 10);
     log.info(`[${operationId}] PUT /categories/${id}: FN_START`);
@@ -116,6 +118,7 @@ export const PUT: RequestHandler = async ({ params, request }) => {
  * @description Deletes a category master data record with careful dependency checking.
  */
 export const DELETE: RequestHandler = async ({ params, url }): Promise<Response> => {
+    log.infoHeader("DELETE /api/categories/[id]");
     const operationId = uuidv4();
     const id = parseInt(params.id ?? '', 10);
     log.info(`[${operationId}] DELETE /categories/${id}: FN_START`);

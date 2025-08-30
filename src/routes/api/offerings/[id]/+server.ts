@@ -66,6 +66,7 @@ async function checkOfferingDependencies(offeringId: number): Promise<string[]> 
  * GET /api/offerings/[id] - Get a single offering with details
  */
 export const GET: RequestHandler = async ({ params }) => {
+    log.infoHeader("GET /api/offerings/[id]");
     const operationId = uuidv4();
     const id = parseInt(params.id ?? '', 10);
     log.info(`[${operationId}] GET /offerings/${id}: FN_START`);
@@ -129,6 +130,7 @@ export const GET: RequestHandler = async ({ params }) => {
  * POST /api/offerings/[id] - Get offering with flexible fields
  */
 export const POST: RequestHandler = async ({ params, request }) => {
+    log.infoHeader("POST /api/offerings/[id]");
     const operationId = uuidv4();
     const id = parseInt(params.id ?? '', 10);
     log.info(`[${operationId}] POST /offerings/${id}: FN_START`);
@@ -205,6 +207,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
  * PUT /api/offerings/[id] - Update an existing offering
  */
 export const PUT: RequestHandler = async ({ params, request }) => {
+    log.infoHeader("PUT /api/offerings/[id]");
     const operationId = uuidv4();
     const id = parseInt(params.id ?? '', 10);
     log.info(`[${operationId}] PUT /offerings/${id}: FN_START`);
@@ -239,7 +242,7 @@ export const PUT: RequestHandler = async ({ params, request }) => {
             return json(errRes, { status: 400 });
         }
 
-        const { wholesaler_id, category_id, product_def_id, size, dimensions, price, currency, comment } = 
+        const { wholesaler_id, category_id, product_def_id, size, dimensions, price, currency, comment } =
             validation.sanitized as Partial<WholesalerItemOffering>;
 
         const result = await db.request()
@@ -293,6 +296,7 @@ export const PUT: RequestHandler = async ({ params, request }) => {
  * DELETE /api/offerings/[id] - Delete offering with dependency checks
  */
 export const DELETE: RequestHandler = async ({ params, url }) => {
+    log.infoHeader("DELETE /api/offerings/[id]");
     const operationId = uuidv4();
     const id = parseInt(params.id ?? '', 10);
     log.info(`[${operationId}] DELETE /offerings/${id}: FN_START`);
@@ -335,12 +339,12 @@ export const DELETE: RequestHandler = async ({ params, url }) => {
         try {
             if (cascade && dependencies.length > 0) {
                 log.info(`[${operationId}] Performing cascade delete.`);
-                
+
                 // Delete offering attributes
                 await transaction.request()
                     .input('offeringId', id)
                     .query('DELETE FROM dbo.wholesaler_offering_attributes WHERE offering_id = @offeringId');
-                
+
                 // Delete offering links
                 await transaction.request()
                     .input('offeringId', id)
@@ -373,7 +377,7 @@ export const DELETE: RequestHandler = async ({ params, url }) => {
             const offeringDetails = offeringResult.recordset[0];
 
             // Delete the offering
-           await transaction.request()
+            await transaction.request()
                 .input('id', id)
                 .query('DELETE FROM dbo.wholesaler_item_offerings WHERE offering_id = @id');
 

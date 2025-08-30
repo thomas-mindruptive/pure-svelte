@@ -31,6 +31,7 @@ import type {
  * GET /api/suppliers/[id] - Get a single, complete supplier record.
  */
 export const GET: RequestHandler = async ({ params }) => {
+    log.infoHeader("GET /api/suppliers/[id]");
     const operationId = uuidv4();
     const id = parseInt(params.id ?? '', 10);
     log.info(`[${operationId}] GET /suppliers/${id}: FN_START`);
@@ -78,6 +79,7 @@ export const GET: RequestHandler = async ({ params }) => {
  * ⚠️ Does NOT create a supplier. => /api/suppliers/new POST
  */
 export const POST: RequestHandler = async ({ params, request }) => {
+    log.infoHeader("POST /api/suppliers/[id]");
     const operationId = uuidv4();
     const id = parseInt(params.id ?? '', 10);
     log.info(`[${operationId}] POST /suppliers/${id}: FN_START`);
@@ -136,6 +138,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
  * PUT /api/suppliers/[id] - Update an existing supplier.
  */
 export const PUT: RequestHandler = async ({ params, request }) => {
+    log.infoHeader("PUT /api/suppliers/[id]");
     const operationId = uuidv4();
     const id = parseInt(params.id ?? '', 10);
     log.info(`[${operationId}] PUT /suppliers/${id}: FN_START`);
@@ -185,6 +188,7 @@ export const PUT: RequestHandler = async ({ params, request }) => {
  * DELETE /api/suppliers/[id] - Delete a supplier with dependency checks.
  */
 export const DELETE: RequestHandler = async ({ params, url }) => {
+    log.infoHeader("DELETE /api/suppliers/[id]");
     const operationId = uuidv4();
     const id = parseInt(params.id ?? '', 10);
     log.info(`[${operationId}] DELETE /suppliers/${id}: FN_START`);

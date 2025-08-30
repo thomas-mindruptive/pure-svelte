@@ -218,9 +218,7 @@ export function buildQuery<T>(
 ): QueryBuildResult {
 	const startTime = Date.now();
 	try {
-		log.info("***********************************");
 		log.info("Starting query build...", { payload, fixedFrom });
-		log.info("***********************************");
 		const fromSource = fixedFrom || payload.from;
 		if (!fromSource) throw new Error('FROM clause is required.');
 

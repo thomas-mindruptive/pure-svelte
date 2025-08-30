@@ -57,13 +57,24 @@ export class ApiClient {
 				headers: { 'content-type': 'application/json', ...init.headers },
 				signal: controller.signal
 			});
-			log.info('ApiClient response', response, response.status, response.statusText, response.ok);
+			// NOTE: NEVER log the response object itself => Tries to read the stream => 500 error!!!!!!!!!!!!!!!
+			log.info('ApiClient.fetch response', { status: response.status, ok: response.ok, statusText: response.statusText });
 			clearTimeout(timeoutId);
 
-			if (!response.ok) {
+			if (response.ok) {
+				const responseText = await response.text();
+				try {
+					const data: unknown = JSON.parse(responseText);
+					return (data as ApiSuccessResponse<TSuccessData>).data;
+				} catch {
+					log.error("ApiClient: Failed to parse JSON. Server Response Text:", responseText);
+					throw new ApiError('Invalid JSON response from server', response.status);
+				}
+			} else {
 				const text = await response.text().catch(() => '');
+				const trimmed = text.replace(/^\uFEFF/, '').trim();
 				let details: unknown = text;
-				try { details = text ? JSON.parse(text) : text; } catch {
+				try { details = text ? JSON.parse(trimmed) : text; } catch {
 					log.info('response != OK => try to parse response.text => Failed to parse error response JSON:', text);
 				}
 				const err = new ApiError(
@@ -71,14 +82,10 @@ export class ApiClient {
 					response.status
 				);
 				(err as any).response = {
-					status:response.status, statusText: response.statusText, details
+					status: response.status, statusText: response.statusText, details
 				};
 				throw err;
-			} else {
-				const data: unknown = await response
-					.json()
-					.catch(() => ({ message: 'Invalid JSON response from server' }));
-				return (data as ApiSuccessResponse<TSuccessData>).data;
+
 			}
 
 		} catch (error) {

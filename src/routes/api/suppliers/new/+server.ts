@@ -24,6 +24,7 @@ import type {
  * @description Creates a new supplier.
  */
 export const POST: RequestHandler = async ({ request }) => {
+	log.infoHeader("POST /api/suppliers/new");
 	const operationId = uuidv4();
 	log.info(`[${operationId}] POST /suppliers/new: FN_START`);
 

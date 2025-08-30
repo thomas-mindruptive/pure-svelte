@@ -29,6 +29,7 @@ import type {
  * @description READ ONLY endpoint for forms. All modifications use main relationship endpoint.
  */
 export const GET: RequestHandler = async ({ params }) => {
+    log.infoHeader("GET /api/offering-links/[id]");
     const operationId = uuidv4();
     const id = parseInt(params.id ?? '', 10);
     log.info(`[${operationId}] GET /offering-links/${id}: FN_START`);
@@ -91,6 +92,7 @@ export const GET: RequestHandler = async ({ params }) => {
  * @description Alternative READ ONLY endpoint for flexible form field selection.
  */
 export const POST: RequestHandler = async ({ params, request }) => {
+    log.infoHeader("POST /api/offering-links/[id]");
     const operationId = uuidv4();
     const id = parseInt(params.id ?? '', 10);
     log.info(`[${operationId}] POST /offering-links/${id}: FN_START`);

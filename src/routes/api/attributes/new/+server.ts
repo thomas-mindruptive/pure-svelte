@@ -25,6 +25,7 @@ import type {
  * @description Creates a new attribute master data record.
  */
 export const POST: RequestHandler = async ({ request }) => {
+    log.infoHeader("POST /api/attributes/new");
     const operationId = uuidv4();
     log.info(`[${operationId}] POST /attributes/new: FN_START`);
 

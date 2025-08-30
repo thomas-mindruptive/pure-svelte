@@ -120,7 +120,7 @@ export const supplierQueryConfig: QueryConfig = {
       from: 'dbo.wholesaler_item_offerings wio',
       joins: [
         {
-          type: JoinType.LEFT,
+          type: JoinType.INNER,
           table: 'dbo.wholesaler_offering_attributes',
           alias: 'woa',
           on: {
@@ -136,7 +136,7 @@ export const supplierQueryConfig: QueryConfig = {
       from: 'dbo.wholesaler_item_offerings wio',
       joins: [
         {
-          type: JoinType.LEFT,
+          type: JoinType.INNER,
           table: 'dbo.wholesaler_offering_links',
           alias: 'wol',
           on: {

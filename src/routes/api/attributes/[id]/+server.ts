@@ -52,6 +52,7 @@ async function checkAttributeDependencies(attributeId: number): Promise<string[]
  * GET /api/attributes/[id] - Get a single attribute record
  */
 export const GET: RequestHandler = async ({ params }) => {
+    log.infoHeader("GET /api/attributes/[id]");
     const operationId = uuidv4();
     const id = parseInt(params.id ?? '', 10);
     log.info(`[${operationId}] GET /attributes/${id}: FN_START`);
@@ -94,6 +95,7 @@ export const GET: RequestHandler = async ({ params }) => {
  * POST /api/attributes/[id] - Get attribute with flexible fields
  */
 export const POST: RequestHandler = async ({ params, request }) => {
+    log.infoHeader("POST /api/attributes/[id]");
     const operationId = uuidv4();
     const id = parseInt(params.id ?? '', 10);
     log.info(`[${operationId}] POST /attributes/${id}: FN_START`);
@@ -170,6 +172,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
  * PUT /api/attributes/[id] - Update an existing attribute
  */
 export const PUT: RequestHandler = async ({ params, request }) => {
+    log.infoHeader("PUT /api/attributes/[id]");
     const operationId = uuidv4();
     const id = parseInt(params.id ?? '', 10);
     log.info(`[${operationId}] PUT /attributes/${id}: FN_START`);
@@ -250,6 +253,7 @@ export const PUT: RequestHandler = async ({ params, request }) => {
  * DELETE /api/attributes/[id] - Delete attribute with dependency checks
  */
 export const DELETE: RequestHandler = async ({ params, url }) => {
+    log.infoHeader("DELETE /api/attributes/[id]");
     const operationId = uuidv4();
     const id = parseInt(params.id ?? '', 10);
     log.info(`[${operationId}] DELETE /attributes/${id}: FN_START`);

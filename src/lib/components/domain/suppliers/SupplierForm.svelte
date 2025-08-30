@@ -232,11 +232,12 @@
   <!-- FORM HEADER -->
   <!-- Displays entity info and unsaved changes indicator -->
   {#snippet header({ data, dirty })}
+  {@const wholesaler = data as Wholesaler}
     <div class="form-header">
       <div>
         <h3>Wholesaler Details</h3>
-        {#if (data as any)?.id}
-          <span class="field-hint">ID: {(data as any).id}</span>
+        {#if wholesaler?.wholesaler_id}
+          <span class="field-hint">ID: {wholesaler.wholesaler_id}</span>
         {/if}
       </div>
       <div>

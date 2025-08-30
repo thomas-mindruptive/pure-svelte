@@ -19,6 +19,10 @@
     ID,
   } from "$lib/components/client/Datagrid.types";
 
+  import "$lib/components/styles/assignment-section.css";
+  import "$lib/components/styles/grid-section.css";
+  import "$lib/components/styles/detail-page-layout.css";
+
   import { ApiClient } from "$lib/api/client/ApiClient";
 
   type LoadData = {
@@ -57,7 +61,7 @@
         addNotification(`Could not delete attribute assignment.`, "error");
       }
     }
-    if (dataChanged) await invalidateAll();
+    if (dataChanged) invalidateAll();
   }
 
   function handleAttributeSelect(
@@ -143,16 +147,8 @@ mit der Anpassung der `HierarchySidebar` fortfahren, damit sie die volle Navigat
 abbildet. Bereit? Bitte gib mir dein **ok**.
 
 <style>
-  .assignment-section {
-    margin-bottom: 1.5rem;
-  }
   h2,
   h3 {
     margin-top: 0;
-  }
-  .assignment-form {
-    display: grid;
-    grid-template-columns: 2fr 2fr 1fr;
-    gap: 1rem;
   }
 </style>

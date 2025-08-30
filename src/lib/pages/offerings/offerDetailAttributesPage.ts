@@ -9,7 +9,7 @@ import { error, type LoadEvent } from '@sveltejs/kit';
 /**
  * Lädt alle Daten für die Angebots-Detailseite (Attribute).
  */
-export async function load({ params }: LoadEvent) {
+export async function load({ params, fetch: fetchLoad }: LoadEvent) {
   const offeringId = Number(params.offeringId);
 
   if (isNaN(offeringId)) {
@@ -19,7 +19,7 @@ export async function load({ params }: LoadEvent) {
   log.info(`(OfferDetailAttributesPage) loading all data for offeringId: ${offeringId}`);
 
     // 1. Create an ApiClient instance with the context-aware `fetch`.
-    const client = new ApiClient(fetch);
+    const client = new ApiClient(fetchLoad);
   
     // 2. Get the supplier-specific API methods from the factory.
     const offeringApi = getOfferingApi(client);

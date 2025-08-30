@@ -1,0 +1,28 @@
+/* src/lib/components/styles/detail-page-layout.css */
+/*
+ * Shared styles for the standard layout of detail pages.
+ * Defines the main page container and the standard header section.
+*/
+
+.detail-page-layout {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.detail-header-section {
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* Common pattern for the title inside the header */
+.detail-header-section h1 {
+    margin: 0;
+}
+
+/* Common pattern for the subtitle/description inside the header */
+.detail-header-section p {
+    margin: 0.5rem 0 0 0;
+    color: var(--color-muted);
+}

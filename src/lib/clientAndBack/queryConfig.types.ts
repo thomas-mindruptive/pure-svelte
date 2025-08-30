@@ -37,6 +37,7 @@ export type BaseTableConfig = {
   'dbo.wholesaler_item_offerings': (keyof Domain.WholesalerItemOffering)[];
   'dbo.wholesaler_offering_attributes': (keyof Domain.WholesalerOfferingAttribute)[];
   'dbo.wholesaler_offering_links': (keyof Domain.WholesalerOfferingLink)[];
+  'dbo.attributes': (keyof Domain.Attribute)[];
 };
 
 /**

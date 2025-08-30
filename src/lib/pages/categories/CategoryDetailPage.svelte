@@ -5,7 +5,9 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/stores";
 
-  // Komponenten
+  // Komponenten;
+  import "$lib/components/styles/grid-section.css";
+  import "$lib/components/styles/detail-page-layout.css";
   import OfferingGrid from "$lib/components/domain/offerings/OfferingGrid.svelte";
 
   // API & Typen
@@ -96,8 +98,8 @@
     };
 </script>
 
-<div class="page-layout">
-  <div class="header-section">
+<div class="detail-page-layout">
+  <div class="detail-header-section">
     <h1>Offerings in "{data.category.name}"</h1>
     <p>
       {data.category.description ||
@@ -122,16 +124,6 @@
 </div>
 
 <style>
-  .page-layout {
-    padding: 1.5rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-  }
-  .header-section {
-    padding-bottom: 1rem;
-    border-bottom: 1px solid var(--color-border);
-  }
   h1 {
     margin: 0;
   }

@@ -623,3 +623,5 @@ This not only prevents the error but also provides the raw server output for bet
 * ~~`Create routes/api/categories[id]`~~ **DONE**
 * Check if error handling in pages is correct, does not swallow or incorrectly rethrow wrong errors or hide server errors.
 * Check if API typing is consistent on server and client and if the types in `lib/api/*` are used correctly.
+* Check if it pays off: factor out style "form-section" to own css and name it "detail-form-section". (The form itself is in form.css)
+  * Same for .page-content-wrapper or create wrapper and section components?

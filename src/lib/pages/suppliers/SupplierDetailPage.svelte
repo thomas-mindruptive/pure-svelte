@@ -6,6 +6,9 @@
   import { requestConfirmation } from "$lib/stores/confirmation";
 
   // Komponenten
+  import "$lib/components/styles/detail-page-layout.css";
+  import "$lib/components/styles/assignment-section.css";
+  import "$lib/components/styles/grid-section.css";
   import SupplierForm from "$lib/components/domain/suppliers/SupplierForm.svelte";
   import CategoryGrid from "$lib/components/domain/categories/CategoryGrid.svelte";
   import CategoryAssignment from "$lib/components/domain/suppliers/CategoryAssignment.svelte";
@@ -108,44 +111,68 @@
   /**
    * Führt den Löschvorgang für eine Kategoriezuweisung durch.
    */
-  async function handleCategoryDelete(ids: ID[]): Promise<void> {
+  
+   async function handleCategoryDelete(ids: ID[]): Promise<void> {
     log.info(`(SupplierDetailPage) Removing category assignments`, { ids });
+    let dataChanged = false;
 
     for (const id of ids) {
       const [supplierIdStr, categoryIdStr] = String(id).split("-");
       const supplierId = Number(supplierIdStr);
       const categoryId = Number(categoryIdStr);
-      if (!supplierId || !categoryId) continue;
+      if (isNaN(supplierId) || isNaN(categoryId)) continue;
 
-      const result = await supplierApi.removeCategoryFromSupplier({
+      // 1. Optimistischer erster Versuch ohne Kaskadierung
+      const initialResult = await supplierApi.removeCategoryFromSupplier({
         supplierId,
         categoryId,
         cascade: false,
       });
 
-      if (result.success) {
+      if (initialResult.success) {
+        // HAPPY PATH: Keine Abhängigkeiten, Zuweisung erfolgreich entfernt.
         addNotification(`Category assignment removed.`, "success");
-      } else if ("cascade_available" in result) {
-        const offeringCount = (result.dependencies as any)?.offering_count ?? 0;
+        dataChanged = true;
+      } else if ("cascade_available" in initialResult && initialResult.cascade_available) {
+        // CONFLICT PATH: Abhängigkeiten gefunden, zweites Dialogfenster anzeigen.
+        const offeringCount = (initialResult.dependencies as any)?.offering_count ?? 0;
         const confirmed = await requestConfirmation(
-          `This category has ${offeringCount} offerings. Remove them as well?`,
+          `This category has ${offeringCount} offerings for this supplier. Remove the assignment and all these offerings?`,
           "Confirm Cascade Delete",
         );
+        
         if (confirmed) {
-          await supplierApi.removeCategoryFromSupplier({
+          // 2. Wenn bestätigt, den zweiten API-Aufruf mit cascade=true durchführen.
+          const cascadeResult = await supplierApi.removeCategoryFromSupplier({
             supplierId,
             categoryId,
             cascade: true,
           });
-          addNotification("Category and its offerings removed.", "success");
+
+          if (cascadeResult.success) {
+            addNotification("Category assignment and its offerings removed.", "success");
+            dataChanged = true;
+          } else {
+            addNotification(cascadeResult.message || "Failed to remove assignment.", "error");
+          }
         }
+        // Wenn der Benutzer hier "Abbrechen" wählt, passiert nichts weiter,
+        // und die Funktion beendet sich sauber. Der `finally`-Block im DataGrid wird den "deleting" Status entfernen.
+      } else {
+         // UNEXPECTED ERROR PATH: Ein anderer Fehler ist aufgetreten.
+        addNotification(initialResult.message || "Could not remove assignment.", "error");
       }
     }
-    // Seite neu laden, um die Gitter zu aktualisieren.
-    await goto(`/suppliers/${data.supplier.wholesaler_id}`, {
-      invalidateAll: true,
-    });
+
+    if (dataChanged) {
+      // "Fire-and-forget" Neuladen, um die UI zu aktualisieren.
+      // Nicht `await`-en, um dem DataGrid Zeit zum Aufräumen zu geben.
+      goto(`/suppliers/${data.supplier.wholesaler_id}`, {
+        invalidateAll: true,
+      });
+    }
   }
+
 
   /**
    * Navigiert zur nächsten Hierarchieebene (Angebote).
@@ -168,7 +195,7 @@
   };
 </script>
 
-<div class="page-layout">
+<div class="detail-page-layout">
   <!-- Sektion 1: Formular für Lieferantendetails -->
   <div class="form-section">
     <SupplierForm
@@ -207,15 +234,7 @@
 </div>
 
 <style>
-  .page-layout {
-    padding: 1.5rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-  }
-  .form-section,
-  .assignment-section,
-  .grid-section {
+  .form-section{
     background: var(--color-background);
     border-radius: 8px;
     border: 1px solid var(--color-border);

@@ -4,7 +4,10 @@
   import { invalidateAll } from "$app/navigation";
 
   import LinkGrid from "$lib/components/links/LinkGrid.svelte";
-  import { getOfferingApi, offeringLoadingState } from "$lib/api/client/offering";
+  import {
+    getOfferingApi,
+    offeringLoadingState,
+  } from "$lib/api/client/offering";
   import type {
     WholesalerOfferingLink,
     WholesalerItemOffering_ProductDef_Category,
@@ -14,7 +17,11 @@
     RowActionStrategy,
     ID,
   } from "$lib/components/client/Datagrid.types";
-    import { ApiClient } from "$lib/api/client/ApiClient";
+  import { ApiClient } from "$lib/api/client/ApiClient";
+
+  import "$lib/components/styles/assignment-section.css";
+  import "$lib/components/styles/grid-section.css";
+  import "$lib/components/styles/detail-page-layout.css";
 
   type LoadData = {
     offering: WholesalerItemOffering_ProductDef_Category;
@@ -37,7 +44,7 @@
       await offeringApi.deleteOfferingLink(Number(id));
     }
     addNotification("Link(s) deleted.", "success");
-    await invalidateAll();
+    invalidateAll();
   }
 
   function handleLinkSelect(link: WholesalerOfferingLink) {
@@ -47,9 +54,8 @@
     );
   }
 
-  // KORREKTUR: Der Handler empfängt das Event-Objekt.
   async function handleAssignLink(event: SubmitEvent) {
-    // KORREKTUR: Das Standardverhalten wird hier programmatisch verhindert.
+    // Das Standardverhalten wird hier programmatisch verhindert.
     event.preventDefault();
 
     if (!newUrl) return;
@@ -98,7 +104,7 @@
 
   <div class="assignment-section">
     <h3>Add New Link</h3>
-    <!-- KORREKTUR: Standard-onsubmit-Handler ohne Modifier. -->
+
     <form class="assignment-form" onsubmit={handleAssignLink}>
       <input
         type="url"
@@ -131,16 +137,6 @@
 </div>
 
 <style>
-  .page-layout {
-    padding: 1.5rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-  }
-  .header-section {
-    padding-bottom: 1rem;
-    border-bottom: 1px solid var(--color-border);
-  }
   h1 {
     margin: 0;
   }
@@ -155,20 +151,8 @@
     padding: 1.5rem;
     border-radius: 8px;
   }
-  .assignment-section,
-  .grid-section {
-    background: var(--color-background);
-    border-radius: 8px;
-    border: 1px solid var(--color-border);
-    padding: 1.5rem;
-  }
   h2,
   h3 {
     margin-top: 0;
-  }
-  .assignment-form {
-    display: grid;
-    grid-template-columns: 2fr 2fr 1fr;
-    gap: 1rem;
   }
 </style>

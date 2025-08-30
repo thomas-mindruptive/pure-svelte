@@ -36,11 +36,9 @@ export const POST: RequestHandler = async (event) => {
 		const requestBody = await event.request.json();
 
 		if (isPredefinedQuery(requestBody)) {
-			log.debug("2 - #######################");
 			const { namedQuery, payload } = requestBody;
 			log.info(`[${operationId}] Handling PredefinedQueryRequest`, { namedQuery });
 
-			log.debug("3 - #######################");
 			if (!(namedQuery in (supplierQueryConfig.joinConfigurations || {}))) {
 				const errRes: ApiErrorResponse = {
 					success: false, message: `Predefined query '${namedQuery}' is not allowed.`,
@@ -52,7 +50,6 @@ export const POST: RequestHandler = async (event) => {
 			const { sql, parameters, metadata } = buildQuery(payload, supplierQueryConfig, namedQuery);
 			const results = await executeQuery(sql, parameters);
 
-			log.debug("4 - ##########################################");
 			log.debug(`[${operationId}] Executed SQL: ${sql} with parameters: ${JSON.stringify(parameters)}`, {result: results});
 
 			const response: QuerySuccessResponse<unknown> = {
@@ -101,9 +98,6 @@ export const POST: RequestHandler = async (event) => {
 			const { sql, parameters, metadata } = buildQuery(payload, supplierQueryConfig);
 			const results = await executeQuery(sql, parameters);
 
-			log.debug("##########################################");
-			log.debug("##########################################");
-			log.debug("##########################################");
 			log.debug(`[${operationId}] Executed SQL: ${sql} with parameters: ${JSON.stringify(parameters)}`, results);
 
 			const response: QuerySuccessResponse<unknown> = {

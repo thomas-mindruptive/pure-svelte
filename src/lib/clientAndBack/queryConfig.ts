@@ -33,10 +33,11 @@ export const supplierQueryConfig: QueryConfig = {
     'dbo.wholesaler_offering_attributes': ['offering_id', 'attribute_id', 'value'],
     'dbo.wholesaler_offering_links': ['link_id', 'offering_id', 'url', 'notes', 'created_at'],
     'dbo.product_definitions': ['product_def_id', 'title', 'description', 'category_id'],
+    'dbo.attributes': ['attribute_id', 'name', 'description'],
 
     // Validate columns for join configurations below. Validated against typos through "PredefinedQueryConfig"
     'supplier_categories': [
-      'w.wholesaler_id', 'w.name AS supplier_name', 'wc.wholesaler_id', 'wc.category_id', 'pc.category_id', 'pc.name','pc.name AS category_name',
+      'w.wholesaler_id', 'w.name AS supplier_name', 'wc.wholesaler_id', 'wc.category_id', 'pc.category_id', 'pc.name', 'pc.name AS category_name',
       'pc.description AS category_description', 'wc.comment', 'wc.link'
     ],
     'category_offerings': [
@@ -46,11 +47,12 @@ export const supplierQueryConfig: QueryConfig = {
     ],
     'offering_attributes': [
       'wio.offering_id', 'wio.price', 'wio.category_id',
-      'woa.attribute_id', 'woa.value'
+      'woa.attribute_id', 'woa.value', 'woa.offering_id',
+      'a.name', 'a.attribute_id'
     ],
     'offering_links': [
-      'wio.offering_id', 'wio.price', 'wio.category_id', 
-      'wol.offering_id','wol.created_at', 'wol.link_id', 'wol.url', 'wol.notes'
+      'wio.offering_id', 'wio.price', 'wio.category_id',
+      'wol.offering_id', 'wol.created_at', 'wol.link_id', 'wol.url', 'wol.notes'
     ],
     'product_definitions': [
       'pd.product_def_id', 'pd.category_id', 'pd.title', 'pd.description', 'pd.category_id', 'pd.material_id', 'pd.form_id', 'pd.material_id'
@@ -127,6 +129,17 @@ export const supplierQueryConfig: QueryConfig = {
             op: LogicalOperator.AND,
             conditions: [
               { columnA: 'wio.offering_id', op: ComparisonOperator.EQUALS, columnB: 'woa.offering_id' }
+            ]
+          }
+        },
+        {
+          type: JoinType.INNER,
+          table: 'dbo.attributes',
+          alias: 'a',
+          on: {
+            op: LogicalOperator.AND,
+            conditions: [
+              { columnA: 'woa.attribute_id', op: ComparisonOperator.EQUALS, columnB: 'a.attribute_id' }
             ]
           }
         }

@@ -706,7 +706,7 @@
       // Always remove loading indicators, even if delete failed
       markDeleting(pendingIds, false);
       log.info(
-        "\n##########\nFINALLY: deletingObjectIds after clear:",
+        "FINALLY: deletingObjectIds after clear:",
         Array.from(deletingObjectIds),
       );
     }

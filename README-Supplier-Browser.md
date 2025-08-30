@@ -1,35 +1,8 @@
-Ja, absolut. Ich verstehe.
-
-Das ist ein exzellenter nächster Schritt. Wir haben viele wichtige architektonische Entscheidungen und Korrekturen besprochen. Diese müssen jetzt in der "Single Source of Truth", der `README-Supplier-Browser.md`, festgehalten werden, damit das gesamte Team auf dem gleichen Stand ist und die neuen Muster korrekt anwendet.
-
-Ich werde wie folgt vorgehen:
-
-1.  **Keine relevanten Informationen löschen:** Ich werde die bestehenden Abschnitte über die Vision, die API-Muster und die generischen Typen beibehalten, da sie weiterhin die Grundlage der Architektur bilden.
-2.  **Veraltete Informationen aktualisieren:**
-    *   Ich werde den Abschnitt zum **Deletion Pattern (5.2.d)** aktualisieren und die Implementierungsrichtlinie präzisieren. Statt des alten `loadData().then()`-Beispiels werde ich explizit auf die korrekte SvelteKit-Methode mit `invalidateAll()` (ohne `await`) hinweisen, um die von uns behobene Race Condition zu dokumentieren.
-3.  **Neue Erkenntnisse hinzufügen:**
-    *   Ich werde einen **neuen Hauptabschnitt** für die **Frontend Styling Architecture** erstellen. Dieser wird unsere Entscheidung für explizit importierte, musterbasierte CSS-Dateien (`detail-page-layout.css`, `grid-section.css` etc.) als "Styleguide"-Ansatz festhalten.
-    *   Ich werde den Abschnitt zur **LoadingState Architecture (10)** erweitern. Ich werde klarstellen, dass die bestehende `LoadingState`-Klasse perfekt für *komponentenspezifisches* Feedback ist (z.B. ein Spinner in einem Button), und einen neuen Unterabschnitt für das von uns besprochene, übergeordnete **"Page-Level Loading State"**-Muster hinzufügen, das `derived` Stores verwendet, um einen seitenweiten Indikator zu steuern.
-    *   Ich werde den Abschnitt **Implementation Pitfalls & Best Practices (11)** um einen neuen, kritischen Punkt erweitern: die korrekte, SSR-sichere Verwendung des `ApiClient` in `load`-Funktionen durch die Übergabe von `event.fetch`.
-4.  **TODO-Liste aktualisieren:**
-    *   Ich werde die bestehende Liste um unsere neuen Aufgaben erweitern:
-        *   Die Implementierung des seitenweiten "Loading Indicator"-Musters auf allen relevanten Seiten.
-        *   Die Finalisierung des CSS-Refactorings für alle Seiten.
-        *   Eine Überprüfung aller API-Client-Dateien, um sicherzustellen, dass die `if (browser)`-Bedingung für die `LoadingState`-Aufrufe konsistent angewendet wird.
-        *   Eine Überprüfung aller `load`-Funktionen, um sicherzustellen, dass der SSR-`fetch`-Fix überall korrekt implementiert ist.
-
-Ich glaube, dieser Plan erfasst alle wichtigen Punkte unserer Konversation und bringt das `README` auf den neuesten Stand, ohne wertvolle bestehende Informationen zu verlieren.
-
----
-
-Hier ist die vollständige, aktualisierte `README-Supplier-Browser.md`-Datei.
-
-```markdown
 # SupplierBrowser - Architectural Specification & Developer Guide
 
 **Single source of truth for the project's architecture. All development must adhere to the patterns and principles defined herein.**
 
-*Updated: 30. August 2025 - Architectural clarifications, styling patterns, and implementation status update*
+*Updated: 30. August 2025 - Corrected Form Architecture documentation, added Navigation Architecture.*
 
 ---
 
@@ -122,8 +95,7 @@ export type DeleteRequest<T> = {
 ```
 
 ### 2.1. a) Option: Adjust AssignmentReqeust to same semantics as ChreateChildRequest:
-```
-export type AssignmentRequest<TParent, TChild> = {
+```export type AssignmentRequest<TParent, TChild> = {
   parentId: TParent[IdField<TParent>];
   childId: TChild[IdField<TChild>];
   data?: object // "Attributes" oder additonalData for the relationship.
@@ -460,7 +432,7 @@ To ensure a consistent and maintainable user interface, the application avoids g
 - `src/lib/components/styles/grid-section.css`: Defines the visual container for data grids when they appear as a subsection on a detail page.
 
 **Example Usage (`CategoryDetailPage.svelte`):**
-```svelte
+```
 <script>
   // Explicitly import the required UI patterns
   import '$lib/components/styles/detail-page-layout.css';
@@ -475,6 +447,67 @@ To ensure a consistent and maintainable user interface, the application avoids g
 ```
 
 This approach combines the benefits of reusable styles with the safety and clarity of explicit dependencies.
+
+### 5.5. Frontend Form Architecture: The "Dumb Shell / Smart Parent" Pattern
+
+To create reusable, yet fully type-safe forms, this project uses the **"Dumb Shell / Smart Parent" Pattern**. This pattern separates the general state management logic from the domain-specific implementation, ensuring robustness and maintainability. This architecture was chosen after attempts to create a fully generic `FormShell` component led to complex and brittle type inference issues with the Svelte 5 compiler.
+
+#### The "Dumb" State Manager: `FormShell.svelte`
+- **Purpose:** `FormShell.svelte` is a generic, reusable component. Its only job is to manage the core mechanics of a form: tracking the data object, detecting if it's "dirty" (changed), handling the submission state (`submitting`), and orchestrating the `validate` and `submit` lifecycle.
+- **Implementation:** To remain generic and avoid type conflicts, it works internally with `Record<string, any>`. It receives functions (`validate`, `submit`) as props and calls them at the appropriate time. It has no knowledge of specific data types like `Wholesaler`.
+
+#### The "Smart" Parent: `SupplierForm.svelte`
+- **Purpose:** A component like `SupplierForm.svelte` is a "smart" parent. It knows everything about a specific data type (e.g., `Wholesaler`).
+- **Responsibilities:**
+    1.  **Knows the Type:** It imports the `Wholesaler` type and uses it for its internal functions and props.
+    2.  **Implements Logic:** It defines the specific `validate` and `submit` functions that know the validation rules and API endpoints for a `Wholesaler`.
+    3.  **Bridges the Type Gap:** It is responsible for bridging the gap between its own strongly-typed world and the weakly-typed world of `FormShell`.
+
+#### The Key to Type Safety
+This pattern works by using two explicit techniques in the **"Smart Parent"** (`SupplierForm.svelte`) to ensure end-to-end type safety:
+
+1.  **Casting Props Down:** The parent's strongly-typed functions (e.g., `validate(data: Wholesaler)`) are passed to the shell's weakly-typed props (`validate(data: Record<string, any>)`) using an `as any` cast. This is a deliberate signal to TypeScript that the developer guarantees the type compatibility.
+
+    ```svelte
+    <!-- In SupplierForm.svelte -->
+    <FormShell
+      ...
+      validate={validate as any}
+      submit={submit as any}
+      onSubmitted={onSubmitted as any}
+    />
+    ```
+
+2.  **Typing Snippet Parameters Up:** Inside the snippets provided to `FormShell`, the parameters (`data`, `get`, `set`) would normally be of type `any`. The parent **restores full type safety** by explicitly typing these parameters. This provides autocompletion and compile-time checking within the template.
+
+    ```svelte
+    <!-- In SupplierForm.svelte -->
+    {#snippet header({ data, dirty }: { data: Wholesaler, dirty: boolean })}
+      <!-- `data` is now a fully-typed Wholesaler object. -->
+      <!-- A typo like `data.naem` would cause a compiler error. -->
+      <h1>{data.name}</h1>
+    {/snippet}
+    ```
+This explicit, clear pattern proved to be the most robust and stable solution, providing both reusability and complete type safety where it matters most—in the domain-specific form components.
+
+### 5.6. Frontend Navigation Architecture: Context Conservation
+
+To provide an intuitive, hierarchical navigation experience, the application uses a "Context Conservation" pattern. This pattern ensures that the user's navigation path is "remembered", even when they navigate to higher levels in the hierarchy. This is primarily visualized through a `Breadcrumb` component.
+
+#### Core Components:
+1.  **Persistent State (`navigationState.ts`):** A custom Svelte store (`writable`) is used to store the IDs of the last visited path (e.g., `{ supplierId: 1, categoryId: 5, offeringId: 10 }`). This store automatically synchronizes its state with the browser's `sessionStorage`, making the user's context persistent across page reloads.
+
+2.  **The "Brain" (`(browser)/+layout.ts`):** The root `load` function for the browser section acts as the central orchestrator. In every navigation:
+    *   It reads the current path from the URL's `params`.
+    *   It reads the "remembered" path from the `navigationState` store.
+    *   It combines these two sources to create a "resolved path". This resolved path is used to enable/disable items in the `HierarchySidebar` and to build the `Breadcrumb` trail.
+    *   It also fetches the names of the entities (e.g., supplier name, category name) corresponding to the IDs in the resolved path.
+
+3.  **The UI (`Breadcrumb.svelte` & `buildBreadcrumb.ts`):**
+    *   A reusable `Breadcrumb.svelte` component is responsible for rendering the navigation trail.
+    *   A utility function, `buildBreadcrumb.ts`, takes the data from the `load` function (URL, params, entity names, conserved path) and constructs the final array of `Crumb` objects to be displayed.
+
+This architecture creates a powerful and user-friendly navigation system where the UI (Sidebar and Breadcrumb) always reflects the deepest context the user has reached. The context is only reset when the user makes an explicit choice that changes it (e.g., selecting a different supplier from the main list).
 
 ---
 
@@ -616,7 +649,7 @@ To ensure a good developer experience when editing the templates, they are valid
 
 To generate all pages defined in the configuration, run the following command from the project root:
 
-```bash
+```
 npm run generate:pages
 ```
 
@@ -708,13 +741,11 @@ This pattern ensures that data loading works seamlessly for both server-side ren
 ---
 
 # TODOS
-* ~~`Create routes/api/categories[id]`~~ **DONE**
-* Finalize the sidebar navigation logic. +layout.ts uses "depends(`url:${url.href}`);" Is this correct?
-* **Implement Page-Level Loading Indicators:** Apply the `derived` store pattern on all detail pages to create a consistent, top-level loading badge.
-* **Finalize CSS Refactoring:** Ensure all pages correctly import and use the new pattern-based CSS files (`detail-page-layout.css`, etc.) and that all duplicate local styles have been removed.
-* **Audit API Clients for SSR Safety:** Verify that all `LoadingState` method calls (`.start()`, `.finish()`) across all API client files are wrapped in an `if (browser)` check.
-* **Audit `load` Functions:** Verify that all `load` functions correctly destructure `fetch` from the `LoadEvent` and pass it to the `ApiClient`.
-* **Audit Deletion Logic:** Verify that all `deleteStrategy` implementations use the "fire-and-forget" `invalidateAll()` pattern to prevent UI race conditions.
-* Check if error handling in pages is correct, does not swallow or incorrectly rethrow wrong errors or hide server errors.
-* **Fix scaffolding tool:** Ensure the `+page.ts` template generates extension-less imports for module delegation.
-```
+*   **Fix Breadcrumb:** Indicator for current "location" (underscore) does not work. always showst lowest select hierarchy.
+*   **Refactor All Forms:** Update `OfferingForm.svelte`, `AttributeForm.svelte`, and `LinkForm.svelte` to use the now-stable **"Dumb Shell / Smart Parent"** pattern.
+*   **Finalize CSS Refactoring:** Ensure all pages correctly import and use the new pattern-based CSS files (`detail-page-layout.css`, etc.) and that all duplicate local styles have been removed.
+*   **Audit API Clients for SSR Safety:** Verify that all `LoadingState` method calls (`.start()`, `.finish()`) across all API client files are wrapped in an `if (browser)` check.
+*   **Audit `load` Functions:** Verify that all `load` functions correctly destructure `fetch` from the `LoadEvent` and pass it to the `ApiClient`.
+*   **Audit Deletion Logic:** Verify that all `deleteStrategy` implementations use the "fire-and-forget" `invalidateAll()` pattern to prevent UI race conditions.
+*   Check if error handling in pages is correct, does not swallow or incorrectly rethrow wrong errors or hide server errors.
+*   **Fix scaffolding tool:** Ensure the `+page.ts` template generates extension-less imports for module delegation.

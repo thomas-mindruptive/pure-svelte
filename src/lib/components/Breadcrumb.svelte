@@ -51,8 +51,8 @@
 
 <style>
   .breadcrumb-nav {
-    margin-bottom: 1rem;
-    padding: 0 0.5rem;
+    margin-bottom: 0.1rem;
+    padding: 1rem 1rem;
   }
 
   .breadcrumb-list {

@@ -412,49 +412,6 @@ This pattern is realized by separating Page Modules from the Routes that use the
 
 ---
 
-## 6. Architecture Validation Checklist
-
-### Generic Type System (Completed)
-- [x] Generic request types defined with clear pattern distinction
-- [x] All server endpoints use correct generic patterns
-- [x] All client endpoints use correct generic patterns  
-- [x] CreateChildRequest handles redundancy appropriately
-
-### Optional: Adjust Typesystem
-- See 2.1. a): Adjust "AssignmentRequest" and related types.
-
-### API Consistency 
-- [x] QueryPayload pattern ONLY for Master Data (suppliers, attributes, categories)
-- [x] Relationship endpoints use consistent `/api/<parent>-<child>` pattern  
-- [x] Hierarchical creation uses CreateChildRequest with parent context
-- [x] Assignment operations use AssignmentRequest with two entity IDs
-- [x] Individual reads for forms use GET on individual endpoints where needed
-- [x] Hierarchical data only via `/api/query` with named queries
-
-### Client-Server Alignment (Completed)
-- [x] Client calls match server endpoint patterns with generic types
-- [x] All relationship operations use appropriate request patterns
-- [x] Complete flow testing with corrected architecture
-- [x] Removed deprecated `/api/offerings/new` endpoint
-
-### Type Safety
-- [x] No `any` types in production code
-- [x] Compile-time query validation via QueryPayload<T>
-- [x] Generic API response types with pattern-specific structures
-- [x] `exactOptionalPropertyTypes: true` configuration
-
-### Security  
-- [x] SQL injection prevention via parameterized queries
-- [x] Column whitelist validation in queryConfig
-- [x] No client-side table name control
-
-### Performance & Maintainability
-- [x] LoadingState for UI feedback
-- [x] Composition pattern for code organization
-- [x] Centralized error handling
-- [x] Structured logging
-
----
 
 ## 7. Examples of Generic Type Usage
 
@@ -601,3 +558,9 @@ During the integration of the API clients with Svelte 5 Runes, key architectural
 -   **Integration Pattern:** Frontend components combine the individual loading stores (e.g., `$supplierLoadingState`, `$categoryLoadingState`) using `$derived` to create a central, reactive `isLoading` state for global UI feedback. This ensures automatic reactivity to API operations. For example: `const isLoading = $derived($supplierLoadingState || $categoryLoadingState);`
 
 This solution eliminates race conditions between component mounting and API initialization and provides a consistent loading UX across all hierarchy levels.
+
+
+# TODOS
+* Create routes/api/categories[id]
+* Check if error handling in pages is correct, does not swallor or incorrectly rethrow wrong errors or hide server errrors.
+* Check if API typing is consistent on server and client and if the types in lib/api/* are used correctly.

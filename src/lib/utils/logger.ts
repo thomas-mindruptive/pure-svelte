@@ -153,28 +153,34 @@ if (browser) {
 
 		const pinoInstance = dev
 			? pino({
-					level: 'debug',
-					transport: {
-						target: require.resolve('pino-pretty'),
-						options: { colorize: true, ignore: 'pid,hostname,time' }
+				level: 'debug',
+				transport: {
+					target: require.resolve('pino-pretty'),
+					options: {
+						colorize: true,
+						ignore: 'pid,hostname,time',
+						// NEU: Diese Zeile anfügen, um alle Metadaten anzuzeigen
+						singleLine: true, // Optional, aber oft klarer mit Metadaten
+						//messageFormat: '{caller} - {msg} {metadata}' // Zeigt Metadaten explizit an
 					}
-			  })
+				}
+			})
 			: pino({
-					level: 'info',
-					base: { pid: undefined, hostname: undefined },
-					timestamp: false
-			  });
+				level: 'info',
+				base: { pid: undefined, hostname: undefined },
+				timestamp: false
+			});
 
 		const createPinoWrapper = (pinoMethod: (...args: any[]) => void) => {
 			return (...args: LogArgs): void => {
 				const caller = getCallerInfo(1);
 				const callerMeta = caller ? { caller: `${caller.functionName} (${caller.displayPath})` } : {};
-				
+
 				if (typeof args[0] === 'object' && args[0] !== null && !Array.isArray(args[0])) {
 					pinoMethod({ ...callerMeta, ...args[0] }, ...args.slice(1));
 					return;
 				}
-				
+
 				const msg = args[0];
 				const potentialObject = args.length > 1 ? args[1] : undefined;
 				if (
@@ -188,7 +194,7 @@ if (browser) {
 					pinoMethod({ ...callerMeta, ...potentialObject }, msg, ...args.slice(2));
 					return;
 				}
-				
+
 				pinoMethod(callerMeta, ...args);
 			};
 		};

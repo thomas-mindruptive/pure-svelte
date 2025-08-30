@@ -279,9 +279,9 @@ export function buildQuery<T>(
 			}
 		};
 	} catch (error: unknown) {
-		log.error("Query building failed", { error: error instanceof Error ? error.message : String(error) });
+		log.error("Query building failed", error );
 		throw error;
-	}
+	}	
 }
 
 /**

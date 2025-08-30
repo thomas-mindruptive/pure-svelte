@@ -49,7 +49,7 @@ export const supplierQueryConfig: QueryConfig = {
       'woa.attribute_id', 'woa.value'
     ],
     'offering_links': [
-      'wio.offering_id', 'wio.price', 'wio.category_id',
+      'wio.offering_id', 'wio.price', 'wio.category_id', 'wol.offering_id',
       'wol.link_id', 'wol.url', 'wol.notes'
     ],
     'product_definitions': [

@@ -18,9 +18,8 @@ EXTENSIONS = {
 
 EXCLUDE_PATTERNS = [
     "node_modules",
-    "routes/api",
     "lib/server",
-    "tools/dist",
+    "tools",
     ".git",
     ".venv",
     ".vscode",

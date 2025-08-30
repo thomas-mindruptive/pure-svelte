@@ -59,6 +59,7 @@ export type QueryResultRow = Record<string, SqlParameterValue>;
  * @private
  */
 function parseWhere(
+	fromSource: string,
 	item: Condition<unknown> | ConditionGroup<unknown>,
 	allowedColumns: ReadonlyArray<string>,
 	parameters: Record<string, SqlParameterValue>,
@@ -68,7 +69,7 @@ function parseWhere(
 	if (!isConditionGroup(item)) {
 		// SECURITY: Regardless of compile-time type, validate every key at runtime against the whitelist.
 		if (!allowedColumns.includes(item.key)) {
-			throw new Error(`Column '${item.key}' is not allowed in the WHERE clause.`);
+			throw new Error(`Column '${item.key}' is not allowed in the WHERE clause. Source: ${fromSource}`);
 		}
 
 		if (item.op === ComparisonOperator.IS_NULL || item.op === ComparisonOperator.IS_NOT_NULL) {
@@ -94,7 +95,7 @@ function parseWhere(
 
 	// Recursive case: item is a condition group
 	if (item.conditions.length === 0) return '1=1'; // Neutral for empty groups
-	const parts = item.conditions.map(c => parseWhere(c, allowedColumns, parameters, paramIndex));
+	const parts = item.conditions.map(c => parseWhere(fromSource, c, allowedColumns, parameters, paramIndex));
 
 	if (item.op === LogicalOperator.NOT) {
 		if (parts.length !== 1) throw new Error('A NOT group must contain exactly one condition or group.');
@@ -109,6 +110,7 @@ function parseWhere(
  * @private
  */
 function buildOrderBy(
+	fromSource: string,
 	orderBy: ReadonlyArray<JoinSortDescriptor>,
 	allowedColumns: ReadonlyArray<string>
 ): string {
@@ -120,7 +122,7 @@ function buildOrderBy(
 	const orderByParts = orderBy.map(s => {
 		// SECURITY: Validate every sort key against the whitelist.
 		if (!allowedColumns.includes(s.key)) {
-			throw new Error(`Sort column '${s.key}' is not allowed.`);
+			throw new Error(`Sort column '${s.key}' is not allowed. Source: ${fromSource}`);
 		}
 		const dir = s.direction.toLowerCase();
 		if (dir !== 'asc' && dir !== 'desc') {
@@ -133,6 +135,7 @@ function buildOrderBy(
 }
 
 function buildJoinClauses(
+	fromSource: string,
 	joins: ReadonlyArray<JoinClause>,
 	allowedColumns: ReadonlyArray<string>
 ): string {
@@ -149,25 +152,26 @@ function buildJoinClauses(
 		}
 
 		const alias = join.alias ? ` AS ${join.alias}` : '';
-		const onClause = parseJoinConditions(join.on, allowedColumns);
+		const onClause = parseJoinConditions(fromSource,join.on, allowedColumns);
 
 		return `${join.type} ${join.table}${alias} ON ${onClause}`;
 	}).join(' ');
 }
 
 function parseJoinConditions(
+	fromSource: string,
 	item: JoinConditionGroup | JoinCondition,
 	allowedColumns: ReadonlyArray<string>
 ): string {
 
-	log.debug(`parseJoinConditions`, { item, allowedColumns }); 
+	log.debug(`parseJoinConditions`, { item, allowedColumns, fromSource });
 
 	// Base case: item is a single join condition (columnA = columnB)
 	if (!('conditions' in item)) {
 		// SECURITY: Validate both columns against whitelist
 		if (!allowedColumns.includes(item.columnA) || !allowedColumns.includes(item.columnB)) {
-			log.error(`parseJoinConditions: Join columns '${item.columnA}' or '${item.columnB}' are not allowed.`, { allowedColumns }); // Extra logging for security
-			throw new Error(`parseJoinConditions: Join columns '${item.columnA}' or '${item.columnB}' are not allowed.`);
+			log.error(`parseJoinConditions: Join columns '${item.columnA}' or '${item.columnB}' are not allowed. Source: ${fromSource}`, { allowedColumns }); // Extra logging for security
+			throw new Error(`parseJoinConditions: Join columns '${item.columnA}' or '${item.columnB}' are not allowed. Source: ${fromSource}`);
 		}
 
 		// For JOIN conditions, we typically don't parameterize - it's column = column
@@ -179,7 +183,7 @@ function parseJoinConditions(
 	if (item.conditions.length === 0) return '1=1'; // Neutral for empty groups
 
 	const parts = item.conditions.map(c =>
-		parseJoinConditions(c, allowedColumns)
+		parseJoinConditions(fromSource,c, allowedColumns)
 	);
 
 	if (item.op === LogicalOperator.NOT) {
@@ -214,6 +218,9 @@ export function buildQuery<T>(
 ): QueryBuildResult {
 	const startTime = Date.now();
 	try {
+		log.info("***********************************");
+		log.info("Starting query build...", { payload, fixedFrom });
+		log.info("***********************************");
 		const fromSource = fixedFrom || payload.from;
 		if (!fromSource) throw new Error('FROM clause is required.');
 
@@ -233,10 +240,10 @@ export function buildQuery<T>(
 		if (config.joinConfigurations?.[fromSource as keyof typeof config.joinConfigurations]) {
 			const joinConfig = config.joinConfigurations[fromSource as keyof typeof config.joinConfigurations];
 			fromClause = joinConfig.from;
-			joinClauses = buildJoinClauses(joinConfig.joins, allowedColumns);
+			joinClauses = buildJoinClauses(fromSource,joinConfig.joins, allowedColumns);
 		} else {
 			fromClause = fromSource;
-			if (payload.joins) joinClauses = buildJoinClauses(payload.joins, allowedColumns);
+			if (payload.joins) joinClauses = buildJoinClauses(fromSource, payload.joins, allowedColumns);
 		}
 
 		const parameters: Record<string, SqlParameterValue> = {};
@@ -252,12 +259,13 @@ export function buildQuery<T>(
 		let whereClause = '';
 		if (payload.where) {
 			// `payload.where` is structurally compatible, allowing TypeScript to resolve this safely.
-			const parsed = parseWhere(payload.where as Condition<unknown>, allowedColumns, parameters, paramIndex);
+			const parsed = parseWhere(fromSource, payload.where as Condition<unknown>, allowedColumns, parameters, paramIndex);
 			if (parsed !== '1=1') whereClause = `WHERE ${parsed}`;
 		}
 
 		// The `orderBy` payload is cast to the broader type, which is safe due to the `keyof T & string` fix.
 		const orderByClause = buildOrderBy(
+			fromSource,
 			(payload.orderBy as JoinSortDescriptor[]) || [],
 			allowedColumns
 		);

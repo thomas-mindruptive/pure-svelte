@@ -26,6 +26,9 @@ export type AllQualifiedColumns = {
 
 export type AllAliasedColumns = `${AllQualifiedColumns} AS ${string}`;
 
+/**
+ * Validate column names against the domain model.
+ */
 export type BaseTableConfig = {
   'dbo.wholesalers': (keyof Domain.Wholesaler)[];
   'dbo.product_categories': (keyof Domain.ProductCategory)[];
@@ -36,6 +39,9 @@ export type BaseTableConfig = {
   'dbo.wholesaler_offering_links': (keyof Domain.WholesalerOfferingLink)[];
 };
 
+/**
+ * Validate column names of predefined queries against the domain model.
+ */
 export type PredefinedQueryConfig = {
   supplier_categories: (AllQualifiedColumns | AllAliasedColumns)[];
   category_offerings: (AllQualifiedColumns | AllAliasedColumns)[];

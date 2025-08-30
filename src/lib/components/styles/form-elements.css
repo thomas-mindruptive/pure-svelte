@@ -1,0 +1,118 @@
+/* src/lib/components/styles/form-elements.css */
+/*
+ * Shared, basic styles for form elements (inputs, buttons, etc.).
+ * This file defines the LOOK of the elements, but not their LAYOUT.
+ * It can be imported by any component that needs consistent form styling.
+*/
+
+/* --- Inputs, Textareas, Selects --- */
+input[type="text"],
+input[type="email"],
+input[type="url"],
+input[type="number"],
+textarea,
+select {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-border, #cbd5e1);
+  border-radius: 6px;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+  background: white;
+  font-family: inherit;
+  width: 100%; /* Make elements fill their container by default */
+}
+
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="url"]:focus,
+input[type="number"]:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--color-primary, #4f46e5);
+  box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.1);
+}
+
+input.error,
+select.error {
+  border-color: #dc3545;
+  box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.1);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--color-muted, #64748b);
+}
+
+textarea {
+  resize: vertical;
+  min-height: 4rem;
+  line-height: 1.4;
+}
+
+select {
+  cursor: pointer;
+}
+
+:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: #f1f5f9;
+}
+
+/* --- Buttons --- */
+.primary-button,
+.secondary-button {
+  padding: 0.5rem 1.25rem;
+  border: none;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.primary-button {
+  background-color: var(--color-primary);
+  color: white;
+}
+
+.primary-button:hover:not(:disabled) {
+  background-color: #4338ca;
+  transform: translateY(-1px);
+}
+
+.secondary-button {
+  background: var(--color-background, #fff);
+  color: var(--color-text, #1e293b);
+  border: 1px solid var(--color-border, #e2e8f0);
+}
+
+.secondary-button:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.primary-button:disabled,
+.secondary-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+
+/* --- Helper Text --- */
+.error-text {
+  font-size: 0.75rem;
+  color: #dc3545;
+  margin-top: 0.25rem;
+  font-weight: 500;
+}
+
+.field-hint {
+  font-size: 0.75rem;
+  color: var(--color-muted, #64748b);
+  margin-top: 0.25rem;
+  font-style: italic;
+}

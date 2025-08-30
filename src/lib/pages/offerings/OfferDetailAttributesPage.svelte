@@ -3,7 +3,6 @@
   import { log } from "$lib/utils/logger";
   import { addNotification } from "$lib/stores/notifications";
   import { invalidateAll } from "$app/navigation";
-  import { page } from "$app/stores";
   import AttributeGrid from "$lib/components/domain/attributes/AttributeGrid.svelte";
   import {
     getOfferingApi,
@@ -12,6 +11,7 @@
   import type {
     WholesalerOfferingAttribute_Attribute,
     Attribute,
+    WholesalerItemOffering_ProductDef_Category,
   } from "$lib/domain/types";
   import type {
     DeleteStrategy,
@@ -22,10 +22,12 @@
   import "$lib/components/styles/assignment-section.css";
   import "$lib/components/styles/grid-section.css";
   import "$lib/components/styles/detail-page-layout.css";
+  import "$lib/components/styles/form-elements.css";
 
   import { ApiClient } from "$lib/api/client/ApiClient";
 
   type LoadData = {
+    offering: WholesalerItemOffering_ProductDef_Category; // Make sure the offering is part of the data
     assignedAttributes: WholesalerOfferingAttribute_Attribute[];
     availableAttributes: Attribute[];
   };
@@ -83,7 +85,7 @@
     try {
       // KORREKTUR: Korrekte Objekterstellung für exactOptionalPropertyTypes
       const assignmentData = {
-        offering_id: Number($page.params.offeringId),
+        offering_id: data.offering.offering_id,
         attribute_id: selectedAttributeId,
         ...(attributeValue && { value: attributeValue }), // `value` wird nur hinzugefügt, wenn es einen Wert hat
       };
@@ -126,7 +128,7 @@
         bind:value={attributeValue}
         disabled={isAssigning}
       />
-      <button type="submit" disabled={isAssigning || !selectedAttributeId}>
+      <button type="submit" class="primary-button" disabled={isAssigning || !selectedAttributeId}>
         {isAssigning ? "Assigning..." : "Assign"}
       </button>
     </form>
@@ -142,9 +144,6 @@
     />
   </div>
 </div>
-```--- Vielen Dank. Die Codebasis ist jetzt deutlich robuster. Jetzt können wir wirklich
-mit der Anpassung der `HierarchySidebar` fortfahren, damit sie die volle Navigationstiefe
-abbildet. Bereit? Bitte gib mir dein **ok**.
 
 <style>
   h2,

@@ -9,17 +9,32 @@ OUTPUT_FILE = Path(__file__).parent.resolve() / "generated" / "bundle.txt"
 # --- Optionen ---
 TREE_ONLY = False  # Wenn True: nur Verzeichnisstruktur schreiben und beenden
 TREE_OUTPUT_FILE = Path(__file__).parent.resolve() / "generated" / "tree.txt"
-TREE_INCLUDE_ALL_FILES = False  # Alle Dateien listen (nicht nur EXTENSIONS) beim Struktur-Output
+TREE_INCLUDE_ALL_FILES = (
+    False  # Alle Dateien listen (nicht nur EXTENSIONS) beim Struktur-Output
+)
 
 EXTENSIONS = {
-    '.cs', '.ts', '.html', '.json', '.yaml', '.yml', '.css',
-    '.md', '.svelte', '.js', '.txt', '.scss', '.cjs', '.mjs'
+    ".cs",
+    ".ts",
+    ".html",
+    ".json",
+    ".yaml",
+    ".yml",
+    ".css",
+    ".md",
+    ".svelte",
+    ".js",
+    ".txt",
+    ".scss",
+    ".cjs",
+    ".mjs",
 }
 
 EXCLUDE_PATTERNS = [
+    "tools",
     "node_modules",
     "lib/server",
-    "tools",
+    "api/routes",
     ".git",
     ".venv",
     ".vscode",
@@ -37,9 +52,8 @@ EXCLUDE_PATTERNS = [
     "Tests",
 ]
 
-EXCLUDE_FILES = [
-    "package-lock.json", ".gitignore", "package.json", "package-lock.json"
-]
+EXCLUDE_FILES = ["package-lock.json", ".gitignore", "package.json", "package-lock.json"]
+
 
 def should_skip_dir(rel_dirpath: str) -> bool:
     rel = rel_dirpath.replace("\\", "/")
@@ -49,6 +63,7 @@ def should_skip_dir(rel_dirpath: str) -> bool:
             return True
     return False
 
+
 def is_excluded_file(filepath_or_name: str) -> bool:
     fname = os.path.basename(filepath_or_name)
     if fname in EXCLUDE_FILES:
@@ -56,9 +71,11 @@ def is_excluded_file(filepath_or_name: str) -> bool:
         return True
     return False
 
+
 def ensure_parent(path: Path):
     print(f"→ Stelle sicher, dass Zielverzeichnis '{path.parent}' existiert …")
     path.parent.mkdir(parents=True, exist_ok=True)
+
 
 # --- Verzeichnisstruktur (NEU) ---
 def build_tree_lines(start_dir: Path, include_all_files: bool) -> list[str]:
@@ -118,6 +135,7 @@ def build_tree_lines(start_dir: Path, include_all_files: bool) -> list[str]:
     walk(start_dir, 0)
     return lines
 
+
 def write_tree(start_dir: Path, output_file: Path, include_all_files: bool = False):
     ensure_parent(output_file)
 
@@ -139,7 +157,10 @@ def write_tree(start_dir: Path, output_file: Path, include_all_files: bool = Fal
         print(f"⚠ Fehler beim Schreiben der Baumdatei: {e}", file=sys.stderr)
         sys.exit(1)
 
-    print(f"✔ Verzeichnisstruktur in '{output_file}' geschrieben ({len(lines)} Zeilen).")
+    print(
+        f"✔ Verzeichnisstruktur in '{output_file}' geschrieben ({len(lines)} Zeilen)."
+    )
+
 
 # --- Bundling ---
 def bundle_files(start_dir: Path, output_file: Path):
@@ -196,8 +217,9 @@ def bundle_files(start_dir: Path, output_file: Path):
 
     print(f"✔ Erfolgreich alle Dateien in '{output_file}' gebündelt.")
 
+
 # --- main ---
-if __name__ == '__main__':
+if __name__ == "__main__":
     print("--- Zusammenfassung ---")
     print(f"Quell-Startverzeichnis: {START_DIR}")
     print(f"Zieldatei (Bundle): {OUTPUT_FILE.name}")
@@ -214,7 +236,9 @@ if __name__ == '__main__':
         sys.exit(1)
 
     if TREE_ONLY:
-        write_tree(START_DIR, TREE_OUTPUT_FILE, include_all_files=TREE_INCLUDE_ALL_FILES)
+        write_tree(
+            START_DIR, TREE_OUTPUT_FILE, include_all_files=TREE_INCLUDE_ALL_FILES
+        )
     else:
         bundle_files(START_DIR, OUTPUT_FILE)
 

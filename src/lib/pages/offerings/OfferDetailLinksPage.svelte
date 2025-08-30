@@ -22,6 +22,7 @@
   import "$lib/components/styles/assignment-section.css";
   import "$lib/components/styles/grid-section.css";
   import "$lib/components/styles/detail-page-layout.css";
+  import '$lib/components/styles/form-elements.css';
 
   type LoadData = {
     offering: WholesalerItemOffering_ProductDef_Category;
@@ -119,7 +120,7 @@
         bind:value={newNotes}
         disabled={isAssigning}
       />
-      <button type="submit" disabled={isAssigning || !newUrl}>
+      <button type="submit" class="primary-button" disabled={isAssigning || !newUrl}>
         {isAssigning ? "Adding..." : "Add Link"}
       </button>
     </form>

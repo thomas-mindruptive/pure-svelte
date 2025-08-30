@@ -1,6 +1,11 @@
 /*
- * CSS for all forms
+ * CSS for all COMPLEX forms (e.g., FormShell based).
+ * It imports the basic element styles and adds LAYOUT styles on top.
  */
+
+@import './form-elements.css'; /* <-- NEUER IMPORT */
+
+/* --- LAYOUT STYLES --- */
 .form-header {
   display: flex;
   justify-content: space-between;
@@ -64,54 +69,6 @@
   font-size: 0.875rem;
 }
 
-.form-group input,
-.form-group textarea {
-  padding: 0.5rem 0.75rem;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
-  font-size: 0.875rem;
-  transition: all 0.2s ease;
-  background: white;
-  font-family: inherit;
-}
-
-.form-group input:focus,
-.form-group textarea:focus {
-  outline: none;
-  border-color: var(--color-primary, #4f46e5);
-  box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.1);
-}
-
-.form-group input.error {
-  border-color: #dc3545;
-  box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.1);
-}
-
-.form-group input::placeholder,
-.form-group textarea::placeholder {
-  color: var(--color-muted, #64748b);
-}
-
-.form-group textarea {
-  resize: vertical;
-  min-height: 4rem;
-  line-height: 1.4;
-}
-
-.error-text {
-  font-size: 0.75rem;
-  color: #dc3545;
-  margin-top: 0.25rem;
-  font-weight: 500;
-}
-
-.field-hint {
-  font-size: 0.75rem;
-  color: var(--color-muted, #64748b);
-  margin-top: 0.25rem;
-  font-style: italic;
-}
-
 .char-count {
   font-size: 0.75rem;
   color: var(--color-muted, #64748b);
@@ -119,14 +76,14 @@
   text-align: right;
 }
 
-/* Preview Section */
+/* --- Preview Section --- */
 .preview-section {
   background: #f8fafc;
   border: 1px solid var(--color-border, #e2e8f0);
   border-radius: 8px;
   padding: 1rem;
 }
-
+/* ... (Rest von preview-section und summary-section bleibt unverändert) ... */
 .preview-section h4 {
   margin: 0 0 0.75rem 0;
   font-size: 0.875rem;
@@ -181,77 +138,7 @@
   border-top: 1px solid var(--color-border, #e2e8f0);
 }
 
-/* Buttons */
-.primary-button {
-  padding: 0.5rem 1.25rem;
-  background-color: var(--color-primary);
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-size: 0.875rem;
-}
-
-.primary-button:hover:not(:disabled) {
-  background-color: #4338ca;
-  transform: translateY(-1px);
-}
-
-.primary-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.secondary-button {
-  padding: 0.5rem 1rem;
-  background: var(--color-background, #fff);
-  color: var(--color-text, #1e293b);
-  border: 1px solid var(--color-border, #e2e8f0);
-  border-radius: 6px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-size: 0.875rem;
-}
-
-.secondary-button:hover {
-  background: #f8fafc;
-  border-color: #cbd5e1;
-}
-
-/* Combos */
-.form-group select {
-  padding: 0.5rem 0.75rem;
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
-  font-size: 0.875rem;
-  transition: all 0.2s ease;
-  background: white;
-  font-family: inherit;
-  cursor: pointer;
-}
-
-.form-group select:focus {
-  outline: none;
-  border-color: var(--color-primary, #4f46e5);
-  box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.1);
-}
-
-.form-group select.error {
-  border-color: #dc3545;
-  box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.1);
-}
-
-.form-group select:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  background: #f1f5f9;
-}
-
-/* Responsive Design */
+/* --- Responsive Design for LAYOUT --- */
 @media (max-width: 768px) {
   .form-grid {
     grid-template-columns: 1fr;
@@ -285,14 +172,14 @@
   }
 }
 
-/* Summary Section */
+/* --- Summary Section --- */
 .summary-section {
   background: #f8fafc;
   border: 1px solid var(--color-border, #e2e8f0);
   border-radius: 8px;
   padding: 1rem;
 }
-
+/* ... (Rest von summary-section bleibt unverändert) ... */
 .summary-section h4 {
   margin: 0 0 0.75rem 0;
   font-size: 0.875rem;

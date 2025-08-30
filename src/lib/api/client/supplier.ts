@@ -25,6 +25,7 @@ import type {
     RemoveCategoryApiResponse
 } from '$lib/api/app/appSpecificTypes';
 import { LoadingState } from './loadingState';
+//import delay from '$lib/utils/delay';
 
 // Loading state managers remain global as they are a client-side concern.
 const supplierLoadingManager = new LoadingState();
@@ -64,6 +65,10 @@ export function getSupplierApi(client: ApiClient) {
           { context: operationId }
         );
         log.info(`loadSuppliers: successful.`, responseData);
+
+        //DEBUG!!!
+        //await delay(2000);
+
         return responseData.results as Wholesaler[];
       } catch (err) {
         log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });

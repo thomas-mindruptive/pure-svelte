@@ -4,7 +4,7 @@ import { ApiClient } from '$lib/api/client/ApiClient';
 import { getOfferingApi } from '$lib/api/client/offering';
 import { log } from '$lib/utils/logger';
 import { error, type LoadEvent } from '@sveltejs/kit';
-// TODO: import { getProductDefinitionApi } from '$lib/api/client/productDefinition';
+import { getProductDefinitionApi } from '$lib/api/client/productDefintion';
 
 
 /**
@@ -13,30 +13,37 @@ import { error, type LoadEvent } from '@sveltejs/kit';
  */
 export async function load({ params, fetch: fetchLoad }: LoadEvent) {
   const offeringId = Number(params.offeringId);
+  const categoryId = Number(params.categoryId);
+  const supplierId = Number(params.supplierId);
+
   if (isNaN(offeringId)) {
     throw error(400, 'Invalid Offering ID');
   }
+  if (isNaN(categoryId)) {
+    throw error(400, 'Invalid Category ID');
+  }
+  if (isNaN(supplierId)) {
+    throw error(400, 'Invalid Supplier ID');
+  }
 
-  log.info(`(OfferDetailLinksPage) loading all data for offeringId: ${offeringId}`);
+  log.info(`(OfferDetailLinksPage) loading all data for offeringId: ${offeringId}, categoryId: ${categoryId}, supplierId: ${supplierId}`);
 
   const client = new ApiClient(fetchLoad);
   const offeringApi = getOfferingApi(client);
-  // TODO: const productDefApi = getProductDefinitionApi(client); 
+  const productDefApi = getProductDefinitionApi(client);
 
   try {
     // Lade Angebots-Details und Links parallel
-    const [offering, links /*, availableProducts*/] = await Promise.all([
+    const [offering, links, availableProducts] = await Promise.all([
       offeringApi.loadOffering(offeringId),
-      offeringApi.loadOfferingLinks(offeringId)
+      offeringApi.loadOfferingLinks(offeringId),
+      productDefApi.getAvailableProductDefsForOffering(categoryId, supplierId)
     ]);
 
     return {
       offering,
       links,
-      availableProducts: [  // TODO: change after API implemented
-        { product_def_id: 10, category_id: offering.category_id, title: 'Mock Product A' },
-        { product_def_id: 11, category_id: offering.category_id, title: 'Mock Product B' }
-      ]
+      availableProducts
     };
   } catch (err: any) {
     log.error(`Failed to load data for offeringId: ${offeringId}`, err);

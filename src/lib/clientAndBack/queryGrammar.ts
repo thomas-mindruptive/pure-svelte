@@ -36,7 +36,7 @@ export interface JoinColCondition {
 // E.g. on columnA = columnB AND columnA = "hugo"
 export interface JoinConditionGroup {
 	joinCondOp: LogicalOperator;
-	conditions: (JoinColCondition | JoinConditionGroup | WhereConditionGroup<unknown>)[];
+	conditions: (JoinColCondition | JoinConditionGroup | WhereCondition<unknown> |WhereConditionGroup<unknown>)[];
 }
 
 export interface JoinSortDescriptor {

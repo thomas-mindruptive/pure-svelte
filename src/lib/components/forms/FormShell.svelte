@@ -20,29 +20,38 @@
   // - No onkeydown on <form> (avoids a11y warning). Keyboard shortcuts are bound programmatically.
   // - Error summary has aria-live="polite".
 
-  import { onMount } from 'svelte';
-  import type { Snippet } from 'svelte';
-  import { log } from '$lib/utils/logger';
-
-  // Optional typing for DOM CustomEvents (kept for consumers who listen to events)
-  export interface $$Events {
-    submitted:   CustomEvent<{ data: Record<string, any>; result: unknown }>;
-    submitError: CustomEvent<{ data: Record<string, any>; error: unknown }>;
-    cancelled:   CustomEvent<{ data: Record<string, any>; reason?: string }>;
-    changed:     CustomEvent<{ data: Record<string, any>; dirty: boolean }>;
-  }
+  import { onMount } from "svelte";
+  import type { Snippet } from "svelte";
+  import { log } from "$lib/utils/logger";
 
   type FormData = Record<string, any>;
   export type Errors = Record<string, string[]>;
   export type ValidateResult = { valid: boolean; errors?: Errors };
 
-  export type ValidateFn = (data: FormData) => ValidateResult | Promise<ValidateResult>;
-  export type SubmitFn   = (data: FormData) => unknown | Promise<unknown>;
-  export type CancelFn   = (data: FormData) => void | Promise<void>;
+  // ===== FORM HANDLER TYPES =====
+  export type ValidateFn = (
+    data: FormData,
+  ) => ValidateResult | Promise<ValidateResult>;
+  export type SubmitFn = (data: FormData) => unknown | Promise<unknown>;
+  export type CancelFn = (data: FormData) => void | Promise<void>;
+
+  export type SubmittedCallback = (p: {
+    data: FormData;
+    result: unknown;
+  }) => void;
+  export type CancelledCallback = (p: {
+    data: FormData;
+    reason?: string;
+  }) => void;
+  export type SubmitErrorCallback = (info: {
+    data: Record<string, any>;
+    error: unknown;
+  }) => void;
+  export type ChangedCallback = (p: { data: FormData; dirty: boolean }) => void;
 
   // Snippet prop types (tuple generic for Svelte 5)
-  type HeaderProps  = { data: FormData; dirty: boolean };
-  type FieldsProps  = {
+  type HeaderProps = { data: FormData; dirty: boolean };
+  type FieldsProps = {
     data: FormData;
     set: (path: string, value: unknown) => void;
     get: (path: string) => any;
@@ -59,18 +68,18 @@
     dirty: boolean;
     disabled: boolean;
   };
-  type FooterProps  = { data: FormData };
+  type FooterProps = { data: FormData };
 
   const {
     // Data & lifecycle
     initial = {} as FormData,
-    validate,                 // optional: (data) => { valid, errors? }
-    submit,                   // required
-    onCancel,                 // optional (simple callback on cancel)
-    autoValidate = 'submit' as 'submit' | 'blur' | 'change',
+    validate, // optional: (data) => { valid, errors? }
+    submit, // required
+    onCancel, // optional (simple callback on cancel)
+    autoValidate = "submit" as "submit" | "blur" | "change",
     disabled = false,
-    formId = 'form',
-    entity = 'form',          // for logging context
+    formId = "form",
+    entity = "form", // for logging context
 
     // Snippets (all optional)
     header,
@@ -82,31 +91,31 @@
     onSubmitted,
     onSubmitError,
     onCancelled,
-    onChanged
+    onChanged,
   } = $props<{
     initial?: FormData;
     validate?: ValidateFn;
     submit: SubmitFn;
     onCancel?: CancelFn;
-    autoValidate?: 'submit' | 'blur' | 'change';
+    autoValidate?: "submit" | "blur" | "change";
     disabled?: boolean;
     formId?: string;
     entity?: string;
 
-    header?:  Snippet<[HeaderProps]>;
-    fields?:  Snippet<[FieldsProps]>;
+    header?: Snippet<[HeaderProps]>;
+    fields?: Snippet<[FieldsProps]>;
     actions?: Snippet<[ActionsProps]>;
-    footer?:  Snippet<[FooterProps]>;
+    footer?: Snippet<[FooterProps]>;
 
     // Callback props (component "events" in Svelte 5)
-    onSubmitted?: (p: { data: FormData; result: unknown }) => void;
-    onSubmitError?: (p: { data: FormData; error: unknown }) => void;
-    onCancelled?: (p: { data: FormData; reason?: string }) => void;
-    onChanged?: (p: { data: FormData; dirty: boolean }) => void;
+    onSubmitted?: SubmittedCallback;
+    onSubmitError?: SubmitErrorCallback;
+    onCancelled?: CancelledCallback;
+    onChanged?: ChangedCallback;
   }>();
 
   // ---- SAFE CLONING UTILITY ----
-  
+
   /**
    * Safely clones form data, handling DataCloneError from non-cloneable objects
    * Falls back to JSON clone if structuredClone fails
@@ -115,20 +124,20 @@
     try {
       return structuredClone(obj);
     } catch (error) {
-      log.warn("structuredClone failed, using JSON fallback", { 
-        entity, 
-        error: String(error) 
+      log.warn("structuredClone failed, using JSON fallback", {
+        entity,
+        error: String(error),
       });
-      
+
       try {
         // JSON fallback: works for most form data but loses functions/dates
         return JSON.parse(JSON.stringify(obj));
       } catch (jsonError) {
-        log.error("JSON clone also failed, using shallow copy", { 
-          entity, 
-          error: String(jsonError) 
+        log.error("JSON clone also failed, using shallow copy", {
+          entity,
+          error: String(jsonError),
         });
-        
+
         // Last resort: shallow copy
         return { ...obj } as T;
       }
@@ -141,34 +150,36 @@
    */
   function createSnapshot(data: FormData): FormData {
     const cleaned: FormData = {};
-    
+
     for (const [key, value] of Object.entries(data)) {
       // Skip known problematic types
       if (value === null || value === undefined) {
         cleaned[key] = value;
-      } else if (typeof value === 'object' && value instanceof Date) {
+      } else if (typeof value === "object" && value instanceof Date) {
         cleaned[key] = value.toISOString(); // Convert dates to strings
-      } else if (typeof value === 'object' && value.constructor === Object) {
+      } else if (typeof value === "object" && value.constructor === Object) {
         cleaned[key] = createSnapshot(value); // Recursively clean nested objects
       } else if (Array.isArray(value)) {
-        cleaned[key] = value.map(item => 
-          typeof item === 'object' && item !== null ? createSnapshot(item) : item
+        cleaned[key] = value.map((item) =>
+          typeof item === "object" && item !== null
+            ? createSnapshot(item)
+            : item,
         );
-      } else if (['string', 'number', 'boolean'].includes(typeof value)) {
+      } else if (["string", "number", "boolean"].includes(typeof value)) {
         cleaned[key] = value;
       }
       // Skip functions, DOM elements, circular references, etc.
     }
-    
+
     return cleaned;
   }
 
   // ---- State (Runes) ----
   const cleanInitial = createSnapshot(initial);
-  const data     = $state<FormData>(safeClone(cleanInitial));
+  const data = $state<FormData>(safeClone(cleanInitial));
   const snapshot = $state<FormData>(safeClone(cleanInitial)); // for dirty check
-  const errors   = $state<Errors>({});
-  const touched  = $state<Set<string>>(new Set());
+  const errors = $state<Errors>({});
+  const touched = $state<Set<string>>(new Set());
   let submitting = $state(false);
   let validating = $state(false);
 
@@ -181,48 +192,55 @@
       if (!formEl || !(t && formEl.isConnected && formEl.contains(t))) return;
 
       // Ctrl/Cmd + Enter → submit
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
         e.preventDefault();
         void doSubmit();
         return;
       }
       // Esc → cancel
-      if (e.key === 'Escape') {
+      if (e.key === "Escape") {
         e.preventDefault();
-        doCancel('escape');
+        doCancel("escape");
       }
     };
 
-    formEl?.addEventListener('keydown', keyHandler);
-    log.info({ component: 'FormShell', entity, autoValidate }, 'FORM_MOUNTED');
-    return () => formEl?.removeEventListener('keydown', keyHandler);
+    formEl?.addEventListener("keydown", keyHandler);
+    log.info({ component: "FormShell", entity, autoValidate }, "FORM_MOUNTED");
+    return () => formEl?.removeEventListener("keydown", keyHandler);
   });
 
   // ---- Helpers ----
   function coerceMessage(e: unknown): string {
     if (e instanceof Error) return e.message;
-    try { return JSON.stringify(e); } catch { return String(e); }
+    try {
+      return JSON.stringify(e);
+    } catch {
+      return String(e);
+    }
   }
 
   function set(path: string, value: unknown) {
     // naive dotted-path setter (sufficient for typical forms)
     try {
-      const parts = path.split('.');
+      const parts = path.split(".");
       let cur: any = data;
       for (let i = 0; i < parts.length - 1; i++) {
         const k = parts[i];
-        if (cur[k] == null || typeof cur[k] !== 'object') cur[k] = {};
+        if (cur[k] == null || typeof cur[k] !== "object") cur[k] = {};
         cur = cur[k];
       }
       cur[parts[parts.length - 1]] = value;
     } catch (e) {
-      log.error({ component: 'FormShell', entity, path, error: coerceMessage(e) }, 'set failed');
+      log.error(
+        { component: "FormShell", entity, path, error: coerceMessage(e) },
+        "set failed",
+      );
     }
   }
 
   function get(path: string): any {
     try {
-      const parts = path.split('.');
+      const parts = path.split(".");
       let cur: any = data;
       for (const k of parts) {
         if (cur == null) return undefined;
@@ -230,19 +248,24 @@
       }
       return cur;
     } catch (e) {
-      log.error({ component: 'FormShell', entity, path, error: coerceMessage(e) }, 'get failed');
+      log.error(
+        { component: "FormShell", entity, path, error: coerceMessage(e) },
+        "get failed",
+      );
       return undefined;
     }
   }
 
   function isDirty(): boolean {
-    try { 
+    try {
       // Use safe comparison for dirty checking
       const currentSnapshot = createSnapshot(data);
-      return JSON.stringify(currentSnapshot) !== JSON.stringify(snapshot); 
-    }
-    catch { 
-      log.warn({ component: 'FormShell', entity }, 'isDirty comparison failed, assuming dirty');
+      return JSON.stringify(currentSnapshot) !== JSON.stringify(snapshot);
+    } catch {
+      log.warn(
+        { component: "FormShell", entity },
+        "isDirty comparison failed, assuming dirty",
+      );
       return true; // assume dirty if comparison fails
     }
   }
@@ -278,7 +301,10 @@
       }
       return !!res?.valid;
     } catch (e) {
-      log.warn({ component: 'FormShell', entity, error: coerceMessage(e) }, 'validate threw');
+      log.warn(
+        { component: "FormShell", entity, error: coerceMessage(e) },
+        "validate threw",
+      );
       return true; // fail-open on validator errors
     } finally {
       validating = false;
@@ -287,36 +313,10 @@
 
   function markTouched(path: string) {
     touched.add(path);
-    if (autoValidate === 'blur') {
+    if (autoValidate === "blur") {
       // run validation for this field only; ignore result
       void runValidate(path);
     }
-  }
-
-  // ---- Emission helpers: callback props first, then optional DOM events ----
-  function emitSubmitted(detail: { data: FormData; result: unknown }) {
-    try { onSubmitted?.(detail); } catch (e) {
-      log.error({ component: 'FormShell', entity, error: coerceMessage(e) }, 'onSubmitted threw');
-    }
-    try { formEl?.dispatchEvent(new CustomEvent('submitted', { detail })); } catch {}
-  }
-  function emitSubmitError(detail: { data: FormData; error: unknown }) {
-    try { onSubmitError?.(detail); } catch (e) {
-      log.error({ component: 'FormShell', entity, error: coerceMessage(e) }, 'onSubmitError threw');
-    }
-    try { formEl?.dispatchEvent(new CustomEvent('submitError', { detail })); } catch {}
-  }
-  function emitCancelled(detail: { data: FormData; reason?: string }) {
-    try { onCancelled?.(detail); } catch (e) {
-      log.error({ component: 'FormShell', entity, error: coerceMessage(e) }, 'onCancelled threw');
-    }
-    try { formEl?.dispatchEvent(new CustomEvent('cancelled', { detail })); } catch {}
-  }
-  function emitChanged(detail: { data: FormData; dirty: boolean }) {
-    try { onChanged?.(detail); } catch (e) {
-      log.error({ component: 'FormShell', entity, error: coerceMessage(e) }, 'onChanged threw');
-    }
-    try { formEl?.dispatchEvent(new CustomEvent('changed', { detail })); } catch {}
   }
 
   // ---- Orchestration ----
@@ -324,12 +324,21 @@
     if (disabled || submitting) return;
     submitting = true;
 
-    // validate on submit if needed
-    if (autoValidate === 'submit' || autoValidate === 'change') {
+    if (autoValidate === "submit" || autoValidate === "change") {
       const ok = await runValidate();
       if (!ok) {
         submitting = false;
-        emitSubmitError({ data: safeClone(data), error: { message: 'validation failed' } });
+        try {
+          onSubmitError?.({
+            data: safeClone(data),
+            error: new Error("Validation failed before submission."),
+          });
+        } catch (e) {
+          log.error(
+            { component: "FormShell", entity, error: coerceMessage(e) },
+            "onSubmitError threw",
+          );
+        }
         return;
       }
     }
@@ -339,11 +348,31 @@
       // Update snapshot after successful submission
       const newSnapshot = createSnapshot(data);
       Object.assign(snapshot, newSnapshot);
-      emitSubmitted({ data: safeClone(data), result });
-      log.info({ component: 'FormShell', entity }, 'FORM_SUBMITTED');
+
+      try {
+        onSubmitted?.({ data: safeClone(data), result });
+      } catch (e) {
+        log.error(
+          { component: "FormShell", entity, error: coerceMessage(e) },
+          "onSubmitted threw",
+        );
+      }
+
+      log.info({ component: "FormShell", entity }, "FORM_SUBMITTED");
     } catch (e) {
-      log.error({ component: 'FormShell', entity, error: coerceMessage(e) }, 'FORM_SUBMIT_FAILED');
-      emitSubmitError({ data: safeClone(data), error: e });
+      log.error(
+        { component: "FormShell", entity, error: coerceMessage(e) },
+        "FORM_SUBMIT_FAILED",
+      );
+
+      try {
+        onSubmitError?.({ data: safeClone(data), error: e });
+      } catch (e) {
+        log.error(
+          { component: "FormShell", entity, error: coerceMessage(e) },
+          "onSubmitError threw",
+        );
+      }
     } finally {
       submitting = false;
     }
@@ -353,19 +382,40 @@
     try {
       onCancel?.(safeClone(data));
     } catch (e) {
-      log.warn({ component: 'FormShell', entity, error: coerceMessage(e) }, 'onCancel threw');
+      log.warn(
+        { component: "FormShell", entity, error: coerceMessage(e) },
+        "onCancel threw",
+      );
     } finally {
-      const detail: { data: FormData; reason?: string } = { data: safeClone(data) };
+      const detail: { data: FormData; reason?: string } = {
+        data: safeClone(data),
+      };
       if (reason !== undefined) detail.reason = reason;
-      emitCancelled(detail);
+
+      try {
+        onCancelled?.(detail);
+      } catch (e) {
+        log.error(
+          { component: "FormShell", entity, error: coerceMessage(e) },
+          "onCancelled threw",
+        );
+      }
     }
   }
 
-  // auto-validate on change mode
   function handleInput(path: string, value: unknown) {
     set(path, value);
-    emitChanged({ data: safeClone(data), dirty: isDirty() });
-    if (autoValidate === 'change') {
+
+    try {
+      onChanged?.({ data: safeClone(data), dirty: isDirty() });
+    } catch (e) {
+      log.error(
+        { component: "FormShell", entity, error: coerceMessage(e) },
+        "onChanged threw",
+      );
+    }
+
+    if (autoValidate === "change") {
       void runValidate(path);
     }
   }
@@ -375,7 +425,10 @@
   id={formId}
   class="pc-form pc-grid pc-grid--comfortable"
   bind:this={formEl}
-  onsubmit={(e: Event) => { e.preventDefault(); void doSubmit(); }}
+  onsubmit={(e: Event) => {
+    e.preventDefault();
+    void doSubmit();
+  }}
   aria-busy={submitting || validating}
 >
   <!-- Header area -->
@@ -404,12 +457,12 @@
     {#if fields}
       {@render fields({
         data,
-        set: handleInput,        /* set(path, value) + fires 'changed' + optional auto-validate */
+        set: handleInput /* set(path, value) + fires 'changed' + optional auto-validate */,
         get,
         errors,
         touched,
         markTouched,
-        validate: runValidate
+        validate: runValidate,
       })}
     {:else}
       <em style="color: var(--pc-grid-muted);">No fields snippet provided</em>
@@ -421,18 +474,29 @@
     {#if actions}
       {@render actions({
         submit: doSubmit,
-        cancel: () => doCancel('button'),
+        cancel: () => doCancel("button"),
         submitting,
         valid: Object.keys(errors).length === 0,
         dirty: isDirty(),
-        disabled
+        disabled,
       })}
     {:else}
-      <button class="pc-grid__btn" type="button" onclick={() => doCancel('button')} disabled={submitting || disabled}>
+      <button
+        class="pc-grid__btn"
+        type="button"
+        onclick={() => doCancel("button")}
+        disabled={submitting || disabled}
+      >
         Cancel
       </button>
-      <button class="pc-grid__btn pc-grid__btn--danger" type="submit" disabled={submitting || disabled} aria-busy={submitting}>
-        {#if submitting}<span class="pc-grid__spinner" aria-hidden="true"></span>{/if}
+      <button
+        class="pc-grid__btn pc-grid__btn--danger"
+        type="submit"
+        disabled={submitting || disabled}
+        aria-busy={submitting}
+      >
+        {#if submitting}<span class="pc-grid__spinner" aria-hidden="true"
+          ></span>{/if}
         Save
       </button>
     {/if}

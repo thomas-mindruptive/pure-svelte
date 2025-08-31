@@ -203,6 +203,7 @@
       disabled={$supplierLoadingState}
       onSubmitted={handleSupplierUpdate}
       onCancelled={() => goto("/suppliers")}
+      onSubmitError={() => log.warn("Supplier form submission error")}
     />
   </div>
 

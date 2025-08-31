@@ -1,24 +1,24 @@
 <script lang="ts">
   /**
    * SupplierForm Component (Svelte 5 + Runes)
-   * 
+   *
    * @description A comprehensive form component for creating and editing supplier (wholesaler) records.
    * Built as a wrapper around the reusable FormShell component, providing supplier-specific
    * validation, business logic, and UI elements.
-   * 
+   *
    * @features
    * - Create/Edit mode detection based on presence of ID
    * - Comprehensive validation with custom business rules
    * - Responsive 4-column grid layout with mobile adaptivity
    * - Integration with logging and notification systems
    * - Type-safe props and validation using domain types
-   * 
+   *
    * @architecture
    * - Uses FormShell for form state management and lifecycle
    * - Implements adapter pattern for validation and submission
    * - Follows CSS-in-JS pattern with form.css integration
    * - Svelte 5 callback props for event handling
-   * 
+   *
    * @example
    * ```svelte
    * <SupplierForm
@@ -31,12 +31,19 @@
    */
 
   import FormShell, {
+    type CancelledCallback,
+    type ChangedCallback,
+    type SubmitErrorCallback,
+    type SubmittedCallback,
     type ValidateResult,
   } from "$lib/components/forms/FormShell.svelte";
   import { log } from "$lib/utils/logger";
   import type { Wholesaler } from "$lib/domain/types";
   import "$lib/components/styles/form.css";
   import "$lib/components/styles/grid.css";
+  import { ApiClient } from "$lib/api/client/ApiClient";
+  import { getSupplierApi } from "$lib/api/client/supplier";
+  import { typeGuard } from "$lib/utils/typeUtils";
 
   // ===== COMPONENT PROPS & TYPES =====
 
@@ -52,31 +59,43 @@
     // Default to minimal Wholesaler object with required fields
     initial = { name: "", dropship: false } as Wholesaler,
     disabled = false,
+
+    // Svelte 5 component-callback props
     onSubmitted,
+    onSubmitError,
     onCancelled,
+    onChanged,
   } = $props<{
     /** Initial form data - if provided with ID, enables edit mode */
     initial?: Wholesaler;
     /** Whether the entire form should be disabled */
     disabled?: boolean;
-    /** Callback fired when form submission succeeds */
-    onSubmitted?: (p: any) => void;
-    /** Callback fired when form is cancelled by user */
-    onCancelled?: (p: any) => void;
+
+    // Callback props (component "events" in Svelte 5)
+    onSubmitted?: SubmittedCallback;
+    onSubmitError?: SubmitErrorCallback;
+    onCancelled?: CancelledCallback;
+    onChanged?: ChangedCallback;
   }>();
 
   // Silence unused variable warnings - these are used by FormShell via callback props
   onSubmitted;
   onCancelled;
 
+  // ===== API =====
+
+  // 1. Create an ApiClient instance with client `fetch`.
+  const client = new ApiClient(fetch);
+  const supplierApi = getSupplierApi(client);
+
   // ===== VALIDATION LOGIC =====
 
   /**
    * Validates supplier form data against business rules and UI constraints
-   * 
+   *
    * @param raw - Raw form data from FormShell (includes both domain and UI-specific fields)
    * @returns ValidationResult with validation status and field-specific errors
-   * 
+   *
    * @businessRules
    * - Name: Required, non-empty after trimming
    * - Dropship: Required boolean (business constraint)
@@ -89,31 +108,31 @@
 
     // === REQUIRED DOMAIN FIELDS ===
     // These are enforced by the Wholesaler domain type
-    
+
     if (!String(data.name ?? "").trim()) {
       errors.name = ["Name is required"];
     }
-    
+
     if (typeof data.dropship !== "boolean") {
       errors.dropship = ["Dropship must be true/false"];
     }
 
     // === OPTIONAL UI VALIDATION ===
     // These fields may not be part of core Wholesaler type but are required by UI/business logic
-    
+
     // Email validation: optional field, but must be valid if provided
     if (data.email && !/^\S+@\S+\.\S+$/.test(String(data.email))) {
       errors.email = ["Invalid email address"];
     }
-    
+
     // Country validation: required for business operations
     if (data.country == null || String(data.country).trim() === "") {
       errors.country = ["Country is required"];
     }
 
-    return { 
-      valid: Object.keys(errors).length === 0, 
-      errors 
+    return {
+      valid: Object.keys(errors).length === 0,
+      errors,
     };
   }
 
@@ -121,48 +140,35 @@
 
   /**
    * Handles form submission with automatic create/update detection
-   * 
+   *
    * @param raw - Form data from FormShell
    * @returns API response data for success handling
-   * 
+   *
    * @throws {Error} When API request fails or returns non-ok status
-   * 
-   * @apiEndpoints
-   * - POST /api/wholesalers - Create new supplier
-   * - PUT /api/wholesalers/:id - Update existing supplier
+   *
    */
   async function submitWholesaler(raw: Record<string, any>) {
-    const data = raw as Partial<Wholesaler> & Record<string, any>;
-    
+    log.debug(`SUBMIT_START`);
+    const data = raw as Partial<Wholesaler>;
+
     // Detect create vs update mode based on presence of ID
-    const id = data.id as string | undefined;
+    const id = data.wholesaler_id as string | undefined;
     const isUpdate = Boolean(id);
 
-    // Configure API endpoint based on operation type
-    const url = isUpdate ? `/api/wholesalers/${id}` : "/api/wholesalers";
-    const method = isUpdate ? "PUT" : "POST";
-
     try {
-      log.info({ component: "SupplierForm", method, url }, "SUBMIT_START");
-      
-      // Execute API request with JSON payload
-      const res = await fetch(url, {
-        method,
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      
-      // Handle non-ok responses
-      if (!res.ok) {
-        const errorText = await res.text().catch(() => "Save failed");
-        throw new Error(errorText);
+      log.info("SUBMIT_START");
+
+      let res;
+      if (isUpdate) {
+        log.info(`(SupplierForm) Updating supplier ID: ${id}`);
+        res = supplierApi.updateSupplier(data.wholesaler_id!, data);
+      } else {
+        log.info(`(SupplierForm) Creating new supplier`);
+        res = supplierApi.createSupplier(data);
       }
-      
-      // Parse successful response
-      const json = await res.json().catch(() => ({}));
+
       log.info({ component: "SupplierForm", ok: true }, "SUBMIT_OK");
-      
-      return json;
+      return res;
     } catch (e) {
       log.error(
         { component: "SupplierForm", error: String(e) },
@@ -172,7 +178,7 @@
     }
   }
 
-  // ===== EVENT HANDLERS =====
+  // ===== EVENT HANDLERS - They log and delegate to the parent =====
 
   /**
    * Handles successful form submission
@@ -180,35 +186,43 @@
    */
   function handleSubmitted(p: { data: Record<string, any>; result: unknown }) {
     log.info({ component: "SupplierForm", event: "submitted" }, "FORM_EVENT");
-    // Parent component handles success logic (notifications, navigation, etc.)
+    onSubmitted(p.data);
   }
 
   /**
-   * Handles form submission errors
+   * Handles form submission errors AND delegates to parent component.
    * Logs the error for debugging and monitoring
    */
   function handleSubmitError(p: { data: Record<string, any>; error: unknown }) {
-    log.warn(
-      {
-        component: "SupplierForm",
-        event: "submitError",
-        error: String(p.error),
-      },
-      "FORM_EVENT",
-    );
-    // Error handling is managed by FormShell and parent component
+    log.warn(`Submit error: ${String(p.error)}`, {
+      component: "SupplierForm",
+      event: "submitError",
+    });
+    onSubmitError(p);
   }
 
   /**
-   * Handles form cancellation
-   * Logs the cancellation reason and delegates to parent component
+   * Handles form cancellation.
+   * Logs the cancellation reason and delegates to parent component.
    */
   function handleCancelled(p: { data: Record<string, any>; reason?: string }) {
-    log.info(
+    log.debug(
       { component: "SupplierForm", event: "cancelled", reason: p.reason },
       "FORM_EVENT",
     );
-    // Parent component handles cancellation logic (navigation, state reset, etc.)
+    onCancelled(p);
+  }
+
+  /**
+   * Handles form change.
+   * Logs the change event and delegates to parent component.
+   */
+  function handleChanged(p: { data: Record<string, any>; dirty: boolean }) {
+    log.debug(
+      { component: "SupplierForm", event: "changed", dirty: p.dirty },
+      "FORM_EVENT",
+    );
+    onChanged(p);
   }
 </script>
 
@@ -228,11 +242,22 @@
   onSubmitted={handleSubmitted}
   onSubmitError={handleSubmitError}
   onCancelled={handleCancelled}
+  onChanged={handleChanged}
 >
   <!-- FORM HEADER -->
   <!-- Displays entity info and unsaved changes indicator -->
   {#snippet header({ data, dirty })}
-  {@const wholesaler = data as Wholesaler}
+    {typeGuard<Wholesaler>(
+      "wholesaler_id",
+      "name",
+      "region",
+      "status",
+      "dropship",
+      "b2b_notes",
+      "website",
+      "created_at",
+    )}
+    {@const wholesaler = data as Wholesaler}
     <div class="form-header">
       <div>
         <h3>Wholesaler Details</h3>
@@ -242,7 +267,9 @@
       </div>
       <div>
         {#if dirty}
-          <span class="pc-grid__badge pc-grid__badge--warn">Unsaved changes</span>
+          <span class="pc-grid__badge pc-grid__badge--warn"
+            >Unsaved changes</span
+          >
         {/if}
       </div>
     </div>
@@ -250,12 +277,21 @@
 
   <!-- FORM FIELDS -->
   <!-- Responsive 4-column grid layout with comprehensive supplier fields -->
-  {#snippet fields({ get, set, errors, markTouched })}
-    <div class="category-form">
-      
+  {#snippet fields({ data, get, set, errors, markTouched })}
+    {typeGuard<Wholesaler>(
+      "wholesaler_id",
+      "name",
+      "region",
+      "status",
+      "dropship",
+      "b2b_notes",
+      "website",
+      "created_at",
+    )}
+
+    <div class="form-body">
       <!-- === MAIN SUPPLIER INFORMATION SECTION === -->
       <div class="form-grid">
-        
         <!-- Supplier Name (Required, Primary Identifier) -->
         <div class="form-group span-2">
           <label for="wh-name">Supplier Name *</label>
@@ -263,7 +299,7 @@
             id="wh-name"
             type="text"
             value={get("name") ?? ""}
-            class={errors.name ? 'error' : ''}
+            class={errors.name ? "error" : ""}
             placeholder="Enter supplier name"
             oninput={(e: Event) =>
               set("name", (e.currentTarget as HTMLInputElement).value)}
@@ -315,7 +351,7 @@
           <select
             id="wh-country"
             value={get("country") ?? ""}
-            class={errors.country ? 'error' : ''}
+            class={errors.country ? "error" : ""}
             onchange={(e: Event) =>
               set("country", (e.currentTarget as HTMLSelectElement).value)}
             required
@@ -366,7 +402,6 @@
 
       <!-- === CONTACT INFORMATION SECTION === -->
       <div class="form-grid">
-        
         <!-- Email Address (Optional but Validated) -->
         <div class="form-group span-2">
           <label for="wh-email">Email Address</label>
@@ -375,7 +410,7 @@
             type="email"
             inputmode="email"
             value={get("email") ?? ""}
-            class={errors.email ? 'error' : ''}
+            class={errors.email ? "error" : ""}
             placeholder="contact@supplier.com"
             oninput={(e: Event) =>
               set("email", (e.currentTarget as HTMLInputElement).value)}
@@ -407,7 +442,6 @@
 
       <!-- === BUSINESS NOTES SECTION === -->
       <div class="form-grid">
-        
         <!-- Business Notes (Optional, Free-form Business Context) -->
         <div class="form-group span-4">
           <label for="wh-notes">Business Notes</label>
@@ -417,7 +451,8 @@
             placeholder="Additional notes about this supplier, business terms, contact persons, etc."
             oninput={(e: Event) =>
               set("b2b_notes", (e.currentTarget as HTMLTextAreaElement).value)}
-            >{get("b2b_notes") ?? ""}</textarea>
+            >{get("b2b_notes") ?? ""}</textarea
+          >
           <!-- Character count feedback for user guidance -->
           <div class="char-count">
             {(get("b2b_notes") ?? "").length} / 1000 characters

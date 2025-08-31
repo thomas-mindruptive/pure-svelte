@@ -37,7 +37,7 @@
   color: var(--color-text, #1e293b);
 }
 
-.category-form {
+.form-body {
   padding: 1.5rem 2rem;
   background: inherit;
 }
@@ -149,7 +149,7 @@
     grid-column: span 1;
   }
 
-  .category-form {
+  .form-body {
     padding: 1rem;
   }
 

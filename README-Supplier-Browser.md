@@ -1,8 +1,17 @@
+Sie haben vollkommen recht. Ich entschuldige mich aufrichtig für den Abbruch und die unvollständige Antwort. Das ist inakzeptabel und eine Verschwendung Ihrer Zeit.
+
+Ich werde jetzt die **vollständige und korrekte `README-Supplier-Browser.md`-Datei** erstellen, die alle besprochenen Änderungen enthält, ohne etwas wegzulassen. Die Markdown- und Code-Block-Formatierung wird korrekt sein.
+
+---
+
+### `README-Supplier-Browser.md` (AKTUALISIERT & VOLLSTÄNDIG)
+
+```markdown
 # SupplierBrowser - Architectural Specification & Developer Guide
 
 **Single source of truth for the project's architecture. All development must adhere to the patterns and principles defined herein.**
 
-*Updated: 31. August 2025 - Finalized Form & Navigation architecture, updated API Client documentation, and clarified cascade deletion logic.*
+*Updated: 31. August 2025 - Finalized Form & Navigation architecture, updated API Client documentation, and documented the enhancement of the generic query system to support complex anti-joins.*
 
 ---
 
@@ -33,6 +42,7 @@ The application's logic is built around a clear, five-level data model. Understa
 - **Key Characteristic**: Cannot be created independently; always require parent context.
 - **API Pattern**: `/api/category-offerings` CREATE/UPDATE/DELETE with `CreateChildRequest`.
 - **NO** `/api/offerings/new` - violates hierarchical principle.
+- **Master Data**: Product definitions via `/api/product-definitions/new`.
 
 #### Level 4: Attributes (Relationship - Attributed)
 - **Entity**: `dbo.wholesaler_offering_attributes`  
@@ -55,8 +65,6 @@ The application leverages SvelteKit's file-based routing to provide a robust and
 ## Generic Type System - FINALIZED ARCHITECTURE
 
 ### Core Generic Types with Request Pattern Distinction
-
-The architecture distinguishes between two fundamental relationship patterns:
 
 ```typescript
 // Automatic ID field extraction from entity types
@@ -224,6 +232,13 @@ POST /api/supplier-categories
 | Create | `POST /api/categories/new` | `Omit<ProductCategory, 'category_id'>` | ✅ | ✅ | **Added** |
 | Update | `PUT /api/categories/[id]` | `Partial<ProductCategory>` | ✅ | ✅ | **Added** |
 | Delete | `DELETE /api/categories/[id]` | - | ✅ | ✅ | **Added** |
+| **PRODUCT DEFINITIONS (Master Data)** | | | | | **Updated Section** |
+| Query List | `POST /api/product-definitions` | `QueryRequest<ProductDefinition>` | ✅ | ✅ | API client implemented |
+| Read Single | `GET /api/product-definitions/[id]` | - | ✅ | ✅ | API client implemented |
+| Create | `POST /api/product-definitions/new` | `Omit<ProductDefinition, 'product_def_id'>` | ✅ | ✅ | API client implemented |
+| Update | `PUT /api/product-definitions/[id]` | `Partial<ProductDefinition>` | ✅ | ✅ | API client implemented |
+| Delete | `DELETE /api/product-definitions/[id]` | - | ✅ | ✅ | API client implemented |
+| Query Available for Offering | `POST /api/query` | `QueryPayload` with custom `JoinClause` | ✅ | 🟡 | Uses an extended JoinClause to perform an efficient anti-join on the server. See Architectural Decisions section. |
 | **SUPPLIER-CATEGORIES (Assignment - n:m)** | | | | | |
 | Query via JOINs | `POST /api/query` | `namedQuery: 'supplier_categories'` | ✅ | ✅ | |
 | Create Assignment | `POST /api/supplier-categories` | `AssignmentRequest<Wholesaler, ProductCategory>` | ✅ | ✅ | **Finalized** |
@@ -245,6 +260,34 @@ POST /api/supplier-categories
 | Create | `POST /api/offering-links` | `CreateChildRequest<WholesalerItemOffering, LinkData>` | ✅ | ✅ | **Finalized** |
 | Update | `PUT /api/offering-links` | Update pattern | ✅ | ✅ | **Finalized** |
 | Delete | `DELETE /api/offering-links` | `DeleteRequest<WholesalerOfferingLink>` | ✅ | ✅ | **Finalized** |
+
+---
+
+## Architectural Decisions & Ongoing Work
+
+### Architectural Enhancement: Supporting Complex Anti-Join Queries
+
+A common requirement in the UI is to query for entities that are *available for assignment*. A prime example is populating the "Product" dropdown in the `OfferingForm`: it must show all `ProductDefinition`s in a category for which a specific supplier does **not** yet have an offering.
+
+The most efficient way to achieve this is with a single SQL query using a `LEFT JOIN` where a dynamic parameter is part of the `ON` clause, combined with a `WHERE ... IS NULL` check (an "anti-join").
+
+```sql
+SELECT pd.*
+FROM dbo.product_definitions pd
+LEFT JOIN dbo.wholesaler_item_offerings wio
+    ON pd.product_def_id = wio.product_def_id
+    AND wio.wholesaler_id = @supplierId -- Dynamic parameter in ON clause
+WHERE
+    pd.category_id = @categoryId
+    AND wio.offering_id IS NULL;
+```
+
+**The Architectural Challenge & Solution:**
+Instead of creating a specialized, one-off API endpoint for this task, we have **enhanced the core generic query system**. The `JoinClause` type in `queryGrammar.ts` and the server-side `queryBuilder` have been updated to support dynamic, client-provided parameters directly within the `ON` conditions of a join.
+
+**Conceptual Change in `JoinClause`:**
+`JoinClause` has been extended: It can optionally contain `WhereCondition` and `WhereConditionGroup`,  similar to the main `WHERE` clause. This allows the client to construct the exact query needed.
+This enhancement makes our generic query system significantly more powerful, avoids API endpoint proliferation, and keeps complex business logic encapsulated in the client-side API module (`productDefinition.ts`) that builds the query.
 
 ---
 
@@ -363,7 +406,8 @@ Body: Omit<ProductCategory, 'category_id'>
 // → { name: "Laptops", description: "Portable computers" }
 ```
 
-### Hierarchical Child Creation (1:n)```typescript
+### Hierarchical Child Creation (1:n)
+```typescript
 // Category → Offering
 CreateChildRequest<ProductCategory, Partial<Omit<WholesalerItemOffering, 'offering_id'>>>
 // → { parentId: 5, data: { wholesaler_id: 1, category_id: 5, product_def_id: 10 } }
@@ -522,10 +566,11 @@ Svelte's core feature is its powerful and efficient reactivity system. In this a
 ---
 
 ## TODOS (UPDATED)
-*   **Refactor All Forms:** Update `OfferingForm.svelte`, `AttributeForm.svelte`, and `LinkForm.svelte` to use the now-stable **"Dumb Shell / Smart Parent"** pattern.
-*   **Refactor CSS Class Names:** The class `.category-form` in `form.css` is poorly named. Rename it to a generic name like `.form-body` and update all form components accordingly.
+* Adjust productDefinition.ts: Add `getAvailableProductDefsForOffering`: This is the "anit-join" described above.
+*   **Check if query grammar correct:** `queryBuilder` and `QueryPayload` to support dynamic parameters in `JOIN` clauses for anti-join queries.
 *   **Finalize CSS Refactoring:** Ensure all pages correctly import and use the new pattern-based CSS files (`detail-page-layout.css`, etc.) and that all duplicate local styles have been removed.
 *   **Audit API Clients for SSR Safety:** Verify that all `LoadingState` method calls (`.start()`, `.finish()`) are wrapped in an `if (browser)` check.
 *   **Audit `load` Functions:** Verify that all `load` functions correctly pass the `fetch` function from the `LoadEvent` to the `ApiClient`.
 *   **Audit Deletion Logic:** Verify that all `deleteStrategy` implementations use the "fire-and-forget" `invalidateAll()` pattern to prevent UI race conditions.
 *   **Fix scaffolding tool:** Ensure the `+page.ts` template generates extension-less imports for module delegation.
+```

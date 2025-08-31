@@ -87,7 +87,7 @@ export function getOfferingApi(client: ApiClient) {
               'woa.offering_id', 'woa.attribute_id', 'woa.value',
               'a.name AS attribute_name', 'a.description AS attribute_description'
             ],
-            where: { op: LogicalOperator.AND, conditions: [{ key: 'wio.offering_id', op: ComparisonOperator.EQUALS, val: offeringId }] },
+            where: { whereCondOp: LogicalOperator.AND, conditions: [{ key: 'wio.offering_id', whereCondOp: ComparisonOperator.EQUALS, val: offeringId }] },
             orderBy: [{ key: 'a.name', direction: 'asc' }]
           }
         };
@@ -244,7 +244,7 @@ export function getOfferingApi(client: ApiClient) {
           namedQuery: 'offering_links',
           payload: {
             select: ['wol.link_id', 'wol.offering_id', 'wol.url', 'wol.notes', 'wol.created_at'],
-            where: { op: LogicalOperator.AND, conditions: [{ key: 'wio.offering_id', op: ComparisonOperator.EQUALS, val: offeringId }] },
+            where: { whereCondOp: LogicalOperator.AND, conditions: [{ key: 'wio.offering_id', whereCondOp: ComparisonOperator.EQUALS, val: offeringId }] },
             orderBy: [{ key: 'wol.created_at', direction: 'desc' }]
           }
         };

@@ -14,7 +14,7 @@ import { supplierQueryConfig } from '$lib/clientAndBack/queryConfig';
 import { validateWholesaler } from '$lib/server/validation/domainValidator';
 import { mssqlErrorMapper } from '$lib/server/errors/mssqlErrorMapper';
 import { checkWholesalerDependencies } from '$lib/dataModel/dependencyChecks';
-import { LogicalOperator, ComparisonOperator, type QueryPayload, type Condition } from '$lib/clientAndBack/queryGrammar';
+import { LogicalOperator, ComparisonOperator, type QueryPayload, type WhereCondition } from '$lib/clientAndBack/queryGrammar';
 import type { Wholesaler } from '$lib/domain/types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -95,15 +95,15 @@ export const POST: RequestHandler = async ({ params, request }) => {
         const clientPayload = requestBody.payload;
         log.info(`[${operationId}] Parsed request body`, { clientPayload });
 
-        const supplierIdCondition: Condition<Wholesaler> = { key: 'wholesaler_id', op: ComparisonOperator.EQUALS, val: id };
+        const supplierIdCondition: WhereCondition<Wholesaler> = { key: 'wholesaler_id', whereCondOp: ComparisonOperator.EQUALS, val: id };
         const securePayload: QueryPayload<Wholesaler> = {
             ...clientPayload,
             from: 'dbo.wholesalers',
             where: clientPayload.where ? {
-                op: LogicalOperator.AND,
+                whereCondOp: LogicalOperator.AND,
                 conditions: [supplierIdCondition, clientPayload.where]
             } : {
-                op: LogicalOperator.AND, conditions: [supplierIdCondition]
+                whereCondOp: LogicalOperator.AND, conditions: [supplierIdCondition]
 
             },
             limit: 1

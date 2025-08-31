@@ -67,7 +67,7 @@ export const supplierQueryConfig: QueryConfig = {
           table: 'dbo.wholesaler_categories',
           alias: 'wc',
           on: {
-            op: LogicalOperator.AND,
+            joinCondOp: LogicalOperator.AND,
             conditions: [
               { columnA: 'w.wholesaler_id', op: ComparisonOperator.EQUALS, columnB: 'wc.wholesaler_id' }
             ]
@@ -78,7 +78,7 @@ export const supplierQueryConfig: QueryConfig = {
           table: 'dbo.product_categories',
           alias: 'pc',
           on: {
-            op: LogicalOperator.AND,
+            joinCondOp: LogicalOperator.AND,
             conditions: [
               { columnA: 'wc.category_id', op: ComparisonOperator.EQUALS, columnB: 'pc.category_id' }
             ]
@@ -94,7 +94,7 @@ export const supplierQueryConfig: QueryConfig = {
           table: 'dbo.wholesaler_item_offerings',
           alias: 'wio',
           on: {
-            op: LogicalOperator.AND,
+            joinCondOp: LogicalOperator.AND,
             conditions: [
               { columnA: 'pc.category_id', op: ComparisonOperator.EQUALS, columnB: 'wio.category_id' }
             ]
@@ -110,7 +110,7 @@ export const supplierQueryConfig: QueryConfig = {
           table: 'dbo.wholesaler_item_offerings',
           alias: 'wio',
           on: {
-            op: LogicalOperator.AND,
+            joinCondOp: LogicalOperator.AND,
             conditions: [
               { columnA: 'wc.wholesaler_id', op: ComparisonOperator.EQUALS, columnB: 'wio.wholesaler_id' }
             ]
@@ -126,7 +126,7 @@ export const supplierQueryConfig: QueryConfig = {
           table: 'dbo.wholesaler_offering_attributes',
           alias: 'woa',
           on: {
-            op: LogicalOperator.AND,
+            joinCondOp: LogicalOperator.AND,
             conditions: [
               { columnA: 'wio.offering_id', op: ComparisonOperator.EQUALS, columnB: 'woa.offering_id' }
             ]
@@ -137,7 +137,7 @@ export const supplierQueryConfig: QueryConfig = {
           table: 'dbo.attributes',
           alias: 'a',
           on: {
-            op: LogicalOperator.AND,
+            joinCondOp: LogicalOperator.AND,
             conditions: [
               { columnA: 'woa.attribute_id', op: ComparisonOperator.EQUALS, columnB: 'a.attribute_id' }
             ]
@@ -153,7 +153,7 @@ export const supplierQueryConfig: QueryConfig = {
           table: 'dbo.wholesaler_offering_links',
           alias: 'wol',
           on: {
-            op: LogicalOperator.AND,
+            joinCondOp: LogicalOperator.AND,
             conditions: [
               { columnA: 'wio.offering_id', op: ComparisonOperator.EQUALS, columnB: 'wol.offering_id' }
             ]

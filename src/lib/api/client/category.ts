@@ -171,10 +171,10 @@ export function getCategoryApi(client: ApiClient) {
                         'pc.name AS category_name'
                     ],
                     where: {
-                        op: LogicalOperator.AND,
+                        whereCondOp: LogicalOperator.AND,
                         conditions: [
-                            { key: 'wio.wholesaler_id', op: ComparisonOperator.EQUALS, val: supplierId },
-                            { key: 'wio.category_id', op: ComparisonOperator.EQUALS, val: categoryId }
+                            { key: 'wio.wholesaler_id', whereCondOp: ComparisonOperator.EQUALS, val: supplierId },
+                            { key: 'wio.category_id', whereCondOp: ComparisonOperator.EQUALS, val: categoryId }
                         ]
                     },
                     orderBy: [{ key: 'wio.created_at', direction: 'desc' }]

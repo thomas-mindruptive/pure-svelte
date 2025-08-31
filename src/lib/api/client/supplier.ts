@@ -172,7 +172,7 @@ export function getSupplierApi(client: ApiClient) {
           namedQuery: 'supplier_categories',
           payload: {
             select: ['w.wholesaler_id', 'wc.category_id', 'pc.name AS category_name', 'wc.comment', 'wc.link'],
-            where: { op: LogicalOperator.AND, conditions: [{ key: 'w.wholesaler_id', op: ComparisonOperator.EQUALS, val: supplierId }] },
+            where: { whereCondOp: LogicalOperator.AND, conditions: [{ key: 'w.wholesaler_id', whereCondOp: ComparisonOperator.EQUALS, val: supplierId }] },
             orderBy: [{ key: 'pc.name', direction: 'asc' }]
           }
         };

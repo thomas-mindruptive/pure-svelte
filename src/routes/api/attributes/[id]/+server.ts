@@ -13,7 +13,7 @@ import { buildQuery, executeQuery } from '$lib/server/queryBuilder';
 import { supplierQueryConfig } from '$lib/clientAndBack/queryConfig';
 import { validateAttribute } from '$lib/server/validation/domainValidator';
 import { mssqlErrorMapper } from '$lib/server/errors/mssqlErrorMapper';
-import { LogicalOperator, ComparisonOperator, type QueryPayload, type Condition } from '$lib/clientAndBack/queryGrammar';
+import { LogicalOperator, ComparisonOperator, type QueryPayload, type WhereCondition } from '$lib/clientAndBack/queryGrammar';
 import type { Attribute } from '$lib/domain/types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -117,9 +117,9 @@ export const POST: RequestHandler = async ({ params, request }) => {
         const clientPayload = requestBody.payload;
         log.info(`[${operationId}] Parsed request body`, { clientPayload });
 
-        const attributeIdCondition: Condition<Attribute> = {
+        const attributeIdCondition: WhereCondition<Attribute> = {
             key: 'attribute_id',
-            op: ComparisonOperator.EQUALS,
+            whereCondOp: ComparisonOperator.EQUALS,
             val: id
         };
 
@@ -127,10 +127,10 @@ export const POST: RequestHandler = async ({ params, request }) => {
             ...clientPayload,
             from: 'dbo.attributes',
             where: clientPayload.where ? {
-                op: LogicalOperator.AND,
+                whereCondOp: LogicalOperator.AND,
                 conditions: [attributeIdCondition, clientPayload.where]
             } : {
-                op: LogicalOperator.AND,
+                whereCondOp: LogicalOperator.AND,
                 conditions: [attributeIdCondition]
             },
             limit: 1

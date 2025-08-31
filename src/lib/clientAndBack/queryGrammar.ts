@@ -26,15 +26,17 @@ export interface JoinClause {
 	on: JoinConditionGroup; // dieselbe Struktur wie WHERE-Bedingungen
 }
 
-export interface JoinCondition {
+// E.g. on columnA = columnB
+export interface JoinColCondition {
 	columnA: AllQualifiedColumns | AllAliasedColumns;
 	op: ComparisonOperator;
 	columnB: AllQualifiedColumns | AllAliasedColumns;
 }
 
+// E.g. on columnA = columnB AND columnA = "hugo"
 export interface JoinConditionGroup {
-	op: LogicalOperator;
-	conditions: (JoinCondition | JoinConditionGroup)[];
+	joinCondOp: LogicalOperator;
+	conditions: (JoinColCondition | JoinConditionGroup | WhereConditionGroup<unknown>)[];
 }
 
 export interface JoinSortDescriptor {
@@ -44,20 +46,38 @@ export interface JoinSortDescriptor {
 
 // --- STRUCTURE 1: For Strictly Typed Single-Entity Queries ---
 
-export interface Condition<T> {
+export interface WhereCondition<T> {
 	key: keyof T & string | AllQualifiedColumns | AllAliasedColumns;
-	op: ComparisonOperator;
+	whereCondOp: ComparisonOperator;
 	val?: unknown | unknown[];
 }
 
-export interface ConditionGroup<T> {
-	op: LogicalOperator;
-	conditions: (Condition<T> | ConditionGroup<T>)[];
+export interface WhereConditionGroup<T> {
+	whereCondOp: LogicalOperator;
+	conditions: (WhereCondition<T> | WhereConditionGroup<T>)[];
 }
 
-export function isConditionGroup<T>(item: Condition<T> | ConditionGroup<T>): item is ConditionGroup<T> {
+export function isConditionGroup<T>(item: WhereCondition<T> | WhereConditionGroup<T> | JoinColCondition | JoinConditionGroup): item is WhereConditionGroup<T> | JoinConditionGroup {
   return 'conditions' in item;
 }
+
+export function isWhereCondition(item: JoinColCondition | JoinConditionGroup | WhereCondition<unknown> |WhereConditionGroup<unknown>): item is WhereCondition<unknown> {
+  return 'key' in item && 'whereCondOp' in item;
+}
+
+export function isWhereConditionGroup<T>(item: JoinColCondition | JoinConditionGroup |WhereCondition<T> | WhereConditionGroup<T>): item is WhereConditionGroup<T> {
+  return 'conditions' in item && 'whereCondOp' in item;
+}
+
+export function isJoinConditionGroup(item: JoinColCondition | JoinConditionGroup): item is JoinConditionGroup {
+  return 'joinCondOp' in item && 'conditions' in item;
+}
+
+export function isJoinColCondition(item: JoinColCondition | JoinConditionGroup | WhereCondition<unknown> |WhereConditionGroup<unknown>): item is JoinColCondition {
+  return 'columnA' in item && 'columnB' in item && 'op' in item;
+}
+
+
 
 export interface SortDescriptor<T> {
 	key: keyof T & string | AllQualifiedColumns | AllAliasedColumns 
@@ -72,7 +92,7 @@ export interface QueryPayload<T> {
 	select: Array<keyof T | AllQualifiedColumns | AllAliasedColumns>;
 	from?: string;
 	joins?: JoinClause[];
-	where?: Condition<T> | ConditionGroup<T>;
+	where?: WhereCondition<T> | WhereConditionGroup<T>;
 	orderBy?: SortDescriptor<T>[];
 	limit?: number;
 	offset?: number;

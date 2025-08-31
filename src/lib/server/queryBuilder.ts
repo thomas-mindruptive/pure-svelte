@@ -16,11 +16,14 @@ import {
 	type JoinSortDescriptor,
 	LogicalOperator,
 	ComparisonOperator,
-	type ConditionGroup,
-	type Condition,
+	type WhereConditionGroup,
+	type WhereCondition,
 	type JoinConditionGroup,
-	type JoinCondition,
-	isConditionGroup
+	type JoinColCondition,
+	isWhereConditionGroup,
+	isJoinColCondition,
+	isConditionGroup,
+	isWhereCondition
 } from '$lib/clientAndBack/queryGrammar';
 import type { supplierQueryConfig as SupplierQueryConfigType } from '$lib/clientAndBack/queryConfig';
 
@@ -60,49 +63,49 @@ export type QueryResultRow = Record<string, SqlParameterValue>;
  */
 function parseWhere(
 	fromSource: string,
-	item: Condition<unknown> | ConditionGroup<unknown>,
+	item: WhereCondition<unknown> | WhereConditionGroup<unknown>,
 	allowedColumns: ReadonlyArray<string>,
 	parameters: Record<string, SqlParameterValue>,
 	paramIndex: { i: number }
 ): string {
 	// Base case: item is a single condition
-	if (!isConditionGroup(item)) {
+	if (!isWhereConditionGroup(item)) {
 		// SECURITY: Regardless of compile-time type, validate every key at runtime against the whitelist.
 		if (!allowedColumns.includes(item.key)) {
 			throw new Error(`Column '${item.key}' is not allowed in the WHERE clause. Source: ${fromSource}`);
 		}
 
-		if (item.op === ComparisonOperator.IS_NULL || item.op === ComparisonOperator.IS_NOT_NULL) {
-			return `${item.key} ${item.op}`;
+		if (item.whereCondOp === ComparisonOperator.IS_NULL || item.whereCondOp === ComparisonOperator.IS_NOT_NULL) {
+			return `${item.key} ${item.whereCondOp}`;
 		}
 
-		if ((item.op === ComparisonOperator.IN || item.op === ComparisonOperator.NOT_IN) && Array.isArray(item.val)) {
+		if ((item.whereCondOp === ComparisonOperator.IN || item.whereCondOp === ComparisonOperator.NOT_IN) && Array.isArray(item.val)) {
 			// Handle empty arrays to prevent invalid SQL like `IN ()`
-			if (item.val.length === 0) return item.op === ComparisonOperator.IN ? '1=0' : '1=1';
+			if (item.val.length === 0) return item.whereCondOp === ComparisonOperator.IN ? '1=0' : '1=1';
 
 			const paramNames = item.val.map(v => {
 				const paramName = `p${paramIndex.i++}`;
 				parameters[paramName] = v as SqlParameterValue;
 				return `@${paramName}`;
 			});
-			return `${item.key} ${item.op} (${paramNames.join(', ')})`;
+			return `${item.key} ${item.whereCondOp} (${paramNames.join(', ')})`;
 		}
 
 		const paramName = `p${paramIndex.i++}`;
 		parameters[paramName] = item.val as SqlParameterValue;
-		return `${item.key} ${item.op} @${paramName}`;
+		return `${item.key} ${item.whereCondOp} @${paramName}`;
 	}
 
 	// Recursive case: item is a condition group
 	if (item.conditions.length === 0) return '1=1'; // Neutral for empty groups
 	const parts = item.conditions.map(c => parseWhere(fromSource, c, allowedColumns, parameters, paramIndex));
 
-	if (item.op === LogicalOperator.NOT) {
+	if (item.whereCondOp === LogicalOperator.NOT) {
 		if (parts.length !== 1) throw new Error('A NOT group must contain exactly one condition or group.');
 		return `NOT (${parts[0]})`;
 	}
 
-	return `(${parts.join(` ${item.op} `)})`;
+	return `(${parts.join(` ${item.whereCondOp} `)})`;
 }
 
 /**
@@ -152,7 +155,7 @@ function buildJoinClauses(
 		}
 
 		const alias = join.alias ? ` AS ${join.alias}` : '';
-		const onClause = parseJoinConditions(fromSource,join.on, allowedColumns);
+		const onClause = parseJoinConditions(fromSource, join.on, allowedColumns);
 
 		return `${join.type} ${join.table}${alias} ON ${onClause}`;
 	}).join(' ');
@@ -160,40 +163,61 @@ function buildJoinClauses(
 
 function parseJoinConditions(
 	fromSource: string,
-	item: JoinConditionGroup | JoinCondition,
-	allowedColumns: ReadonlyArray<string>
+	item: JoinConditionGroup | JoinColCondition | WhereCondition<unknown> | WhereConditionGroup<unknown>,
+	allowedColumns: ReadonlyArray<string>,
+	parameters?: Record<string, SqlParameterValue>,
+	paramIndex?: { i: number }
 ): string {
 
-	log.debug(`parseJoinConditions`, { item, allowedColumns, fromSource });
+	// ===== Regular WHERE =====
+
+	// If regular WHERE => Use respective parser.
+	if (isWhereCondition(item) || isWhereConditionGroup(item)) {
+		log.debug(`Parsing WHERE clause`, { item, allowedColumns, fromSource });
+		const whereClause = parseWhere(fromSource, item, allowedColumns, parameters ?? {}, paramIndex ?? { i: 0 });
+		return whereClause;
+	}
+
+	// ===== Simple/single JOIN condition =====	
+	
+	log.debug(`Parsing JOIN clause`, { item, allowedColumns, fromSource });
 
 	// Base case: item is a single join condition (columnA = columnB)
-	if (!('conditions' in item)) {
-		// SECURITY: Validate both columns against whitelist
-		if (!allowedColumns.includes(item.columnA) || !allowedColumns.includes(item.columnB)) {
-			log.error(`parseJoinConditions: Join columns '${item.columnA}' or '${item.columnB}' are not allowed. Source: ${fromSource}`, { allowedColumns }); // Extra logging for security
-			throw new Error(`parseJoinConditions: Join columns '${item.columnA}' or '${item.columnB}' are not allowed. Source: ${fromSource}`);
+	if (!(isConditionGroup(item))) {
+		if (isJoinColCondition(item)) {
+			// SECURITY: Validate both columns against whitelist
+			if (!allowedColumns.includes(item.columnA) || !allowedColumns.includes(item.columnB)) {
+				log.error(`parseJoinConditions: Join columns '${item.columnA}' or '${item.columnB}' are not allowed. Source: ${fromSource}`, { allowedColumns }); // Extra logging for security
+				throw new Error(`parseJoinConditions: Join columns '${item.columnA}' or '${item.columnB}' are not allowed. Source: ${fromSource}`);
+			}
+
+			// For JOIN conditions, we typically don't parameterize - it's column = column
+			// But we could parameterize if needed for security
+			return `${item.columnA} ${item.op} ${item.columnB}`;
+		} else {
+			throw Error("Invalid join condition: expected JoinColCondition.");
 		}
 
-		// For JOIN conditions, we typically don't parameterize - it's column = column
-		// But we could parameterize if needed for security
-		return `${item.columnA} ${item.op} ${item.columnB}`;
 	}
+
+	// ===== JOIN condition group =====	
 
 	// Recursive case: item is a condition group
 	if (item.conditions.length === 0) return '1=1'; // Neutral for empty groups
 
 	const parts = item.conditions.map(c =>
-		parseJoinConditions(fromSource,c, allowedColumns)
+		parseJoinConditions(fromSource, c, allowedColumns)
 	);
 
-	if (item.op === LogicalOperator.NOT) {
+	if (item.joinCondOp === LogicalOperator.NOT) {
 		if (parts.length !== 1) {
 			throw new Error('A NOT group must contain exactly one condition or group.');
 		}
 		return `NOT (${parts[0]})`;
 	}
 
-	return `(${parts.join(` ${item.op} `)})`;
+	return `(${parts.join(` ${item.joinCondOp} `)})`;
+
 }
 
 
@@ -238,7 +262,7 @@ export function buildQuery<T>(
 		if (config.joinConfigurations?.[fromSource as keyof typeof config.joinConfigurations]) {
 			const joinConfig = config.joinConfigurations[fromSource as keyof typeof config.joinConfigurations];
 			fromClause = joinConfig.from;
-			joinClauses = buildJoinClauses(fromSource,joinConfig.joins, allowedColumns);
+			joinClauses = buildJoinClauses(fromSource, joinConfig.joins, allowedColumns);
 		} else {
 			fromClause = fromSource;
 			if (payload.joins) joinClauses = buildJoinClauses(fromSource, payload.joins, allowedColumns);
@@ -257,7 +281,7 @@ export function buildQuery<T>(
 		let whereClause = '';
 		if (payload.where) {
 			// `payload.where` is structurally compatible, allowing TypeScript to resolve this safely.
-			const parsed = parseWhere(fromSource, payload.where as Condition<unknown>, allowedColumns, parameters, paramIndex);
+			const parsed = parseWhere(fromSource, payload.where as WhereCondition<unknown>, allowedColumns, parameters, paramIndex);
 			if (parsed !== '1=1') whereClause = `WHERE ${parsed}`;
 		}
 
@@ -285,9 +309,9 @@ export function buildQuery<T>(
 			}
 		};
 	} catch (error: unknown) {
-		log.error("Query building failed", error );
+		log.error("Query building failed", error);
 		throw error;
-	}	
+	}
 }
 
 /**
@@ -295,7 +319,7 @@ export function buildQuery<T>(
  */
 export async function executeQuery(sql: string, parameters: Record<string, SqlParameterValue>): Promise<QueryResultRow[]> {
 	const startTime = Date.now();
-	log.info("Executing query...", { sql, parameters});
+	log.info("Executing query...", { sql, parameters });
 
 	try {
 		const request = db.request();

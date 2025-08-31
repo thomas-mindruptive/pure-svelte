@@ -7,7 +7,7 @@
  */
 
 import { log } from '$lib/utils/logger';
-import { ComparisonOperator, LogicalOperator, type QueryPayload, type Condition, type ConditionGroup } from '$lib/clientAndBack/queryGrammar';
+import { ComparisonOperator, LogicalOperator, type QueryPayload, type WhereCondition, type WhereConditionGroup } from '$lib/clientAndBack/queryGrammar';
 import type { Attribute } from '$lib/domain/types';
 
 import type { ApiClient } from './ApiClient';
@@ -157,7 +157,7 @@ export function getAttributeApi(client: ApiClient) {
             if (!searchTerm.trim()) return [];
             const query: QueryPayload<Attribute> = {
                 select: ['attribute_id', 'name', 'description'],
-                where: { key: 'name', op: ComparisonOperator.LIKE, val: `%${searchTerm.trim()}%` },
+                where: { key: 'name', whereCondOp: ComparisonOperator.LIKE, val: `%${searchTerm.trim()}%` },
                 orderBy: [{ key: 'name', direction: 'asc' }],
                 limit
             };
@@ -183,12 +183,12 @@ export function getAttributeApi(client: ApiClient) {
         attributeLoadingOperations.start(operationId);
         try {
             if (!name.trim()) return false;
-            const nameCondition: Condition<Attribute> = { key: 'name', op: ComparisonOperator.EQUALS, val: name.trim() };
-            let whereCondition: Condition<Attribute> | ConditionGroup<Attribute> = nameCondition;
+            const nameCondition: WhereCondition<Attribute> = { key: 'name', whereCondOp: ComparisonOperator.EQUALS, val: name.trim() };
+            let whereCondition: WhereCondition<Attribute> | WhereConditionGroup<Attribute> = nameCondition;
             
             if (excludeId) {
-                const excludeCondition: Condition<Attribute> = { key: 'attribute_id', op: ComparisonOperator.NOT_EQUALS, val: excludeId };
-                whereCondition = { op: LogicalOperator.AND, conditions: [nameCondition, excludeCondition] };
+                const excludeCondition: WhereCondition<Attribute> = { key: 'attribute_id', whereCondOp: ComparisonOperator.NOT_EQUALS, val: excludeId };
+                whereCondition = { whereCondOp: LogicalOperator.AND, conditions: [nameCondition, excludeCondition] };
             }
 
             const query: QueryPayload<Attribute> = { select: ['attribute_id'], where: whereCondition, limit: 1 };

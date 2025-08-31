@@ -12,6 +12,7 @@
     WholesalerOfferingAttribute_Attribute,
     Attribute,
     WholesalerItemOffering_ProductDef_Category,
+    ProductDefinition,
   } from "$lib/domain/types";
   import type {
     DeleteStrategy,
@@ -23,6 +24,7 @@
   import "$lib/components/styles/grid-section.css";
   import "$lib/components/styles/detail-page-layout.css";
   import "$lib/components/styles/form-elements.css";
+  import OfferingDetailWrapper from "$lib/components/domain/offerings/OfferingDetailWrapper.svelte";
 
   import { ApiClient } from "$lib/api/client/ApiClient";
 
@@ -30,6 +32,7 @@
     offering: WholesalerItemOffering_ProductDef_Category; // Make sure the offering is part of the data
     assignedAttributes: WholesalerOfferingAttribute_Attribute[];
     availableAttributes: Attribute[];
+    availableProducts: ProductDefinition[];
   };
   let { data } = $props<{ data: LoadData }>();
 
@@ -37,11 +40,12 @@
   let attributeValue: string = $state("");
   let isAssigning = $state(false);
 
-  // 1. Create an ApiClient instance with the client `fetch`.
-  const client = new ApiClient(fetch);
+  // ===== API client =====
 
-  // 2. Get the supplier-specific API methods from the factory.
+  const client = new ApiClient(fetch);
   const offeringApi = getOfferingApi(client);
+
+  // ===== API CALLS =====
 
   async function handleAttributeDelete(ids: ID[]): Promise<void> {
     log.info(`(OfferDetailAttributesPage) Deleting attribute assignments`, {
@@ -106,36 +110,46 @@
     }
   }
 
+  // ===== Strategies to be passed to grid =====
+
   const deleteStrategy: DeleteStrategy<WholesalerOfferingAttribute_Attribute> =
     { execute: handleAttributeDelete };
   const rowActionStrategy: RowActionStrategy<WholesalerOfferingAttribute_Attribute> =
     { click: handleAttributeSelect };
 </script>
 
-<div>
-  <div class="assignment-section">
-    <h3>Assign New Attribute</h3>
-    <form class="assignment-form" onsubmit={handleAssignAttribute}>
-      <select bind:value={selectedAttributeId} disabled={isAssigning}>
-        <option value={null}>Select an attribute...</option>
-        {#each data.availableAttributes as attr (attr.attribute_id)}
-          <option value={attr.attribute_id}>{attr.name}</option>
-        {/each}
-      </select>
-      <input
-        type="text"
-        placeholder="Value (e.g., 'Red')"
-        bind:value={attributeValue}
-        disabled={isAssigning}
-      />
-      <button type="submit" class="primary-button" disabled={isAssigning || !selectedAttributeId}>
-        {isAssigning ? "Assigning..." : "Assign"}
-      </button>
-    </form>
-  </div>
-
+<OfferingDetailWrapper
+  offering={data.offering}
+  availableProducts={data.availableProducts}
+>
+  <!-- Der spezifische Inhalt dieser Seite kommt in den Default Slot -->
   <div class="grid-section">
-    <h2>Assigned Attributes</h2>
+    <div class="assignment-section">
+      <h3>Assign New Attribute</h3>
+      <form class="assignment-form" onsubmit={handleAssignAttribute}>
+        <select bind:value={selectedAttributeId} disabled={isAssigning}>
+          <option value={null}>Select an attribute...</option>
+          {#each data.availableAttributes as attr (attr.attribute_id)}
+            <option value={attr.attribute_id}>{attr.name}</option>
+          {/each}
+        </select>
+        <input
+          type="text"
+          placeholder="Value (e.g., 'Red')"
+          bind:value={attributeValue}
+          disabled={isAssigning}
+        />
+        <button
+          type="submit"
+          class="primary-button"
+          disabled={isAssigning || !selectedAttributeId}
+        >
+          {isAssigning ? "Assigning..." : "Assign"}
+        </button>
+      </form>
+    </div>
+
+    <h2 style="margin-top: 1.5rem;">Assigned Attributes</h2>
     <AttributeGrid
       rows={data.assignedAttributes}
       loading={$offeringLoadingState}
@@ -143,11 +157,4 @@
       {rowActionStrategy}
     />
   </div>
-</div>
-
-<style>
-  h2,
-  h3 {
-    margin-top: 0;
-  }
-</style>
+</OfferingDetailWrapper>

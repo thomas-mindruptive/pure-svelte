@@ -22,7 +22,8 @@
   import "$lib/components/styles/assignment-section.css";
   import "$lib/components/styles/grid-section.css";
   import "$lib/components/styles/detail-page-layout.css";
-  import '$lib/components/styles/form-elements.css';
+  import "$lib/components/styles/form-elements.css";
+  import OfferingDetailWrapper from "$lib/components/domain/offerings/OfferingDetailWrapper.svelte";
 
   type LoadData = {
     offering: WholesalerItemOffering_ProductDef_Category;
@@ -86,74 +87,32 @@
   };
 </script>
 
-<div class="page-layout">
-  <div class="header-section">
-    <h1>Manage Links for "{data.offering.product_def_title}"</h1>
-    <p>
-      Offering ID: {data.offering.offering_id} / Price: {data.offering.price}
-      {data.offering.currency}
-    </p>
-  </div>
+<OfferingDetailWrapper offering={data.offering} availableProducts={data.availableProducts}>
+	<!-- Der spezifische Inhalt dieser Seite kommt in den Default Slot -->
+	<div class="grid-section">
+		<div class="assignment-section">
+			<h3>Add New Link</h3>
+			<form class="assignment-form" onsubmit={handleAssignLink}>
+				<input
+					type="url"
+					placeholder="https://example.com/product"
+					bind:value={newUrl}
+					required
+					disabled={isAssigning}
+				/>
+				<input
+					type="text"
+					placeholder="Optional notes..."
+					bind:value={newNotes}
+					disabled={isAssigning}
+				/>
+				<button type="submit" class="primary-button" disabled={isAssigning || !newUrl}>
+					{isAssigning ? 'Adding...' : 'Add Link'}
+				</button>
+			</form>
+		</div>
 
-  <div class="form-section placeholder">
-    <h3>Offering Details</h3>
-    <p>
-      A full form (`OfferingForm.svelte`) for editing offering details like
-      price, size, and comments would be rendered here.
-    </p>
-  </div>
-
-  <div class="assignment-section">
-    <h3>Add New Link</h3>
-
-    <form class="assignment-form" onsubmit={handleAssignLink}>
-      <input
-        type="url"
-        placeholder="https://example.com/product"
-        bind:value={newUrl}
-        required
-        disabled={isAssigning}
-      />
-      <input
-        type="text"
-        placeholder="Optional notes..."
-        bind:value={newNotes}
-        disabled={isAssigning}
-      />
-      <button type="submit" class="primary-button" disabled={isAssigning || !newUrl}>
-        {isAssigning ? "Adding..." : "Add Link"}
-      </button>
-    </form>
-  </div>
-
-  <div class="grid-section">
-    <h2>Assigned Links</h2>
-    <LinkGrid
-      rows={data.links}
-      loading={$offeringLoadingState}
-      {deleteStrategy}
-      {rowActionStrategy}
-    />
-  </div>
-</div>
-
-<style>
-  h1 {
-    margin: 0;
-  }
-  p {
-    margin: 0.5rem 0 0 0;
-    color: var(--color-muted);
-  }
-  .form-section.placeholder {
-    background-color: #fefce8;
-    border-color: #facc15;
-    color: #713f12;
-    padding: 1.5rem;
-    border-radius: 8px;
-  }
-  h2,
-  h3 {
-    margin-top: 0;
-  }
-</style>
+		<h2 style="margin-top: 1.5rem;">Assigned Links</h2>
+		<LinkGrid rows={data.links} loading={$offeringLoadingState} {deleteStrategy} {rowActionStrategy} />
+	</div>
+</OfferingDetailWrapper>

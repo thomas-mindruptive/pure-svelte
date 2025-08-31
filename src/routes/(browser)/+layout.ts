@@ -58,12 +58,21 @@ export async function load({ url, params, depends, fetch: loadEventFetch }: Load
   // 6. Determine the `activeLevel`.
   let activeLevel: string;
   if (currentOfferingId) {
-    activeLevel = url.pathname.endsWith('/links') ? 'links' : 'attributes';
+    // Wenn eine offeringId in der URL ist, sind wir auf Level 4 oder 5.
+    // Der aktive Sidebar-Eintrag ist entweder 'attributes' oder 'links'.
+    activeLevel = url.pathname.endsWith('/attributes') ? 'attributes' : 'links';
   } else if (currentCategoryId) {
+    // Wenn eine categoryId da ist (aber keine offeringId), sind wir auf der
+    // KATEGORIE-Detailseite, die die OFFERINGS auflistet.
+    // Der aktive Sidebar-Eintrag ist daher 'offerings'.
     activeLevel = 'offerings';
   } else if (currentSupplierId) {
+    // Wenn eine supplierId da ist (aber keine categoryId), sind wir auf der
+    // SUPPLIER-Detailseite, die die KATEGORIEN auflistet.
+    // Der aktive Sidebar-Eintrag ist daher 'categories'.
     activeLevel = 'categories';
   } else {
+    // Ansonsten sind wir auf der Top-Level-Seite, die die SUPPLIERS auflistet.
     activeLevel = 'suppliers';
   }
 
@@ -89,8 +98,15 @@ export async function load({ url, params, depends, fetch: loadEventFetch }: Load
     { key: 'links', label: 'Links', disabled: !resolvedOfferingId, level: 3, href: offeringPathBase === '#' ? '#' : `${offeringPathBase}/links` },
   ];
 
-  log.info(`(Layout Load) Resolved Path for UI`, { resolved: { supplierId: resolvedSupplierId, categoryId: resolvedCategoryId, offeringId: resolvedOfferingId }, activeLevel });
-
+  log.info(`(Layout Load) Resolved Path for UI`, {
+    resolved:
+    {
+      supplierId: resolvedSupplierId,
+      categoryId: resolvedCategoryId, 
+      offeringId: resolvedOfferingId, 
+      leaf: conservedPath.leaf
+    }, activeLevel
+  });
   // 8. Return all the prepared data.
   return {
     breadcrumbItems,

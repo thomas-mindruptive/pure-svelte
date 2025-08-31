@@ -8,12 +8,14 @@ export interface NavigationPath {
   supplierId: number | null;
   categoryId: number | null;
   offeringId: number | null;
+  leaf: 'attributes' | 'links' | null;
 }
 
 const initialState: NavigationPath = {
   supplierId: null,
   categoryId: null,
-  offeringId: null
+  offeringId: null,
+  leaf: null
 };
 
 /**
@@ -49,5 +51,6 @@ export function resetDownstreamPath(newPath: Partial<NavigationPath>) {
     supplierId: newPath.supplierId ?? null,
     categoryId: newPath.categoryId ?? null,
     offeringId: newPath.offeringId ?? null,
+    leaf: newPath.leaf ?? null
   });
 }

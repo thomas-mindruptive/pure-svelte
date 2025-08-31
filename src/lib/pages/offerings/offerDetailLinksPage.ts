@@ -4,6 +4,7 @@ import { ApiClient } from '$lib/api/client/ApiClient';
 import { getOfferingApi } from '$lib/api/client/offering';
 import { log } from '$lib/utils/logger';
 import { error, type LoadEvent } from '@sveltejs/kit';
+// TODO: import { getProductDefinitionApi } from '$lib/api/client/productDefinition';
 
 
 /**
@@ -18,22 +19,24 @@ export async function load({ params, fetch: fetchLoad }: LoadEvent) {
 
   log.info(`(OfferDetailLinksPage) loading all data for offeringId: ${offeringId}`);
 
-  // 1. Create an ApiClient instance with the client `fetch`.
   const client = new ApiClient(fetchLoad);
-
-  // 2. Get the supplier-specific API methods from the factory.
   const offeringApi = getOfferingApi(client);
+  // TODO: const productDefApi = getProductDefinitionApi(client); 
 
   try {
     // Lade Angebots-Details und Links parallel
-    const [offering, links] = await Promise.all([
+    const [offering, links /*, availableProducts*/] = await Promise.all([
       offeringApi.loadOffering(offeringId),
       offeringApi.loadOfferingLinks(offeringId)
     ]);
 
     return {
       offering,
-      links
+      links,
+      availableProducts: [  // TODO: change after API implemented
+        { product_def_id: 10, category_id: offering.category_id, title: 'Mock Product A' },
+        { product_def_id: 11, category_id: offering.category_id, title: 'Mock Product B' }
+      ]
     };
   } catch (err: any) {
     log.error(`Failed to load data for offeringId: ${offeringId}`, err);

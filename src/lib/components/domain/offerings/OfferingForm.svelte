@@ -1,0 +1,321 @@
+<!-- src/lib/components/domain/offerings/OfferingForm.svelte -->
+<script lang="ts">
+	/**
+	 * OfferingForm Component (Svelte 5 + Runes)
+	 *
+	 * @description A form for creating and editing product offerings (WholesalerItemOffering).
+	 * It follows the "Dumb Shell / Smart Parent" pattern, using FormShell for state management.
+	 *
+	 * @architecture
+	 * - Requires `supplierId` and `categoryId` context for creating new offerings.
+	 * - Requires a list of `availableProducts` for the product definition dropdown.
+	 * - Implements offering-specific validation and submission logic.
+	 * - Uses the ApiClient factory pattern for type-safe, SSR-safe API calls.
+	 */
+
+	import FormShell, {
+		type CancelledCallback,
+		type ChangedCallback,
+		type SubmitErrorCallback,
+		type SubmittedCallback,
+		type ValidateResult
+	} from '$lib/components/forms/FormShell.svelte';
+	import { log } from '$lib/utils/logger';
+	import type { WholesalerItemOffering, ProductDefinition } from '$lib/domain/types';
+	import { ApiClient } from '$lib/api/client/ApiClient';
+	import { getCategoryApi } from '$lib/api/client/category';
+	import { typeGuard } from '$lib/utils/typeUtils';
+
+	import '$lib/components/styles/form.css';
+	import '$lib/components/styles/grid.css';
+
+	// ===== COMPONENT PROPS & TYPES =====
+
+	type ValidationErrors = Record<string, string[]>;
+	type OfferingFormData = Partial<WholesalerItemOffering>;
+
+	const {
+		// Context IDs are required for creating a new offering.
+		supplierId,
+		categoryId,
+
+		// The list of products that can be selected for this offering.
+		availableProducts = [] as ProductDefinition[],
+
+		// Initial data; presence of 'offering_id' determines create/edit mode.
+		initial = {} as OfferingFormData,
+		disabled = false,
+
+		// Svelte 5 component-callback props
+		onSubmitted,
+		onSubmitError,
+		onCancelled,
+		onChanged
+	} = $props<{
+		supplierId: number;
+		categoryId: number;
+		availableProducts?: ProductDefinition[];
+		initial?: OfferingFormData;
+		disabled?: boolean;
+
+		onSubmitted?: SubmittedCallback;
+		onSubmitError?: SubmitErrorCallback;
+		onCancelled?: CancelledCallback;
+		onChanged?: ChangedCallback;
+	}>();
+
+	// ===== API CLIENT SETUP =====
+
+	const client = new ApiClient(fetch);
+	const categoryApi = getCategoryApi(client);
+
+	// ===== VALIDATION LOGIC =====
+
+	/**
+	 * Validates the offering form data against business rules.
+	 */
+	function validateOffering(raw: Record<string, any>): ValidateResult {
+		const data = raw as OfferingFormData;
+		const errors: ValidationErrors = {};
+
+		if (!data.product_def_id) {
+			errors.product_def_id = ['A product must be selected.'];
+		}
+
+		if (data.price != null) {
+			if (isNaN(Number(data.price)) || Number(data.price) < 0) {
+				errors.price = ['Price must be a valid, non-negative number.'];
+			}
+		}
+
+		if (!data.currency || String(data.currency).trim().length !== 3) {
+			errors.currency = ['A 3-letter currency code (e.g., USD) is required.'];
+		}
+
+		return {
+			valid: Object.keys(errors).length === 0,
+			errors
+		};
+	}
+
+	// ===== SUBMISSION LOGIC =====
+
+	/**
+	 * Handles form submission, detecting create vs. update mode.
+	 */
+	async function submitOffering(raw: Record<string, any>) {
+		const id = raw.offering_id as number | undefined;
+		const isUpdate = !!id;
+
+		// Ensure contextual IDs are included in the data payload.
+		const dataToSubmit: Omit<WholesalerItemOffering, 'offering_id'> = {
+			...(raw as WholesalerItemOffering),
+			wholesaler_id: supplierId,
+			category_id: categoryId
+		};
+
+		log.info(`(OfferingForm) Submitting...`, { isUpdate, id });
+
+		try {
+			if (isUpdate) {
+				return await categoryApi.updateOffering(id!, dataToSubmit);
+			} else {
+				return await categoryApi.createOfferingForCategory(categoryId, dataToSubmit);
+			}
+		} catch (e) {
+			log.error(`(OfferingForm) Submit failed`, { error: String(e) });
+			throw e; // Re-throw for FormShell to handle
+		}
+	}
+
+	// ===== EVENT HANDLERS (LOGGING & DELEGATION) =====
+
+	function handleSubmitted(p: { data: Record<string, any>; result: unknown }) {
+		log.info({ component: 'OfferingForm', event: 'submitted' }, 'FORM_EVENT');
+		onSubmitted?.(p.data);
+	}
+
+	function handleSubmitError(p: { data: Record<string, any>; error: unknown }) {
+		log.warn(`Submit error: ${String(p.error)}`, { component: 'OfferingForm', event: 'submitError' });
+		onSubmitError?.(p);
+	}
+
+	function handleCancelled(p: { data: Record<string, any>; reason?: string }) {
+		log.debug({ component: 'OfferingForm', event: 'cancelled' }, 'FORM_EVENT');
+		onCancelled?.(p);
+	}
+
+	function handleChanged(p: { data: Record<string, any>; dirty: boolean }) {
+		log.debug({ component: 'OfferingForm', event: 'changed', dirty: p.dirty }, 'FORM_EVENT');
+		onChanged?.(p);
+	}
+</script>
+
+<FormShell
+	entity="Offering"
+	{initial}
+	validate={validateOffering}
+	submit={submitOffering}
+	{disabled}
+	onSubmitted={handleSubmitted}
+	onSubmitError={handleSubmitError}
+	onCancelled={handleCancelled}
+	onChanged={handleChanged}
+>
+	<!-- FORM HEADER -->
+	{#snippet header({ data, dirty })}
+		{@const offering = data as OfferingFormData}
+		<div class="form-header">
+			<div>
+				<h3>Product Offering Details</h3>
+				{#if offering?.offering_id}
+					<span class="field-hint">ID: {offering.offering_id}</span>
+				{/if}
+			</div>
+			<div>
+				{#if dirty}
+					<span class="pc-grid__badge pc-grid__badge--warn">Unsaved changes</span>
+				{/if}
+			</div>
+		</div>
+	{/snippet}
+
+	<!-- FORM FIELDS -->
+	{#snippet fields({ data, get, set, errors, markTouched })}
+		<!-- Compile-time check that all keys are valid for WholesalerItemOffering -->
+		{typeGuard<WholesalerItemOffering>(
+			'offering_id',
+			'wholesaler_id',
+			'category_id',
+			'product_def_id',
+			'size',
+			'dimensions',
+			'price',
+			'currency',
+			'comment',
+			'created_at'
+		)}
+
+		<div class="form-body">
+			<div class="form-grid">
+				<!-- Product Definition (Required) -->
+				<div class="form-group span-4">
+					<label for="offering-product">Product *</label>
+					<select
+						id="offering-product"
+						value={get('product_def_id') ?? ''}
+						class={errors.product_def_id ? 'error' : ''}
+						onchange={(e) => set('product_def_id', Number((e.currentTarget as HTMLSelectElement).value))}
+						onblur={() => markTouched('product_def_id')}
+						required
+						aria-invalid={!!errors.product_def_id}
+						aria-describedby={errors.product_def_id ? 'err-product' : undefined}
+					>
+						<option value="" disabled>Select a product...</option>
+						{#each availableProducts as product (product.product_def_id)}
+							<option value={product.product_def_id}>{product.title}</option>
+						{/each}
+					</select>
+					{#if errors.product_def_id}
+						<div id="err-product" class="error-text">{errors.product_def_id[0]}</div>
+					{/if}
+				</div>
+
+				<!-- Price & Currency -->
+				<div class="form-group span-2">
+					<label for="offering-price">Price</label>
+					<input
+						id="offering-price"
+						type="number"
+						step="0.01"
+						placeholder="e.g., 199.99"
+						value={get('price') ?? ''}
+						class={errors.price ? 'error' : ''}
+						oninput={(e) => set('price', (e.currentTarget as HTMLInputElement).valueAsNumber)}
+						onblur={() => markTouched('price')}
+						aria-invalid={!!errors.price}
+						aria-describedby={errors.price ? 'err-price' : undefined}
+					/>
+					{#if errors.price}
+						<div id="err-price" class="error-text">{errors.price[0]}</div>
+					{/if}
+				</div>
+				<div class="form-group span-2">
+					<label for="offering-currency">Currency *</label>
+					<input
+						id="offering-currency"
+						type="text"
+						placeholder="e.g., USD"
+						maxlength="3"
+						value={get('currency') ?? ''}
+						class={errors.currency ? 'error' : ''}
+						oninput={(e) => set('currency', (e.currentTarget as HTMLInputElement).value.toUpperCase())}
+						onblur={() => markTouched('currency')}
+						required
+						aria-invalid={!!errors.currency}
+						aria-describedby={errors.currency ? 'err-currency' : undefined}
+					/>
+					{#if errors.currency}
+						<div id="err-currency" class="error-text">{errors.currency[0]}</div>
+					{/if}
+				</div>
+
+				<!-- Size & Dimensions -->
+				<div class="form-group span-2">
+					<label for="offering-size">Size</label>
+					<input
+						id="offering-size"
+						type="text"
+						placeholder="e.g., 15 inch, Large"
+						value={get('size') ?? ''}
+						oninput={(e) => set('size', (e.currentTarget as HTMLInputElement).value)}
+						onblur={() => markTouched('size')}
+					/>
+				</div>
+				<div class="form-group span-2">
+					<label for="offering-dimensions">Dimensions</label>
+					<input
+						id="offering-dimensions"
+						type="text"
+						placeholder="e.g., 10x20x5 cm"
+						value={get('dimensions') ?? ''}
+						oninput={(e) => set('dimensions', (e.currentTarget as HTMLInputElement).value)}
+						onblur={() => markTouched('dimensions')}
+					/>
+				</div>
+
+				<!-- Comment Section -->
+				<div class="form-group span-4">
+					<label for="offering-comment">Comment</label>
+					<textarea
+						id="offering-comment"
+						rows="3"
+						placeholder="Internal notes about this specific offering..."
+						oninput={(e) => set('comment', (e.currentTarget as HTMLTextAreaElement).value)}
+					>{get('comment') ?? ''}</textarea>
+				</div>
+			</div>
+		</div>
+	{/snippet}
+
+	<!-- FORM ACTIONS -->
+	{#snippet actions({ submit, cancel, submitting, dirty })}
+		<div class="form-actions">
+			<button class="secondary-button" type="button" onclick={cancel} disabled={submitting}>
+				Cancel
+			</button>
+			<button
+				class="primary-button"
+				type="button"
+				onclick={() => submit()}
+				disabled={!dirty || submitting}
+				aria-busy={submitting}
+			>
+				{#if submitting}
+					<span class="pc-grid__spinner" aria-hidden="true"></span>
+				{/if}
+				Save Offering
+			</button>
+		</div>
+	{/snippet}
+</FormShell>

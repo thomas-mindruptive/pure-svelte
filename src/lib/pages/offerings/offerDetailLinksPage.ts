@@ -4,7 +4,7 @@ import { ApiClient } from '$lib/api/client/ApiClient';
 import { getOfferingApi } from '$lib/api/client/offering';
 import { log } from '$lib/utils/logger';
 import { error, type LoadEvent } from '@sveltejs/kit';
-import { getProductDefinitionApi } from '$lib/api/client/productDefintion';
+import { getProductDefinitionApi } from '$lib/api/client/productDefinition';
 
 
 /**

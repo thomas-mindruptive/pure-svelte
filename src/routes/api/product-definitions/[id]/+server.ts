@@ -26,7 +26,6 @@ import type {
  * @description Retrieves a single product definition record.
  */
 export const GET: RequestHandler = async ({ params }) => {
-	log.infoHeader('GET /api/product-definitions/[id]'); // KORREKTUR: Fehlendes Logging hinzugefügt
 	const operationId = uuidv4();
 	const id = parseInt(params.id ?? '', 10);
 	log.info(`[${operationId}] GET /product-definitions/${id}: FN_START`);
@@ -67,7 +66,6 @@ export const GET: RequestHandler = async ({ params }) => {
  * @description Dynamically updates an existing product definition based on provided fields.
  */
 export const PUT: RequestHandler = async ({ params, request }) => {
-	log.infoHeader('PUT /api/product-definitions/[id]'); // KORREKTUR: Fehlendes Logging hinzugefügt
 	const operationId = uuidv4();
 	const id = parseInt(params.id ?? '', 10);
 	log.info(`[${operationId}] PUT /product-definitions/${id}: FN_START`);
@@ -96,6 +94,7 @@ export const PUT: RequestHandler = async ({ params, request }) => {
 
 		log.info(`[${operationId}] Validated fields for dynamic update:`, fieldsToUpdate);
 
+		// Dynamically build the SET clause for the SQL query
 		const setClauses = fieldsToUpdate.map((field) => `${field} = @${field}`);
 		const sqlQuery = `
             UPDATE dbo.product_definitions 
@@ -104,6 +103,7 @@ export const PUT: RequestHandler = async ({ params, request }) => {
             WHERE product_def_id = @id
         `;
 
+		// Prepare the database request with dynamic inputs
 		const dbRequest = db.request().input('id', id);
 		for (const field of fieldsToUpdate) {
 			dbRequest.input(field, (sanitized as Record<string, unknown>)[field]);
@@ -137,7 +137,6 @@ export const PUT: RequestHandler = async ({ params, request }) => {
  * @description Deletes a product definition after checking for hard dependencies.
  */
 export const DELETE: RequestHandler = async ({ params }) => {
-	log.infoHeader('DELETE /api/product-definitions/[id]'); // KORREKTUR: Fehlendes Logging hinzugefügt
 	const operationId = uuidv4();
 	const id = parseInt(params.id ?? '', 10);
 	log.info(`[${operationId}] DELETE /product-definitions/${id}: FN_START`);
@@ -150,6 +149,7 @@ export const DELETE: RequestHandler = async ({ params }) => {
 	try {
 		const dependencies = await checkProductDefinitionDependencies(id);
 
+		// Hard dependency check: Offerings must not exist.
 		if (dependencies.length > 0) {
 			const conflictResponse: DeleteConflictResponse<string[]> = {
 				success: false,
@@ -157,12 +157,13 @@ export const DELETE: RequestHandler = async ({ params }) => {
 				status_code: 409,
 				error_code: 'DEPENDENCY_CONFLICT',
 				dependencies: dependencies,
-				cascade_available: false,
+				cascade_available: false, // Cascade is NOT allowed for this hard link.
 				meta: { timestamp: new Date().toISOString() }
 			};
 			return json(conflictResponse, { status: 409 });
 		}
 
+		// Get details before deletion for the response payload
 		const detailsResult = await db
 			.request()
 			.input('id', id)
@@ -173,6 +174,7 @@ export const DELETE: RequestHandler = async ({ params }) => {
 		}
 		const details = detailsResult.recordset[0];
 
+		// Perform the deletion
 		await db.request().input('id', id).query('DELETE FROM dbo.product_definitions WHERE product_def_id = @id');
 
 		const response: DeleteSuccessResponse<Pick<ProductDefinition, 'product_def_id' | 'title'>> = {

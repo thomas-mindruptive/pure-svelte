@@ -56,7 +56,7 @@ export async function checkWholesalerDependencies(wholesalerId: number): Promise
     if (offeringsCheck.recordset[0].count > 0) {
         dependencies.push(`${offeringsCheck.recordset[0].count} product offerings`);
     }
-    
+
     // Note: The following checks could be considered redundant if offerings are a hard dependency,
     // but are included for completeness as per the original file.
     const linksCheck = await db.request()
@@ -139,4 +139,34 @@ export async function checkProductCategoryMasterDependencies(categoryId: number)
     log.info(`(dependencyChecks) Found dependencies for categoryId: ${categoryId}`, { hard: hardDependencies, soft: softDependencies });
 
     return { hard: hardDependencies, soft: softDependencies };
+}
+
+/**
+ * Checks for hard dependencies on a Product Definition.
+ * This is used before deleting a product_definitions record to see if it would
+ * orphan any offerings, which is not allowed.
+ * @param productDefId The ID of the product definition to check.
+ * @returns An array of strings describing the found dependencies.
+ */
+export async function checkProductDefinitionDependencies(productDefId: number): Promise<string[]> {
+    const dependencies: string[] = [];
+    log.info(`(dependencyChecks) Checking master dependencies for productDefId: ${productDefId}`);
+
+    // Hard Dependency: Offerings (dbo.wholesaler_item_offerings)
+    const offeringsCheck = await db
+        .request()
+        .input('productDefId', productDefId).query`
+      SELECT COUNT(*) as count 
+      FROM dbo.wholesaler_item_offerings
+      WHERE product_def_id = @productDefId
+    `;
+
+    if (offeringsCheck.recordset[0].count > 0) {
+        dependencies.push(`${offeringsCheck.recordset[0].count} product offerings`);
+    }
+
+    log.info(`(dependencyChecks) Found dependencies for productDefId: ${productDefId}`, {
+        dependencies
+    });
+    return dependencies;
 }

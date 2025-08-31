@@ -36,13 +36,14 @@
  * ```
  */
 
-import type { 
-  Wholesaler, 
-  ProductCategory, 
+import type {
+  Wholesaler,
+  ProductCategory,
   WholesalerItemOffering,
   WholesalerOfferingAttribute,
-  WholesalerOfferingLink, 
-  Attribute
+  WholesalerOfferingLink,
+  Attribute,
+  ProductDefinition
 } from '$lib/domain/types';
 import { log } from '$lib/utils/logger';
 
@@ -138,9 +139,9 @@ export const COMMON_CONSTRAINTS = {
   /** Website URL */
   url: { maxLength: 2048, format: 'url', trim: true } as FieldConstraints,
   /** Status enumeration */
-  status: { 
+  status: {
     enum: ['active', 'inactive', 'new', 'pending', 'suspended'] as const,
-    trim: true 
+    trim: true
   } as FieldConstraints,
   /** Currency amount */
   currency: { min: 0, max: 999999999.99 } as FieldConstraints,
@@ -155,6 +156,7 @@ const DOMAIN_SCHEMAS: {
   offering: ValidationSchema<WholesalerItemOffering>;
   attribute: ValidationSchema<WholesalerOfferingAttribute>;
   link: ValidationSchema<WholesalerOfferingLink>;
+  productDefinition: ValidationSchema<ProductDefinition>;
 } = {
   wholesaler: {
     requiredOnCreate: ['name', 'dropship'],
@@ -169,14 +171,14 @@ const DOMAIN_SCHEMAS: {
     },
     entityValidator: (data) => {
       const errors: Record<string, string[]> = {};
-      
+
       // Business rule: name must not contain certain characters
       if (data.name && typeof data.name === 'string') {
         if (/[<>"'&]/.test(data.name)) {
           errors.name = ['Name cannot contain special characters: < > " \' &'];
         }
       }
-      
+
       // Business rule: website and region correlation
       if (data.website && data.region) {
         const websiteLower = data.website.toLowerCase();
@@ -185,7 +187,7 @@ const DOMAIN_SCHEMAS: {
           // This is a warning, not an error - could be implemented as warnings array
         }
       }
-      
+
       return errors;
     }
   },
@@ -206,22 +208,22 @@ const DOMAIN_SCHEMAS: {
       size: { maxLength: 50, trim: true },
       dimensions: { maxLength: 100, trim: true },
       price: COMMON_CONSTRAINTS.currency,
-      currency: { 
+      currency: {
         enum: ['USD', 'EUR', 'GBP', 'JPY', 'CNY'] as const,
-        trim: true 
+        trim: true
       },
       comment: COMMON_CONSTRAINTS.longText,
     },
     entityValidator: (data) => {
       const errors: Record<string, string[]> = {};
-      
+
       // Business rule: if price is set, currency must be set
       if (data.price !== undefined && data.price !== null && data.price > 0) {
         if (!data.currency || typeof data.currency !== 'string' || !data.currency.trim()) {
           errors.currency = ['Currency is required when price is specified'];
         }
       }
-      
+
       return errors;
     }
   },
@@ -241,7 +243,16 @@ const DOMAIN_SCHEMAS: {
       url: COMMON_CONSTRAINTS.url,
       notes: COMMON_CONSTRAINTS.longText,
     }
-  }
+  },
+
+  	productDefinition: {
+		requiredOnCreate: ['title', 'category_id'],
+		requiredOnUpdate: [],
+		constraints: {
+			title: COMMON_CONSTRAINTS.shortText,
+			description: COMMON_CONSTRAINTS.longText
+		}
+	}
 };
 
 /**
@@ -253,36 +264,36 @@ const DOMAIN_SCHEMAS: {
  * @returns Array of error messages (empty if valid)
  */
 function validateFieldConstraints(
-  value: unknown, 
-  constraints: FieldConstraints, 
+  value: unknown,
+  constraints: FieldConstraints,
   fieldName: string
 ): string[] {
   const errors: string[] = [];
-  
+
   // Handle null/undefined values
   if (value === null || value === undefined) {
     return errors; // Null/undefined handled by required field validation
   }
-  
+
   // Convert to string for string-based validations
   let stringValue = String(value);
-  
+
   // Apply trimming if requested
   if (constraints.trim && typeof value === 'string') {
     stringValue = value.trim();
   }
-  
+
   // String length validations
   if (typeof value === 'string' || typeof value === 'number') {
     if (constraints.minLength !== undefined && stringValue.length < constraints.minLength) {
       errors.push(`${fieldName} must be at least ${constraints.minLength} characters long`);
     }
-    
+
     if (constraints.maxLength !== undefined && stringValue.length > constraints.maxLength) {
       errors.push(`${fieldName} must be ${constraints.maxLength} characters or less`);
     }
   }
-  
+
   // Format validation
   if (constraints.format && stringValue.length > 0) {
     const pattern = FORMAT_PATTERNS[constraints.format];
@@ -291,32 +302,32 @@ function validateFieldConstraints(
       errors.push(`${fieldName} must be a valid ${formatName.toLowerCase()}`);
     }
   }
-  
+
   // Pattern validation
   if (constraints.pattern && stringValue.length > 0) {
     if (!constraints.pattern.test(stringValue)) {
       errors.push(`${fieldName} format is invalid`);
     }
   }
-  
+
   // Enum validation
   if (constraints.enum && stringValue.length > 0) {
     if (!constraints.enum.includes(stringValue as never)) {
       errors.push(`${fieldName} must be one of: ${constraints.enum.join(', ')}`);
     }
   }
-  
+
   // Numeric validations
   if (typeof value === 'number') {
     if (constraints.min !== undefined && value < constraints.min) {
       errors.push(`${fieldName} must be at least ${constraints.min}`);
     }
-    
+
     if (constraints.max !== undefined && value > constraints.max) {
       errors.push(`${fieldName} must be at most ${constraints.max}`);
     }
   }
-  
+
   // Custom validation
   if (constraints.custom) {
     const customError = constraints.custom(value);
@@ -324,7 +335,7 @@ function validateFieldConstraints(
       errors.push(customError);
     }
   }
-  
+
   return errors;
 }
 
@@ -339,12 +350,12 @@ function sanitizeFieldValue(value: unknown, constraints: FieldConstraints): unkn
   if (value === null || value === undefined) {
     return value;
   }
-  
+
   // Apply trimming to strings
   if (constraints.trim && typeof value === 'string') {
     return value.trim();
   }
-  
+
   return value;
 }
 
@@ -369,11 +380,11 @@ export function validateDomainEntity<T extends Record<string, unknown>>(
   options: ValidationOptions
 ): ValidationResult {
   const { mode, entity = 'entity', context } = options;
-  
+
   // Get entity type from generic or infer from data
   const entityType = inferEntityType(data);
   const schema = DOMAIN_SCHEMAS[entityType as keyof typeof DOMAIN_SCHEMAS] as ValidationSchema<T> | undefined;
-  
+
   if (!schema) {
     log.warn("No validation schema found for entity type", { entityType, entity });
     return {
@@ -382,10 +393,10 @@ export function validateDomainEntity<T extends Record<string, unknown>>(
       sanitized: { ...data }
     };
   }
-  
+
   const errors: Record<string, string[]> = {};
   const sanitized: Record<string, unknown> = {};
-  
+
   // Determine required fields based on mode
   let requiredFields: Array<keyof T> = [];
   switch (mode) {
@@ -399,31 +410,31 @@ export function validateDomainEntity<T extends Record<string, unknown>>(
       requiredFields = []; // No required fields for partial updates
       break;
   }
-  
+
   // Validate required fields
   for (const field of requiredFields) {
     const fieldName = String(field);
     const value = data[field];
-    
-    if (value === null || value === undefined || 
-        (typeof value === 'string' && value.trim() === '') ||
-        (typeof value === 'boolean' && mode === 'create' && value !== true && value !== false)) {
-      
+
+    if (value === null || value === undefined ||
+      (typeof value === 'string' && value.trim() === '') ||
+      (typeof value === 'boolean' && mode === 'create' && value !== true && value !== false)) {
+
       if (!errors[fieldName]) errors[fieldName] = [];
       errors[fieldName].push(`${fieldName.charAt(0).toUpperCase() + fieldName.slice(1)} is required`);
     }
   }
-  
+
   // Validate field constraints
   if (schema.constraints) {
     for (const [fieldKey, constraints] of Object.entries(schema.constraints)) {
       const field = fieldKey as keyof T;
       const fieldName = String(field);
       const value = data[field];
-      
+
       // Type guard: ensure constraints exists
       if (!constraints) continue;
-      
+
       // Skip validation if value is not provided (handled by required field validation)
       if (value !== null && value !== undefined) {
         const fieldErrors = validateFieldConstraints(value, constraints, fieldName);
@@ -431,7 +442,7 @@ export function validateDomainEntity<T extends Record<string, unknown>>(
           if (!errors[fieldName]) errors[fieldName] = [];
           errors[fieldName].push(...fieldErrors);
         }
-        
+
         // Sanitize the value
         sanitized[fieldName] = sanitizeFieldValue(value, constraints);
       } else {
@@ -440,14 +451,14 @@ export function validateDomainEntity<T extends Record<string, unknown>>(
       }
     }
   }
-  
+
   // Copy non-constrained fields to sanitized data
   for (const [key, value] of Object.entries(data)) {
     if (!(key in sanitized)) {
       sanitized[key] = value;
     }
   }
-  
+
   // Run entity-level validation
   if (schema.entityValidator) {
     const entityErrors = schema.entityValidator(data, mode);
@@ -456,9 +467,9 @@ export function validateDomainEntity<T extends Record<string, unknown>>(
       errors[field].push(...fieldErrors);
     }
   }
-  
+
   const isValid = Object.keys(errors).length === 0;
-  
+
   // Log validation results
   log.info("Domain entity validation completed", {
     entity,
@@ -469,7 +480,7 @@ export function validateDomainEntity<T extends Record<string, unknown>>(
     errorCount: Object.keys(errors).length,
     fieldCount: Object.keys(data).length
   });
-  
+
   return {
     isValid,
     errors,
@@ -490,7 +501,7 @@ function inferEntityType(data: Record<string, unknown>): string {
   if ('offering_id' in data && 'product_def_id' in data) return 'offering';
   if ('attribute_id' in data && 'offering_id' in data) return 'attribute';
   if ('link_id' in data || ('url' in data && 'offering_id' in data)) return 'link';
-  
+
   // Default fallback
   return 'unknown';
 }
@@ -517,3 +528,6 @@ export const validateOfferingAttribute = (data: Partial<WholesalerOfferingAttrib
 
 export const validateOfferingLink = (data: Partial<WholesalerOfferingLink>, options: Omit<ValidationOptions, 'entity'>) =>
   validateDomainEntity<WholesalerOfferingLink>(data, { ...options, entity: 'link' });
+
+export const validateProductDefinition = (data: Partial<ProductDefinition>, options: Omit<ValidationOptions, 'entity'>) =>
+  validateDomainEntity<ProductDefinition>(data, { ...options, entity: 'productDefinition' });

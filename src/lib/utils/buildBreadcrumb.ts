@@ -28,6 +28,7 @@ type BuildBreadcrumbOptions = {
   conservedPath?: ConservedPath | null;
   // Optional: controls if '#' is set as href (otherwise undefined = not clickable)
   useHashForDisabled?: boolean;
+  activeLevel?: string;
 };
 
 export function buildBreadcrumb(opts: BuildBreadcrumbOptions): Crumb[] {
@@ -37,14 +38,14 @@ export function buildBreadcrumb(opts: BuildBreadcrumbOptions): Crumb[] {
     opts.conservedPath ??
     (browser
       ? // Lazy import to avoid SSR issues if your store uses sessionStorage
-        (() => {
-          try {
-            const raw = sessionStorage.getItem('sb:lastPath');
-            return raw ? (JSON.parse(raw) as ConservedPath) : empty;
-          } catch {
-            return empty;
-          }
-        })()
+      (() => {
+        try {
+          const raw = sessionStorage.getItem('sb:lastPath');
+          return raw ? (JSON.parse(raw) as ConservedPath) : empty;
+        } catch {
+          return empty;
+        }
+      })()
       : empty);
 
   // 2) Current params
@@ -58,19 +59,19 @@ export function buildBreadcrumb(opts: BuildBreadcrumbOptions): Crumb[] {
   const resolvedCategoryId =
     curCategoryId ??
     (resolvedSupplierId !== null &&
-    conserved.supplierId !== null &&
-    resolvedSupplierId === conserved.supplierId
+      conserved.supplierId !== null &&
+      resolvedSupplierId === conserved.supplierId
       ? conserved.categoryId ?? null
       : null);
 
   const resolvedOfferingId =
     curOfferingId ??
     (resolvedSupplierId !== null &&
-    conserved.supplierId !== null &&
-    resolvedSupplierId === conserved.supplierId &&
-    resolvedCategoryId !== null &&
-    conserved.categoryId !== null &&
-    resolvedCategoryId === conserved.categoryId
+      conserved.supplierId !== null &&
+      resolvedSupplierId === conserved.supplierId &&
+      resolvedCategoryId !== null &&
+      conserved.categoryId !== null &&
+      resolvedCategoryId === conserved.categoryId
       ? conserved.offeringId ?? null
       : null);
 
@@ -78,20 +79,20 @@ export function buildBreadcrumb(opts: BuildBreadcrumbOptions): Crumb[] {
   // --- CORRECTED LOGIC TO AVOID RETURNING `0` ---
   const leafFromUrl = resolvedOfferingId != null
     ? (
-        /(?:^|\/)links\/?$/.test(opts.url.pathname)
+      /(?:^|\/)links\/?$/.test(opts.url.pathname)
         ? 'links'
         : /(?:^|\/)attributes\/?$/.test(opts.url.pathname)
           ? 'attributes'
           : null
-      )
+    )
     : null;
 
   const resolvedLeaf: ConservedPath['leaf'] =
     leafFromUrl ??
     (resolvedOfferingId &&
-    conserved.supplierId === resolvedSupplierId &&
-    conserved.categoryId === resolvedCategoryId &&
-    conserved.offeringId === resolvedOfferingId
+      conserved.supplierId === resolvedSupplierId &&
+      conserved.categoryId === resolvedCategoryId &&
+      conserved.offeringId === resolvedOfferingId
       ? conserved.leaf ?? null
       : null);
 
@@ -150,10 +151,27 @@ export function buildBreadcrumb(opts: BuildBreadcrumbOptions): Crumb[] {
     }
   }
 
-  // 7) Mark the last crumb as active
-  if (crumbs.length > 0) {
-    crumbs[crumbs.length - 1].active = true;
+  const activeLevelToIndexMap: Record<string, number> = {
+    'suppliers': 0,  // Aktiv: Suppliers List Page
+    'categories': 1, // Aktiv: Supplier Detail Page
+    'offerings': 2,  // Aktiv: Category Detail Page
+    // Für 'attributes' und 'links' ist das letzte Element immer korrekt,
+    // da sie die tiefste Ebene darstellen.
+    'attributes': crumbs.length - 1,
+    'links': crumbs.length - 1
+  };
+  if (opts.activeLevel) {
+    const activeIndex = activeLevelToIndexMap[opts.activeLevel];
+    crumbs.forEach((crumb, index) => {
+      crumb.active = (index === activeIndex);
+    });
   }
+
+
+  // // 7) WRONG: !!!!!! Mark the last crumb as active
+  // if (crumbs.length > 0) {
+  //   crumbs[crumbs.length - 1].active = true;
+  // }
 
   return crumbs;
 }

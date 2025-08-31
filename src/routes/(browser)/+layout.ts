@@ -41,26 +41,19 @@ export async function load({ url, params, depends, fetch: loadEventFetch }: Load
 
   if (resolvedSupplierId) {
     apiPromises.push(
-      getSupplierApi(client).loadSupplier(resolvedSupplierId).then(s => entityNames.supplier = s.name).catch(() => {})
+      getSupplierApi(client).loadSupplier(resolvedSupplierId).then(s => entityNames.supplier = s.name).catch(() => { })
     );
   }
   if (resolvedCategoryId) {
     apiPromises.push(
-      getCategoryApi(client).loadCategory(resolvedCategoryId).then(c => entityNames.category = c.name).catch(() => {})
+      getCategoryApi(client).loadCategory(resolvedCategoryId).then(c => entityNames.category = c.name).catch(() => { })
     );
   }
   if (resolvedOfferingId) {
     apiPromises.push(
-      getOfferingApi(client).loadOffering(resolvedOfferingId).then(o => entityNames.offering = o.product_def_title).catch(() => {})
+      getOfferingApi(client).loadOffering(resolvedOfferingId).then(o => entityNames.offering = o.product_def_title).catch(() => { })
     );
   }
-  await Promise.all(apiPromises);
-    const breadcrumbItems = buildBreadcrumb({
-    url,
-    params,
-    entityNames,
-    conservedPath: conservedPath // <-- Injecting the state
-  });
 
   // 6. Determine the `activeLevel`.
   let activeLevel: string;
@@ -74,19 +67,28 @@ export async function load({ url, params, depends, fetch: loadEventFetch }: Load
     activeLevel = 'suppliers';
   }
 
+  await Promise.all(apiPromises);
+  const breadcrumbItems = buildBreadcrumb({
+    url,
+    params,
+    entityNames,
+    conservedPath, // <-- Injecting the state
+    activeLevel
+  });
+
   // 7. Create the sidebar paths and states.
   const supplierPath = resolvedSupplierId ? `/suppliers/${resolvedSupplierId}` : '#';
   const categoryPath = resolvedSupplierId && resolvedCategoryId ? `/suppliers/${resolvedSupplierId}/categories/${resolvedCategoryId}` : '#';
   const offeringPathBase = resolvedSupplierId && resolvedCategoryId && resolvedOfferingId ? `/suppliers/${resolvedSupplierId}/categories/${resolvedCategoryId}/offerings/${resolvedOfferingId}` : '#';
 
   const sidebarItems = [
-    { key: 'suppliers',  label: 'Suppliers',  disabled: false,                   level: 0, href: '/suppliers' },
-    { key: 'categories', label: 'Categories', disabled: !resolvedSupplierId,     level: 1, href: supplierPath },
-    { key: 'offerings',  label: 'Offerings',  disabled: !resolvedCategoryId,     level: 2, href: categoryPath },
-    { key: 'attributes', label: 'Attributes', disabled: !resolvedOfferingId,     level: 3, href: offeringPathBase === '#' ? '#' : `${offeringPathBase}/attributes` },
-    { key: 'links',      label: 'Links',      disabled: !resolvedOfferingId,     level: 3, href: offeringPathBase === '#' ? '#' : `${offeringPathBase}/links` },
+    { key: 'suppliers', label: 'Suppliers', disabled: false, level: 0, href: '/suppliers' },
+    { key: 'categories', label: 'Categories', disabled: !resolvedSupplierId, level: 1, href: supplierPath },
+    { key: 'offerings', label: 'Offerings', disabled: !resolvedCategoryId, level: 2, href: categoryPath },
+    { key: 'attributes', label: 'Attributes', disabled: !resolvedOfferingId, level: 3, href: offeringPathBase === '#' ? '#' : `${offeringPathBase}/attributes` },
+    { key: 'links', label: 'Links', disabled: !resolvedOfferingId, level: 3, href: offeringPathBase === '#' ? '#' : `${offeringPathBase}/links` },
   ];
-  
+
   log.info(`(Layout Load) Resolved Path for UI`, { resolved: { supplierId: resolvedSupplierId, categoryId: resolvedCategoryId, offeringId: resolvedOfferingId }, activeLevel });
 
   // 8. Return all the prepared data.

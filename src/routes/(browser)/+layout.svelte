@@ -4,17 +4,10 @@
   import { goto } from "$app/navigation";
   import { log } from "$lib/utils/logger";
   import Breadcrumb from "$lib/components/Breadcrumb.svelte";
-  import { buildBreadcrumb } from "$lib/utils/buildBreadcrumb";
 
   let { data, children } = $props();
 
-  const crumbItems = $derived(
-    buildBreadcrumb({
-      url: data.url,
-      params: data.params,
-      entityNames: data.entityNames,
-    }),
-  );
+  const crumbItems = $derived(data.breadcrumbItems);
 
   // Die Daten (sidebarItems, activeLevel) kommen aus der +layout.ts
   const sidebarItems = $derived(data.sidebarItems);

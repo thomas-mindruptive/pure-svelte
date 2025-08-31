@@ -2,69 +2,69 @@
 
 **Single source of truth for the project's architecture. All development must adhere to the patterns and principles defined herein.**
 
-*Updated: 30. August 2025 - Corrected Form Architecture documentation, added Navigation Architecture.*
+*Updated: 31. August 2025 - Finalized Form & Navigation architecture, updated API Client documentation, and clarified cascade deletion logic.*
 
 ---
 
-## 1. The Vision: What is the SupplierBrowser?
+## The Vision: What is the SupplierBrowser?
 
 The SupplierBrowser is a specialized, high-performance tool for managing a 5-level data hierarchy. Its primary purpose is to provide a fast and intuitive interface for navigating and editing complex relationships between business entities.
 
-### 1.1. The 5 Levels of the Hierarchy
+### The 5 Levels of the Hierarchy
 
 The application's logic is built around a clear, five-level data model. Understanding the distinction between **Master Data**, **Hierarchical Real Objects**, and **Relationships** is critical.
 
 #### Level 1: Suppliers (Master Data)
 - **Entity**: `dbo.wholesalers`
-- **Purpose**: Independent master data entities that can be queried flexibly
-- **API Pattern**: QueryPayload for lists + Standard CRUD for individuals
-- **Creation**: `/api/suppliers/new` POST with direct entity data
+- **Purpose**: Independent master data entities that can be queried flexibly.
+- **API Pattern**: QueryPayload for lists + Standard CRUD for individuals.
+- **Creation**: `/api/suppliers/new` POST with direct entity data.
 
 #### Level 2: Categories (Relationship - Simple Assignment)  
 - **Entity**: `dbo.wholesaler_categories`
-- **Purpose**: Pure n:m relationship between suppliers and global categories
-- **Properties**: `comment`, `link` (simple metadata)
-- **API Pattern**: `/api/supplier-categories` CREATE/DELETE with AssignmentRequest
-- **Master Data**: Category definitions via `/api/categories/new`
+- **Purpose**: Pure n:m relationship between suppliers and global categories.
+- **Properties**: `comment`, `link` (simple metadata).
+- **API Pattern**: `/api/supplier-categories` CREATE/DELETE with `AssignmentRequest`.
+- **Master Data**: Category definitions via `/api/categories/new`.
 
 #### Level 3: Offerings (Relationship - 1:n Hierarchical)
 - **Entity**: `dbo.wholesaler_item_offerings`
-- **Purpose**: Products that exist only in [supplier + category] context
-- **Key Characteristic**: Cannot be created independently - always require parent context
-- **API Pattern**: `/api/category-offerings` CREATE/UPDATE/DELETE with CreateChildRequest
-- **NO** `/api/offerings/new` - violates hierarchical principle
+- **Purpose**: Products that exist only in a [supplier + category] context.
+- **Key Characteristic**: Cannot be created independently; always require parent context.
+- **API Pattern**: `/api/category-offerings` CREATE/UPDATE/DELETE with `CreateChildRequest`.
+- **NO** `/api/offerings/new` - violates hierarchical principle.
 
 #### Level 4: Attributes (Relationship - Attributed)
 - **Entity**: `dbo.wholesaler_offering_attributes`  
-- **Purpose**: n:m relationship between offerings and attributes WITH business data (`value`)
-- **Key Distinction**: Not just a link - stores attribute values (e.g., Color="Red")
-- **API Pattern**: `/api/offering-attributes` CREATE/UPDATE/DELETE with AssignmentRequest
-- **Master Data**: Attribute definitions via `/api/attributes/new`
+- **Purpose**: n:m relationship between offerings and attributes WITH business data (`value`).
+- **Key Distinction**: Not just a link - stores attribute values (e.g., Color="Red").
+- **API Pattern**: `/api/offering-attributes` CREATE/UPDATE/DELETE with `AssignmentRequest`.
+- **Master Data**: Attribute definitions via `/api/attributes/new`.
 
 #### Level 5: Links (Relationship - 1:n Composition)
 - **Entity**: `dbo.wholesaler_offering_links`
-- **Purpose**: Links that belong to specific offerings
-- **API Pattern**: `/api/offering-links` CREATE/UPDATE/DELETE with CreateChildRequest
+- **Purpose**: Links that belong to specific offerings.
+- **API Pattern**: `/api/offering-links` CREATE/UPDATE/DELETE with `CreateChildRequest`.
 
-### 1.2. The User Experience: A SvelteKit-Powered Application
+### The User Experience: A SvelteKit-Powered Application
 
-The application leverages SvelteKit's file-based routing to provide a robust and bookmarkable user experience. The state of the application is primarily driven by the URL's path, creating a seamless, app-like feel with client-side navigation. This approach replaces the previous query-parameter-based state management. See Section 5.3 for a detailed breakdown of the frontend architecture.
+The application leverages SvelteKit's file-based routing to provide a robust and bookmarkable user experience. The state of the application is primarily driven by the URL's path, creating a seamless, app-like feel with client-side navigation. This approach replaces the previous query-parameter-based state management. See the Frontend Architecture section for a detailed breakdown.
 
 ---
 
-## 2. Generic Type System - FINALIZED ARCHITECTURE
+## Generic Type System - FINALIZED ARCHITECTURE
 
-### 2.1. Core Generic Types with Request Pattern Distinction
+### Core Generic Types with Request Pattern Distinction
 
-**The architecture distinguishes between two fundamental relationship patterns:**
+The architecture distinguishes between two fundamental relationship patterns:
 
 ```typescript
-// Automatic ID field extraction
+// Automatic ID field extraction from entity types
 type IdField<T> = Extract<keyof T, `${string}_id`>;
 
-// 1:n Hierarchical Creation (one parent ID, child exists in parent context)
+// CORRECTED: 1:n Hierarchical Creation (one parent ID, child exists in parent context)
 export type CreateChildRequest<TParent, TChild> = {
-  id: TParent[IdField<TParent>];
+  parentId: TParent[IdField<TParent>];
   data: TChild;
 };
 
@@ -87,133 +87,122 @@ export type RemoveAssignmentRequest<TParent, TChild> = {
   cascade?: boolean;
 };
 
-// Deletion of entity by its ID
+// Deletion of an entity by its ID
 export type DeleteRequest<T> = {
   id: T[IdField<T>];
   cascade?: boolean;
 };
 ```
 
-### 2.1. a) Option: Adjust AssignmentReqeust to same semantics as ChreateChildRequest:
-```export type AssignmentRequest<TParent, TChild> = {
-  parentId: TParent[IdField<TParent>];
-  childId: TChild[IdField<TChild>];
-  data?: object // "Attributes" oder additonalData for the relationship.
-};```
+### Option: Adjust AssignmentRequest
 
-
-### 2.2. Request Pattern Decision Matrix
-
-| Relationship Type | Pattern | Use Case | Example |
-|------------------|---------|----------|---------|
-| **Master Data Creation** | Direct Entity Data | Independent entities | `POST /api/suppliers/new` with `Omit<Wholesaler, 'wholesaler_id'>` |
-| **1:n Hierarchical Creation** | `CreateChildRequest<Parent, Child>` | Child exists only in parent context | `POST /api/category-offerings` with parent categoryId |
-| **n:m Assignment** | `AssignmentRequest<Parent, Child>` | Link two existing entities | `POST /api/supplier-categories` with supplierID + categoryId |
-
-### 2.3. Redundancy Handling in CreateChildRequest (Option B)
-
-For hierarchical relationships, we accept controlled redundancy between parent context and child FK:
+This optional semantic adjustment remains for consideration in future API versions.
 
 ```typescript
-// Client sends:
+export type AssignmentRequest<TParent, TChild> = {
+  parentId: TParent[IdField<TParent>];
+  childId: TChild[IdField<TChild>];
+  data?: object // "Attributes" or additionalData for the relationship.
+};
+```
+
+### Request Pattern Decision Matrix
+
+| Relationship Type | Pattern | Use Case | Example |
+|---|---|---|---|
+| **Master Data Creation** | Direct Entity Data | Independent entities | `POST /api/suppliers/new` with `Omit<Wholesaler, 'wholesaler_id'>` |
+| **1:n Hierarchical Creation**| `CreateChildRequest<Parent, Child>` | Child exists only in parent context | `POST /api/category-offerings` |
+| **n:m Assignment** | `AssignmentRequest<Parent, Child>` | Link two existing entities | `POST /api/supplier-categories` |
+
+### Redundancy Handling in `CreateChildRequest`
+
+For hierarchical relationships, the API accepts controlled redundancy between the parent context and the child's foreign key in the request body.
+
+```typescript
+// Client sends a request to POST /api/category-offerings
+// The parentId (5) is provided in the body for consistency.
 CreateChildRequest<ProductCategory, Partial<Omit<WholesalerItemOffering, 'offering_id'>>> = {
-  id: 5,           // category_id as parent context  
+  parentId: 5,           // Parent category_id context
   data: {
-    category_id: 5,  // May be redundant - server validates consistency
+    category_id: 5,      // May be redundant - server validates consistency
     wholesaler_id: 1,
     product_def_id: 10
   }
 }
 
-// Server logic:
-if (requestData.id !== requestData.data.category_id) {
-  throw new Error("Category ID mismatch");
-}
-// OR auto-set if missing:
-if (!requestData.data.category_id) {
-  requestData.data.category_id = requestData.id;
+// Server-side logic ensures consistency:
+if (requestData.parentId !== requestData.data.category_id) {
+  throw new Error("Parent ID mismatch");
 }
 ```
 
-**Benefits of Option B:**
-- Stays close to DB reality and constraints
-- Allows flexible client behavior (explicit or implicit parent FK)
-- Server validates consistency without complex entity assembly
-
 ---
 
-## 3. API Architecture Patterns
+## API Architecture Patterns
 
-### 3.1. The Generic Query Endpoint: /api/query
+### The Generic Query Endpoint: `/api/query`
 
-The `/api/query` endpoint is a central architectural component that handles all complex JOIN operations and hierarchical data access.
+The `/api/query` endpoint is a central architectural component that handles all complex relational data access.
 
 #### Purpose
-- **Complex JOINs**: Multi-table operations that require predefined, optimized query structures
-- **Named Queries**: Predefined query configurations like `supplier_categories`, `category_offerings`, `offering_attributes`
-- **Hierarchical Access**: The ONLY way to query offerings (which exist in [supplier + category] context)
-- **Security**: All JOINs are predefined in `queryConfig.ts` to prevent arbitrary JOIN injections
+- **Complex JOINs**: Multi-table operations that require predefined, optimized query structures.
+- **Named Queries**: Predefined query configurations like `supplier_categories`, `category_offerings`, etc.
+- **Security**: All JOINs are predefined in `queryConfig.ts` to prevent arbitrary table access.
 
-#### Available Named Queries
-- `supplier_categories`: Suppliers with their assigned categories and offering counts
-- `category_offerings`: Offerings within [supplier + category] context with product details  
-- `offering_attributes`: Offering-attribute assignments with attribute details
-- `offering_links`: Offering links with context information
+### Master Data Pattern: QueryPayload + Individual CRUD
 
-### 3.2. Master Data Pattern: QueryPayload + Individual CRUD
-
-Master data entities follow a consistent pattern:
+Master data entities follow a consistent pattern for API interactions.
 
 ```typescript
 // List with flexible querying
 POST /api/suppliers with QueryRequest<Wholesaler>
 
 // Individual operations
-GET /api/suppliers/[id]           // Read single
-POST /api/suppliers/new           // Create new with Omit<Entity, 'id_field'>
-PUT /api/suppliers/[id]           // Update with Partial<Entity>  
-DELETE /api/suppliers/[id]        // Delete with dependency checking
+GET    /api/suppliers/[id]      // Read a single entity
+POST   /api/suppliers/new       // Create a new entity
+PUT    /api/suppliers/[id]      // Update an existing entity
+DELETE /api/suppliers/[id]      // Delete an entity
 ```
 
-### 3.3. Relationship Endpoint Pattern: `/api/<parent>-<child>`
+### Relationship Endpoint Pattern: `/api/<parent>-<child>`
 
 All relationship endpoints follow a consistent naming pattern that makes the parent-child relationship explicit.
 
-#### 1:n Hierarchical Relationships (CreateChildRequest)
-- `/api/category-offerings`: Category has Offerings 
-- `/api/offering-links`: Offering has Links
+#### 1:n Hierarchical Relationships (`CreateChildRequest`)
+- `/api/category-offerings`: A Category has many Offerings.
+- `/api/offering-links`: An Offering has many Links.
 
 ```typescript
-// CreateChildRequest pattern
+// Example: Create an Offering for a Category
 POST /api/category-offerings
 {
-  id: 5,                    // parent category_id
-  data: {                   // child offering data (may include category_id for validation)
-    wholesaler_id: 1,
-    product_def_id: 10,
-    price: 100
+  "parentId": 5,
+  "data": {
+    "wholesaler_id": 1,
+    "product_def_id": 10,
+    "price": 100
   }
 }
 ```
 
-#### n:m Assignment Relationships (AssignmentRequest)
-- `/api/supplier-categories`: Supplier assigned to Categories
-- `/api/offering-attributes`: Offering assigned to Attributes
+#### n:m Assignment Relationships (`AssignmentRequest`)
+- `/api/supplier-categories`: Assign a Supplier to a Category.
+- `/api/offering-attributes`: Assign an Attribute to an Offering.
 
 ```typescript
-// AssignmentRequest pattern  
+// Example: Assign a Category to a Supplier
 POST /api/supplier-categories
 {
-  parentId: 1,              // supplier_id
-  childId: 5,               // category_id
-  comment: "High priority", // metadata
-  link: "https://..."
+  "parentId": 1,
+  "childId": 5,
+  "comment": "High priority",
+  "link": "https://..."
 }
 ```
 
 ---
 
-## 4. Current Implementation Status
+## Current Implementation Status
 
 | Entity/Operation | Endpoint | Generic Type | Server Status | Client Status | Notes |
 | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -259,284 +248,114 @@ POST /api/supplier-categories
 
 ---
 
-## 5. Technical Architecture Pillars
+## Technical Architecture Pillars
 
-### 5.1. Type Safety Architecture
+### Type Safety Architecture
+The project is built on four pillars of type safety that work together to ensure correctness from the database to the UI.
+- **Pillar I: Generic API Types:** Universal request/response envelopes in `lib/api/types/common.ts`.
+- **Pillar II: Query Grammar:** Type-safe query language in `lib/clientAndBack/queryGrammar.ts`.
+- **Pillar III: Query Config:** A security whitelist for all table and column access in `lib/clientAndBack/queryConfig.ts`.
+- **Pillar IV: Query Builder:** A server-side utility that converts the type-safe grammar into parameterized SQL.
 
-#### Pillar I: Generic API Types (`lib/api/types/common.ts`)
-- Universal response envelopes
-- Generic request patterns with compile-time validation
-- Distinct patterns for Master Data, Hierarchical Children, and Assignments
-- Type guards for union responses
+### Request Pattern Architecture
 
-#### Pillar II: Query Grammar (`lib/clientAndBack/queryGrammar.ts`)  
-- `QueryPayload<T>` for type-safe queries
-- Strictly typed to `keyof T` for compile-time safety
+#### Deletion Pattern: Optimistic Delete with Two-Step Confirmation
+The client implements an **"Optimistic Delete"** pattern to provide a safe and informative user experience.
 
-#### Pillar III: Query Config (`lib/clientAndBack/queryConfig.ts`)
-- Security whitelist for all table access
-- Predefined JOIN configurations
-- ALL queries must use query config
+**Workflow:**
+1.  **Step 1 (Intent):** The user clicks "Delete". A generic confirmation dialog appears.
+2.  **Step 2 (API Call):** If confirmed, the client sends a **non-cascading** `DELETE` request.
+    -   **Happy Path (`200 OK`):** The item is deleted. The process ends.
+    -   **Conflict Path (`409 Conflict`):** The API responds with dependency details, including a crucial `cascade_available` flag.
+3.  **Step 3 (Consequence-Aware Confirmation):**
+    -   If the API returns `409 Conflict` and `cascade_available: true`, the UI displays a **second, specific dialog** detailing the consequences (e.g., `"This will also delete 5 offerings. Continue?"`).
+    -   If the user confirms again, the client sends a second `DELETE` request, this time with the `cascade=true` parameter.
 
-#### Pillar IV: Query Builder (`lib/server/queryBuilder.ts`)
-- Only for SELECT statements
-- Converts QueryPayload to parameterized SQL
-- Individual CRUD uses direct SQL with mssqlErrorMapper
+#### Important Distinction: Scope of Cascade
+The two-step confirmation process is universal, but the **scope** of the cascade differs significantly.
 
-### 5.2. Request Pattern Architecture
+*   **Deleting an Assignment (Narrow Cascade):**
+    *   **Trigger:** Removing a single `Supplier-Category` link.
+    *   **Impact:** The potential cascade is **narrowly scoped**, affecting only the `Offerings` (and their children) that exist within that *specific* supplier-category context. All other categories and offerings for that supplier remain untouched.
+    *   **User Confirmation:** The dialog is targeted: `"This category assignment has 5 offerings. Delete the assignment AND these 5 offerings?"`
 
-#### a) Master Data Pattern
-```typescript
-// Create
-POST /api/{entity}/new
-Body: Omit<Entity, 'id_field'>
+*   **Deleting Master Data (Wide Cascade):**
+    *   **Trigger:** Deleting an entire `Supplier` record.
+    *   **Impact:** The potential cascade is **wide and destructive**, affecting the entire data tree beneath that supplier: *all* of its category assignments, *all* of its offerings across all categories, and *all* attributes and links associated with those offerings.
+    *   **User Confirmation:** The dialog reflects the massive scope: `"Delete supplier AND ALL related data (5 categories, 28 offerings)?"`
 
-// Update  
-PUT /api/{entity}/[id]
-Body: Partial<Entity>```
+### Frontend Architecture: Page Delegation Pattern
+To avoid code duplication, the frontend follows a powerful **Page Delegation Pattern**.
+- A SvelteKit **Route** (`src/routes/...`) acts as a simple "delegator".
+- It imports and renders a reusable **Page Module** (`src/lib/pages/...`).
+- This allows multiple, different URLs to render the same UI with different data contexts, ensuring that UI and data-loading logic exist only once.
 
-#### b) Hierarchical Child Pattern  ```typescript
-// Create child in parent context
-POST /api/{parent}-{child}
-Body: CreateChildRequest<Parent, Omit<Child, 'id_field'>>
+### Frontend Styling Architecture: Pattern-Based CSS
+The application avoids global, unscoped CSS. Instead, it follows a **pattern-based approach** where common UI patterns are defined in central CSS files and explicitly imported by the components or pages that use them.
+- **Key Files:** `detail-page-layout.css`, `assignment-section.css`, `form.css`.
+- **Principle:** Components are self-documenting in their style dependencies, preventing CSS conflicts.
 
-// Update child (individual)
-PUT /api/{parent}-{child}
-Body: { child_id, ...updates }```
-
-#### c) Assignment Pattern
-```typescript
-// Create assignment
-POST /api/{parent}-{child}  
-Body: AssignmentRequest<Parent, Child, Metadata>
-
-// Remove assignment
-DELETE /api/{parent}-{child}
-Body: RemoveAssignmentRequest<Parent, Child>
-```
-
-#### d) Deletion Pattern: Optimistic Delete with Two-Step Confirmation
-Due to the backend API design, information about cascading dependencies is only revealed after a `DELETE` attempt results in a `409 Conflict`. A separate, pre-emptive "dry run" API call is inefficient and not provided. Therefore, the client implements an **"Optimistic Delete"** pattern, which provides both performance benefits and enhanced user safety.
-
-**This is the official, intended workflow for all deletion operations:**
-
-1.  **Step 1: Initial, Generic Confirmation (Intent)**
-    -   **Trigger**: The user clicks a "Delete" button.
-    -   **Action**: The generic `DataGrid` component displays a first, simple confirmation dialog (`"Are you sure you want to delete this item?"`). This can be customized via the `deleteStrategy.confirm` property.
-    -   **Purpose**: To confirm the user's basic *intent* to delete, preventing accidental clicks.
-
-2.  **Step 2: The Optimistic API Call**
-    -   **Action**: If the user confirms, the `deleteStrategy.execute` function attempts a non-cascade `DELETE` request.
-    -   **Happy Path (`200 OK`)**: If the entity has no dependencies, it's deleted immediately. The process ends here. This is the most common and fastest case.
-    -   **Conflict Path (`409 Conflict`)**: The API responds with dependency details, which the `ApiClient`'s `apiFetchUnion` method returns as a structured object (not an error).
-
-3.  **Step 3: Specific, Consequence-Aware Confirmation (Warning)**
-    -   **Trigger**: The `execute` function receives the `409 Conflict` response object.
-    -   **Action**: It now displays a **second, specific confirmation dialog** that details the consequences (e.g., `"This supplier has dependencies: 5 offerings, 2 categories. Delete anyway?"`).
-    -   **Purpose**: To warn the user about the side effects and get explicit permission for a cascading delete.
-
-**Important Distinction: Deleting Master Data vs. Assignments**
-
-The optimistic delete pattern applies universally, but the server's cascade logic differs based on the entity type:
-
--   **Master Data (e.g., `Suppliers`, `Categories`):** Deletion is **always blocked** by "hard" dependencies (like `Offerings` or `Product Definitions`). Cascading is only possible for "soft" dependencies (like the assignments in `wholesaler_categories`). The `cascade_available` flag in the API response will be `false` if hard dependencies exist, forcing the user to resolve them manually.
--   **Assignments (e.g., `Supplier-Categories`):** These relationships are simpler. Deletion can often be cascaded (e.g., removing a category assignment can also remove its associated offerings), and `cascade_available` will be `true` accordingly.
-
-**Implementation Guideline & Race Condition Prevention:**
-The `deleteStrategy.execute` function handles this entire workflow. To prevent UI race conditions where a row might get stuck in a "deleting" state, data reloading must be decoupled.
-
-```typescript
-// Correct implementation inside deleteStrategy.execute
-if (dataChanged) {
-  // Fire-and-forget: Start the reload but do not 'await' it.
-  // This allows the execute function to return immediately, letting the
-  // DataGrid clean up its internal state *before* the new data arrives
-  // and triggers a re-render.
-  // The modern SvelteKit way to do this:
-  invalidateAll(); 
-}
-```
-
-### 5.3. Frontend Architecture: Page Delegation Pattern
-
-To support multiple, complex navigation hierarchies while avoiding code duplication, the frontend follows a powerful **Page Delegation Pattern**. This SvelteKit-idiomatic approach separates the concerns of routing, data loading, and UI rendering.
-
-#### The Core Principle
-A SvelteKit **Route** is a simple "delegator" that connects a URL to a reusable **Page Module**. This Page Module contains both the UI and the data-loading logic for that specific view.
-
-#### Concrete Application: Pages & Hierarchies
-The application is composed of several reusable "Page" components that can be arranged in different navigation hierarchies.
-
-**Reusable Pages:**
-- `[supplier-list]`: list + create supplier
-- `[cat-list]`: list + create cat
-- `[supplier-detail]`: form + cat-grid
-- `[cat-detail readonly-cat]`: readonly cat-info + offers-grid
-- `[cat-detail editable-cat]`: cat-form + offers-grid
-- `[offer-detail/attributes]`: form + attribute-grid + create attribute (inline)
-- `[offer-detail/links]`: form + link-grid + create link (inline)
-
-**Example Navigation Hierarchies:**
-- **Supplier-centric Path:**
-  - 1) `[supplier-list]`
-    - 2) `[supplier-detail]`
-      - 3) `[cat-detail readonly-cat]`
-        - 4a) `[offer-detail/attributes]`
-        - 4b) `[offer-detail/links]`
-- **Category-centric Path:**
-  - 1) `[cat-list]`
-    - 2) `[cat-detail editable-cat]`
-      - 3a) `[offer-detail/attributes]`
-      - 3b) `[offer-detail/links]`
-        - 4) `[supplier-detail]` 
-
-#### Example Implementation: File Structure & Reuse Pattern
-This pattern is realized by separating Page Modules from the Routes that use them.
-
-- `src/`
-  - `lib/`
-    - `pages/`
-      - `categories/`
-        - `CategoryDetailPage.svelte`: UI (form + grid)
-        - `categoryDetailPage.ts`: `load()` and other logic
-  - `routes/`
-    - `categories/`
-      - `[categoryId]/`
-        - `+page.ts`: [DELEGATOR] `import { load } from '$lib/pages/categories/categoryDetailPage'`
-        - `+page.svelte`: [RENDERER] `import CategoryDetailPage from '$lib/pages/categories/CategoryDetailPage.svelte'`
-    - `suppliers/`
-      - `[supplierId]/`
-        - `categories/`
-          - `[categoryId]/`
-            - `+page.ts`: [DELEGATOR] `import { load } from '$lib/pages/categories/categoryDetailPage'`
-            - `+page.svelte`: [RENDERER] `import CategoryDetailPage from '$lib/pages/categories/CategoryDetailPage.svelte'`
-
-**Benefits:**
-- **DRY (Don't Repeat Yourself):** UI and data logic for a view like "Category Detail" exist only once.
-- **n:m Routing:** Multiple, different URLs can all delegate to the same Page Module, rendering the same UI with different contexts.
-- **Separation of Concerns:** Routes handle *what* to show, Pages handle *how* to show it.
-- **Maintainability:** The architecture is predictable, scalable, and easy to navigate.
-
-### 5.4. Frontend Styling Architecture: Pattern-Based CSS
-
-To ensure a consistent and maintainable user interface, the application avoids global, unscoped CSS. Instead, it follows a **pattern-based approach** where common UI patterns are defined in central CSS files and explicitly imported by the components or pages that use them. This acts as a local "Styleguide".
-
-**Core Principles:**
-- **No Global CSS Soup:** Styles are not automatically available everywhere. This prevents naming collisions and makes dependencies clear.
-- **Explicit Imports:** A page that needs to render a certain pattern (e.g., a detail page header) must import the corresponding CSS file. This makes the component's dependencies self-documenting.
-- **Pattern-Based Files:** CSS files are organized by the UI pattern they describe, not by the component that uses them.
-
-**Key Pattern Files:**
-- `src/lib/components/styles/detail-page-layout.css`: Defines the overall structure for detail pages, including classes like `.detail-page-layout` and `.detail-header-section`.
-- `src/lib/components/styles/assignment-section.css`: Defines the visual container for simple forms that assign child entities (e.g., assigning a category or an attribute).
-- `src/lib/components/styles/grid-section.css`: Defines the visual container for data grids when they appear as a subsection on a detail page.
-
-**Example Usage (`CategoryDetailPage.svelte`):**
-```
-<script>
-  // Explicitly import the required UI patterns
-  import '$lib/components/styles/detail-page-layout.css';
-  import '$lib/components/styles/grid-section.css';
-  // ...
-</script>
-
-<div class="detail-page-layout">
-  <div class="detail-header-section">...</div>
-  <div class="grid-section">...</div>
-</div>
-```
-
-This approach combines the benefits of reusable styles with the safety and clarity of explicit dependencies.
-
-### 5.5. Frontend Form Architecture: The "Dumb Shell / Smart Parent" Pattern
-
-To create reusable, yet fully type-safe forms, this project uses the **"Dumb Shell / Smart Parent" Pattern**. This pattern separates the general state management logic from the domain-specific implementation, ensuring robustness and maintainability. This architecture was chosen after attempts to create a fully generic `FormShell` component led to complex and brittle type inference issues with the Svelte 5 compiler.
+### Frontend Form Architecture: The "Dumb Shell / Smart Parent" Pattern
+To create reusable yet fully type-safe forms, the project uses this robust pattern.
 
 #### The "Dumb" State Manager: `FormShell.svelte`
-- **Purpose:** `FormShell.svelte` is a generic, reusable component. Its only job is to manage the core mechanics of a form: tracking the data object, detecting if it's "dirty" (changed), handling the submission state (`submitting`), and orchestrating the `validate` and `submit` lifecycle.
-- **Implementation:** To remain generic and avoid type conflicts, it works internally with `Record<string, any>`. It receives functions (`validate`, `submit`) as props and calls them at the appropriate time. It has no knowledge of specific data types like `Wholesaler`.
+- A generic component that knows nothing about specific data types like `Wholesaler`.
+- It manages the core form mechanics: tracking data, "dirty" state, submission status, and orchestrating the `validate` and `submit` lifecycle via Svelte 5 callback props (`onSubmitted`, `onSubmitError`).
 
 #### The "Smart" Parent: `SupplierForm.svelte`
-- **Purpose:** A component like `SupplierForm.svelte` is a "smart" parent. It knows everything about a specific data type (e.g., `Wholesaler`).
-- **Responsibilities:**
-    1.  **Knows the Type:** It imports the `Wholesaler` type and uses it for its internal functions and props.
-    2.  **Implements Logic:** It defines the specific `validate` and `submit` functions that know the validation rules and API endpoints for a `Wholesaler`.
-    3.  **Bridges the Type Gap:** It is responsible for bridging the gap between its own strongly-typed world and the weakly-typed world of `FormShell`.
+- A specific component that knows everything about a `Wholesaler`.
+- It defines a local type for its form data (e.g., `SupplierFormData`) which can include both domain fields and UI-specific fields.
+- It provides the domain-specific `validate` and `submit` functions to the `FormShell`.
+- It bridges the type gap between its specific world and the generic world of the `FormShell`.
 
-#### The Key to Type Safety
-This pattern works by using two explicit techniques in the **"Smart Parent"** (`SupplierForm.svelte`) to ensure end-to-end type safety:
+#### The Key to Type Safety: A Controlled Bridge
+This pattern works by using two explicit techniques in the "Smart Parent" to ensure end-to-end type safety:
 
-1.  **Casting Props Down:** The parent's strongly-typed functions (e.g., `validate(data: Wholesaler)`) are passed to the shell's weakly-typed props (`validate(data: Record<string, any>)`) using an `as any` cast. This is a deliberate signal to TypeScript that the developer guarantees the type compatibility.
-
+1.  **Casting Props Down (`as any`):** The parent's strongly-typed functions are passed to the shell's weakly-typed props using an `as any` cast. This is a deliberate, localized signal to TypeScript that the developer guarantees type compatibility.
     ```svelte
-    <!-- In SupplierForm.svelte -->
-    <FormShell
-      ...
-      validate={validate as any}
-      submit={submit as any}
-      onSubmitted={onSubmitted as any}
-    />
+    <FormShell validate={validateWholesaler as any} />
     ```
 
-2.  **Typing Snippet Parameters Up:** Inside the snippets provided to `FormShell`, the parameters (`data`, `get`, `set`) would normally be of type `any`. The parent **restores full type safety** by explicitly typing these parameters. This provides autocompletion and compile-time checking within the template.
-
+2.  **Casting Data Up (`{@const}`):** Inside the snippets, the weakly-typed `data` object from the shell is immediately cast to the parent's specific form data type. This restores full type safety, autocompletion, and compile-time checking within the template.
     ```svelte
-    <!-- In SupplierForm.svelte -->
-    {#snippet header({ data, dirty }: { data: Wholesaler, dirty: boolean })}
-      <!-- `data` is now a fully-typed Wholesaler object. -->
-      <!-- A typo like `data.naem` would cause a compiler error. -->
-      <h1>{data.name}</h1>
+    {#snippet fields({ data, get, set })}
+      {@const form_data = data as SupplierFormData}
+      <h1>{form_data.name}</h1>
     {/snippet}
     ```
-This explicit, clear pattern proved to be the most robust and stable solution, providing both reusability and complete type safety where it matters most—in the domain-specific form components.
 
-### 5.6. Frontend Navigation Architecture: Context Conservation
-
-To provide an intuitive, hierarchical navigation experience, the application uses a "Context Conservation" pattern. This pattern ensures that the user's navigation path is "remembered", even when they navigate to higher levels in the hierarchy. This is primarily visualized through a `Breadcrumb` component.
+### Frontend Navigation Architecture: Context Conservation
+The application uses a "Context Conservation" pattern to provide an intuitive, hierarchical navigation experience.
 
 #### Core Components:
-1.  **Persistent State (`navigationState.ts`):** A custom Svelte store (`writable`) is used to store the IDs of the last visited path (e.g., `{ supplierId: 1, categoryId: 5, offeringId: 10 }`). This store automatically synchronizes its state with the browser's `sessionStorage`, making the user's context persistent across page reloads.
-
-2.  **The "Brain" (`(browser)/+layout.ts`):** The root `load` function for the browser section acts as the central orchestrator. In every navigation:
-    *   It reads the current path from the URL's `params`.
-    *   It reads the "remembered" path from the `navigationState` store.
-    *   It combines these two sources to create a "resolved path". This resolved path is used to enable/disable items in the `HierarchySidebar` and to build the `Breadcrumb` trail.
-    *   It also fetches the names of the entities (e.g., supplier name, category name) corresponding to the IDs in the resolved path.
-
-3.  **The UI (`Breadcrumb.svelte` & `buildBreadcrumb.ts`):**
-    *   A reusable `Breadcrumb.svelte` component is responsible for rendering the navigation trail.
-    *   A utility function, `buildBreadcrumb.ts`, takes the data from the `load` function (URL, params, entity names, conserved path) and constructs the final array of `Crumb` objects to be displayed.
-
-This architecture creates a powerful and user-friendly navigation system where the UI (Sidebar and Breadcrumb) always reflects the deepest context the user has reached. The context is only reset when the user makes an explicit choice that changes it (e.g., selecting a different supplier from the main list).
+1.  **Persistent State (`navigationState.ts`):** A Svelte store that "remembers" the IDs of the last visited path and synchronizes with `sessionStorage`.
+2.  **The "Brain" (`(browser)/+layout.ts`):** The root `load` function acts as the central orchestrator. On every navigation, it:
+    - Reads the current path from URL `params`.
+    - Reads the "remembered" path from the `navigationState` store.
+    - Determines the current `activeLevel` (e.g., 'suppliers', 'categories') based on the URL.
+    - Calls `buildBreadcrumb.ts`, passing it all necessary data to construct the final UI state for the `Breadcrumb` and `HierarchySidebar`.
+3.  **The UI (`Breadcrumb.svelte`, `HierarchySidebar.svelte`):** These are "dumb" components that simply render the pre-calculated data provided by the `load` function.
 
 ---
 
-## 6. Architectural Insight: Handling Isomorphic Code (Server vs. Browser)
+## Architectural Insight: Handling Isomorphic Code
 
 One of the major challenges in SvelteKit is managing code that runs in both environments (isomorphic code, primarily in `src/lib`).
 
 **The Problem: Hidden Node.js Dependencies in the Browser**
-
-During the development of a robust logger, a critical issue was discovered: attempting to import server-side Node.js modules (like `pino-pretty` or `node:module`) in an isomorphic file **inevitably breaks the browser build**. This happens at build-time, long before a runtime `if (browser)` check can prevent the import.
+Attempting to import server-side Node.js modules (like `pino-pretty`) in an isomorphic file **inevitably breaks the browser build**. This happens at build-time, long before a runtime `if (browser)` check can prevent the import.
 
 **The Challenge: Race Conditions with Asynchronous Initialization**
-
-Workarounds involving dynamic, asynchronous imports within the server-only block proved to be fragile. They introduced race conditions where log calls at the beginning of a request would be "swallowed" because the logger had not yet finished its asynchronous initialization. This leads to unreliable and hard-to-debug behavior.
+Workarounds involving dynamic, asynchronous imports introduce race conditions where log calls can be "swallowed" because the logger has not yet finished its asynchronous initialization.
 
 **The Current Solution: A Minimal, Synchronous Logger**
-
-To avoid these issues and ensure stability, the project currently uses a **minimal, synchronous logger implementation** in `src/lib/utils/logger.ts`. This file:
--   Uses an `if (browser)` check to strictly separate the environments.
--   Implements a simple wrapper around `console` in the browser.
--   Uses a basic configuration of `pino` on the server **without any asynchronous or Node.js-specific dependencies that could contaminate the client build.**
-
-This approach guarantees reliability and avoids the complexity and fragility of asynchronous initialization in an isomorphic context. Future logger enhancements must respect this principle.
+The project uses a **minimal, synchronous logger implementation** in `src/lib/utils/logger.ts` that uses a simple `if (browser)` check to strictly separate the environments without any problematic server-side imports. This guarantees reliability.
 
 ---
 
-## 7. Examples of Generic Type Usage
+## Examples of Generic Type Usage
 
-### 7.1. Master Data Creation
+### Master Data Creation
 ```typescript
 // Category Master Data
 POST /api/categories/new
@@ -544,17 +363,17 @@ Body: Omit<ProductCategory, 'category_id'>
 // → { name: "Laptops", description: "Portable computers" }
 ```
 
-### 7.2. Hierarchical Child Creation (1:n)
-```typescript
+### Hierarchical Child Creation (1:n)```typescript
 // Category → Offering
 CreateChildRequest<ProductCategory, Partial<Omit<WholesalerItemOffering, 'offering_id'>>>
-// → { id: 5, data: { wholesaler_id: 1, category_id: 5, product_def_id: 10 } }
+// → { parentId: 5, data: { wholesaler_id: 1, category_id: 5, product_def_id: 10 } }
 
 // Offering → Link
 CreateChildRequest<WholesalerItemOffering, Omit<WholesalerOfferingLink, 'link_id'>>
-// → { id: 12, data: { offering_id: 12, url: "https://...", notes: "..." } }```
+// → { parentId: 12, data: { offering_id: 12, url: "https://...", notes: "..." } }
+```
 
-### 7.3. Assignment Creation (n:m)
+### Assignment Creation (n:m)
 ```typescript
 // Supplier-Category Assignment
 AssignmentRequest<Wholesaler, ProductCategory, { comment?: string; link?: string }>
@@ -567,9 +386,9 @@ AssignmentRequest<WholesalerItemOffering, Attribute, { value?: string }>
 
 ---
 
-## 8. Implementation Guidelines
+## Implementation Guidelines
 
-### 8.1. Adding New Master Data
+### Adding New Master Data
 
 **For Independent Entities:**
 ```typescript
@@ -580,7 +399,7 @@ Body: Omit<Entity, 'id_field'>
 create{Entity}(data: Omit<Entity, 'id_field'>): Promise<Entity>
 ```
 
-### 8.2. Adding New Hierarchical Children
+### Adding New Hierarchical Children
 
 **For 1:n Relationships:**
 ```typescript
@@ -594,7 +413,7 @@ create{Child}For{Parent}(
 ): Promise<ChildEntity>
 ```
 
-### 8.3. Adding New Assignments
+### Adding New Assignments
 
 **For n:m Relationships:**
 ```typescript
@@ -611,16 +430,15 @@ assign{Child}To{Parent}(data: {
 
 ---
 
-## 9. Developer Tooling: Automated Page Scaffolding
+## Developer Tooling: Automated Page Scaffolding
 
 To enforce the Page Delegation Pattern and accelerate development, a command-line scaffolding tool is provided. It automatically generates the required file structure for a new page based on a central configuration.
 
-### 9.1. The Configuration (`tools/scaffoldConfig.ts`)
+### The Configuration (`tools/scaffoldConfig.ts`)
 
 This file is the single source of truth for the application's page structure. It defines root directories and a nested map of all available pages.
 
-```
-typescript
+```typescript
 // tools/scaffoldConfig.ts
 
 // Defines root paths for all generated files
@@ -641,13 +459,11 @@ export const pages: Record<string, Record<string, PageDefinition>> = {
 };
 ```
 
-### 9.2. The Templates (`tools/templates/`)
+### The Templates (`tools/templates/`)
 
 The tool uses template files for each generated file type (`page.svelte`, `page.ts`, `+page.svelte`, `+page.ts`). These templates contain Svelte 5-compliant boilerplate code and placeholders (e.g., `PageName$PlaceHolder`) that are filled in by the script.
 
-To ensure a good developer experience when editing the templates, they are valid Svelte/TypeScript files themselves, using special comments (`SCAFFOLD-REMOVE-BEGIN/END`) to handle expected linter errors.
-
-### 9.3. Usage
+### Usage
 
 To generate all pages defined in the configuration, run the following command from the project root:
 
@@ -655,255 +471,61 @@ To generate all pages defined in the configuration, run the following command fr
 npm run generate:pages
 ```
 
-The script will:
-1.  Optionally clean the output directory.
-2.  Iterate through every page defined in `scaffoldConfig.ts`.
-3.  Generate the corresponding Page Module (`.svelte` and `.ts` files) in the `pagesRoot`.
-4.  Generate the SvelteKit Route (`+page.svelte` and `+page.ts` files) in the `routesRoot`.
-5.  Handle existing files based on the `overwriteExisting` flag.
-
 ---
 
+## Frontend API Client & State Management
 
-
-## 10. Svelte 5 Runes Integration - LoadingState Architecture
-
-*Insights from Frontend Integration*
-
-### 10.1 Page-Level vs. Action-Specific Loading States
-
-The application uses a two-level approach to provide clear loading feedback to the user.
-
-**1. Action-Specific Loading (via `LoadingState` class):**
--   **Purpose:** To provide granular feedback for specific, client-triggered actions that do not involve a full page navigation (e.g., deleting a single item, saving a form).
--   **Mechanism:** Each API client module (e.g., `supplier.ts`) has its own `LoadingState` instance (e.g., `supplierLoadingState`). Components like `DataGrid` or `FormShell` use these states to show inline spinners or disable buttons.
--   **SSR Safety:** To prevent issues where `LoadingState` is instantiated on the server, all calls to its methods (`.start()`, `.finish()`) within the API client modules **must** be wrapped in an `if (browser)` check.
-
-**2. Page-Level Loading (via `derived` stores):**
--   **Purpose:** To provide a single, top-level loading indicator for an entire page view, which activates if *any* of its required data is currently being fetched.
--   **Mechanism:** The page component (e.g., `SupplierDetailPage.svelte`) imports all relevant `LoadingState` stores and combines them into a single reactive boolean using a `derived` store from Svelte.
--   **Example in `SupplierDetailPage.svelte`:**
-    ```typescript
-    import { derived } from 'svelte/store';
-    import { supplierLoadingState } from '$lib/api/client/supplier';
-    import { categoryLoadingState } from '$lib/api/client/category';
-
-    // This store is `true` if EITHER suppliers OR categories are loading.
-    const isPageLoading = derived(
-      [supplierLoadingState, categoryLoadingState],
-      ([$sup, $cat]) => $sup || $cat
-    );
-    ```
--   **Usage:** The page can use `$isPageLoading` to show a top-level loading badge or overlay, while passing the more specific stores (`$supplierLoadingState`, `$categoryLoadingState`) down to the individual child components.
-
-This two-level architecture provides both a holistic overview and granular, contextual feedback, leading to a better user experience.
-
----
-
-## Reactivity
-Of course. Here is the detailed explanation of Svelte's reactivity, using your application as a concrete example, formatted in Markdown.
-
----
-
-# Understanding Svelte's Reactivity in the SupplierBrowser App
-
-Svelte's core feature is its powerful and efficient reactivity system. Instead of using a Virtual DOM to check for differences, Svelte is a compiler that writes highly optimized, imperative code that surgically updates the DOM when your application's state changes.
-
-In your SupplierBrowser application, this reactivity can be understood on three distinct levels, each handling a different scope of state management:
-
-1.  **Architectural Reactivity:** SvelteKit's `load` function for page and layout data.
-2.  **Global Reactivity:** Svelte Stores for cross-component state.
-3.  **Component-Level Reactivity:** Svelte 5 Runes for state within a single component.
-
----
-
-### 1. Architectural Reactivity: The `load` Function
-
-This is the highest level of reactivity in your app, triggered by navigation between pages. The `load` function in your `+page.ts` or `+layout.ts` files is a reactive trigger for data fetching.
-
-#### How it Works
-
-SvelteKit automatically re-runs a `load` function whenever:
-*   A user first navigates to the route.
-*   A user navigates from one page to another.
-*   A dependency, declared using `depends()`, is invalidated (e.g., by calling `invalidateAll()`).
-
-#### Example: The Final Breadcrumb Solution (`src/routes/(browser)/+layout.ts`)
-
-Your final solution for the breadcrumb issue is a perfect demonstration of this principle.
+### The ApiClient: An SSR-Safe Foundation
+The cornerstone of frontend data fetching is the `ApiClient` class. A new instance is created for each data-loading context, passing in the context-aware `fetch` function provided by SvelteKit's `load` event. This ensures that API calls are SSR-safe.
 
 ```typescript
-// src/routes/(browser)/+layout.ts
-export async function load({ url, params, depends, fetch }: LoadEvent) {
-  // 1. Declare a dependency on the URL
-  depends(`url:${url.href}`);
-
-  // ... logic to get IDs, entityNames, etc.
-
-  // 6. Determine the `activeLevel` based on current URL params
-  let activeLevel: string;
-  if (currentOfferingId) {
-    // ...
-  } else if (currentCategoryId) {
-    activeLevel = 'offerings';
-  } // ... etc.
-
-  // 7. Directly build the breadcrumb items with the fresh data
-  const breadcrumbItems = buildBreadcrumb({
-    url,
-    params,
-    entityNames,
-    conservedPath,
-    activeLevel // <-- Pass the freshly calculated activeLevel
-  });
-
-  // 8. Return the complete, ready-to-render data object
-  return {
-    breadcrumbItems,
-    sidebarItems,
-    activeLevel,
-    // ...
-  };
-}
-```
-
-**The Reactive Chain of Events:**
-
-1.  **Action:** A user is on the `/suppliers` page and clicks on a specific supplier in the `HierarchySidebar`.
-2.  **Trigger:** The URL changes to `/suppliers/1`.
-3.  **Reaction:** Because of `depends(\`url:${url.href}\`)`, SvelteKit knows the output of this `load` function is now stale. It re-runs the entire function.
-4.  **Data Flow:**
-    *   The `load` function reads the new `params` (which now contain `supplierId: 1`).
-    *   It correctly calculates the new `activeLevel` as `'categories'`.
-    *   It calls `buildBreadcrumb` with all the **brand-new, up-to-date information**, including the correct `activeLevel`.
-    *   It returns a completely new `data` object containing the correct `breadcrumbItems` and `sidebarItems`.
-5.  **Rendering:** The `+layout.svelte` component receives this new `data` object as its prop. Svelte detects the change and efficiently re-renders the `Breadcrumb` and `HierarchySidebar` components with the correct active state.
-
-This is reactivity at the application architecture level. The `load` function acts as a "guardian" that reacts to navigation and ensures the UI always has the data it needs for the current view.
-
----
-
-### 2. Global Reactivity: Svelte Stores
-
-Stores are reactive containers for values that need to be shared across multiple, disconnected components.
-
-#### Example: `navigationState.ts` and Context Conservation
-
-Your "Context Conservation" pattern relies heavily on a store to maintain state *across* navigations.
-
-```typescript
-// src/lib/stores/navigationState.ts
-import { writable } from 'svelte/store';
-
-// Creates a reactive container for the navigation path
-export const navigationState = createPersistentPathStore('sb:lastPath', initialState);
-```
-The `writable` store exposes methods (`subscribe`, `set`, `update`) that allow any part of your app to react to or cause changes.
-
-**The Reactive Chain for "Context Conservation":**
-
-1.  **Action:** A user navigates deep into the hierarchy, for example to `/suppliers/1/categories/5`.
-2.  **Trigger:** The code responsible for this navigation (likely an event handler) updates the store: `navigationState.set({ supplierId: 1, categoryId: 5, ... })`.
-3.  **Reaction:**
-    *   The store updates its internal value.
-    *   It notifies all subscribers of the change.
-    *   Your custom `createPersistentPathStore` function also writes the new state to `sessionStorage`.
-4.  **Next Navigation:** When the user now navigates back to `/suppliers`, the `load` function in `+layout.ts` is triggered again. It reads the last known state using `const conservedPath = get(navigationState);`. This allows it to build the breadcrumb trail (`Suppliers / Global Tech Supply / Laptops`) even though the user is currently on the `/suppliers` page.
-
-Here, the store provides reactivity that persists beyond the lifecycle of a single page view. The `notifications` store is another classic example of this pattern.
-
----
-
-### 3. Component-Level Reactivity: Svelte 5 Runes
-
-Runes (`$state`, `$props`, `$derived`) make reactivity explicit and granular *inside* your Svelte components.
-
-#### Example: `+layout.svelte` and `FormShell.svelte`
-
-Your layout component shows this perfectly:
-
-```svelte
-<!-- src/routes/(browser)/+layout.svelte -->
-<script lang="ts">
-  let { data, children } = $props(); // 1. Reactive Props
-
-  const crumbItems = $derived(data.breadcrumbItems); // 2. Derived State
-  const activeLevel = $derived(data.activeLevel);
-</script>
-```
-
-1.  **`$props()`:** This rune declares that the component's properties are reactive. When the `load` function returns a new `data` object after a navigation, Svelte knows that this is a reactive change and that anything depending on `data` must be re-evaluated.
-
-2.  **`$derived(...)`:** This is the most powerful rune for expressing relationships. It tells Svelte: "The value of `crumbItems` is **always** the result of `data.breadcrumbItems`".
-    *   Whenever the `data` prop changes, Svelte **automatically and efficiently** recalculates the value of `crumbItems`.
-    *   You don't write code to handle the update; you simply declare the relationship. The Svelte compiler handles the rest.
-
-Another example is in your `FormShell.svelte`, which uses `$state` to create local reactive variables:
-
-```svelte
-// In FormShell.svelte
-const data     = $state<FormData>(safeClone(cleanInitial));
-let submitting = $state(false);
-```
-When you assign a new value to a `$state` variable (e.g., `submitting = true;`), Svelte knows that this is a state change and will automatically update any part of the component's template that depends on that variable (like disabling the submit button).
-
-### Synthesis
-
-Your app perfectly demonstrates how these three levels of reactivity work together:
-
-> **Navigation** (an external event) triggers the **Architectural Reactivity** of the `load` function. This function may read from a **Globally Reactive** `store` to get persistent context. It then produces a new `data` object, which is passed as a prop to a component. Inside that component, **Component-Level Reactivity** (Runes like `$props` and `$derived`) takes over, ensuring the UI updates efficiently in response to the new data.
-
-
-## 11. Implementation Pitfalls & Best Practices
-
-### 11.1. ApiClient: Handling the Response Body
-
-**Problem:** A `Response` body from a `fetch` call is a stream and can only be read **once**. Attempting to read it multiple times (e.g., by logging the full `response` object and then calling `await response.json()`) will result in a `Body is unusable: Body has already been read` error.
-
-**Best Practice:** Always read the body exactly once and reuse the result. The most robust method is:
-
-1.  Always read the body as text using `const responseText = await response.text()`.
-2.  If needed, log the `responseText`.
-3.  Use `JSON.parse(responseText)` inside a `try...catch` block to get the JSON object.
-
-This not only prevents the error but also provides the raw server output for better debugging in case of invalid JSON.
-
-### 11.2. ApiClient: SSR-Safe Data Loading in `load` functions
-
-**Problem:** When a SvelteKit `load` function runs on the server (during Server-Side Rendering), the global `fetch` API cannot be used with relative URLs (e.g., `/api/suppliers`). This will cause a `Cannot use relative URL with global fetch` error.
-
-**Best Practice:** Always use the context-aware `fetch` function provided by SvelteKit's `LoadEvent`. Pass this specific fetch function to the `ApiClient`'s constructor.
-
-**Correct Implementation in a `...page.ts` file:**
-```typescript
-// src/lib/pages/suppliers/supplierListPage.ts
-import { ApiClient } from '$lib/api/client/ApiClient';
-import { getSupplierApi } from '$lib/api/client/supplier';
-import type { LoadEvent } from '@sveltejs/kit';
-
-// 1. Destructure `fetch` from the LoadEvent parameter
+// Correct usage in any `+page.ts` or `+layout.ts`
 export async function load({ fetch: svelteKitFetch }: LoadEvent) {
-  
-  // 2. Pass the context-aware `svelteKitFetch` to the ApiClient
   const client = new ApiClient(svelteKitFetch);
   const supplierApi = getSupplierApi(client);
-
-  // 3. Now all API calls within this load function are SSR-safe
   const suppliers = await supplierApi.loadSuppliers();
-  
-  return { suppliers };
 }
 ```
-This pattern ensures that data loading works seamlessly for both server-side rendering and client-side navigation.
+
+### The LoadingState Architecture
+The application uses a two-level approach to provide clear loading feedback.
+- **Action-Specific Loading:** Each API client module (`supplier.ts`, etc.) exports its own `LoadingState` instance for granular feedback on specific actions (e.g., deleting, saving).
+- **Page-Level Loading:** Page components import relevant `LoadingState` stores and combine them using a `derived` store to create a single, top-level loading indicator for the entire view.
 
 ---
 
-# TODOS
-*   **Fix Breadcrumb:** Indicator for current "location" (underscore) does not work. always showst lowest select hierarchy.
+## Understanding Svelte's Reactivity in the SupplierBrowser App
+
+Svelte's core feature is its powerful and efficient reactivity system. In this application, it can be understood on three distinct levels:
+
+1.  **Architectural Reactivity (`load` Function):** SvelteKit's `load` function is the highest level of reactivity, triggered by navigation. It re-runs automatically when its declared dependencies (like the URL) change, ensuring that page and layout components always receive fresh data props. This is the engine that drives the entire application's data flow between views.
+
+2.  **Global Reactivity (Svelte Stores):** For state that needs to be shared across disconnected components or persist across navigations, the app uses Svelte Stores. The `navigationState.ts` store is a prime example, providing a reactive container for the "remembered" path that is accessible to the `load` function in any context.
+
+3.  **Component-Level Reactivity (Svelte 5 Runes):** Runes (`$state`, `$props`, `$derived`) make reactivity explicit and granular inside components.
+    - **`$props()`** makes component properties reactive. When a `load` function returns a new `data` object, the component automatically updates.
+    - **`$state()`** creates locally-scoped, reactive variables (e.g., `submitting` in `FormShell`).
+    - **`$derived()`** creates a value that is automatically recalculated whenever its dependencies change, forming the backbone of reactive UI logic.
+
+---
+
+## Implementation Pitfalls & Best Practices
+
+### ApiClient: Handling the Response Body
+**Problem:** A `Response` body from a `fetch` call is a stream and can only be read **once**.
+**Best Practice:** Always read the body into a variable (`await response.text()` or `await response.json()`) exactly once and then reuse that variable.
+
+### ApiClient: SSR-Safe Data Loading in `load` functions
+**Problem:** Using the global `fetch` with relative URLs (e.g., `/api/suppliers`) will fail during Server-Side Rendering (SSR).
+**Best Practice:** Always use the context-aware `fetch` function provided by SvelteKit's `LoadEvent` and pass it to the `ApiClient`'s constructor, as documented in the architecture.
+
+---
+
+## TODOS (UPDATED)
 *   **Refactor All Forms:** Update `OfferingForm.svelte`, `AttributeForm.svelte`, and `LinkForm.svelte` to use the now-stable **"Dumb Shell / Smart Parent"** pattern.
+*   **Refactor CSS Class Names:** The class `.category-form` in `form.css` is poorly named. Rename it to a generic name like `.form-body` and update all form components accordingly.
 *   **Finalize CSS Refactoring:** Ensure all pages correctly import and use the new pattern-based CSS files (`detail-page-layout.css`, etc.) and that all duplicate local styles have been removed.
-*   **Audit API Clients for SSR Safety:** Verify that all `LoadingState` method calls (`.start()`, `.finish()`) across all API client files are wrapped in an `if (browser)` check.
-*   **Audit `load` Functions:** Verify that all `load` functions correctly destructure `fetch` from the `LoadEvent` and pass it to the `ApiClient`.
+*   **Audit API Clients for SSR Safety:** Verify that all `LoadingState` method calls (`.start()`, `.finish()`) are wrapped in an `if (browser)` check.
+*   **Audit `load` Functions:** Verify that all `load` functions correctly pass the `fetch` function from the `LoadEvent` to the `ApiClient`.
 *   **Audit Deletion Logic:** Verify that all `deleteStrategy` implementations use the "fire-and-forget" `invalidateAll()` pattern to prevent UI race conditions.
-*   Check if error handling in pages is correct, does not swallow or incorrectly rethrow wrong errors or hide server errors.
 *   **Fix scaffolding tool:** Ensure the `+page.ts` template generates extension-less imports for module delegation.

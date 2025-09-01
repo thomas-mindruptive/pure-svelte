@@ -12,7 +12,6 @@ import { log } from '$lib/utils/logger';
 import { buildQuery, executeQuery } from '$lib/server/queryBuilder';
 import { supplierQueryConfig } from '$lib/clientAndBack/queryConfig';
 import { mssqlErrorMapper } from '$lib/server/errors/mssqlErrorMapper';
-import type { QueryPayload } from '$lib/clientAndBack/queryGrammar';
 import type { Wholesaler } from '$lib/domain/types';
 import type { QueryRequest, QuerySuccessResponse, ApiErrorResponse } from '$lib/api/types/common';
 import { v4 as uuidv4 } from 'uuid';
@@ -46,14 +45,8 @@ export const POST: RequestHandler = async (event) => {
 			limit: clientPayload.limit
 		});
 
-		// 2. SECURITY: Enforce the table name on the server. Ignore any `from` field sent by the client.
-		const securePayload: QueryPayload<Wholesaler> = {
-			...clientPayload,
-			from: 'dbo.wholesalers' // <-- SERVER-ENFORCED
-		};
-
 		// 3. Build and execute the query.
-		const { sql, parameters, metadata } = buildQuery(securePayload, supplierQueryConfig);
+		const { sql, parameters, metadata } = buildQuery(clientPayload, supplierQueryConfig, undefined, { table: 'dbo.wholesalers', alias: 'w' });
 		const results = await executeQuery(sql, parameters);
 		log.info(`[${operationId}] Executed suppliers query: result: %O`, results );
 

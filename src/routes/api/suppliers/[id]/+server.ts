@@ -98,7 +98,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
         const supplierIdCondition: WhereCondition<Wholesaler> = { key: 'wholesaler_id', whereCondOp: ComparisonOperator.EQUALS, val: id };
         const securePayload: QueryPayload<Wholesaler> = {
             ...clientPayload,
-            from: 'dbo.wholesalers',
+            from: { table: 'dbo.wholesalers', alias: 'w' },
             where: clientPayload.where ? {
                 whereCondOp: LogicalOperator.AND,
                 conditions: [supplierIdCondition, clientPayload.where]

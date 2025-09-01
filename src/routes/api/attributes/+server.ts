@@ -12,7 +12,6 @@ import { log } from '$lib/utils/logger';
 import { buildQuery, executeQuery } from '$lib/server/queryBuilder';
 import { supplierQueryConfig } from '$lib/clientAndBack/queryConfig';
 import { mssqlErrorMapper } from '$lib/server/errors/mssqlErrorMapper';
-import type { QueryPayload } from '$lib/clientAndBack/queryGrammar';
 import type { Attribute } from '$lib/domain/types';
 import type { ApiErrorResponse, QueryRequest, QuerySuccessResponse } from '$lib/api/types/common';
 import { v4 as uuidv4 } from 'uuid';
@@ -48,14 +47,9 @@ export const POST: RequestHandler = async (event) => {
             where: clientPayload.where
         });
 
-        // 2. SECURITY: Enforce the table name on the server.
-        const securePayload: QueryPayload<Attribute> = {
-            ...clientPayload,
-            from: 'dbo.attributes' // <-- SERVER-ENFORCED
-        };
 
         // 3. Build and execute the query.
-        const { sql, parameters, metadata } = buildQuery(securePayload, supplierQueryConfig);
+        const { sql, parameters, metadata } = buildQuery(clientPayload, supplierQueryConfig, undefined, { table: 'dbo.attributes', alias: 'a' });
         const results = await executeQuery(sql, parameters);
 
         // 4. Format the response using the standard `QuerySuccessResponse` type.

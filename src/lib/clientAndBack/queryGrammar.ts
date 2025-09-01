@@ -1,6 +1,6 @@
 // src/lib/clientAndBack/queryGrammar.ts
 
-import type { AllAliasedColumns, AllQualifiedColumns } from "./queryConfig.types";
+import type { AllAliasedColumns, AllQualifiedColumns, ValidFromClause } from "./queryConfig.types";
 
 /**
  * @file Query Grammar & Core Structures - FINAL
@@ -95,7 +95,7 @@ export interface FromClause {
  */
 export interface QueryPayload<T> {
 	select: Array<keyof T | AllQualifiedColumns | AllAliasedColumns>;
-	from?: { table: string, alias: string };
+	from?: ValidFromClause;
 	joins?: JoinClause[];
 	where?: WhereCondition<T> | WhereConditionGroup<T>;
 	orderBy?: SortDescriptor<T>[];

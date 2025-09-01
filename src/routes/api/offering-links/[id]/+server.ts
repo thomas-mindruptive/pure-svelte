@@ -122,7 +122,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
 
         const securePayload: QueryPayload<WholesalerOfferingLink> = {
             ...clientPayload,
-            from: 'dbo.wholesaler_offering_links',
+            from: { table: 'dbo.wholesaler_offering_links', alias: 'wol' },
             where: clientPayload.where ? {
                 whereCondOp: LogicalOperator.AND,
                 conditions: [linkIdCondition, clientPayload.where]

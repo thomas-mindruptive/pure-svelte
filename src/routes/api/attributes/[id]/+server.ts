@@ -125,7 +125,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
 
         const securePayload: QueryPayload<Attribute> = {
             ...clientPayload,
-            from: 'dbo.attributes',
+            from: { table: 'dbo.attributes', alias: 'a' },
             where: clientPayload.where ? {
                 whereCondOp: LogicalOperator.AND,
                 conditions: [attributeIdCondition, clientPayload.where]

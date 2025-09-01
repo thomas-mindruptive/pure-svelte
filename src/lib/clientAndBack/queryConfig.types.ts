@@ -22,6 +22,25 @@ export type AliasToEntityMap = {
     oc: { offering_count: number };
 };
 
+/**
+ * Creates a union of all valid {table, alias} pairs based on `aliasedTablesConfig`.
+ * This is the core of compile-time safety for the FROM clause.
+ *
+ * How it works:
+ * 1. `[Alias in keyof typeof aliasedTablesConfig]`: This mapped type iterates through each alias ('w', 'pc', 'pd', etc.).
+ * 2. `{ table: ..., alias: ... }`: For each alias, it creates a specific object type.
+ * 3. `['tableName']`: It looks up the corresponding table name string from the config.
+ * 4. `[keyof typeof aliasedTablesConfig]`: This final step extracts all the generated object types and combines them into a single union type.
+ *    e.g., { table: 'dbo.wholesalers', alias: 'w' } | { table: 'dbo.product_categories', alias: 'pc' } | ...
+ */
+export type ValidFromClause = {
+  [Alias in keyof typeof aliasedTablesConfig]: {
+    table: (typeof aliasedTablesConfig)[Alias]['tableName'];
+    alias: Alias;
+  }
+}[keyof typeof aliasedTablesConfig];
+
+
 export type AllQualifiedColumns = {
   [Alias in keyof AliasToEntityMap]: `${Alias}.${Extract<keyof AliasToEntityMap[Alias], string>}`
 }[keyof AliasToEntityMap];

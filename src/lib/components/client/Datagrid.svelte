@@ -206,7 +206,7 @@
         //   `safeAccessor: Cell accessor for ${colName} returned: ${val}`,
         // );
         if (undefined === val) {
-          log.warn(
+          log.info(
             `safeAccessor: Cell accessor for ${colName} returned undefined`,
           );
           return `${colInfo} (accessor) undefined`;
@@ -219,7 +219,7 @@
         //   `safeAccessor: safeAccessor: Direct access for ${colName} returned: ${val}`,
         // );
         if (undefined === val) {
-          log.warn(
+          log.info(
             `safeAccessor: Cell accessor for ${colName} returned undefined`,
           );
           return `${colInfo} (direct) undefined`;

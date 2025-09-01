@@ -1,119 +1,124 @@
+// src/routes/(browser)/+layout.ts
+
 import { get } from 'svelte/store';
 import { log } from '$lib/utils/logger';
 import type { LoadEvent } from '@sveltejs/kit';
-import { navigationState } from '$lib/stores/navigationState';
+import { navigationState, type NavigationPath } from '$lib/stores/navigationState';
 import { ApiClient } from '$lib/api/client/ApiClient';
 import { getSupplierApi } from '$lib/api/client/supplier';
 import { getCategoryApi } from '$lib/api/client/category';
 import { getOfferingApi } from '$lib/api/client/offering';
-import { buildBreadcrumb } from '$lib/utils/buildBreadcrumb';
+import { buildBreadcrumb, type ConservedPath } from '$lib/utils/buildBreadcrumb';
 
-
-// Define a type for the entity names to keep the code clean.
 type EntityNames = {
   supplier: string | null;
   category: string | null;
-  offering: string | null | undefined; // `product_def_title` can be undefined
+  offering: string | null | undefined;
 };
 
 export async function load({ url, params, depends, fetch: loadEventFetch }: LoadEvent) {
-  // 1. Register a dependency on the URL.
   depends(`url:${url.href}`);
 
-  // 2. Extract the current path from the URL parameters.
-  const currentSupplierId = params.supplierId ? Number(params.supplierId) : null;
-  const currentCategoryId = params.categoryId ? Number(params.categoryId) : null;
-  const currentOfferingId = params.offeringId ? Number(params.offeringId) : null;
+  // --- STEP 1: DEFINE PATHS FROM BOTH SOURCES ---
+  const pathFromUrl: NavigationPath = {
+    supplierId: params.supplierId ? Number(params.supplierId) : null,
+    categoryId: params.categoryId ? Number(params.categoryId) : null,
+    offeringId: params.offeringId ? Number(params.offeringId) : null,
+    leaf: url.pathname.endsWith('/attributes') ? 'attributes' : (url.pathname.endsWith('/links') ? 'links' : null)
+  };
 
-  // 3. Get the "conserved" path from the store.
   const conservedPath = get(navigationState);
 
-  // 4. Determine the final, "resolved" path.
-  const resolvedSupplierId = currentSupplierId ?? conservedPath.supplierId;
-  const resolvedCategoryId = currentCategoryId ?? (resolvedSupplierId === conservedPath.supplierId ? conservedPath.categoryId : null);
-  const resolvedOfferingId = currentOfferingId ?? (resolvedCategoryId === conservedPath.categoryId ? conservedPath.offeringId : null);
 
-  // 5. Load entity names for the breadcrumb.
-  //    CORRECTION: Apply the explicit `EntityNames` type here.
+  // --- STEP 2: RECONCILE PATHS (THE CORRECT LOGIC) ---
+  let finalUiPath: NavigationPath;
+
+  // Case A: The user is switching to a completely new supplier tree.
+  // The new URL's supplierId exists and is DIFFERENT from the one in memory.
+  // ACTION: The memory is obsolete. Reset the path completely to the URL's path.
+  if (pathFromUrl.supplierId && pathFromUrl.supplierId !== conservedPath.supplierId) {
+    finalUiPath = pathFromUrl;
+  } else {
+    // Case B: The user is navigating WITHIN the same supplier tree, or to the root list.
+    // ACTION: Construct the UI path by taking the deeper value from either the URL or the memory.
+    // This correctly handles both forward and backward navigation.
+    finalUiPath = {
+      supplierId: pathFromUrl.supplierId ?? conservedPath.supplierId,
+      categoryId: pathFromUrl.categoryId ?? conservedPath.categoryId,
+      offeringId: pathFromUrl.offeringId ?? conservedPath.offeringId,
+      leaf: pathFromUrl.leaf ?? conservedPath.leaf
+    };
+  }
+
+  // Ensure the final path is logically consistent (pruning).
+  // e.g., if categoryId becomes null, offeringId and leaf must also be null.
+  if (!finalUiPath.supplierId) finalUiPath.categoryId = null;
+  if (!finalUiPath.categoryId) finalUiPath.offeringId = null;
+  if (!finalUiPath.offeringId) finalUiPath.leaf = null;
+
+  // The newly reconciled path is now the new "truth" for our memory.
+  navigationState.set(finalUiPath);
+
+
+  // --- STEP 3: FETCH ENTITY NAMES FOR THE UI PATH ---
+  // API calls are based on the `finalUiPath` to ensure breadcrumbs and sidebar are always complete.
   const entityNames: EntityNames = { supplier: null, category: null, offering: null };
   const apiPromises = [];
   const client = new ApiClient(loadEventFetch);
 
-  if (resolvedSupplierId) {
-    apiPromises.push(
-      getSupplierApi(client).loadSupplier(resolvedSupplierId).then(s => entityNames.supplier = s.name).catch(() => { })
-    );
+  if (finalUiPath.supplierId) {
+    apiPromises.push(getSupplierApi(client).loadSupplier(finalUiPath.supplierId).then(s => entityNames.supplier = s.name).catch(() => {}));
   }
-  if (resolvedCategoryId) {
-    apiPromises.push(
-      getCategoryApi(client).loadCategory(resolvedCategoryId).then(c => entityNames.category = c.name).catch(() => { })
-    );
+  if (finalUiPath.categoryId) {
+    apiPromises.push(getCategoryApi(client).loadCategory(finalUiPath.categoryId).then(c => entityNames.category = c.name).catch(() => {}));
   }
-  if (resolvedOfferingId) {
-    apiPromises.push(
-      getOfferingApi(client).loadOffering(resolvedOfferingId).then(o => entityNames.offering = o.product_def_title).catch(() => { })
-    );
+  if (finalUiPath.offeringId) {
+    apiPromises.push(getOfferingApi(client).loadOffering(finalUiPath.offeringId).then(o => entityNames.offering = o.product_def_title).catch(() => {}));
   }
 
-  // 6. Determine the `activeLevel`.
+
+  // --- STEP 4: DETERMINE ACTIVE LEVEL BASED ON THE ACTUAL URL ---
+  // The active highlight must correspond to the page the user is *actually viewing* (`pathFromUrl`).
   let activeLevel: string;
-  if (currentOfferingId) {
-    // Wenn eine offeringId in der URL ist, sind wir auf Level 4 oder 5.
-    // Der aktive Sidebar-Eintrag ist entweder 'attributes' oder 'links'.
-    activeLevel = url.pathname.endsWith('/attributes') ? 'attributes' : 'links';
-  } else if (currentCategoryId) {
-    // Wenn eine categoryId da ist (aber keine offeringId), sind wir auf der
-    // KATEGORIE-Detailseite, die die OFFERINGS auflistet.
-    // Der aktive Sidebar-Eintrag ist daher 'offerings'.
+  if (pathFromUrl.offeringId) {
+    activeLevel = pathFromUrl.leaf || 'attributes';
+  } else if (pathFromUrl.categoryId) {
     activeLevel = 'offerings';
-  } else if (currentSupplierId) {
-    // Wenn eine supplierId da ist (aber keine categoryId), sind wir auf der
-    // SUPPLIER-Detailseite, die die KATEGORIEN auflistet.
-    // Der aktive Sidebar-Eintrag ist daher 'categories'.
+  } else if (pathFromUrl.supplierId) {
     activeLevel = 'categories';
   } else {
-    // Ansonsten sind wir auf der Top-Level-Seite, die die SUPPLIERS auflistet.
     activeLevel = 'suppliers';
   }
+  
 
+  // --- STEP 5: BUILD FINAL PROPS AND RETURN ---
   await Promise.all(apiPromises);
+
   const breadcrumbItems = buildBreadcrumb({
     url,
     params,
     entityNames,
-    conservedPath, // <-- Injecting the state
+    conservedPath: finalUiPath as ConservedPath,
     activeLevel
   });
 
-  // 7. Create the sidebar paths and states.
-  const supplierPath = resolvedSupplierId ? `/suppliers/${resolvedSupplierId}` : '#';
-  const categoryPath = resolvedSupplierId && resolvedCategoryId ? `/suppliers/${resolvedSupplierId}/categories/${resolvedCategoryId}` : '#';
-  const offeringPathBase = resolvedSupplierId && resolvedCategoryId && resolvedOfferingId ? `/suppliers/${resolvedSupplierId}/categories/${resolvedCategoryId}/offerings/${resolvedOfferingId}` : '#';
+  const supplierPath = finalUiPath.supplierId ? `/suppliers/${finalUiPath.supplierId}` : '#';
+  const categoryPath = finalUiPath.supplierId && finalUiPath.categoryId ? `/suppliers/${finalUiPath.supplierId}/categories/${finalUiPath.categoryId}` : '#';
+  const offeringPathBase = finalUiPath.supplierId && finalUiPath.categoryId && finalUiPath.offeringId ? `/suppliers/${finalUiPath.supplierId}/categories/${finalUiPath.categoryId}/offerings/${finalUiPath.offeringId}` : '#';
 
   const sidebarItems = [
     { key: 'suppliers', label: 'Suppliers', disabled: false, level: 0, href: '/suppliers' },
-    { key: 'categories', label: 'Categories', disabled: !resolvedSupplierId, level: 1, href: supplierPath },
-    { key: 'offerings', label: 'Offerings', disabled: !resolvedCategoryId, level: 2, href: categoryPath },
-    { key: 'attributes', label: 'Attributes', disabled: !resolvedOfferingId, level: 3, href: offeringPathBase === '#' ? '#' : `${offeringPathBase}/attributes` },
-    { key: 'links', label: 'Links', disabled: !resolvedOfferingId, level: 3, href: offeringPathBase === '#' ? '#' : `${offeringPathBase}/links` },
+    { key: 'categories', label: 'Categories', disabled: !finalUiPath.supplierId, level: 1, href: supplierPath },
+    { key: 'offerings', label: 'Offerings', disabled: !finalUiPath.categoryId, level: 2, href: categoryPath },
+    { key: 'attributes', label: 'Attributes', disabled: !finalUiPath.offeringId, level: 3, href: offeringPathBase === '#' ? '#' : `${offeringPathBase}/attributes` },
+    { key: 'links', label: 'Links', disabled: !finalUiPath.offeringId, level: 3, href: offeringPathBase === '#' ? '#' : `${offeringPathBase}/links` },
   ];
 
-  log.info(`(Layout Load) Resolved Path for UI`, {
-    resolved:
-    {
-      supplierId: resolvedSupplierId,
-      categoryId: resolvedCategoryId, 
-      offeringId: resolvedOfferingId, 
-      leaf: conservedPath.leaf
-    }, activeLevel
-  });
-  // 8. Return all the prepared data.
+  log.info(`(Layout Load) Data prepared for UI`, { finalUiPath, activeLevel });
+
   return {
     breadcrumbItems,
     sidebarItems,
-    activeLevel,
-    entityNames,
-    url: new URL(url),
-    params
+    activeLevel
   };
 }

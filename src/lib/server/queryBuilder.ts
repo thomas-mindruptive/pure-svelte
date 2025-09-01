@@ -44,7 +44,7 @@ function buildWhereClause<T>(where: WhereCondition<T> | WhereConditionGroup<T>, 
 
 	// It's a single WhereCondition (e.g., { key: 'w.status', op: '=', val: 'active' }).
 	const { key, whereCondOp, val } = where;
-	
+
 	// Handle operators that don't require a value.
 	if (whereCondOp === 'IS NULL' || whereCondOp === 'IS NOT NULL') {
 		return `${String(key)} ${whereCondOp}`;
@@ -74,19 +74,19 @@ function buildWhereClause<T>(where: WhereCondition<T> | WhereConditionGroup<T>, 
  * @returns The generated SQL string for the ON clause segment.
  */
 function buildOnClause(on: JoinConditionGroup, ctx: BuildContext): string {
-    const conditions = on.conditions.map(cond => {
-        if (isJoinColCondition(cond)) {
-            // This is a standard column-to-column join, e.g., 'w.wholesaler_id = wc.wholesaler_id'.
-            return `${cond.columnA} ${cond.op} ${cond.columnB}`;
-        }
-        if (isWhereCondition(cond) || isWhereConditionGroup(cond)) {
-            // This handles dynamic parameters within the ON clause (for the anti-join pattern).
-            // e.g., 'AND wio.wholesaler_id = @p1'
-            return buildWhereClause(cond, ctx);
-        }
-        throw new Error('Unsupported condition type encountered in JOIN ON clause.');
-    }).join(` ${on.joinCondOp} `);
-    return `(${conditions})`;
+	const conditions = on.conditions.map(cond => {
+		if (isJoinColCondition(cond)) {
+			// This is a standard column-to-column join, e.g., 'w.wholesaler_id = wc.wholesaler_id'.
+			return `${cond.columnA} ${cond.op} ${cond.columnB}`;
+		}
+		if (isWhereCondition(cond) || isWhereConditionGroup(cond)) {
+			// This handles dynamic parameters within the ON clause (for the anti-join pattern).
+			// e.g., 'AND wio.wholesaler_id = @p1'
+			return buildWhereClause(cond, ctx);
+		}
+		throw new Error('Unsupported condition type encountered in JOIN ON clause.');
+	}).join(` ${on.joinCondOp} `);
+	return `(${conditions})`;
 }
 
 // ===================================================================================
@@ -108,7 +108,8 @@ export function buildQuery<T>(
 	fixedFrom?: FromClause
 ) {
 	const { select, joins, where, orderBy, limit, offset } = payload;
-	
+	let realJoins = joins || [];
+
 	const ctx: BuildContext = {
 		parameters: {},
 		paramIndex: 0,
@@ -125,6 +126,9 @@ export function buildQuery<T>(
 		if (!joinConfig) throw new Error(`Named query '${namedQuery}' is not defined.`);
 		fromClause = joinConfig.from;
 		fromTableForMetadata = namedQuery;
+		if (joinConfig.joins) {
+			realJoins = [...joinConfig.joins, ...realJoins];
+		}
 	} else {
 		// Case 2: A dynamic query is being built.
 		// Prioritize the server-enforced 'fixedFrom' from the typed endpoint. If it's not present,
@@ -133,7 +137,7 @@ export function buildQuery<T>(
 		if (!fromSource) {
 			throw new Error("Query payload must include a 'from' clause.");
 		}
-		
+
 		const { table, alias } = fromSource;
 
 		// --- NESTED VALIDATION STEPS FOR THE FROM CLAUSE ---
@@ -151,22 +155,22 @@ export function buildQuery<T>(
 		if (aliasConfig.tableName !== table) {
 			throw new Error(`Alias '${alias}' is registered for table '${aliasConfig.tableName}', but was incorrectly used for table '${table}'.`);
 		}
-		
+
 		// If all checks pass, construct the final FROM clause string for the SQL query.
 		fromClause = `${table} ${alias}`;
 		fromTableForMetadata = table;
 	}
 
 	// --- 2. Build JOIN Clauses ---
-	const joinClause = joins?.map((join: JoinClause) => {
+	const joinClause = realJoins?.map((join: JoinClause) => {
 		const { type, table, alias, on } = join;
 		if (!alias) throw new Error("All JOINs must have an alias for consistency and security.");
-		
+
 		// Perform the same validation checks for each JOIN's alias and table.
 		const aliasConfig = aliasedTablesConfig[alias as keyof typeof aliasedTablesConfig];
 		if (!aliasConfig) throw new Error(`JOIN alias '${alias}' is not a registered alias.`);
 		if (aliasConfig.tableName !== table) throw new Error(`JOIN alias '${alias}' is for table '${aliasConfig.tableName}', not '${table}'.`);
-		
+
 		const onClause = buildOnClause(on, ctx);
 		return `${type} ${table} ${alias} ON ${onClause}`;
 	}).join(' ');
@@ -185,7 +189,7 @@ export function buildQuery<T>(
 		parameters: ctx.parameters,
 		metadata: {
 			selectColumns: select as string[],
-			hasJoins: !!joins?.length,
+			hasJoins: !!realJoins?.length,
 			hasWhere: !!where,
 			parameterCount: ctx.paramIndex,
 			tableFixed: fromTableForMetadata
@@ -200,16 +204,16 @@ export function buildQuery<T>(
  * @returns A promise that resolves to an array of query result objects.
  */
 export async function executeQuery(sql: string, parameters: Parameters): Promise<Record<string, unknown>[]> {
-    try {
-        const request = db.request();
-        for (const key in parameters) {
-            request.input(key, parameters[key]);
-        }
-        const result = await request.query(sql);
-        return result.recordset;
-    } catch (err) {
-        // Log the failed query for easier debugging, then re-throw.
-        log.error("SQL Execution Failed", { sql, parameters, error: err });
-        throw err;
-    }
+	try {
+		const request = db.request();
+		for (const key in parameters) {
+			request.input(key, parameters[key]);
+		}
+		const result = await request.query(sql);
+		return result.recordset;
+	} catch (err) {
+		// Log the failed query for easier debugging, then re-throw.
+		log.error("SQL Execution Failed", { sql, parameters, error: err });
+		throw err;
+	}
 }

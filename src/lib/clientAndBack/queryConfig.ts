@@ -97,6 +97,17 @@ export const supplierQueryConfig: QueryConfig = {
               { columnA: 'pc.category_id', op: ComparisonOperator.EQUALS, columnB: 'wio.category_id' }
             ]
           }
+        },
+                {
+          type: JoinType.INNER, // oder LEFT, falls ein Offering ohne Product Definition existieren könnte
+          table: 'dbo.product_definitions',
+          alias: 'pd',
+          on: {
+            joinCondOp: LogicalOperator.AND,
+            conditions: [
+              { columnA: 'wio.product_def_id', op: ComparisonOperator.EQUALS, columnB: 'pd.product_def_id' }
+            ]
+          }
         }
       ]
     },

@@ -1,17 +1,8 @@
-Sie haben vollkommen recht. Ich entschuldige mich aufrichtig für den Abbruch und die unvollständige Antwort. Das ist inakzeptabel und eine Verschwendung Ihrer Zeit.
-
-Ich werde jetzt die **vollständige und korrekte `README-Supplier-Browser.md`-Datei** erstellen, die alle besprochenen Änderungen enthält, ohne etwas wegzulassen. Die Markdown- und Code-Block-Formatierung wird korrekt sein.
-
----
-
-### `README-Supplier-Browser.md` (AKTUALISIERT & VOLLSTÄNDIG)
-
-```markdown
 # SupplierBrowser - Architectural Specification & Developer Guide
 
 **Single source of truth for the project's architecture. All development must adhere to the patterns and principles defined herein.**
 
-*Updated: 31. August 2025 - Finalized Form & Navigation architecture, updated API Client documentation, and documented the enhancement of the generic query system to support complex anti-joins.*
+*Updated: 1. September 2025 - Finalized the `QueryPayload` interface to use a structured `from` object, enhancing type safety. Clarified API client responsibilities for loading product definitions based on context (create vs. edit). Documented known issue in top-level navigation state.*
 
 ---
 
@@ -121,6 +112,8 @@ export type AssignmentRequest<TParent, TChild> = {
 | **Master Data Creation** | Direct Entity Data | Independent entities | `POST /api/suppliers/new` with `Omit<Wholesaler, 'wholesaler_id'>` |
 | **1:n Hierarchical Creation**| `CreateChildRequest<Parent, Child>` | Child exists only in parent context | `POST /api/category-offerings` |
 | **n:m Assignment** | `AssignmentRequest<Parent, Child>` | Link two existing entities | `POST /api/supplier-categories` |
+| **Generic Query** | **`QueryRequest<T>`** with **`from: { table, alias }`** | Flexible querying for lists or complex joins | `POST /api/query` |
+
 
 ### Redundancy Handling in `CreateChildRequest`
 
@@ -150,19 +143,20 @@ if (requestData.parentId !== requestData.data.category_id) {
 
 ### The Generic Query Endpoint: `/api/query`
 
-The `/api/query` endpoint is a central architectural component that handles all complex relational data access.
+The `/api/query` endpoint is a central architectural component that handles all complex relational data access. **Update:** It now expects the `from` clause in a `QueryPayload` to be a structured object: `{ table: string, alias: string }`, which is validated on the server against a central `aliasedTablesConfig`.
 
 #### Purpose
-- **Complex JOINs**: Multi-table operations that require predefined, optimized query structures.
+- **Complex JOINs**: Multi-table operations that require predefined, optimized query structures. The anti-join to find available products is a prime example of its power.
 - **Named Queries**: Predefined query configurations like `supplier_categories`, `category_offerings`, etc.
-- **Security**: All JOINs are predefined in `queryConfig.ts` to prevent arbitrary table access.
+- **Security**: All table and alias access is validated against a central `aliasedTablesConfig` on the server to prevent unauthorized data access.
 
 ### Master Data Pattern: QueryPayload + Individual CRUD
 
-Master data entities follow a consistent pattern for API interactions.
+Master data entities follow a consistent pattern for API interactions. **Update:** List queries are now initiated by the client sending a complete `QueryPayload`, including the `from` object. The typed server endpoint (e.g., `/api/suppliers`) acts as a semantic gatekeeper that enforces the `from` clause.
 
 ```typescript
 // List with flexible querying
+// The client sends the full payload, e.g., from: { table: 'dbo.suppliers', alias: 'w' }
 POST /api/suppliers with QueryRequest<Wholesaler>
 
 // Individual operations
@@ -215,7 +209,7 @@ POST /api/supplier-categories
 | Entity/Operation | Endpoint | Generic Type | Server Status | Client Status | Notes |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **SUPPLIERS (Master Data)** | | | | | |
-| Query List | `POST /api/suppliers` | `QueryRequest<Wholesaler>` | ✅ | ✅ | |
+| Query List | `POST /api/suppliers` | `QueryRequest<Wholesaler>` | ✅ | ✅ | Client sends full `from` object. |
 | Read Single | `GET /api/suppliers/[id]` | - | ✅ | ✅ | |
 | Create | `POST /api/suppliers/new` | `Omit<Wholesaler, 'wholesaler_id'>` | ✅ | ✅ | **Fixed** |
 | Update | `PUT /api/suppliers/[id]` | `Partial<Wholesaler>` | ✅ | ✅ | |
@@ -238,13 +232,13 @@ POST /api/supplier-categories
 | Create | `POST /api/product-definitions/new` | `Omit<ProductDefinition, 'product_def_id'>` | ✅ | ✅ | API client implemented |
 | Update | `PUT /api/product-definitions/[id]` | `Partial<ProductDefinition>` | ✅ | ✅ | API client implemented |
 | Delete | `DELETE /api/product-definitions/[id]` | - | ✅ | ✅ | API client implemented |
-| Query Available for Offering | `POST /api/query` | `QueryPayload` with custom `JoinClause` | ✅ | 🟡 | Uses an extended JoinClause to perform an efficient anti-join on the server. See Architectural Decisions section. |
+| Query Available for New Offering | `POST /api/query` | `QueryPayload` with `LEFT JOIN` | ✅ | ✅ | **Functionality moved to `offering.ts` client.** |
 | **SUPPLIER-CATEGORIES (Assignment - n:m)** | | | | | |
 | Query via JOINs | `POST /api/query` | `namedQuery: 'supplier_categories'` | ✅ | ✅ | |
 | Create Assignment | `POST /api/supplier-categories` | `AssignmentRequest<Wholesaler, ProductCategory>` | ✅ | ✅ | **Finalized** |
 | Remove Assignment | `DELETE /api/supplier-categories` | `RemoveAssignmentRequest<Wholesaler, ProductCategory>` | ✅ | ✅ | **Finalized** |
 | **CATEGORY-OFFERINGS (Hierarchical - 1:n)** | | | | | |
-| Query via JOINs | `POST /api/query` | `namedQuery: 'category_offerings'` | ✅ | ✅ | |
+| Query via JOINs | `POST /api/query` | `namedQuery: 'category_offerings'` | ✅ | ✅ | **JOIN definition fixed.** |
 | Create | `POST /api/category-offerings` | `CreateChildRequest<ProductCategory, OfferingData>` | ✅ | ✅ | **Finalized** |
 | Update | `PUT /api/category-offerings` | `{offering_id, ...updates}` | ✅ | ✅ | **Fixed** |
 | Delete | `DELETE /api/category-offerings` | `DeleteRequest<WholesalerItemOffering>` | ✅ | ✅ | **Fixed** |
@@ -267,7 +261,7 @@ POST /api/supplier-categories
 
 ### Architectural Enhancement: Supporting Complex Anti-Join Queries
 
-A common requirement in the UI is to query for entities that are *available for assignment*. A prime example is populating the "Product" dropdown in the `OfferingForm`: it must show all `ProductDefinition`s in a category for which a specific supplier does **not** yet have an offering.
+A common requirement in the UI is to query for entities that are *available for assignment*. A prime example is populating the "Product" dropdown when creating a **new** `Offering`: it must show all `ProductDefinition`s in a category for which a specific supplier does **not** yet have an offering.
 
 The most efficient way to achieve this is with a single SQL query using a `LEFT JOIN` where a dynamic parameter is part of the `ON` clause, combined with a `WHERE ... IS NULL` check (an "anti-join").
 
@@ -283,11 +277,9 @@ WHERE
 ```
 
 **The Architectural Challenge & Solution:**
-Instead of creating a specialized, one-off API endpoint for this task, we have **enhanced the core generic query system**. The `JoinClause` type in `queryGrammar.ts` and the server-side `queryBuilder` have been updated to support dynamic, client-provided parameters directly within the `ON` conditions of a join.
+Instead of creating a specialized, one-off API endpoint, we **leverage the flexibility of the generic query system**. The client-side API module (`offering.ts`) now constructs a full `QueryPayload` that perfectly describes this complex join. This payload is then sent to the generic `/api/query` endpoint, which validates it against the `aliasedTablesConfig` and builds the secure, parameterized SQL.
 
-**Conceptual Change in `JoinClause`:**
-`JoinClause` has been extended: It can optionally contain `WhereCondition` and `WhereConditionGroup`,  similar to the main `WHERE` clause. This allows the client to construct the exact query needed.
-This enhancement makes our generic query system significantly more powerful, avoids API endpoint proliferation, and keeps complex business logic encapsulated in the client-side API module (`productDefinition.ts`) that builds the query.
+This enhancement makes our generic query system significantly more powerful, avoids API endpoint proliferation, and keeps complex business logic encapsulated in the client-side API module responsible for the context (`offering.ts`).
 
 ---
 
@@ -296,8 +288,8 @@ This enhancement makes our generic query system significantly more powerful, avo
 ### Type Safety Architecture
 The project is built on four pillars of type safety that work together to ensure correctness from the database to the UI.
 - **Pillar I: Generic API Types:** Universal request/response envelopes in `lib/api/types/common.ts`.
-- **Pillar II: Query Grammar:** Type-safe query language in `lib/clientAndBack/queryGrammar.ts`.
-- **Pillar III: Query Config:** A security whitelist for all table and column access in `lib/clientAndBack/queryConfig.ts`.
+- **Pillar II: Query Grammar:** Type-safe query language in `lib/clientAndBack/queryGrammar.ts`, featuring a structured `from: { table, alias }` object.
+- **Pillar III: Query Config:** A security whitelist for all table, alias, and column access, centered around a single source of truth: the `aliasedTablesConfig` object.
 - **Pillar IV: Query Builder:** A server-side utility that converts the type-safe grammar into parameterized SQL.
 
 ### Request Pattern Architecture
@@ -344,12 +336,16 @@ To create reusable yet fully type-safe forms, the project uses this robust patte
 #### The "Dumb" State Manager: `FormShell.svelte`
 - A generic component that knows nothing about specific data types like `Wholesaler`.
 - It manages the core form mechanics: tracking data, "dirty" state, submission status, and orchestrating the `validate` and `submit` lifecycle via Svelte 5 callback props (`onSubmitted`, `onSubmitError`).
+- **Update:** The `FormShell` is now enhanced with an `$effect` to robustly handle asynchronous changes to its `initial` prop, preventing state inconsistencies when a component is reused across navigations.
 
 #### The "Smart" Parent: `SupplierForm.svelte`
 - A specific component that knows everything about a `Wholesaler`.
 - It defines a local type for its form data (e.g., `SupplierFormData`) which can include both domain fields and UI-specific fields.
 - It provides the domain-specific `validate` and `submit` functions to the `FormShell`.
 - It bridges the type gap between its specific world and the generic world of the `FormShell`.
+
+#### **Business Logic Example: Offering Immutability**
+A key architectural decision was made in the `OfferingForm`: The `ProductDefinition` of an existing offering cannot be changed. This is a business rule. The `OfferingForm` implements this by rendering a disabled `<select>` box or a simple `<span>` when in "edit" mode (i.e., when an `offering_id` is present), displaying the product name as plain text. This prevents invalid state changes and simplifies the backend logic.
 
 #### The Key to Type Safety: A Controlled Bridge
 This pattern works by using two explicit techniques in the "Smart Parent" to ensure end-to-end type safety:
@@ -368,16 +364,47 @@ This pattern works by using two explicit techniques in the "Smart Parent" to ens
     ```
 
 ### Frontend Navigation Architecture: Context Conservation
-The application uses a "Context Conservation" pattern to provide an intuitive, hierarchical navigation experience.
+The application employs a **"Context Conservation"** pattern to create an intuitive and non-destructive hierarchical browsing experience. The primary UX goal is to ensure the user never feels "lost" after navigating. The application should always remember the deepest path the user has explored and reflect this state consistently across the `HierarchySidebar` and the `Breadcrumb` components.
 
 #### Core Components:
 1.  **Persistent State (`navigationState.ts`):** A Svelte store that "remembers" the IDs of the last visited path and synchronizes with `sessionStorage`.
 2.  **The "Brain" (`(browser)/+layout.ts`):** The root `load` function acts as the central orchestrator. On every navigation, it:
     - Reads the current path from URL `params`.
     - Reads the "remembered" path from the `navigationState` store.
-    - Determines the current `activeLevel` (e.g., 'suppliers', 'categories') based on the URL.
+    - Reconciles these two paths to create a final, consistent UI path that preserves user context.
+    - Determines the current `activeLevel` based on the URL.
     - Calls `buildBreadcrumb.ts`, passing it all necessary data to construct the final UI state for the `Breadcrumb` and `HierarchySidebar`.
 3.  **The UI (`Breadcrumb.svelte`, `HierarchySidebar.svelte`):** These are "dumb" components that simply render the pre-calculated data provided by the `load` function.
+
+The core principle is: **The application remembers the user's deepest path within a hierarchy and only prunes this path when the user explicitly changes context on a higher level.**
+
+This principle translates into the following specific behaviors:
+
+1.  **Drilling Down:** When a user navigates deeper into the hierarchy (e.g., from a Supplier to one of its Categories), the navigation path is extended. The sidebar expands, and the breadcrumb grows. This new, deeper path is saved as the "remembered" state.
+
+2.  **Navigating Up (within the same context):** When a user navigates to a higher level *within the same remembered path* (e.g., by clicking a parent breadcrumb or a higher-level sidebar item), the main content area updates to show that level, but the **full remembered path remains visible and enabled**. The breadcrumbs are not shortened, and the lower levels in the sidebar remain enabled, allowing the user to immediately return to their deepest point of exploration without losing context.
+
+3.  **Changing Context (the crucial rule):** When the user makes a choice that invalidates the remembered sub-path, the application prunes the state from that point downwards. All deeper levels in both the sidebar and the breadcrumbs are removed or disabled.
+
+**Concrete Examples:**
+
+*   **Scenario A: Changing a Category**
+    *   **Current Path:** `Supplier A > Category X > Offering 123`
+    *   **Action:** The user is on the "Supplier A" detail page and clicks on a different category, `Category Y`.
+    *   **New State:** The remembered path is pruned below the category level. The new state becomes `Supplier A > Category Y`. The `Offering 123` part of the path is forgotten, and the "Offerings," "Attributes," and "Links" levels in the sidebar become disabled until a new offering is selected.
+
+*   **Scenario B: Changing a Supplier**
+    *   **Current Path:** `Supplier A > Category X > Offering 123`
+    *   **Action:** The user navigates back to the main list and clicks on a different supplier, `Supplier B`.
+    *   **New State:** The remembered path is pruned below the supplier level. The new state becomes `Supplier B`. Both `Category X` and `Offering 123` are forgotten. The sidebar resets, and only the "Categories" level for Supplier B becomes enabled.
+
+This behavior is orchestrated by the root `(browser)/+layout.ts`, which reconciles the current URL with the state persisted in the `navigationState` store on every navigation.
+
+#### **Known Issue: Top-Level Navigation Reset**
+There is currently a known bug in the `(browser)/+layout.ts` reconciliation logic.
+- **Behavior:** When navigating from a deep level (e.g., an Offering page) back to the top-level "Suppliers" list via the sidebar or breadcrumb, the `navigationState` is incorrectly cleared. This causes the breadcrumb to shrink and the deeper sidebar levels to become disabled, losing the user's context.
+- **Correct Behavior:** When navigating to "Categories" (a mid-level), the deeper state (Offering, etc.) is correctly preserved. The issue is specific to returning to the absolute root of the navigation tree.
+- **Status:** This is a high-priority issue to be fixed in the layout's `load` function.
 
 ---
 
@@ -398,12 +425,15 @@ The project uses a **minimal, synchronous logger implementation** in `src/lib/ut
 
 ## Examples of Generic Type Usage
 
-### Master Data Creation
+### Querying Master Data
 ```typescript
-// Category Master Data
-POST /api/categories/new
-Body: Omit<ProductCategory, 'category_id'>
-// → { name: "Laptops", description: "Portable computers" }
+// In an API client (e.g., supplier.ts)
+const query: QueryPayload<Wholesaler> = {
+  from: { table: 'dbo.wholesalers', alias: 'w' },
+  select: ['w.wholesaler_id', 'w.name'],
+  where: { key: 'w.status', whereCondOp: ComparisonOperator.EQUALS, val: 'active' }
+};
+// Sent via POST /api/suppliers
 ```
 
 ### Hierarchical Child Creation (1:n)
@@ -566,8 +596,7 @@ Svelte's core feature is its powerful and efficient reactivity system. In this a
 ---
 
 ## TODOS (UPDATED)
-* Adjust productDefinition.ts: Add `getAvailableProductDefsForOffering`: This is the "anit-join" described above.
-*   **Check if query grammar correct:** `queryBuilder` and `QueryPayload` to support dynamic parameters in `JOIN` clauses for anti-join queries.
+*   **FIX NAVIGATION BUG:** The reconciliation logic in `(browser)/+layout.ts` is faulty. When navigating to the top-level "Suppliers" list, the conserved path is incorrectly cleared, causing the loss of user context. This works correctly when navigating to mid-levels like "Categories". This is a high-priority bug.
 *   **Finalize CSS Refactoring:** Ensure all pages correctly import and use the new pattern-based CSS files (`detail-page-layout.css`, etc.) and that all duplicate local styles have been removed.
 *   **Audit API Clients for SSR Safety:** Verify that all `LoadingState` method calls (`.start()`, `.finish()`) are wrapped in an `if (browser)` check.
 *   **Audit `load` Functions:** Verify that all `load` functions correctly pass the `fetch` function from the `LoadEvent` to the `ApiClient`.

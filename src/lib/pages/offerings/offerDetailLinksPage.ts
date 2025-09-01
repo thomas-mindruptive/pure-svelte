@@ -4,7 +4,6 @@ import { ApiClient } from '$lib/api/client/ApiClient';
 import { getOfferingApi } from '$lib/api/client/offering';
 import { log } from '$lib/utils/logger';
 import { error, type LoadEvent } from '@sveltejs/kit';
-import { getProductDefinitionApi } from '$lib/api/client/productDefinition';
 
 
 /**
@@ -30,14 +29,13 @@ export async function load({ params, fetch: fetchLoad }: LoadEvent) {
 
   const client = new ApiClient(fetchLoad);
   const offeringApi = getOfferingApi(client);
-  const productDefApi = getProductDefinitionApi(client);
 
   try {
     // Lade Angebots-Details und Links parallel
     const [offering, links, availableProducts] = await Promise.all([
       offeringApi.loadOffering(offeringId),
       offeringApi.loadOfferingLinks(offeringId),
-      productDefApi.getAvailableProductDefsForOffering(categoryId, supplierId)
+      offeringApi.getAvailableProductDefsForOffering(categoryId, supplierId)
     ]);
 
     return {

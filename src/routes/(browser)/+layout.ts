@@ -26,42 +26,32 @@ export async function load({ url, params, depends, fetch: loadEventFetch }: Load
     offeringId: params.offeringId ? Number(params.offeringId) : null,
     leaf: url.pathname.endsWith('/attributes') ? 'attributes' : (url.pathname.endsWith('/links') ? 'links' : null)
   };
-
   const conservedPath = get(navigationState);
 
+  // --- STEP 2: RECONCILE PATHS (HIERARCHICALLY CORRECT LOGIC) ---
+  // This logic correctly prunes the "memory" path when a parent level changes.
+  
+  // The supplier is our root anchor. It's always taken from the URL if present.
+  const supplierId = pathFromUrl.supplierId;
 
-  // --- STEP 2: RECONCILE PATHS (THE CORRECT LOGIC) ---
-  let finalUiPath: NavigationPath;
+  // The category can be restored from memory ONLY IF its parent (supplierId) is consistent.
+  // If the URL specifies a categoryId, it ALWAYS takes precedence.
+  const categoryId = pathFromUrl.categoryId ?? (supplierId != null && supplierId === conservedPath.supplierId ? conservedPath.categoryId : null);
 
-  // Case A: The user is switching to a completely new supplier tree.
-  // The new URL's supplierId exists and is DIFFERENT from the one in memory.
-  // ACTION: The memory is obsolete. Reset the path completely to the URL's path.
-  if (pathFromUrl.supplierId && pathFromUrl.supplierId !== conservedPath.supplierId) {
-    finalUiPath = pathFromUrl;
-  } else {
-    // Case B: The user is navigating WITHIN the same supplier tree, or to the root list.
-    // ACTION: Construct the UI path by taking the deeper value from either the URL or the memory.
-    // This correctly handles both forward and backward navigation.
-    finalUiPath = {
-      supplierId: pathFromUrl.supplierId ?? conservedPath.supplierId,
-      categoryId: pathFromUrl.categoryId ?? conservedPath.categoryId,
-      offeringId: pathFromUrl.offeringId ?? conservedPath.offeringId,
-      leaf: pathFromUrl.leaf ?? conservedPath.leaf
-    };
-  }
-
-  // Ensure the final path is logically consistent (pruning).
-  // e.g., if categoryId becomes null, offeringId and leaf must also be null.
-  if (!finalUiPath.supplierId) finalUiPath.categoryId = null;
-  if (!finalUiPath.categoryId) finalUiPath.offeringId = null;
-  if (!finalUiPath.offeringId) finalUiPath.leaf = null;
-
-  // The newly reconciled path is now the new "truth" for our memory.
+  // The offering can be restored from memory ONLY IF its entire parent chain (supplierId AND categoryId) is consistent.
+  // If the URL specifies an offeringId, it ALWAYS takes precedence.
+  const offeringId = pathFromUrl.offeringId ?? (categoryId != null && categoryId === conservedPath.categoryId && supplierId === conservedPath.supplierId ? conservedPath.offeringId : null);
+  
+  // The leaf can be restored from memory ONLY IF the full path down to the offering is consistent.
+  const leaf = pathFromUrl.leaf ?? (offeringId != null && offeringId === conservedPath.offeringId && categoryId === conservedPath.categoryId && supplierId === conservedPath.supplierId ? conservedPath.leaf : null);
+  
+  // This is the final, valid path that represents the state of the application shell.
+  const finalUiPath: NavigationPath = { supplierId, categoryId, offeringId, leaf };
+  
+  // The newly reconciled path becomes the new "truth" for our memory.
   navigationState.set(finalUiPath);
 
-
   // --- STEP 3: FETCH ENTITY NAMES FOR THE UI PATH ---
-  // API calls are based on the `finalUiPath` to ensure breadcrumbs and sidebar are always complete.
   const entityNames: EntityNames = { supplier: null, category: null, offering: null };
   const apiPromises = [];
   const client = new ApiClient(loadEventFetch);
@@ -76,9 +66,7 @@ export async function load({ url, params, depends, fetch: loadEventFetch }: Load
     apiPromises.push(getOfferingApi(client).loadOffering(finalUiPath.offeringId).then(o => entityNames.offering = o.product_def_title).catch(() => {}));
   }
 
-
   // --- STEP 4: DETERMINE ACTIVE LEVEL BASED ON THE ACTUAL URL ---
-  // The active highlight must correspond to the page the user is *actually viewing* (`pathFromUrl`).
   let activeLevel: string;
   if (pathFromUrl.offeringId) {
     activeLevel = pathFromUrl.leaf || 'attributes';
@@ -90,7 +78,6 @@ export async function load({ url, params, depends, fetch: loadEventFetch }: Load
     activeLevel = 'suppliers';
   }
   
-
   // --- STEP 5: BUILD FINAL PROPS AND RETURN ---
   await Promise.all(apiPromises);
 
@@ -114,7 +101,7 @@ export async function load({ url, params, depends, fetch: loadEventFetch }: Load
     { key: 'links', label: 'Links', disabled: !finalUiPath.offeringId, level: 3, href: offeringPathBase === '#' ? '#' : `${offeringPathBase}/links` },
   ];
 
-  log.info(`(Layout Load) Data prepared for UI`, { finalUiPath, activeLevel });
+  log.info(`(Layout Load) Data prepared for UI`, { finalUiPath, activeLevel, pathFromUrl });
 
   return {
     breadcrumbItems,

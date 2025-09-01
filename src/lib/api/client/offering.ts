@@ -7,14 +7,15 @@
  */
 
 import { log } from '$lib/utils/logger';
-import { ComparisonOperator, LogicalOperator, type QueryPayload } from '$lib/clientAndBack/queryGrammar';
+import { ComparisonOperator, JoinType, LogicalOperator, type QueryPayload } from '$lib/clientAndBack/queryGrammar';
 import type {
   WholesalerItemOffering,
   WholesalerItemOffering_ProductDef_Category,
   WholesalerOfferingAttribute,
   WholesalerOfferingAttribute_Attribute,
   WholesalerOfferingLink,
-  Attribute
+  Attribute,
+  ProductDefinition
 } from '$lib/domain/types';
 
 import type { ApiClient } from './ApiClient';
@@ -31,6 +32,7 @@ import type {
   DeleteRequest
 } from '$lib/api/types/common';
 import { LoadingState } from './loadingState';
+import { productDefinitionLoadingOperations } from './productDefinition';
 
 
 const offeringLoadingManager = new LoadingState();
@@ -333,6 +335,76 @@ export function getOfferingApi(client: ApiClient) {
         offeringLoadingOperations.finish(operationId);
       }
     },
+    		/**
+		 * Loads product definitions for a specific category that a given supplier has NOT yet created an offering for.
+		 * This is achieved via a client-constructed anti-join query sent to the generic /api/query endpoint.
+		 * 
+		 * @param categoryId The ID of the category to check within.
+		 * @param supplierId The ID of the supplier for whom to check for existing offerings.
+		 * @returns A promise that resolves to an array of available ProductDefinition objects.
+		 */
+		async getAvailableProductDefsForOffering(
+			categoryId: number,
+			supplierId: number
+		): Promise<ProductDefinition[]> {
+			const operationId = `getAvailableProductDefsForOffering-${categoryId}-${supplierId}`;
+			productDefinitionLoadingOperations.start(operationId);
+			try {
+				const antiJoinQuery: QueryPayload<ProductDefinition> = {
+					from: {table: 'dbo.product_definitions', alias: 'pd'},
+					select: ['pd.product_def_id', 'pd.title', 'pd.description', 'pd.category_id'],
+					joins: [
+						{
+							type: JoinType.LEFT,
+							table: 'dbo.wholesaler_item_offerings',
+							alias: 'wio',
+							on: {
+								joinCondOp: LogicalOperator.AND,
+								conditions: [
+									// Standard JOIN condition
+									{
+										columnA: 'pd.product_def_id',
+										op: ComparisonOperator.EQUALS,
+										columnB: 'wio.product_def_id'
+									},
+									// Dynamic parameter injected into the ON clause
+									{
+										key: 'wio.wholesaler_id',
+										whereCondOp: ComparisonOperator.EQUALS,
+										val: supplierId
+									}
+								]
+							}
+						}
+					],
+					where: {
+						whereCondOp: LogicalOperator.AND,
+						conditions: [
+							// The core of the anti-join: only return rows where the JOIN found no match
+							{
+								key: 'wio.offering_id',
+								whereCondOp: ComparisonOperator.IS_NULL
+							}
+						]
+					},
+					orderBy: [{ key: 'pd.title', direction: 'asc' }]
+				};
+
+				// This complex query is sent to the generic /api/query endpoint
+				const responseData = await client.apiFetch<QueryResponseData<ProductDefinition>>(
+					'/api/query',
+					{ method: 'POST', body: createQueryBody(antiJoinQuery) },
+					{ context: operationId }
+				);
+
+				return responseData.results as ProductDefinition[];
+			} catch (err) {
+				log.error(`[${operationId}] Failed.`, { categoryId, supplierId, error: getErrorMessage(err) });
+				throw err;
+			} finally {
+				offeringLoadingOperations.finish(operationId);
+			}
+		},
 
 
     // ===== UTILITY FUNCTIONS =====

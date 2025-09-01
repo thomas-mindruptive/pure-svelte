@@ -76,10 +76,10 @@ export const POST: RequestHandler = async (event) => {
 
 		if (isStandardQuery(requestBody)) {
 			const { payload } = requestBody;
-			const fromTable = payload.from;
-			log.info(`[${operationId}] Handling Standard QueryRequest`, { fromTable });
+			const fromClause = payload.from;
+			log.info(`[${operationId}] Handling Standard QueryRequest`, { fromTable: fromClause });
 
-			if (!fromTable) {
+			if (!fromClause) {
 				const errRes: ApiErrorResponse = {
 					success: false, message: "The 'from' field is required for a standard query.",
 					status_code: 400, error_code: 'BAD_REQUEST', meta: { timestamp: new Date().toISOString() }
@@ -87,9 +87,9 @@ export const POST: RequestHandler = async (event) => {
 				return json(errRes, { status: 400 });
 			}
 
-			if (!(fromTable in supplierQueryConfig.allowedTables)) {
+			if (!(fromClause.table in supplierQueryConfig.allowedTables)) {
 				const errRes: ApiErrorResponse = {
-					success: false, message: `Table '${fromTable}' is not whitelisted for querying.`,
+					success: false, message: `Table '${fromClause}' is not whitelisted for querying.`,
 					status_code: 403, error_code: 'FORBIDDEN', meta: { timestamp: new Date().toISOString() }
 				};
 				return json(errRes, { status: 403 });

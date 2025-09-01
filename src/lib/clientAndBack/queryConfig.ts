@@ -53,10 +53,8 @@ export const supplierQueryConfig: QueryConfig = {
     'offering_links': [
       'wio.offering_id', 'wio.price', 'wio.category_id',
       'wol.offering_id', 'wol.created_at', 'wol.link_id', 'wol.url', 'wol.notes'
-    ],
-    'product_definitions': [
-      'pd.product_def_id', 'pd.category_id', 'pd.title', 'pd.description', 'pd.category_id', 'pd.material_id', 'pd.form_id', 'pd.material_id'
     ]
+
   },
   joinConfigurations: {
     'supplier_categories': {
@@ -163,3 +161,38 @@ export const supplierQueryConfig: QueryConfig = {
     }
   }
 };
+
+export const aliasedTablesConfig = {
+  w: {
+    tableName: 'dbo.wholesalers',
+    columns: ['wholesaler_id', 'name', 'region', 'status', 'dropship', 'created_at', 'website', 'b2b_notes']
+  },
+  pc: {
+    tableName: 'dbo.product_categories',
+    columns: ['category_id', 'name', 'description']
+  },
+  wc: {
+    tableName: 'dbo.wholesaler_categories',
+    columns: ['wholesaler_id', 'category_id', 'comment', 'link', 'created_at']
+  },
+  wio: {
+    tableName: 'dbo.wholesaler_item_offerings',
+    columns: ['offering_id', 'wholesaler_id', 'category_id', 'product_def_id', 'size', 'dimensions', 'price', 'currency', 'comment', 'created_at']
+  },
+  woa: {
+    tableName: 'dbo.wholesaler_offering_attributes',
+    columns: ['offering_id', 'attribute_id', 'value']
+  },
+  wol: {
+    tableName: 'dbo.wholesaler_offering_links',
+    columns: ['link_id', 'offering_id', 'url', 'notes', 'created_at']
+  },
+  pd: {
+    tableName: 'dbo.product_definitions',
+    columns: ['product_def_id', 'title', 'description', 'category_id']
+  },
+  a: {
+    tableName: 'dbo.attributes',
+    columns: ['attribute_id', 'name', 'description']
+  }
+} as const;

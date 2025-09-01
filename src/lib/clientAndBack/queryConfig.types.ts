@@ -5,19 +5,21 @@
  */
 
 import type * as Domain from '$lib/domain/types';
+import type { aliasedTablesConfig } from './queryConfig';
 
 // --- Type Generation for Compile-Time Safety ---
 
 export type AliasToEntityMap = {
-  w: Domain.Wholesaler;
-  pc: Domain.ProductCategory;
-  wc: Domain.WholesalerCategory;
-  oc: { offering_count: number };
-  wio: Domain.WholesalerItemOffering;
-  woa: Domain.WholesalerOfferingAttribute;
-  wol: Domain.WholesalerOfferingLink;
-  pd: Domain.ProductDefinition;
-  a: Domain.Attribute;
+  // Für jeden Schlüssel (Alias) in unserer `aliasedTablesConfig`...
+  [Alias in keyof typeof aliasedTablesConfig]:
+    // ...hole den zugehörigen Tabellennamen (z.B. 'dbo.wholesalers')...
+    (typeof aliasedTablesConfig)[Alias]['tableName'] extends keyof Domain.TableNameToEntityMap
+      // ...und schlage damit den echten Entitäts-Typ (z.B. `Wholesaler`) in unserer Brücken-Map nach.
+      ? Domain.TableNameToEntityMap[(typeof aliasedTablesConfig)[Alias]['tableName']]
+      : never;
+} & {
+    // Manuelle Erweiterungen für spezielle Fälle wie 'oc' bleiben möglich.
+    oc: { offering_count: number };
 };
 
 export type AllQualifiedColumns = {
@@ -48,5 +50,4 @@ export type PredefinedQueryConfig = {
   category_offerings: (AllQualifiedColumns | AllAliasedColumns)[];
   offering_attributes: (AllQualifiedColumns | AllAliasedColumns)[];
   offering_links: (AllQualifiedColumns | AllAliasedColumns)[];
-  product_definitions: (AllQualifiedColumns | AllAliasedColumns)[];
 };

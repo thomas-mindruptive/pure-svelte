@@ -175,7 +175,7 @@ export function getProductDefinitionApi(client: ApiClient) {
 			productDefinitionLoadingOperations.start(operationId);
 			try {
 				const antiJoinQuery: QueryPayload<ProductDefinition> = {
-					from: 'dbo.product_definitions pd',
+					from: 'dbo.product_definitions',
 					select: ['pd.product_def_id', 'pd.title', 'pd.description', 'pd.category_id'],
 					joins: [
 						{

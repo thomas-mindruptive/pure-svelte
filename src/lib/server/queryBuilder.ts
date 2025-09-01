@@ -1,340 +1,215 @@
 // src/lib/server/queryBuilder.ts
 
 /**
- * @file Secure SQL Query Builder
- * @description This module is the heart of all server-side data access.
- * It is responsible for safely constructing and executing parameterized SQL queries
- * based on defined payloads and a strict security configuration. It prevents
- * SQL injection and ensures only whitelisted data can be queried.
+ * @file Secure SQL Query Builder (FINAL & CORRECTED)
+ * @description This file contains the core logic for securely converting a type-safe
+ * QueryPayload object into a parameterized SQL query. It relies on a strict security
+ * configuration (`aliasedTablesConfig`) as a single source of truth. It supports both
+ * server-enforced queries (via `fixedFrom`) for typed endpoints and more flexible,
+ * client-defined queries for generic endpoints like `/api/query`.
  */
 
-import { db } from '$lib/server/db';
 import { log } from '$lib/utils/logger';
-import {
-	type QueryPayload,
-	type JoinClause,
-	type JoinSortDescriptor,
-	LogicalOperator,
-	ComparisonOperator,
-	type WhereConditionGroup,
-	type WhereCondition,
-	type JoinConditionGroup,
-	type JoinColCondition,
-	isWhereConditionGroup,
-	isJoinColCondition,
-	isConditionGroup,
-	isWhereCondition
-} from '$lib/clientAndBack/queryGrammar';
-import type { supplierQueryConfig as SupplierQueryConfigType } from '$lib/clientAndBack/queryConfig';
+import { db } from '$lib/server/db';
+import type { QueryPayload, WhereCondition, WhereConditionGroup, JoinClause, SortDescriptor, FromClause, JoinConditionGroup } from '$lib/clientAndBack/queryGrammar';
+import { isJoinColCondition, isWhereCondition, isWhereConditionGroup } from '$lib/clientAndBack/queryGrammar';
+import type { QueryConfig } from '$lib/clientAndBack/queryConfig';
+import { aliasedTablesConfig } from '$lib/clientAndBack/queryConfig';
 
-// -----------------------------------------------------------------------------
-// TYPES AND INTERFACES
-// -----------------------------------------------------------------------------
+// --- TYPE DEFINITIONS for internal use ---
 
-/** Defines the allowed types for safe SQL parameters. */
-export type SqlParameterValue = string | number | boolean | Date | null | Buffer;
+/** A record for storing SQL parameters, e.g., { p0: 'value1', p1: 123 } */
+type Parameters = Record<string, unknown>;
 
-/** The result object returned by the `buildQuery` function. */
-export interface QueryBuildResult {
-	sql: string;
-	parameters: Record<string, SqlParameterValue>;
-	metadata: {
-		selectColumns: string[];
-		fromClause: string;
-		hasJoins: boolean;
-		hasWhere: boolean;
-		parameterCount: number;
-		tableFixed: string;
-	};
-}
+/** A context object passed through the builder functions to track parameters. */
+type BuildContext = {
+	parameters: Parameters;
+	paramIndex: number;
+};
 
-/** A generic row object returned from a database query. */
-export type QueryResultRow = Record<string, SqlParameterValue>;
-
-
-// -----------------------------------------------------------------------------
-// INTERNAL HELPER FUNCTIONS
-// -----------------------------------------------------------------------------
+// --- HELPER FUNCTIONS ---
 
 /**
- * Recursively parses WHERE conditions into a parameterized SQL string.
- * It validates EVERY column key at runtime against the security whitelist.
- * @private
+ * Recursively builds the WHERE clause string with proper parameterization.
+ * @param where The condition or group of conditions to process.
+ * @param ctx The build context for tracking parameters.
+ * @returns The generated SQL string for the WHERE clause segment.
  */
-function parseWhere(
-	fromSource: string,
-	item: WhereCondition<unknown> | WhereConditionGroup<unknown>,
-	allowedColumns: ReadonlyArray<string>,
-	parameters: Record<string, SqlParameterValue>,
-	paramIndex: { i: number }
-): string {
-	// Base case: item is a single condition
-	if (!isWhereConditionGroup(item)) {
-		// SECURITY: Regardless of compile-time type, validate every key at runtime against the whitelist.
-		if (!allowedColumns.includes(item.key)) {
-			throw new Error(`Column '${item.key}' is not allowed in the WHERE clause. Source: ${fromSource}`);
-		}
-
-		if (item.whereCondOp === ComparisonOperator.IS_NULL || item.whereCondOp === ComparisonOperator.IS_NOT_NULL) {
-			return `${item.key} ${item.whereCondOp}`;
-		}
-
-		if ((item.whereCondOp === ComparisonOperator.IN || item.whereCondOp === ComparisonOperator.NOT_IN) && Array.isArray(item.val)) {
-			// Handle empty arrays to prevent invalid SQL like `IN ()`
-			if (item.val.length === 0) return item.whereCondOp === ComparisonOperator.IN ? '1=0' : '1=1';
-
-			const paramNames = item.val.map(v => {
-				const paramName = `p${paramIndex.i++}`;
-				parameters[paramName] = v as SqlParameterValue;
-				return `@${paramName}`;
-			});
-			return `${item.key} ${item.whereCondOp} (${paramNames.join(', ')})`;
-		}
-
-		const paramName = `p${paramIndex.i++}`;
-		parameters[paramName] = item.val as SqlParameterValue;
-		return `${item.key} ${item.whereCondOp} @${paramName}`;
+function buildWhereClause<T>(where: WhereCondition<T> | WhereConditionGroup<T>, ctx: BuildContext): string {
+	if (isWhereConditionGroup(where)) {
+		// It's a group (e.g., with AND/OR), so we recurse through its nested conditions.
+		const conditions = where.conditions.map(c => buildWhereClause(c, ctx)).join(` ${where.whereCondOp} `);
+		return `(${conditions})`;
 	}
 
-	// Recursive case: item is a condition group
-	if (item.conditions.length === 0) return '1=1'; // Neutral for empty groups
-	const parts = item.conditions.map(c => parseWhere(fromSource, c, allowedColumns, parameters, paramIndex));
-
-	if (item.whereCondOp === LogicalOperator.NOT) {
-		if (parts.length !== 1) throw new Error('A NOT group must contain exactly one condition or group.');
-		return `NOT (${parts[0]})`;
-	}
-
-	return `(${parts.join(` ${item.whereCondOp} `)})`;
-}
-
-/**
- * Builds the ORDER BY clause, validating every column key at runtime.
- * @private
- */
-function buildOrderBy(
-	fromSource: string,
-	orderBy: ReadonlyArray<JoinSortDescriptor>,
-	allowedColumns: ReadonlyArray<string>
-): string {
-	if (orderBy.length === 0) {
-		// MSSQL requires an ORDER BY clause for OFFSET/FETCH. `(SELECT NULL)` is the standard workaround.
-		return 'ORDER BY (SELECT NULL)';
-	}
-
-	const orderByParts = orderBy.map(s => {
-		// SECURITY: Validate every sort key against the whitelist.
-		if (!allowedColumns.includes(s.key)) {
-			throw new Error(`Sort column '${s.key}' is not allowed. Source: ${fromSource}`);
-		}
-		const dir = s.direction.toLowerCase();
-		if (dir !== 'asc' && dir !== 'desc') {
-			throw new Error(`Invalid sort direction: '${s.direction}'.`);
-		}
-		return `${s.key} ${dir}`;
-	});
-
-	return `ORDER BY ${orderByParts.join(', ')}`;
-}
-
-function buildJoinClauses(
-	fromSource: string,
-	joins: ReadonlyArray<JoinClause>,
-	allowedColumns: ReadonlyArray<string>
-): string {
-	if (!joins || joins.length === 0) return '';
-
-	return joins.map(join => {
-		if (!join.table || !join.on) {
-			throw new Error('JOIN clause requires "table" and "on" properties.');
-		}
-
-		// SECURITY: Basic check to prevent trivial injection in JOIN clauses.
-		if (/[;']/.test(join.table) || (join.alias && /[;']/.test(join.alias))) {
-			throw new Error('Invalid characters detected in JOIN clause.');
-		}
-
-		const alias = join.alias ? ` AS ${join.alias}` : '';
-		const onClause = parseJoinConditions(fromSource, join.on, allowedColumns);
-
-		return `${join.type} ${join.table}${alias} ON ${onClause}`;
-	}).join(' ');
-}
-
-function parseJoinConditions(
-	fromSource: string,
-	item: JoinConditionGroup | JoinColCondition | WhereCondition<unknown> | WhereConditionGroup<unknown>,
-	allowedColumns: ReadonlyArray<string>,
-	parameters?: Record<string, SqlParameterValue>,
-	paramIndex?: { i: number }
-): string {
-
-	// ===== Regular WHERE =====
-
-	// If regular WHERE => Use respective parser.
-	if (isWhereCondition(item) || isWhereConditionGroup(item)) {
-		log.debug(`Parsing WHERE clause`, { item, allowedColumns, fromSource });
-		const whereClause = parseWhere(fromSource, item, allowedColumns, parameters ?? {}, paramIndex ?? { i: 0 });
-		return whereClause;
-	}
-
-	// ===== Simple/single JOIN condition =====	
+	// It's a single WhereCondition (e.g., { key: 'w.status', op: '=', val: 'active' }).
+	const { key, whereCondOp, val } = where;
 	
-	log.debug(`Parsing JOIN clause`, { item, allowedColumns, fromSource });
-
-	// Base case: item is a single join condition (columnA = columnB)
-	if (!(isConditionGroup(item))) {
-		if (isJoinColCondition(item)) {
-			// SECURITY: Validate both columns against whitelist
-			if (!allowedColumns.includes(item.columnA) || !allowedColumns.includes(item.columnB)) {
-				log.error(`parseJoinConditions: Join columns '${item.columnA}' or '${item.columnB}' are not allowed. Source: ${fromSource}`, { allowedColumns }); // Extra logging for security
-				throw new Error(`parseJoinConditions: Join columns '${item.columnA}' or '${item.columnB}' are not allowed. Source: ${fromSource}`);
-			}
-
-			// For JOIN conditions, we typically don't parameterize - it's column = column
-			// But we could parameterize if needed for security
-			return `${item.columnA} ${item.op} ${item.columnB}`;
-		} else {
-			throw Error("Invalid join condition: expected JoinColCondition.");
-		}
-
+	// Handle operators that don't require a value.
+	if (whereCondOp === 'IS NULL' || whereCondOp === 'IS NOT NULL') {
+		return `${String(key)} ${whereCondOp}`;
 	}
 
-	// ===== JOIN condition group =====	
-
-	// Recursive case: item is a condition group
-	if (item.conditions.length === 0) return '1=1'; // Neutral for empty groups
-
-	const parts = item.conditions.map(c =>
-		parseJoinConditions(fromSource, c, allowedColumns)
-	);
-
-	if (item.joinCondOp === LogicalOperator.NOT) {
-		if (parts.length !== 1) {
-			throw new Error('A NOT group must contain exactly one condition or group.');
-		}
-		return `NOT (${parts[0]})`;
+	// Handle IN clauses, which require special syntax for multiple parameters.
+	if ((whereCondOp === 'IN' || whereCondOp === 'NOT IN') && Array.isArray(val)) {
+		if (val.length === 0) return '1=0'; // Return a logically false statement if the IN array is empty to prevent SQL errors.
+		const paramNames = val.map(v => {
+			const paramName = `p${ctx.paramIndex++}`;
+			ctx.parameters[paramName] = v;
+			return `@${paramName}`;
+		});
+		return `${String(key)} ${whereCondOp} (${paramNames.join(', ')})`;
 	}
 
-	return `(${parts.join(` ${item.joinCondOp} `)})`;
-
+	// For all other operators, create a single parameter.
+	const paramName = `p${ctx.paramIndex++}`;
+	ctx.parameters[paramName] = val;
+	return `${String(key)} ${whereCondOp} @${paramName}`;
 }
 
+/**
+ * Recursively builds the ON clause for a JOIN, supporting complex conditions.
+ * @param on The group of conditions for the ON clause.
+ * @param ctx The build context for tracking parameters.
+ * @returns The generated SQL string for the ON clause segment.
+ */
+function buildOnClause(on: JoinConditionGroup, ctx: BuildContext): string {
+    const conditions = on.conditions.map(cond => {
+        if (isJoinColCondition(cond)) {
+            // This is a standard column-to-column join, e.g., 'w.wholesaler_id = wc.wholesaler_id'.
+            return `${cond.columnA} ${cond.op} ${cond.columnB}`;
+        }
+        if (isWhereCondition(cond) || isWhereConditionGroup(cond)) {
+            // This handles dynamic parameters within the ON clause (for the anti-join pattern).
+            // e.g., 'AND wio.wholesaler_id = @p1'
+            return buildWhereClause(cond, ctx);
+        }
+        throw new Error('Unsupported condition type encountered in JOIN ON clause.');
+    }).join(` ${on.joinCondOp} `);
+    return `(${conditions})`;
+}
 
-// -----------------------------------------------------------------------------
-// PUBLIC API FUNCTIONS
-// -----------------------------------------------------------------------------
+// ===================================================================================
+// MAIN BUILDER FUNCTION
+// ===================================================================================
 
 /**
- * Builds a secure, parameterized SQL query from a payload and configuration.
- * This is the main public function of the module.
- *
- * @template T The domain entity type for strict `QueryPayload` validation.
- * @param payload The client-provided query structure, either strictly typed or for joins.
- * @param config The server-side security configuration object.
- * @param fixedFrom An optional string to enforce the `FROM` table/view, overriding any client value.
- * @returns A `QueryBuildResult` object with the SQL string, parameters, and metadata.
+ * Builds a secure, parameterized SQL query from a payload, enforcing all security rules.
+ * @param payload The query definition from the client.
+ * @param config The master security configuration.
+ * @param namedQuery Optional name of a predefined JOIN query.
+ * @param fixedFrom Optional, server-enforced FROM clause to override the client payload for typed endpoints.
+ * @returns An object containing the SQL string, parameters, and metadata.
  */
 export function buildQuery<T>(
 	payload: QueryPayload<T>,
-	config: typeof SupplierQueryConfigType,
-	fixedFrom?: string
-): QueryBuildResult {
-	const startTime = Date.now();
-	try {
-		log.info("Starting query build...", { payload, fixedFrom });
+	config: QueryConfig,
+	namedQuery?: string,
+	fixedFrom?: FromClause
+) {
+	const { select, joins, where, orderBy, limit, offset } = payload;
+	
+	const ctx: BuildContext = {
+		parameters: {},
+		paramIndex: 0,
+	};
+
+	let fromClause = '';
+	let fromTableForMetadata = '';
+
+	// --- 1. Determine and Validate the FROM Clause ---
+	// This logic implements the hybrid model.
+	if (namedQuery && config.joinConfigurations) {
+		// Case 1: A predefined, trusted JOIN configuration is used. This is the most secure path.
+		const joinConfig = config.joinConfigurations[namedQuery as keyof typeof config.joinConfigurations];
+		if (!joinConfig) throw new Error(`Named query '${namedQuery}' is not defined.`);
+		fromClause = joinConfig.from;
+		fromTableForMetadata = namedQuery;
+	} else {
+		// Case 2: A dynamic query is being built.
+		// Prioritize the server-enforced 'fixedFrom' from the typed endpoint. If it's not present,
+		// fall back to the 'from' object provided by the client (used by /api/query).
 		const fromSource = fixedFrom || payload.from;
-		if (!fromSource) throw new Error('FROM clause is required.');
+		if (!fromSource) {
+			throw new Error("Query payload must include a 'from' clause.");
+		}
+		
+		const { table, alias } = fromSource;
 
-		const allowedColumns = config.allowedTables[
-			fromSource as keyof typeof config.allowedTables
-		] as ReadonlyArray<string>;
+		// --- NESTED VALIDATION STEPS FOR THE FROM CLAUSE ---
+		// Fetch the entire configuration for the given alias from our single source of truth.
+		const aliasConfig = aliasedTablesConfig[alias as keyof typeof aliasedTablesConfig];
 
-		log.info("Building query...", { fromSource, fixedFrom: !!fixedFrom, allowedColumns });
-
-		if (!allowedColumns) {
-			throw new Error(`Table or View '${fromSource}' is not allowed for querying.`);
+		// SECURITY CHECK 1: The alias must be explicitly registered in `aliasedTablesConfig`.
+		// This prevents any arbitrary strings from being used as aliases.
+		if (!aliasConfig) {
+			throw new Error(`Alias '${alias}' is not a registered alias.`);
 		}
 
-		let fromClause: string;
-		let joinClauses = '';
-
-		if (config.joinConfigurations?.[fromSource as keyof typeof config.joinConfigurations]) {
-			const joinConfig = config.joinConfigurations[fromSource as keyof typeof config.joinConfigurations];
-			fromClause = joinConfig.from;
-			joinClauses = buildJoinClauses(fromSource, joinConfig.joins, allowedColumns);
-		} else {
-			fromClause = fromSource;
-			if (payload.joins) joinClauses = buildJoinClauses(fromSource, payload.joins, allowedColumns);
+		// SECURITY CHECK 2: The alias must be used for its designated table.
+		// This crucial check prevents misuse, e.g., a client trying to query `dbo.users` using the valid alias 'w'.
+		if (aliasConfig.tableName !== table) {
+			throw new Error(`Alias '${alias}' is registered for table '${aliasConfig.tableName}', but was incorrectly used for table '${table}'.`);
 		}
-
-		const parameters: Record<string, SqlParameterValue> = {};
-		const paramIndex = { i: 0 };
-
-		const selectColumns = payload.select as ReadonlyArray<string>;
-		const validatedSelect = selectColumns.filter(col => {
-			const baseCol = col.split(' AS ')[0].trim();
-			return allowedColumns.includes(baseCol) || allowedColumns.includes(col);
-		});
-		if (validatedSelect.length === 0) throw new Error('No valid columns in SELECT clause after filtering.');
-
-		let whereClause = '';
-		if (payload.where) {
-			// `payload.where` is structurally compatible, allowing TypeScript to resolve this safely.
-			const parsed = parseWhere(fromSource, payload.where as WhereCondition<unknown>, allowedColumns, parameters, paramIndex);
-			if (parsed !== '1=1') whereClause = `WHERE ${parsed}`;
-		}
-
-		// The `orderBy` payload is cast to the broader type, which is safe due to the `keyof T & string` fix.
-		const orderByClause = buildOrderBy(
-			fromSource,
-			(payload.orderBy as JoinSortDescriptor[]) || [],
-			allowedColumns
-		);
-
-		const limit = Math.min(payload.limit ?? 100, 2000);
-		const offset = Math.max(payload.offset ?? 0, 0);
-		const offsetClause = `OFFSET ${offset} ROWS FETCH NEXT ${limit} ROWS ONLY`;
-
-		const sql = `SELECT ${validatedSelect.join(', ')} FROM ${fromClause} ${joinClauses} ${whereClause} ${orderByClause} ${offsetClause};`;
-
-		const buildTime = Date.now() - startTime;
-		log.info(`Query built successfully in ${buildTime}ms`, { parameterCount: paramIndex.i });
-
-		return {
-			sql, parameters,
-			metadata: {
-				selectColumns: validatedSelect, fromClause, hasJoins: !!joinClauses,
-				hasWhere: !!whereClause, parameterCount: paramIndex.i, tableFixed: fromSource
-			}
-		};
-	} catch (error: unknown) {
-		log.error("Query building failed", error);
-		throw error;
+		
+		// If all checks pass, construct the final FROM clause string for the SQL query.
+		fromClause = `${table} ${alias}`;
+		fromTableForMetadata = table;
 	}
+
+	// --- 2. Build JOIN Clauses ---
+	const joinClause = joins?.map((join: JoinClause) => {
+		const { type, table, alias, on } = join;
+		if (!alias) throw new Error("All JOINs must have an alias for consistency and security.");
+		
+		// Perform the same validation checks for each JOIN's alias and table.
+		const aliasConfig = aliasedTablesConfig[alias as keyof typeof aliasedTablesConfig];
+		if (!aliasConfig) throw new Error(`JOIN alias '${alias}' is not a registered alias.`);
+		if (aliasConfig.tableName !== table) throw new Error(`JOIN alias '${alias}' is for table '${aliasConfig.tableName}', not '${table}'.`);
+		
+		const onClause = buildOnClause(on, ctx);
+		return `${type} ${table} ${alias} ON ${onClause}`;
+	}).join(' ');
+
+	// --- 3. Build Remaining SQL Clauses ---
+	const selectClause = select.join(', ');
+	const whereClause = where ? `WHERE ${buildWhereClause(where, ctx)}` : '';
+	const orderByClause = orderBy ? `ORDER BY ${orderBy.map((s: SortDescriptor<T>) => `${String(s.key)} ${s.direction}`).join(', ')}` : '';
+	const limitClause = (limit && limit > 0) ? `OFFSET ${offset || 0} ROWS FETCH NEXT ${limit} ROWS ONLY` : '';
+
+	// --- 4. Assemble Final Query ---
+	const sql = `SELECT ${selectClause} FROM ${fromClause} ${joinClause || ''} ${whereClause} ${orderByClause} ${limitClause}`;
+
+	return {
+		sql: sql.trim().replace(/\s+/g, ' '),
+		parameters: ctx.parameters,
+		metadata: {
+			selectColumns: select as string[],
+			hasJoins: !!joins?.length,
+			hasWhere: !!where,
+			parameterCount: ctx.paramIndex,
+			tableFixed: fromTableForMetadata
+		}
+	};
 }
 
 /**
- * Executes a pre-built, parameterized SQL query against the database.
+ * Executes the generated SQL query with its parameters safely against the database.
+ * @param sql The parameterized SQL string from `buildQuery`.
+ * @param parameters A record of parameters to be safely injected by the driver.
+ * @returns A promise that resolves to an array of query result objects.
  */
-export async function executeQuery(sql: string, parameters: Record<string, SqlParameterValue>): Promise<QueryResultRow[]> {
-	const startTime = Date.now();
-	log.info("Executing query...", { sql, parameters });
-
-	try {
-		const request = db.request();
-		for (const [key, value] of Object.entries(parameters)) {
-			request.input(key, value);
-		}
-		const result = await request.query(sql);
-		const executionTime = Date.now() - startTime;
-		log.info(`Query executed successfully in ${executionTime}ms`, { rowCount: result.recordset.length });
-		return result.recordset as QueryResultRow[];
-	} catch (error: unknown) {
-		log.error("Query execution failed", {
-			sql: sql,
-			error: error instanceof Error ? error.message : String(error)
-		});
-		throw error;
-	}
+export async function executeQuery(sql: string, parameters: Parameters): Promise<Record<string, unknown>[]> {
+    try {
+        const request = db.request();
+        for (const key in parameters) {
+            request.input(key, parameters[key]);
+        }
+        const result = await request.query(sql);
+        return result.recordset;
+    } catch (err) {
+        // Log the failed query for easier debugging, then re-throw.
+        log.error("SQL Execution Failed", { sql, parameters, error: err });
+        throw err;
+    }
 }

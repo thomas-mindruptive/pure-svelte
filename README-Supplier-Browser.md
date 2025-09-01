@@ -597,6 +597,8 @@ Svelte's core feature is its powerful and efficient reactivity system. In this a
 
 ## TODOS (UPDATED)
 *   **FIX NAVIGATION BUG:** The reconciliation logic in `(browser)/+layout.ts` is faulty. When navigating to the top-level "Suppliers" list, the conserved path is incorrectly cleared, causing the loss of user context. This works correctly when navigating to mid-levels like "Categories". This is a high-priority bug.
+See chapter "Frontend Navigation Architecture: Context Conservation" above.
+
 *   **Finalize CSS Refactoring:** Ensure all pages correctly import and use the new pattern-based CSS files (`detail-page-layout.css`, etc.) and that all duplicate local styles have been removed.
 *   **Audit API Clients for SSR Safety:** Verify that all `LoadingState` method calls (`.start()`, `.finish()`) are wrapped in an `if (browser)` check.
 *   **Audit `load` Functions:** Verify that all `load` functions correctly pass the `fetch` function from the `LoadEvent` to the `ApiClient`.

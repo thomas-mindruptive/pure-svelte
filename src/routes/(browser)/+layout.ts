@@ -17,6 +17,7 @@ type EntityNames = {
 };
 
 export async function load({ url, params, depends, fetch: loadEventFetch }: LoadEvent) {
+  log.info('(Layout Load) called with URL:', url.href, 'and params:', params);
   depends(`url:${url.href}`);
 
   // --- STEP 1: DEFINE PATHS FROM BOTH SOURCES ---
@@ -77,6 +78,7 @@ export async function load({ url, params, depends, fetch: loadEventFetch }: Load
   } else {
     activeLevel = 'suppliers';
   }
+  log.info(`(Layout Load) Reconciled navigation path, before loading data:`, { pathFromUrl, conservedPath, finalUiPath, activeLevel });
   
   // --- STEP 5: BUILD FINAL PROPS AND RETURN ---
   await Promise.all(apiPromises);

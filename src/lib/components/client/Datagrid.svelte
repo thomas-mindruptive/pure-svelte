@@ -202,9 +202,9 @@
           throw new Error(`Column accessor for ${colName} is not a function`);
         }
         const val = col.accessor!(row);
-        log.debug(
-          `safeAccessor: Cell accessor for ${colName} returned: ${val}`,
-        );
+        // log.debug(
+        //   `safeAccessor: Cell accessor for ${colName} returned: ${val}`,
+        // );
         if (undefined === val) {
           log.warn(
             `safeAccessor: Cell accessor for ${colName} returned undefined`,
@@ -215,9 +215,9 @@
       } else {
         // @ts-ignore - dynamic property access
         const val = row?.[col.key];
-        log.debug(
-          `safeAccessor: safeAccessor: Direct access for ${colName} returned: ${val}`,
-        );
+        // log.debug(
+        //   `safeAccessor: safeAccessor: Direct access for ${colName} returned: ${val}`,
+        // );
         if (undefined === val) {
           log.warn(
             `safeAccessor: Cell accessor for ${colName} returned undefined`,
@@ -282,12 +282,12 @@
   function rowIsDeleting(row: any): boolean {
     const id = safeGetId(row);
     const result = id != null && isDeleting(id);
-    log.info("rowIsDeleting:", {
-      id,
-      idType: typeof id,
-      setHas: deletingObjectIds.has(id!),
-      result,
-    });
+    // log.info("rowIsDeleting:", {
+    //   id,
+    //   idType: typeof id,
+    //   setHas: deletingObjectIds.has(id!),
+    //   result,
+    // });
     return result;
   }
 
@@ -747,6 +747,7 @@
 
       // Log grid initialization for debugging
       log.info(
+        "Grid mounted",
         {
           component: "DataGrid",
           gridId,
@@ -757,7 +758,6 @@
             (c: ColumnDef<any>) => c.key,
           ),
         },
-        "Grid mounted",
       );
 
       // Validate required props and warn about missing configuration

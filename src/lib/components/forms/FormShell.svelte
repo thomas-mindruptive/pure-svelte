@@ -29,6 +29,7 @@
   export type ValidateResult = { valid: boolean; errors?: Errors };
 
   // ===== FORM HANDLER TYPES =====
+
   export type ValidateFn = (
     data: FormData,
   ) => ValidateResult | Promise<ValidateResult>;
@@ -49,8 +50,11 @@
   }) => void;
   export type ChangedCallback = (p: { data: FormData; dirty: boolean }) => void;
 
+  // ===== PROPS TYPES =====
+
   // Snippet prop types (tuple generic for Svelte 5)
   type HeaderProps = { data: FormData; dirty: boolean };
+
   type FieldsProps = {
     data: FormData;
     set: (path: string, value: unknown) => void;
@@ -60,6 +64,7 @@
     markTouched: (path: string) => void;
     validate: (path?: string) => Promise<boolean>;
   };
+
   type ActionsProps = {
     submit: () => Promise<void>;
     cancel: () => void;
@@ -68,7 +73,10 @@
     dirty: boolean;
     disabled: boolean;
   };
+
   type FooterProps = { data: FormData };
+
+  // ===== PROPS =====
 
   const {
     // Data & lifecycle
@@ -185,6 +193,16 @@
 
   let formEl: HTMLFormElement;
 
+  // !!!!!!!!!!!!!!!!!!!!!!!!! DEBUG
+  $effect(() => {
+    log.debug("FormShell State Change:", {
+        entity,
+        data_product_def_id: data.product_def_id,
+        data_keys: Object.keys(data),
+        snapshot_product_def_id: snapshot.product_def_id
+    });
+});
+
   // ---- Keybindings (programmatic to avoid a11y warning) ----
   onMount(() => {
     const keyHandler = (e: KeyboardEvent) => {
@@ -205,7 +223,7 @@
     };
 
     formEl?.addEventListener("keydown", keyHandler);
-    log.info({ component: "FormShell", entity, autoValidate }, "FORM_MOUNTED");
+    log.info("FORM_MOUNTED", { entity, autoValidate, cleanInitial, data, snapshot });
     return () => formEl?.removeEventListener("keydown", keyHandler);
   });
 
@@ -260,7 +278,9 @@
     try {
       // Use safe comparison for dirty checking
       const currentSnapshot = createSnapshot(data);
-      return JSON.stringify(currentSnapshot) !== JSON.stringify(snapshot);
+      const isDirty =  JSON.stringify(currentSnapshot) !== JSON.stringify(snapshot);
+      log.debug("isDirty check:", { isDirty, current: currentSnapshot.product_def_id, snapshot: snapshot.product_def_id });
+      return isDirty
     } catch {
       log.warn(
         { component: "FormShell", entity },

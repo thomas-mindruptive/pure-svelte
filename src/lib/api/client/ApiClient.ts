@@ -43,7 +43,7 @@ export class ApiClient {
 		const timeoutId = setTimeout(() => controller.abort(), timeout);
 
 		try {
-			log.info(`API Request: ${context}`, { url, method: init.method || 'GET' });
+			log.info(`API Request: ${context}-${url}`, { url, method: init.method || 'GET' });
 
 			const response = await this.fetcher(url, {
 				...init,
@@ -51,7 +51,7 @@ export class ApiClient {
 				signal: controller.signal
 			});
 			clearTimeout(timeoutId);
-			log.info('ApiClient.fetch response', { status: response.status, ok: response.ok, statusText: response.statusText });
+			log.info(`ApiClient.fetch - ${url}, response`, { status: response.status, ok: response.ok, statusText: response.statusText });
 
 			// STABILE PARSING-LOGIK
 			const responseText = await response.text();
@@ -105,7 +105,7 @@ export class ApiClient {
 		const timeoutId = setTimeout(() => controller.abort(), timeout);
 
 		try {
-			log.info(`API Union Request: ${context}`, { url, method: init.method || 'GET' });
+			log.info(`API Union Request: ${context}-${url}`, { url, method: init.method || 'GET' });
 
 			const response = await this.fetcher(url, {
 				...init,
@@ -113,8 +113,8 @@ export class ApiClient {
 				signal: controller.signal
 			});
 			clearTimeout(timeoutId);
-			log.info('ApiClient.fetchUnion response', { status: response.status, ok: response.ok, statusText: response.statusText });
-			
+			log.info(`ApiClient.fetchUnion - ${url}, response`, { status: response.status, ok: response.ok, statusText: response.statusText });
+
 			// STABILE PARSING-LOGIK (identisch zu apiFetch)
 			const responseText = await response.text();
 			let parsedData: unknown;

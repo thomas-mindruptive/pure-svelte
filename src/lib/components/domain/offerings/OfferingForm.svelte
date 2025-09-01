@@ -18,16 +18,20 @@
 		type ChangedCallback,
 		type SubmitErrorCallback,
 		type SubmittedCallback,
-		type ValidateResult
-	} from '$lib/components/forms/FormShell.svelte';
-	import { log } from '$lib/utils/logger';
-	import type { WholesalerItemOffering, ProductDefinition } from '$lib/domain/types';
-	import { ApiClient } from '$lib/api/client/ApiClient';
-	import { getCategoryApi } from '$lib/api/client/category';
-	import { typeGuard } from '$lib/utils/typeUtils';
+		type ValidateResult,
+	} from "$lib/components/forms/FormShell.svelte";
+	import { log } from "$lib/utils/logger";
+	import type {
+		WholesalerItemOffering,
+		ProductDefinition,
+		WholesalerItemOffering_ProductDef_Category,
+	} from "$lib/domain/types";
+	import { ApiClient } from "$lib/api/client/ApiClient";
+	import { getCategoryApi } from "$lib/api/client/category";
+	import { typeGuard } from "$lib/utils/typeUtils";
 
-	import '$lib/components/styles/form.css';
-	import '$lib/components/styles/grid.css';
+	import "$lib/components/styles/form.css";
+	import "$lib/components/styles/grid.css";
 
 	// ===== COMPONENT PROPS & TYPES =====
 
@@ -50,7 +54,7 @@
 		onSubmitted,
 		onSubmitError,
 		onCancelled,
-		onChanged
+		onChanged,
 	} = $props<{
 		supplierId: number;
 		categoryId: number;
@@ -79,22 +83,24 @@
 		const errors: ValidationErrors = {};
 
 		if (!data.product_def_id) {
-			errors.product_def_id = ['A product must be selected.'];
+			errors.product_def_id = ["A product must be selected."];
 		}
 
 		if (data.price != null) {
 			if (isNaN(Number(data.price)) || Number(data.price) < 0) {
-				errors.price = ['Price must be a valid, non-negative number.'];
+				errors.price = ["Price must be a valid, non-negative number."];
 			}
 		}
 
 		if (!data.currency || String(data.currency).trim().length !== 3) {
-			errors.currency = ['A 3-letter currency code (e.g., USD) is required.'];
+			errors.currency = [
+				"A 3-letter currency code (e.g., USD) is required.",
+			];
 		}
 
 		return {
 			valid: Object.keys(errors).length === 0,
-			errors
+			errors,
 		};
 	}
 
@@ -108,10 +114,10 @@
 		const isUpdate = !!id;
 
 		// Ensure contextual IDs are included in the data payload.
-		const dataToSubmit: Omit<WholesalerItemOffering, 'offering_id'> = {
+		const dataToSubmit: Omit<WholesalerItemOffering, "offering_id"> = {
 			...(raw as WholesalerItemOffering),
 			wholesaler_id: supplierId,
-			category_id: categoryId
+			category_id: categoryId,
 		};
 
 		log.info(`(OfferingForm) Submitting...`, { isUpdate, id });
@@ -120,7 +126,10 @@
 			if (isUpdate) {
 				return await categoryApi.updateOffering(id!, dataToSubmit);
 			} else {
-				return await categoryApi.createOfferingForCategory(categoryId, dataToSubmit);
+				return await categoryApi.createOfferingForCategory(
+					categoryId,
+					dataToSubmit,
+				);
 			}
 		} catch (e) {
 			log.error(`(OfferingForm) Submit failed`, { error: String(e) });
@@ -130,23 +139,44 @@
 
 	// ===== EVENT HANDLERS (LOGGING & DELEGATION) =====
 
-	function handleSubmitted(p: { data: Record<string, any>; result: unknown }) {
-		log.info({ component: 'OfferingForm', event: 'submitted' }, 'FORM_EVENT');
+	function handleSubmitted(p: {
+		data: Record<string, any>;
+		result: unknown;
+	}) {
+		log.info(
+			{ component: "OfferingForm", event: "submitted" },
+			"FORM_EVENT",
+		);
 		onSubmitted?.(p.data);
 	}
 
-	function handleSubmitError(p: { data: Record<string, any>; error: unknown }) {
-		log.warn(`Submit error: ${String(p.error)}`, { component: 'OfferingForm', event: 'submitError' });
+	function handleSubmitError(p: {
+		data: Record<string, any>;
+		error: unknown;
+	}) {
+		log.warn(`Submit error: ${String(p.error)}`, {
+			component: "OfferingForm",
+			event: "submitError",
+		});
 		onSubmitError?.(p);
 	}
 
-	function handleCancelled(p: { data: Record<string, any>; reason?: string }) {
-		log.debug({ component: 'OfferingForm', event: 'cancelled' }, 'FORM_EVENT');
+	function handleCancelled(p: {
+		data: Record<string, any>;
+		reason?: string;
+	}) {
+		log.debug(
+			{ component: "OfferingForm", event: "cancelled" },
+			"FORM_EVENT",
+		);
 		onCancelled?.(p);
 	}
 
 	function handleChanged(p: { data: Record<string, any>; dirty: boolean }) {
-		log.debug({ component: 'OfferingForm', event: 'changed', dirty: p.dirty }, 'FORM_EVENT');
+		log.debug(
+			{ component: "OfferingForm", event: "changed", dirty: p.dirty },
+			"FORM_EVENT",
+		);
 		onChanged?.(p);
 	}
 </script>
@@ -164,17 +194,21 @@
 >
 	<!-- FORM HEADER -->
 	{#snippet header({ data, dirty })}
-		{@const offering = data as OfferingFormData}
+		{@const offering = data as WholesalerItemOffering_ProductDef_Category}
 		<div class="form-header">
 			<div>
-				<h3>Product Offering Details</h3>
-				{#if offering?.offering_id}
-					<span class="field-hint">ID: {offering.offering_id}</span>
+				{#if offering.offering_id}
+					<h3>{offering.product_def_title || "Unnamed Product"}</h3>
+				{:else}
+					<h3>New Product Offering</h3>
 				{/if}
+				<span class="field-hint">ID: {offering.offering_id}</span>
 			</div>
 			<div>
 				{#if dirty}
-					<span class="pc-grid__badge pc-grid__badge--warn">Unsaved changes</span>
+					<span class="pc-grid__badge pc-grid__badge--warn"
+						>Unsaved changes</span
+					>
 				{/if}
 			</div>
 		</div>
@@ -182,42 +216,99 @@
 
 	<!-- FORM FIELDS -->
 	{#snippet fields({ data, get, set, errors, markTouched })}
+		{// TODO: Remove debug logging }
+		log.debug("FormShell Debug:", {
+			aaa: "aaa",
+			get_product_def_id: get("product_def_id"),
+			get_type: typeof get("product_def_id"),
+			first_product: availableProducts[0],
+			first_product_id: availableProducts[0]?.product_def_id,
+			first_product_id_type: typeof availableProducts[0]?.product_def_id,
+			exactMatch: availableProducts.find(
+				(p: any) => p.product_def_id === get("product_def_id"),
+			),
+			stringMatch: availableProducts.find(
+				(p: any) =>
+					String(p.product_def_id) === String(get("product_def_id")),
+			),
+		})}
+
 		<!-- Compile-time check that all keys are valid for WholesalerItemOffering -->
-		{typeGuard<WholesalerItemOffering>(
-			'offering_id',
-			'wholesaler_id',
-			'category_id',
-			'product_def_id',
-			'size',
-			'dimensions',
-			'price',
-			'currency',
-			'comment',
-			'created_at'
+		{typeGuard<WholesalerItemOffering_ProductDef_Category>(
+			"offering_id",
+			"wholesaler_id",
+			"category_id",
+			"product_def_id",
+			"size",
+			"dimensions",
+			"price",
+			"currency",
+			"comment",
+			"created_at",
+			"product_def_title",
 		)}
 
 		<div class="form-body">
 			<div class="form-grid">
 				<!-- Product Definition (Required) -->
 				<div class="form-group span-4">
-					<label for="offering-product">Product *</label>
-					<select
-						id="offering-product"
-						value={get('product_def_id') ?? ''}
-						class={errors.product_def_id ? 'error' : ''}
-						onchange={(e) => set('product_def_id', Number((e.currentTarget as HTMLSelectElement).value))}
-						onblur={() => markTouched('product_def_id')}
-						required
-						aria-invalid={!!errors.product_def_id}
-						aria-describedby={errors.product_def_id ? 'err-product' : undefined}
-					>
-						<option value="" disabled>Select a product...</option>
-						{#each availableProducts as product (product.product_def_id)}
-							<option value={product.product_def_id}>{product.title}</option>
-						{/each}
-					</select>
+					{#if false}
+						<!-- 
+					         If no offering_id => "CREATE" mode => Show available product_definitions 
+						     (== all which are not yet assigned to this supplier+category) 
+						-->
+					{/if}
+					{#if availableProducts.length > 0 && !get("offering_id")}
+						<label for="offering-product">Product *</label>
+						<select
+							id="offering-product"
+							value={get("product_def_id")}
+							class={errors.product_def_id ? "error" : ""}
+							onchange={(e) => {
+								log.info(
+									`onchange: Product selected: ${
+										(e.currentTarget as HTMLSelectElement)
+											.value
+									}`,
+								);
+								set(
+									"product_def_id",
+									Number(
+										(e.currentTarget as HTMLSelectElement)
+											.value,
+									),
+								);
+							}}
+							onblur={() => markTouched("product_def_id")}
+							required
+							aria-invalid={!!errors.product_def_id}
+							aria-describedby={errors.product_def_id
+								? "err-product"
+								: undefined}
+						>
+							<option value="" disabled
+								>Select a product...</option
+							>
+							{#each availableProducts as product (product.product_def_id)}
+								<option value={product.product_def_id}
+									>{product.title}</option
+								>
+							{/each}
+						</select>
+					{:else}
+						<p>
+							{get("product_def_title") ??
+								"product_def_title missing"}
+						</p>
+						<p class="field-hint">
+							The product cannot be changed for an existing
+							offering.
+						</p>
+					{/if}
 					{#if errors.product_def_id}
-						<div id="err-product" class="error-text">{errors.product_def_id[0]}</div>
+						<div id="err-product" class="error-text">
+							{errors.product_def_id[0]}
+						</div>
 					{/if}
 				</div>
 
@@ -229,15 +320,24 @@
 						type="number"
 						step="0.01"
 						placeholder="e.g., 199.99"
-						value={get('price') ?? ''}
-						class={errors.price ? 'error' : ''}
-						oninput={(e) => set('price', (e.currentTarget as HTMLInputElement).valueAsNumber)}
-						onblur={() => markTouched('price')}
+						value={get("price") ?? ""}
+						class={errors.price ? "error" : ""}
+						oninput={(e) =>
+							set(
+								"price",
+								(e.currentTarget as HTMLInputElement)
+									.valueAsNumber,
+							)}
+						onblur={() => markTouched("price")}
 						aria-invalid={!!errors.price}
-						aria-describedby={errors.price ? 'err-price' : undefined}
+						aria-describedby={errors.price
+							? "err-price"
+							: undefined}
 					/>
 					{#if errors.price}
-						<div id="err-price" class="error-text">{errors.price[0]}</div>
+						<div id="err-price" class="error-text">
+							{errors.price[0]}
+						</div>
 					{/if}
 				</div>
 				<div class="form-group span-2">
@@ -247,16 +347,26 @@
 						type="text"
 						placeholder="e.g., USD"
 						maxlength="3"
-						value={get('currency') ?? ''}
-						class={errors.currency ? 'error' : ''}
-						oninput={(e) => set('currency', (e.currentTarget as HTMLInputElement).value.toUpperCase())}
-						onblur={() => markTouched('currency')}
+						value={get("currency") ?? ""}
+						class={errors.currency ? "error" : ""}
+						oninput={(e) =>
+							set(
+								"currency",
+								(
+									e.currentTarget as HTMLInputElement
+								).value.toUpperCase(),
+							)}
+						onblur={() => markTouched("currency")}
 						required
 						aria-invalid={!!errors.currency}
-						aria-describedby={errors.currency ? 'err-currency' : undefined}
+						aria-describedby={errors.currency
+							? "err-currency"
+							: undefined}
 					/>
 					{#if errors.currency}
-						<div id="err-currency" class="error-text">{errors.currency[0]}</div>
+						<div id="err-currency" class="error-text">
+							{errors.currency[0]}
+						</div>
 					{/if}
 				</div>
 
@@ -267,9 +377,13 @@
 						id="offering-size"
 						type="text"
 						placeholder="e.g., 15 inch, Large"
-						value={get('size') ?? ''}
-						oninput={(e) => set('size', (e.currentTarget as HTMLInputElement).value)}
-						onblur={() => markTouched('size')}
+						value={get("size") ?? ""}
+						oninput={(e) =>
+							set(
+								"size",
+								(e.currentTarget as HTMLInputElement).value,
+							)}
+						onblur={() => markTouched("size")}
 					/>
 				</div>
 				<div class="form-group span-2">
@@ -278,9 +392,13 @@
 						id="offering-dimensions"
 						type="text"
 						placeholder="e.g., 10x20x5 cm"
-						value={get('dimensions') ?? ''}
-						oninput={(e) => set('dimensions', (e.currentTarget as HTMLInputElement).value)}
-						onblur={() => markTouched('dimensions')}
+						value={get("dimensions") ?? ""}
+						oninput={(e) =>
+							set(
+								"dimensions",
+								(e.currentTarget as HTMLInputElement).value,
+							)}
+						onblur={() => markTouched("dimensions")}
 					/>
 				</div>
 
@@ -291,8 +409,12 @@
 						id="offering-comment"
 						rows="3"
 						placeholder="Internal notes about this specific offering..."
-						oninput={(e) => set('comment', (e.currentTarget as HTMLTextAreaElement).value)}
-					>{get('comment') ?? ''}</textarea>
+						oninput={(e) =>
+							set(
+								"comment",
+								(e.currentTarget as HTMLTextAreaElement).value,
+							)}>{get("comment") ?? ""}</textarea
+					>
 				</div>
 			</div>
 		</div>
@@ -301,7 +423,12 @@
 	<!-- FORM ACTIONS -->
 	{#snippet actions({ submit, cancel, submitting, dirty })}
 		<div class="form-actions">
-			<button class="secondary-button" type="button" onclick={cancel} disabled={submitting}>
+			<button
+				class="secondary-button"
+				type="button"
+				onclick={cancel}
+				disabled={submitting}
+			>
 				Cancel
 			</button>
 			<button

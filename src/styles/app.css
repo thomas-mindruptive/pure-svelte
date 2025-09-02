@@ -27,6 +27,17 @@
   --spacing-md: 1rem;
   --spacing-lg: 1.5rem;
   --spacing-xl: 2rem;
+ 
+  /* Buttons */
+  --button-padding:  0.5rem 1.25rem;
+  --button-border-radius: 6px;
+  --button-font-size: 0.875rem;
+  --button-border: none;
+  --button-font-weight: 500;
+  --button-transition: all 0.2s ease;
+  --button-text-align: center;
+  --button-cursor: pointer;
+  --button-primary-color: white;
 }
 
 /* 3. Ein einfacher CSS-Reset und globale Body-Stile */
@@ -122,6 +133,8 @@ body {
 ::selection {
   background: color-mix(in oklab, var(--color-primary) 20%, white);
 }
+
+
 
 /* Reduzierte Animationen respektieren (Barrierefreiheit) */
 @media (prefers-reduced-motion: reduce) {

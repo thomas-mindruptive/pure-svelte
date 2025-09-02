@@ -63,19 +63,19 @@ select {
 /* --- Buttons --- */
 .primary-button,
 .secondary-button {
-  padding: 0.5rem 1.25rem;
-  border: none;
-  border-radius: 6px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-size: 0.875rem;
-  text-align: center;
+  padding: var(--button-padding, 0.5rem 1.25rem);
+  border: var(--button-border);
+  border-radius: var(--button-border-radius);
+  font-weight: var(--button-font-weight);
+  cursor: var(--button-cursor);
+  transition: var(--button-transition);
+  font-size: var(--button-font-size);
+  text-align: var(--button-text-align);
 }
 
 .primary-button {
   background-color: var(--color-primary);
-  color: white;
+  color: var(--button-primary-color)
 }
 
 .primary-button:hover:not(:disabled) {

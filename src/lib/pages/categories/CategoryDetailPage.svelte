@@ -86,6 +86,13 @@
     goto(`${$page.url.pathname}/offerings/${offering.offering_id}`);
   }
 
+  /**
+   * Create new offering.
+   */
+  function handleOfferingCreate() {
+    log.warn(`handleOfferingCreate not yet implemented`);
+  }
+
   // Strategie-Objekte für das OfferingGrid
   const deleteStrategy: DeleteStrategy<WholesalerItemOffering_ProductDef_Category> =
     {
@@ -114,6 +121,9 @@
   </div>
 
   <div class="grid-section">
+    <button class="pc-grid__createbtn" onclick={handleOfferingCreate}
+      >Create Offering</button
+    >
     <OfferingGrid
       rows={data.offerings}
       loading={$categoryLoadingState}

@@ -13,13 +13,7 @@
 	 * - Uses the ApiClient factory pattern for type-safe, SSR-safe API calls.
 	 */
 
-	import FormShell, {
-		type CancelledCallback,
-		type ChangedCallback,
-		type SubmitErrorCallback,
-		type SubmittedCallback,
-		type ValidateResult,
-	} from "$lib/components/forms/FormShell.svelte";
+	import FormShell from "$lib/components/forms/FormShell.svelte";
 	import { log } from "$lib/utils/logger";
 	import type {
 		WholesalerItemOffering,
@@ -32,11 +26,18 @@
 
 	import "$lib/components/styles/form.css";
 	import "$lib/components/styles/grid.css";
+	import type {
+		SubmittedCallback,
+		SubmitErrorCallback,
+		CancelledCallback,
+		ChangedCallback,
+		ValidateResult,
+	} from "$lib/components/forms/forms.types";
 
 	// ===== COMPONENT PROPS & TYPES =====
 
 	type ValidationErrors = Record<string, string[]>;
-	type OfferingFormData = Partial<WholesalerItemOffering>;
+	export type OfferingFormData = Partial<WholesalerItemOffering>;
 
 	const {
 		// Context IDs are required for creating a new offering.
@@ -120,17 +121,26 @@
 			category_id: categoryId,
 		};
 
-		log.info(`(OfferingForm) Submitting...`, { isUpdate, id });
+		log.info(`(OfferingForm) Submitting to category API...`, {
+			isUpdate,
+			id,
+		});
 
 		try {
+			let offering;
 			if (isUpdate) {
-				return await categoryApi.updateOffering(id!, dataToSubmit);
+				offering = await categoryApi.updateOffering(id!, dataToSubmit);
 			} else {
-				return await categoryApi.createOfferingForCategory(
+				offering = await categoryApi.createOfferingForCategory(
 					categoryId,
 					dataToSubmit,
 				);
 			}
+			log.info(`(OfferingForm) Submitted successfully to category API`, {
+				isUpdate,
+				id,
+			});
+			return offering;
 		} catch (e) {
 			log.error(`(OfferingForm) Submit failed`, { error: String(e) });
 			throw e; // Re-throw for FormShell to handle

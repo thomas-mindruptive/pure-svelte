@@ -1,6 +1,5 @@
 <!-- src/lib/components/domain/offerings/OfferingDetailWrapper.svelte -->
 <script lang="ts">
-	import { invalidateAll } from "$app/navigation";
 	import type {
 		ProductDefinition,
 		WholesalerItemOffering,
@@ -10,17 +9,36 @@
 
 	import "$lib/components/styles/detail-page-layout.css";
 	import "$lib/components/styles/grid-section.css";
-    import { log } from "$lib/utils/logger";
+	import { log } from "$lib/utils/logger";
+	import type { CancelledCallback, ChangedCallback, SubmitErrorCallback, SubmittedCallback } from "$lib/components/forms/forms.types";
 
 	const {
 		offering,
 		availableProducts,
 		children,
+
+		// Svelte 5 component-callback props
+		onSubmitted,
+		onSubmitError,
+		onCancelled,
+		onChanged,
 	}: {
 		offering: WholesalerItemOffering;
 		availableProducts: ProductDefinition[];
 		children: Snippet;
+
+		onSubmitted: SubmittedCallback;
+		onSubmitError: SubmitErrorCallback;
+		onCancelled: CancelledCallback;
+		onChanged: ChangedCallback;
 	} = $props();
+
+	// Silence "unused variable" warning for props passed directly to child components.
+	// This is a deliberate signal to the compiler.
+	void onSubmitted;
+	void onSubmitError;
+	void onCancelled;
+	void onChanged;
 
 	log.debug(`(OfferingDetailWrapper) Loaded props:`, {
 		offering,
@@ -47,7 +65,8 @@
 	<div class="component-error-boundary">
 		<h3>Komponenten-Fehler</h3>
 		<p>
-			Component cannot be displayed because it was called with invalid data.
+			Component cannot be displayed because it was called with invalid
+			data.
 		</p>
 		<!-- Diese detaillierte Meldung ist super für die Entwicklung -->
 		<pre>{validationError}</pre>
@@ -61,7 +80,10 @@
 				supplierId={offering.wholesaler_id}
 				categoryId={offering.category_id}
 				{availableProducts}
-				onSubmitted={() => invalidateAll()}
+				onSubmitted={onSubmitted}
+				onSubmitError={onSubmitError}
+				onCancelled={onCancelled}
+				onChanged={onChanged}
 			/>
 		</div>
 

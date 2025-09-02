@@ -14,17 +14,27 @@
 :root {
   /* Color system (light) */
   --pc-grid-bg: #ffffff;
-  --pc-grid-fg: #0f172a;              /* slate-900 */
-  --pc-grid-muted: #475569;           /* slate-600 */
-  --pc-grid-border: #e2e8f0;          /* slate-200 */
-  --pc-grid-border-strong: #cbd5e1;   /* slate-300 */
-  --pc-grid-header-bg: #f8fafc;       /* slate-50 */
-  --pc-grid-row-hover: #f1f5f9;       /* slate-100 */
-  --pc-grid-row-selected: #e0f2fe;    /* sky-100 */
-  --pc-grid-danger: #dc2626;          /* red-600 */
-  --pc-grid-warning: #d97706;         /* amber-600 */
-  --pc-grid-success: #16a34a;         /* green-600 */
-  --pc-grid-accent: var(--color-primary);       
+  --pc-grid-fg: #0f172a;
+  /* slate-900 */
+  --pc-grid-muted: #475569;
+  /* slate-600 */
+  --pc-grid-border: #e2e8f0;
+  /* slate-200 */
+  --pc-grid-border-strong: #cbd5e1;
+  /* slate-300 */
+  --pc-grid-header-bg: #f8fafc;
+  /* slate-50 */
+  --pc-grid-row-hover: #f1f5f9;
+  /* slate-100 */
+  --pc-grid-row-selected: #e0f2fe;
+  /* sky-100 */
+  --pc-grid-danger: #dc2626;
+  /* red-600 */
+  --pc-grid-warning: #d97706;
+  /* amber-600 */
+  --pc-grid-success: #16a34a;
+  /* green-600 */
+  --pc-grid-accent: var(--color-primary);
 
   /* Typography & metrics */
   --pc-grid-font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI,
@@ -39,7 +49,7 @@
   --pc-grid-radius: 12px;
 
   /* Effects */
-  --pc-grid-shadow: 0 1px 2px rgba(0,0,0,.05), 0 1px 1px rgba(0,0,0,.04);
+  --pc-grid-shadow: 0 1px 2px rgba(0, 0, 0, .05), 0 1px 1px rgba(0, 0, 0, .04);
 
   /* Misc */
   --pc-grid-checkbox-accent: var(--pc-grid-accent);
@@ -48,15 +58,23 @@
 /* Dark mode defaults */
 @media (prefers-color-scheme: dark) {
   :root {
-    --pc-grid-bg: #0b1220;              /* slate-950-ish */
-    --pc-grid-fg: #e5e7eb;              /* slate-200 */
-    --pc-grid-muted: #94a3b8;           /* slate-400 */
-    --pc-grid-border: #1f2937;          /* slate-800 */
-    --pc-grid-border-strong: #334155;   /* slate-700 */
-    --pc-grid-header-bg: #0f172a;       /* slate-900 */
-    --pc-grid-row-hover: #111827;       /* slate-900/950 */
-    --pc-grid-row-selected: #0b3a4b;    /* sky-900-ish */
-    --pc-grid-shadow: 0 1px 2px rgba(0,0,0,.4), 0 1px 1px rgba(0,0,0,.3);
+    --pc-grid-bg: #0b1220;
+    /* slate-950-ish */
+    --pc-grid-fg: #e5e7eb;
+    /* slate-200 */
+    --pc-grid-muted: #94a3b8;
+    /* slate-400 */
+    --pc-grid-border: #1f2937;
+    /* slate-800 */
+    --pc-grid-border-strong: #334155;
+    /* slate-700 */
+    --pc-grid-header-bg: #0f172a;
+    /* slate-900 */
+    --pc-grid-row-hover: #111827;
+    /* slate-900/950 */
+    --pc-grid-row-selected: #0b3a4b;
+    /* sky-900-ish */
+    --pc-grid-shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 1px 1px rgba(0, 0, 0, .3);
   }
 }
 
@@ -100,7 +118,8 @@
   font-weight: 600;
   padding: calc(var(--pc-grid-cell-py) + 2px) var(--pc-grid-cell-px);
   border-bottom: 1px solid var(--pc-grid-border-strong);
-  z-index: 1; /* ensure above body rows when scrolling */
+  z-index: 1;
+  /* ensure above body rows when scrolling */
 }
 
 .pc-grid__tbody td {
@@ -120,6 +139,31 @@
 /* Zebra striping (optional; toggle with `.pc-grid--zebra`) */
 .pc-grid--zebra .pc-grid__tbody tr:nth-child(even) td {
   background: color-mix(in srgb, var(--pc-grid-row-hover) 35%, transparent);
+}
+
+/* ----------------------------- Grid context - e.g. above header  --------------------------------- */
+
+/**
+  * Primary button for actions converning the entire grid, not just rows. E.g. "create".
+  */
+.pc-grid__createbtn {
+  color: var(--button-primary-color);
+  background-color: var(--pc-grid-accent, #4f46e5);
+  /* Nutzt die Akzentfarbe des Themes */
+  padding: var(--button-padding, 0.5rem 1.25rem);
+  margin-top: 0.5rem;
+  margin-bottom: 1rem;
+  border: var(--button-border);
+  border-radius: var(--button-border-radius);
+  font-weight: var(--button-font-weight);
+  cursor: var(--button-cursor);
+  transition: var(--button-transition);
+  font-size: var(--button-font-size);
+  text-align: var(--button-text-align);
+}
+
+.pc-grid__createbtn:hover:not(:disabled) {
+  background-color: color-mix(in srgb, var(--pc-grid-accent) 90%, black);
 }
 
 /* Hover highlight */
@@ -142,8 +186,10 @@
 
 /* Truncate helper for narrow columns */
 .pc-grid__cell--truncate {
-  max-width: 1px;        /* enforce shrinkable cell */
-  width: 0;              /* allow flex/table to shrink */
+  max-width: 1px;
+  /* enforce shrinkable cell */
+  width: 0;
+  /* allow flex/table to shrink */
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -154,6 +200,7 @@
   cursor: pointer;
   user-select: none;
 }
+
 .pc-grid__th--sortable:focus-visible {
   outline: 2px solid var(--pc-grid-accent);
   outline-offset: 2px;
@@ -184,7 +231,11 @@
   border-radius: 10px;
   font-size: 0.9em;
 }
-.pc-grid__btn:hover { background: var(--pc-grid-row-hover); }
+
+.pc-grid__btn:hover {
+  background: var(--pc-grid-row-hover);
+}
+
 .pc-grid__btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
@@ -195,6 +246,7 @@
   border-color: color-mix(in srgb, var(--pc-grid-danger) 40%, var(--pc-grid-border));
   color: var(--pc-grid-danger);
 }
+
 .pc-grid__btn--danger:hover {
   background: color-mix(in srgb, var(--pc-grid-danger) 10%, transparent);
 }
@@ -209,7 +261,10 @@
   background: transparent;
   border-radius: 8px;
 }
-.pc-grid__iconbtn:hover { background: var(--pc-grid-row-hover); }
+
+.pc-grid__iconbtn:hover {
+  background: var(--pc-grid-row-hover);
+}
 
 /* Checkbox accent (for native <input type="checkbox">) */
 .pc-grid input[type="checkbox"],
@@ -235,10 +290,14 @@
 /* Visually hidden but accessible text */
 .pc-grid .visually-hidden {
   position: absolute !important;
-  width: 1px; height: 1px;
-  padding: 0; margin: -1px;
-  overflow: hidden; clip: rect(0, 0, 0, 0);
-  white-space: nowrap; border: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* Soft scroll container for wide tables */
@@ -250,8 +309,8 @@
 /* Optional subtle top/bottom scroll shadows inside the scroller */
 .pc-grid__scroller:is(.has-shadow) {
   box-shadow:
-    inset 0 8px 8px -8px rgba(0,0,0,.08),
-    inset 0 -8px 8px -8px rgba(0,0,0,.08);
+    inset 0 8px 8px -8px rgba(0, 0, 0, .08),
+    inset 0 -8px 8px -8px rgba(0, 0, 0, .08);
 }
 
 /* ----------------------------- Spinner ----------------------------------- */
@@ -259,15 +318,19 @@
    and toggling the parent's `[aria-busy="true"]` */
 .pc-grid__spinner {
   display: inline-block;
-  width: 1em; height: 1em;
+  width: 1em;
+  height: 1em;
   border-radius: 50%;
   border: 2px solid currentColor;
   border-right-color: transparent;
   vertical-align: -0.2em;
   animation: pc-grid-spin 0.7s linear infinite;
 }
+
 @keyframes pc-grid-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* -------------------------- Compact Variants ------------------------------ */
@@ -293,8 +356,15 @@
 
 /* ------------------------------ Helpers ---------------------------------- */
 /* Right/center text alignment helpers for cells/headers */
-.pc-grid__td--right, .pc-grid__th--right { text-align: right; }
-.pc-grid__td--center, .pc-grid__th--center { text-align: center; }
+.pc-grid__td--right,
+.pc-grid__th--right {
+  text-align: right;
+}
+
+.pc-grid__td--center,
+.pc-grid__th--center {
+  text-align: center;
+}
 
 /* Soft badge (useful for statuses) */
 .pc-grid__badge {
@@ -305,6 +375,15 @@
   border: 1px solid var(--pc-grid-border);
   background: color-mix(in srgb, var(--pc-grid-row-hover) 60%, transparent);
 }
-.pc-grid__badge--ok { color: var(--pc-grid-success); }
-.pc-grid__badge--warn { color: var(--pc-grid-warning); }
-.pc-grid__badge--danger { color: var(--pc-grid-danger); }
+
+.pc-grid__badge--ok {
+  color: var(--pc-grid-success);
+}
+
+.pc-grid__badge--warn {
+  color: var(--pc-grid-warning);
+}
+
+.pc-grid__badge--danger {
+  color: var(--pc-grid-danger);
+}

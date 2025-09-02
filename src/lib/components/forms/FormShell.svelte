@@ -23,32 +23,12 @@
   import { onMount } from "svelte";
   import type { Snippet } from "svelte";
   import { log } from "$lib/utils/logger";
-
-  type FormData = Record<string, any>;
-  export type Errors = Record<string, string[]>;
-  export type ValidateResult = { valid: boolean; errors?: Errors };
+  import type { Errors, ValidateFn, SubmitFn, CancelFn, SubmittedCallback, SubmitErrorCallback, CancelledCallback, ChangedCallback } from "./forms.types";
+  import type { FormData } from "./forms.types";
 
   // ===== FORM HANDLER TYPES =====
 
-  export type ValidateFn = (
-    data: FormData,
-  ) => ValidateResult | Promise<ValidateResult>;
-  export type SubmitFn = (data: FormData) => unknown | Promise<unknown>;
-  export type CancelFn = (data: FormData) => void | Promise<void>;
-
-  export type SubmittedCallback = (p: {
-    data: FormData;
-    result: unknown;
-  }) => void;
-  export type CancelledCallback = (p: {
-    data: FormData;
-    reason?: string;
-  }) => void;
-  export type SubmitErrorCallback = (info: {
-    data: Record<string, any>;
-    error: unknown;
-  }) => void;
-  export type ChangedCallback = (p: { data: FormData; dirty: boolean }) => void;
+  // See: forms.types.ts
 
   // ===== PROPS TYPES =====
 
@@ -341,6 +321,7 @@
 
   // ---- Orchestration ----
   async function doSubmit(): Promise<void> {
+    log.debug(`(FormShell) doSubmit called`, { entity });
     if (disabled || submitting) return;
     submitting = true;
 
@@ -364,7 +345,9 @@
     }
 
     try {
+      // Inform parent.
       const result = await submit(safeClone(data));
+
       // Update snapshot after successful submission
       const newSnapshot = createSnapshot(data);
       Object.assign(snapshot, newSnapshot);
@@ -399,6 +382,7 @@
   }
 
   function doCancel(reason?: string) {
+    log.debug(`Cancelled - ${reason}`);
     try {
       onCancel?.(safeClone(data));
     } catch (e) {

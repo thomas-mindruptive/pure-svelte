@@ -593,12 +593,56 @@ Svelte's core feature is its powerful and efficient reactivity system. In this a
 **Problem:** Using the global `fetch` with relative URLs (e.g., `/api/suppliers`) will fail during Server-Side Rendering (SSR).
 **Best Practice:** Always use the context-aware `fetch` function provided by SvelteKit's `LoadEvent` and pass it to the `ApiClient`'s constructor, as documented in the architecture.
 
+## Svelte 5 pitfalls
+**The Core DX Problem: "Global Magic Chaos" and Bypassed Type Safety**
+
+SvelteKit's `PageData` object, which merges data from all parent layouts, is a powerful feature to avoid prop drilling. However, it introduces a pattern that can feel like **"global magic chaos,"** reminiscent of older server-side technologies where data was implicitly injected into a global context. This leads to severe architectural challenges:
+
+*   **Loss of Locality:** A component's correctness no longer depends solely on its own code. It develops an implicit, invisible dependency on the implementation details of a parent layout. A logical cleanup in a `+layout.ts` file can break a child component, even if the component's code and its direct `+page.ts` file are untouched. The root cause of an error is often far removed from where the error is reported.
+*   **Bypassed Static Typing in Snippets:** The static analysis within Svelte templates is not as robust as it should be, undermining the safety provided by TypeScript.
+
+**Critical Example: Bypassed Type Safety in a Generic Form Snippet**
+
+This problem becomes severe when using generic components with slots/snippets, a common pattern for reusable building blocks like forms. The type safety of this pattern is undermined because type information from a "smart parent" is lost when passed through a "dumb generic child" and back into a snippet.
+
+Consider a reusable `FormShell.svelte` component that manages generic form state and a specific `OfferingForm.svelte` that uses it.
+
+1.  `OfferingForm` is used in "create" mode, so `FormShell` is initialized with `initial={{}}`. The internal `data` state of `FormShell` is a generic `Record<string, any>`.
+2.  `OfferingForm` provides a `header` snippet to `FormShell`.
+3.  `FormShell` renders this snippet, passing its generic `data` object (`{}`) to it.
+
+The snippet in `OfferingForm.svelte` contains the following code:
+
+```svelte
+{#snippet header({ data })}
+    <div class="form-header">
+        <div>
+            {#if data.offering_id}
+                <!-- 
+                  THIS IS THE BUG:
+                  This branch is not taken at runtime in "create" mode, but it
+                  MUST be type-safe at compile-time. The compiler should know that
+                  the generic `data` object passed from `FormShell` does not have
+                  a `product_def_title` property.
+                  
+                  Instead of a compile-time error, this code is allowed. If the 
+                  `{#if}` logic were to fail, it would lead to a runtime error 
+                  or a silent failure (rendering `undefined`). This bypasses static typing.
+                -->
+                <h3>{data.product_def_title || "Unnamed Product"}</h3>
+            {:else}
+                <h3>New Product Offering</h3>
+            {/if}
+            <span class="field-hint">ID: {data.offering_id}</span>
+        </div>
+    </div>
+{/snippet}
+
+
 ---
 
 ## TODOS (UPDATED)
-*   **FIX NAVIGATION BUG:** The reconciliation logic in `(browser)/+layout.ts` is faulty. When navigating to the top-level "Suppliers" list, the conserved path is incorrectly cleared, causing the loss of user context. This works correctly when navigating to mid-levels like "Categories". This is a high-priority bug.
-See chapter "Frontend Navigation Architecture: Context Conservation" above.
-
+* Add routes for adding new objects: suppliers, offerings
 *   **Finalize CSS Refactoring:** Ensure all pages correctly import and use the new pattern-based CSS files (`detail-page-layout.css`, etc.) and that all duplicate local styles have been removed.
 *   **Audit API Clients for SSR Safety:** Verify that all `LoadingState` method calls (`.start()`, `.finish()`) are wrapped in an `if (browser)` check.
 *   **Audit `load` Functions:** Verify that all `load` functions correctly pass the `fetch` function from the `LoadEvent` to the `ApiClient`.

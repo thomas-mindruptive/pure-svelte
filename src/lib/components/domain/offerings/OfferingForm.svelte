@@ -22,7 +22,6 @@
 	} from "$lib/domain/types";
 	import { ApiClient } from "$lib/api/client/ApiClient";
 	import { getCategoryApi } from "$lib/api/client/category";
-	import { typeGuard } from "$lib/utils/typeUtils";
 
 	import "$lib/components/styles/form.css";
 	import "$lib/components/styles/grid.css";
@@ -37,7 +36,7 @@
 	// ===== COMPONENT PROPS & TYPES =====
 
 	type ValidationErrors = Record<string, string[]>;
-	export type OfferingFormData = Partial<WholesalerItemOffering>;
+	export type OfferingFormData = Partial<WholesalerItemOffering_ProductDef_Category>;
 
 	const {
 		// Context IDs are required for creating a new offering.
@@ -189,11 +188,12 @@
 		);
 		onChanged?.(p);
 	}
+
 </script>
 
 <FormShell
 	entity="Offering"
-	{initial}
+	initial={initial as OfferingFormData}
 	validate={validateOffering}
 	submit={submitOffering}
 	{disabled}
@@ -224,39 +224,7 @@
 	{/snippet}
 
 	<!-- FORM FIELDS -->
-	{#snippet fields({ data, get, set, errors, markTouched })}
-		{// TODO: Remove debug logging }
-		log.debug("FormShell Debug:", {
-			aaa: "aaa",
-			get_product_def_id: get("product_def_id"),
-			get_type: typeof get("product_def_id"),
-			first_product: availableProducts[0],
-			first_product_id: availableProducts[0]?.product_def_id,
-			first_product_id_type: typeof availableProducts[0]?.product_def_id,
-			exactMatch: availableProducts.find(
-				(p: any) => p.product_def_id === get("product_def_id"),
-			),
-			stringMatch: availableProducts.find(
-				(p: any) =>
-					String(p.product_def_id) === String(get("product_def_id")),
-			),
-		})}
-
-		<!-- Compile-time check that all keys are valid for WholesalerItemOffering -->
-		{typeGuard<WholesalerItemOffering_ProductDef_Category>(
-			"offering_id",
-			"wholesaler_id",
-			"category_id",
-			"product_def_id",
-			"size",
-			"dimensions",
-			"price",
-			"currency",
-			"comment",
-			"created_at",
-			"product_def_title",
-		)}
-
+	{#snippet fields({ data, get, getS, set, errors, markTouched })}
 		<div class="form-body">
 			<div class="form-grid">
 				<!-- Product Definition (Required) -->
@@ -267,11 +235,11 @@
 						     (== all which are not yet assigned to this supplier+category) 
 						-->
 					{/if}
-					{#if availableProducts.length > 0 && !get("offering_id")}
+					{#if availableProducts.length > 0 && !get(["offering_id"])}
 						<label for="offering-product">Product *</label>
 						<select
 							id="offering-product"
-							value={get("product_def_id")}
+							value={getS("product_def_id")}
 							class={errors.product_def_id ? "error" : ""}
 							onchange={(e) => {
 								log.info(
@@ -306,7 +274,7 @@
 						</select>
 					{:else}
 						<p>
-							{get("product_def_title") ??
+							{getS("product_def_title") ??
 								"product_def_title missing"}
 						</p>
 						<p class="field-hint">

@@ -1,4 +1,7 @@
-<script lang="ts">
+<script
+  lang="ts"
+  generics="T extends Record<string, any> = Record<string, any>"
+>
   // FormShell (Svelte 5 + Runes) - FIXED structuredClone Issue
   // - English comments
   // - Owns data state, dirty/touched tracking, validation, submit/cancel orchestration
@@ -23,7 +26,19 @@
   import { onMount } from "svelte";
   import type { Snippet } from "svelte";
   import { log } from "$lib/utils/logger";
-  import type { Errors, ValidateFn, SubmitFn, CancelFn, SubmittedCallback, SubmitErrorCallback, CancelledCallback, ChangedCallback } from "./forms.types";
+  import * as pathUtils from "$lib/utils/pathUtils";
+  import type { NonEmptyPath, PathValue } from "$lib/utils/pathUtils";
+
+  import type {
+    Errors,
+    ValidateFn,
+    SubmitFn,
+    CancelFn,
+    SubmittedCallback,
+    SubmitErrorCallback,
+    CancelledCallback,
+    ChangedCallback,
+  } from "./forms.types";
   import type { FormData } from "./forms.types";
 
   // ===== FORM HANDLER TYPES =====
@@ -33,12 +48,24 @@
   // ===== PROPS TYPES =====
 
   // Snippet prop types (tuple generic for Svelte 5)
-  type HeaderProps = { data: FormData; dirty: boolean };
+  type HeaderProps<T> = { data: FormData<T>; dirty: boolean };
 
-  type FieldsProps = {
-    data: FormData;
-    set: (path: string, value: unknown) => void;
-    get: (path: string) => any;
+  type FieldsProps<T> = {
+    data: FormData<T>;
+
+    // Not needed currently: setS<K extends keyof FormData<T>>(key: K, value: T[K]): void;
+    set<P extends NonEmptyPath<FormData<T>>>(
+      obj: T,
+      path: readonly [...P],
+      value: PathValue<T, P>
+    ): void;
+
+    get<P extends NonEmptyPath<FormData<T>>>(
+      path: readonly [...P],
+    ): PathValue<FormData<T>, P> | undefined;
+
+    getS<K extends keyof FormData<T>>(key: K): T;
+
     errors: Errors;
     touched: Set<string>;
     markTouched: (path: string) => void;
@@ -54,13 +81,13 @@
     disabled: boolean;
   };
 
-  type FooterProps = { data: FormData };
+  type FooterProps<T> = { data: FormData<T> };
 
   // ===== PROPS =====
 
   const {
     // Data & lifecycle
-    initial = {} as FormData,
+    initial = {} as FormData<T>,
     validate, // optional: (data) => { valid, errors? }
     submit, // required
     onCancel, // optional (simple callback on cancel)
@@ -81,25 +108,25 @@
     onCancelled,
     onChanged,
   } = $props<{
-    initial?: FormData;
-    validate?: ValidateFn;
-    submit: SubmitFn;
-    onCancel?: CancelFn;
+    initial?: FormData<T>;
+    validate?: ValidateFn<T>;
+    submit: SubmitFn<T>;
+    onCancel?: CancelFn<T>;
     autoValidate?: "submit" | "blur" | "change";
     disabled?: boolean;
     formId?: string;
     entity?: string;
 
-    header?: Snippet<[HeaderProps]>;
-    fields?: Snippet<[FieldsProps]>;
+    header?: Snippet<[HeaderProps<T>]>;
+    fields?: Snippet<[FieldsProps<T>]>;
     actions?: Snippet<[ActionsProps]>;
-    footer?: Snippet<[FooterProps]>;
+    footer?: Snippet<[FooterProps<T>]>;
 
     // Callback props (component "events" in Svelte 5)
-    onSubmitted?: SubmittedCallback;
-    onSubmitError?: SubmitErrorCallback;
-    onCancelled?: CancelledCallback;
-    onChanged?: ChangedCallback;
+    onSubmitted?: SubmittedCallback<T>;
+    onSubmitError?: SubmitErrorCallback<T>;
+    onCancelled?: CancelledCallback<T>;
+    onChanged?: ChangedCallback<T>;
   }>();
 
   // ---- SAFE CLONING UTILITY ----
@@ -136,8 +163,8 @@
    * Creates a clean snapshot for dirty checking
    * Strips potentially problematic properties
    */
-  function createSnapshot(data: FormData): FormData {
-    const cleaned: FormData = {};
+  function createSnapshot(data: FormData<T>): Record<string, any> {
+    const cleaned: Record<string, any> = {};
 
     for (const [key, value] of Object.entries(data)) {
       // Skip known problematic types
@@ -164,24 +191,14 @@
 
   // ---- State (Runes) ----
   const cleanInitial = createSnapshot(initial);
-  const data = $state<FormData>(safeClone(cleanInitial));
-  const snapshot = $state<FormData>(safeClone(cleanInitial)); // for dirty check
+  const data = $state<FormData<T>>(safeClone(cleanInitial) as any);
+  const snapshot = $state<FormData<T>>(safeClone(cleanInitial) as any); // for dirty check
   const errors = $state<Errors>({});
   const touched = $state<Set<string>>(new Set());
   let submitting = $state(false);
   let validating = $state(false);
 
   let formEl: HTMLFormElement;
-
-  // !!!!!!!!!!!!!!!!!!!!!!!!! DEBUG
-  $effect(() => {
-    log.debug("FormShell State Change:", {
-        entity,
-        data_product_def_id: data.product_def_id,
-        data_keys: Object.keys(data),
-        snapshot_product_def_id: snapshot.product_def_id
-    });
-});
 
   // ---- Keybindings (programmatic to avoid a11y warning) ----
   onMount(() => {
@@ -203,7 +220,13 @@
     };
 
     formEl?.addEventListener("keydown", keyHandler);
-    log.info("FORM_MOUNTED", { entity, autoValidate, cleanInitial, data, snapshot });
+    log.info("FORM_MOUNTED", {
+      entity,
+      autoValidate,
+      cleanInitial,
+      data,
+      snapshot,
+    });
     return () => formEl?.removeEventListener("keydown", keyHandler);
   });
 
@@ -217,17 +240,22 @@
     }
   }
 
-  function set(path: string, value: unknown) {
-    // naive dotted-path setter (sufficient for typical forms)
+  // Not needed currently:
+  // function setS<K extends keyof FormData<T>>(key: K, value: T[K]) {
+  //   // naive dotted-path setter (sufficient for typical forms)
+  //   try {
+  //     pathUtils.set(data, key, value);
+  //   } catch (e) {
+  //     log.error(
+  //       { component: "FormShell", entity, key, error: coerceMessage(e) },
+  //       "set failed",
+  //     );
+  //   }
+  // }
+
+  function set<P extends NonEmptyPath<FormData<T>>>(path: readonly [...P], value: PathValue<FormData<T>, P>) {
     try {
-      const parts = path.split(".");
-      let cur: any = data;
-      for (let i = 0; i < parts.length - 1; i++) {
-        const k = parts[i];
-        if (cur[k] == null || typeof cur[k] !== "object") cur[k] = {};
-        cur = cur[k];
-      }
-      cur[parts[parts.length - 1]] = value;
+      pathUtils.set<FormData<T>, P>(data, path, value);
     } catch (e) {
       log.error(
         { component: "FormShell", entity, path, error: coerceMessage(e) },
@@ -236,31 +264,63 @@
     }
   }
 
-  function get(path: string): any {
+  function get<P extends NonEmptyPath<FormData<T>>>(
+    path: readonly [...P],
+  ): PathValue<FormData<T>, P> | undefined {
     try {
-      const parts = path.split(".");
-      let cur: any = data;
-      for (const k of parts) {
-        if (cur == null) return undefined;
-        cur = cur[k];
-      }
-      return cur;
+      const res = pathUtils.get(data, path);
+      return res;
     } catch (e) {
-      log.error(
-        { component: "FormShell", entity, path, error: coerceMessage(e) },
-        "get failed",
-      );
+      log.error("get failed", {
+        component: "FormShell",
+        entity,
+        path: path.join("."),
+        error: coerceMessage(e),
+      });
       return undefined;
     }
   }
+
+  function getS<K extends keyof FormData<T>>(key: K): T | undefined {
+    try {
+      const res = pathUtils.get(data, key);
+      return res;
+    } catch (e) {
+      log.error("get failed", {
+        component: "FormShell",
+        entity,
+        key,
+        error: coerceMessage(e),
+      });
+      return undefined;
+    }
+  }
+
+  // function get(path: string): any {
+  //   try {
+  //     const parts = path.split(".");
+  //     let cur: any = data;
+  //     for (const k of parts) {
+  //       if (cur == null) return undefined;
+  //       cur = cur[k];
+  //     }
+  //     return cur;
+  //   } catch (e) {
+  //     log.error(
+  //       { component: "FormShell", entity, path, error: coerceMessage(e) },
+  //       "get failed",
+  //     );
+  //     return undefined;
+  //   }
+  // }
 
   function isDirty(): boolean {
     try {
       // Use safe comparison for dirty checking
       const currentSnapshot = createSnapshot(data);
-      const isDirty =  JSON.stringify(currentSnapshot) !== JSON.stringify(snapshot);
-      log.debug("isDirty check:", { isDirty, current: currentSnapshot.product_def_id, snapshot: snapshot.product_def_id });
-      return isDirty
+      const isDirty =
+        JSON.stringify(currentSnapshot) !== JSON.stringify(snapshot);
+      return isDirty;
     } catch {
       log.warn(
         { component: "FormShell", entity },
@@ -391,7 +451,7 @@
         "onCancel threw",
       );
     } finally {
-      const detail: { data: FormData; reason?: string } = {
+      const detail: { data: FormData<T>; reason?: string } = {
         data: safeClone(data),
       };
       if (reason !== undefined) detail.reason = reason;
@@ -407,7 +467,10 @@
     }
   }
 
-  function handleInput(path: string, value: unknown) {
+  function handleInput<P extends NonEmptyPath<FormData<T>>>(
+      path: readonly [...P],
+      value: PathValue<T, P>
+    ): void {
     set(path, value);
 
     try {
@@ -420,7 +483,7 @@
     }
 
     if (autoValidate === "change") {
-      void runValidate(path);
+      void runValidate(path.join("."));
     }
   }
 </script>
@@ -463,6 +526,7 @@
         data,
         set: handleInput /* set(path, value) + fires 'changed' + optional auto-validate */,
         get,
+        getS,
         errors,
         touched,
         markTouched,

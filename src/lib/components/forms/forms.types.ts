@@ -1,25 +1,33 @@
-
-export type FormData<T> = { [K in keyof T]: T[K] };
+// Vereinfachte FormData (oder einfach T direkt verwenden)
+export type FormData<T> = T;
 
 export type Errors = Record<string, string[]>;
 export type ValidateResult = { valid: boolean; errors?: Errors };
 
-export type ValidateFn = (
-    data: FormData,
+// Generic Callback Types
+export type ValidateFn<T = any> = (
+    data: FormData<T>,
 ) => ValidateResult | Promise<ValidateResult>;
-export type SubmitFn = (data: FormData) => unknown | Promise<unknown>;
-export type CancelFn = (data: FormData) => void | Promise<void>;
 
-export type SubmittedCallback = (p: {
-    data: FormData;
+export type SubmitFn<T = any> = (data: FormData<T>) => unknown | Promise<unknown>;
+export type CancelFn<T = any> = (data: FormData<T>) => void | Promise<void>;
+
+export type SubmittedCallback<T = any> = (p: {
+    data: FormData<T>;
     result: unknown;
 }) => void;
-export type CancelledCallback = (p: {
-    data: FormData;
+
+export type CancelledCallback<T = any> = (p: {
+    data: FormData<T>;
     reason?: string;
 }) => void;
-export type SubmitErrorCallback = (info: {
-    data: Record<string, any>;
+
+export type SubmitErrorCallback<T = any> = (info: {
+    data: FormData<T>;
     error: unknown;
 }) => void;
-export type ChangedCallback = (p: { data: FormData; dirty: boolean }) => void;
+
+export type ChangedCallback<T = any> = (p: { 
+    data: FormData<T>; 
+    dirty: boolean 
+}) => void;

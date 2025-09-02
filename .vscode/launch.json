@@ -6,18 +6,34 @@
       "request": "launch",
       "name": "SvelteKit dev (Backend debuggen)",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],        // nutzt dein "dev"-Script
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ], // nutzt dein "dev"-Script
       "env": {
         "NODE_OPTIONS": "--inspect=127.0.0.1:9229"
       },
       "console": "integratedTerminal",
-      "skipFiles": ["<node_internals>/**"],
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
       "outFiles": [
         "${workspaceFolder}/.svelte-kit/**",
         "${workspaceFolder}/build/**",
         "${workspaceFolder}/**/*.ts",
         "${workspaceFolder}/**/*.svelte"
       ]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Run with npx ts-node",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "ts-node",
+        "${file}"
+      ],
+      "cwd": "${workspaceFolder}"
     }
   ]
 }

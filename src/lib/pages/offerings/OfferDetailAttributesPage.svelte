@@ -36,6 +36,8 @@
   };
   let { data } = $props<{ data: LoadData }>();
 
+  log.debug(`(OfferDetailAttributesPage) Loaded data:`, data);
+
   let selectedAttributeId: number | null = $state(null);
   let attributeValue: string = $state("");
   let isAssigning = $state(false);

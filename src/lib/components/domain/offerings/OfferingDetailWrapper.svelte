@@ -10,6 +10,7 @@
 
 	import "$lib/components/styles/detail-page-layout.css";
 	import "$lib/components/styles/grid-section.css";
+    import { log } from "$lib/utils/logger";
 
 	const {
 		offering,
@@ -21,11 +22,15 @@
 		children: Snippet;
 	} = $props();
 
+	log.debug(`(OfferingDetailWrapper) Loaded props:`, {
+		offering,
+		availableProducts,
+	});
 	// ===== VALIDATE and show errors in UI =====
 
 	let validationError = $state<string | null>(null);
 
-	if (offering && (!availableProducts || availableProducts.length === 0)) {
+	if (!offering && (!availableProducts || availableProducts.length === 0)) {
 		const errorMessage =
 			"Dev-error: 'offering' (edit-mode) or 'availableProducts' (for create-mode) must be passed. Both are missing.";
 
@@ -33,7 +38,7 @@
 		validationError = errorMessage;
 
 		// Logge den Fehler zusätzlich laut in der Entwicklerkonsole.
-		console.error(`[Component Contract Violation] ${errorMessage}`);
+		log.error(`[Component Contract Violation] ${errorMessage}`);
 	}
 </script>
 

@@ -10,6 +10,7 @@ import { getCategoryApi } from '$lib/api/client/category';
 import { getOfferingApi } from '$lib/api/client/offering';
 import { buildBreadcrumb, type ConservedPath } from '$lib/utils/buildBreadcrumb';
 
+// KORREKTUR: Definiere einen expliziten Typ für entityNames
 type EntityNames = {
   supplier: string | null;
   category: string | null;
@@ -20,7 +21,7 @@ export async function load({ url, params, depends, fetch: loadEventFetch }: Load
   log.info('(Layout Load) called with URL:', url.href, 'and params:', params);
   depends(`url:${url.href}`);
 
-  // --- STEP 1: DEFINE PATHS FROM BOTH SOURCES ---
+  // --- STEP 1: DEFINE PATHS FROM SOURCES ---
   const pathFromUrl: NavigationPath = {
     supplierId: params.supplierId ? Number(params.supplierId) : null,
     categoryId: params.categoryId ? Number(params.categoryId) : null,
@@ -29,48 +30,41 @@ export async function load({ url, params, depends, fetch: loadEventFetch }: Load
   };
   const conservedPath = get(navigationState);
 
-  // --- STEP 2: RECONCILE PATHS (HIERARCHICALLY CORRECT LOGIC) ---
-  // This logic correctly prunes the "memory" path when a parent level changes.
-  
-  // The supplier is our root anchor. It's always taken from the URL if present.
-  const supplierId = pathFromUrl.supplierId;
+  // --- STEP 2: RECONCILE PATHS (FINAL, ROBUST LOGIC) ---
+  let finalUiPath: NavigationPath;
 
-  // The category can be restored from memory ONLY IF its parent (supplierId) is consistent.
-  // If the URL specifies a categoryId, it ALWAYS takes precedence.
-  const categoryId = pathFromUrl.categoryId ?? (supplierId != null && supplierId === conservedPath.supplierId ? conservedPath.categoryId : null);
-
-  // The offering can be restored from memory ONLY IF its entire parent chain (supplierId AND categoryId) is consistent.
-  // If the URL specifies an offeringId, it ALWAYS takes precedence.
-  const offeringId = pathFromUrl.offeringId ?? (categoryId != null && categoryId === conservedPath.categoryId && supplierId === conservedPath.supplierId ? conservedPath.offeringId : null);
-  
-  // The leaf can be restored from memory ONLY IF the full path down to the offering is consistent.
-  const leaf = pathFromUrl.leaf ?? (offeringId != null && offeringId === conservedPath.offeringId && categoryId === conservedPath.categoryId && supplierId === conservedPath.supplierId ? conservedPath.leaf : null);
-  
-  // This is the final, valid path that represents the state of the application shell.
-  const finalUiPath: NavigationPath = { supplierId, categoryId, offeringId, leaf };
-  
-  // The newly reconciled path becomes the new "truth" for our memory.
+  if (pathFromUrl.supplierId && pathFromUrl.supplierId !== conservedPath.supplierId) {
+    finalUiPath = { supplierId: pathFromUrl.supplierId, categoryId: null, offeringId: null, leaf: null };
+  } else if (pathFromUrl.categoryId && pathFromUrl.categoryId !== conservedPath.categoryId) {
+    finalUiPath = { supplierId: conservedPath.supplierId, categoryId: pathFromUrl.categoryId, offeringId: null, leaf: null };
+  } else if (pathFromUrl.offeringId && pathFromUrl.offeringId !== conservedPath.offeringId) {
+    finalUiPath = { ...conservedPath, offeringId: pathFromUrl.offeringId, leaf: null };
+  } else {
+    finalUiPath = {
+      supplierId: pathFromUrl.supplierId ?? conservedPath.supplierId,
+      categoryId: pathFromUrl.categoryId ?? conservedPath.categoryId,
+      offeringId: pathFromUrl.offeringId ?? conservedPath.offeringId,
+      leaf: pathFromUrl.leaf ?? conservedPath.leaf
+    };
+  }
   navigationState.set(finalUiPath);
 
   // --- STEP 3: FETCH ENTITY NAMES FOR THE UI PATH ---
-  const entityNames: EntityNames = { supplier: null, category: null, offering: null };
-  const apiPromises = [];
   const client = new ApiClient(loadEventFetch);
+  
+  // KORREKTUR: Wende den expliziten Typ hier an
+  const entityNames: EntityNames = { supplier: null, category: null, offering: null };
 
-  if (finalUiPath.supplierId) {
-    apiPromises.push(getSupplierApi(client).loadSupplier(finalUiPath.supplierId).then(s => entityNames.supplier = s.name).catch(() => {}));
-  }
-  if (finalUiPath.categoryId) {
-    apiPromises.push(getCategoryApi(client).loadCategory(finalUiPath.categoryId).then(c => entityNames.category = c.name).catch(() => {}));
-  }
-  if (finalUiPath.offeringId) {
-    apiPromises.push(getOfferingApi(client).loadOffering(finalUiPath.offeringId).then(o => entityNames.offering = o.product_def_title).catch(() => {}));
-  }
+  const promises = [];
+  if (finalUiPath.supplierId) promises.push(getSupplierApi(client).loadSupplier(finalUiPath.supplierId).then(s => entityNames.supplier = s.name).catch(() => {}));
+  if (finalUiPath.categoryId) promises.push(getCategoryApi(client).loadCategory(finalUiPath.categoryId).then(c => entityNames.category = c.name).catch(() => {}));
+  if (finalUiPath.offeringId) promises.push(getOfferingApi(client).loadOffering(finalUiPath.offeringId).then(o => entityNames.offering = o.product_def_title).catch(() => {}));
+  await Promise.all(promises);
 
-  // --- STEP 4: DETERMINE ACTIVE LEVEL BASED ON THE ACTUAL URL ---
+  // --- STEP 4: DETERMINE ACTIVE LEVEL & BUILD UI PROPS (FIXED) ---
   let activeLevel: string;
   if (pathFromUrl.offeringId) {
-    activeLevel = pathFromUrl.leaf || 'attributes';
+    activeLevel = pathFromUrl.leaf || 'links';
   } else if (pathFromUrl.categoryId) {
     activeLevel = 'offerings';
   } else if (pathFromUrl.supplierId) {
@@ -78,19 +72,13 @@ export async function load({ url, params, depends, fetch: loadEventFetch }: Load
   } else {
     activeLevel = 'suppliers';
   }
-  log.info(`(Layout Load) Reconciled navigation path, before loading data:`, { pathFromUrl, conservedPath, finalUiPath, activeLevel });
   
-  // --- STEP 5: BUILD FINAL PROPS AND RETURN ---
-  await Promise.all(apiPromises);
-
   const breadcrumbItems = buildBreadcrumb({
-    url,
-    params,
-    entityNames,
+    url, params, entityNames,
     conservedPath: finalUiPath as ConservedPath,
     activeLevel
   });
-
+  
   const supplierPath = finalUiPath.supplierId ? `/suppliers/${finalUiPath.supplierId}` : '#';
   const categoryPath = finalUiPath.supplierId && finalUiPath.categoryId ? `/suppliers/${finalUiPath.supplierId}/categories/${finalUiPath.categoryId}` : '#';
   const offeringPathBase = finalUiPath.supplierId && finalUiPath.categoryId && finalUiPath.offeringId ? `/suppliers/${finalUiPath.supplierId}/categories/${finalUiPath.categoryId}/offerings/${finalUiPath.offeringId}` : '#';
@@ -103,11 +91,5 @@ export async function load({ url, params, depends, fetch: loadEventFetch }: Load
     { key: 'links', label: 'Links', disabled: !finalUiPath.offeringId, level: 3, href: offeringPathBase === '#' ? '#' : `${offeringPathBase}/links` },
   ];
 
-  log.info(`(Layout Load) Data prepared for UI`, { finalUiPath, activeLevel, pathFromUrl });
-
-  return {
-    breadcrumbItems,
-    sidebarItems,
-    activeLevel
-  };
+  return { breadcrumbItems, sidebarItems, activeLevel };
 }

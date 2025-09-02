@@ -57,6 +57,7 @@ export async function load({ params, fetch: fetchLoad }: LoadEvent) {
       return {
         offering: null, // Not initial offering to edit
         availableAttributes: [],
+        assignedAttributes: [],
         availableProducts: availableProducts // Only the "remaining" products
       };
     }

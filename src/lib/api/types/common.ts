@@ -60,42 +60,44 @@ type IdField<T> = Extract<keyof T, `${string}_id`>;
 /**
  * Assignment between two master entities (n:m relationships)
  */
-export type AssignmentRequest<TParent, TChild, TMetadata = object> = {
-  parentId: TParent[IdField<TParent>];
-  childId: TChild[IdField<TChild>];
-} & TMetadata;
+export type AssignmentRequest<TParent, TChild> = {
+    parentId: TParent[IdField<TParent>];
+    childId: TChild[IdField<TChild>];
+    data?: TChild
+}
 
 /**
  * Update assignment between two master entities
  */
-export type AssignmentUpdateRequest<TParent, TChild, TMetadata = object> = {
-  parentId: TParent[IdField<TParent>];
-  childId: TChild[IdField<TChild>];
-} & TMetadata;
+export type AssignmentUpdateRequest<TParent, TChild> = {
+    parentId: TParent[IdField<TParent>];
+    childId: TChild[IdField<TChild>];
+    data?: TChild
+}
 
 /**
  * Remove assignment between two master entities
  */
 export type RemoveAssignmentRequest<TParent, TChild> = {
-  parentId: TParent[IdField<TParent>];
-  childId: TChild[IdField<TChild>];
-  cascade?: boolean;
+    parentId: TParent[IdField<TParent>];
+    childId: TChild[IdField<TChild>];
+    cascade?: boolean;
 };
 
 /**
  * Create child entity in parent context (1:n compositions)
  */
 export type CreateChildRequest<TParent, TChild> = {
-  parentId: TParent[IdField<TParent>];
-  data: TChild;
-} 
+    parentId: TParent[IdField<TParent>];
+    data: TChild;
+}
 
 /**
  * Delete entity by its ID
  */
 export type DeleteRequest<T> = {
-  id: T[IdField<T>];
-  cascade?: boolean;
+    id: T[IdField<T>];
+    cascade?: boolean;
 };
 
 // /**
@@ -129,13 +131,13 @@ export interface PredefinedQueryRequest {
 export interface QueryResponseData<T> extends Record<string, unknown> {
     results: Partial<T>[];
     meta: {
-        retrieved_at: string; 
-        result_count: number; 
+        retrieved_at: string;
+        result_count: number;
         columns_selected: string[];
-        has_joins: boolean; 
-        has_where: boolean; 
+        has_joins: boolean;
+        has_where: boolean;
         parameter_count: number;
-        table_fixed: string; 
+        table_fixed: string;
         sql_generated: string;
     };
 }
@@ -150,10 +152,10 @@ export type SingleEntitySuccessResponse<T> = ApiSuccessResponse<SingleEntityResp
 
 // --- Assignment Responses ---
 export interface AssignmentSuccessData<TAssignment> extends Record<string, unknown> {
-    assignment: TAssignment; 
+    assignment: TAssignment;
     meta: {
-        assigned_at: string; 
-        parent_name: string; 
+        assigned_at: string;
+        parent_name: string;
         child_name: string;
     };
 }
@@ -161,29 +163,29 @@ export interface AssignmentSuccessData<TAssignment> extends Record<string, unkno
 export type AssignmentSuccessResponse<TAssignment> = ApiSuccessResponse<AssignmentSuccessData<TAssignment>>;
 
 export interface AssignmentConflictResponse<TDetails extends Record<string, unknown>> extends ApiErrorResponse {
-    error_code: 'ASSIGNMENT_CONFLICT'; 
+    error_code: 'ASSIGNMENT_CONFLICT';
     details: TDetails;
 }
 
-export type AssignmentApiResponse<TAssignment, TConflictDetails extends Record<string, unknown>> = 
+export type AssignmentApiResponse<TAssignment, TConflictDetails extends Record<string, unknown>> =
     AssignmentSuccessResponse<TAssignment> | AssignmentConflictResponse<TConflictDetails> | ApiErrorResponse;
 
 // --- Delete Responses ---
 export interface DeleteSuccessData<TDeletedResource> extends Record<string, unknown> {
-    deleted_resource: TDeletedResource; 
-    cascade_performed: boolean; 
+    deleted_resource: TDeletedResource;
+    cascade_performed: boolean;
     dependencies_cleared: number;
 }
 
 export type DeleteSuccessResponse<TDeletedResource> = ApiSuccessResponse<DeleteSuccessData<TDeletedResource>>;
 
 export interface DeleteConflictResponse<TDependencies> extends ApiErrorResponse {
-    error_code: 'DEPENDENCY_CONFLICT'; 
-    dependencies: TDependencies; 
+    error_code: 'DEPENDENCY_CONFLICT';
+    dependencies: TDependencies;
     cascade_available: boolean;
 }
 
-export type DeleteApiResponse<TDeletedResource, TDependencies> = 
+export type DeleteApiResponse<TDeletedResource, TDependencies> =
     DeleteSuccessResponse<TDeletedResource> |
     DeleteConflictResponse<TDependencies> |
     ApiErrorResponse;

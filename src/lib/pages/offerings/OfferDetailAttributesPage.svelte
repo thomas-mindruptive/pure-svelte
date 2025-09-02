@@ -29,10 +29,10 @@
   import { ApiClient } from "$lib/api/client/ApiClient";
 
   type LoadData = {
-    offering: WholesalerItemOffering_ProductDef_Category; // Make sure the offering is part of the data
+    offering?: WholesalerItemOffering_ProductDef_Category | null; // CREATE-mode: can be null
     assignedAttributes: WholesalerOfferingAttribute_Attribute[];
     availableAttributes: Attribute[];
-    availableProducts: ProductDefinition[];
+    availableProducts?: ProductDefinition[] | null; // This is only needed for the "create" mode: We need the available products for the combobox.
   };
   let { data } = $props<{ data: LoadData }>();
 
@@ -87,7 +87,6 @@
     }
     isAssigning = true;
     try {
-      // KORREKTUR: Korrekte Objekterstellung für exactOptionalPropertyTypes
       const assignmentData = {
         offering_id: data.offering.offering_id,
         attribute_id: selectedAttributeId,

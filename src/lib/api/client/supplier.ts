@@ -243,15 +243,14 @@ export function getSupplierApi(client: ApiClient) {
     /**
      * Assigns a category to a supplier.
      */
-    async assignCategoryToSupplier(assignmentData: { supplierId: number; categoryId: number; comment?: string; link?: string; }): Promise<AssignmentSuccessData<WholesalerCategory>> {
+    async assignCategoryToSupplier(supplierId: number, category: Omit<WholesalerCategory, "wholesaler_id">): Promise<AssignmentSuccessData<WholesalerCategory>> {
       const operationId = 'assignCategoryToSupplier';
       supplierLoadingOperations.start(operationId);
       try {
-        const requestBody: AssignmentRequest<Wholesaler, ProductCategory, { comment?: string; link?: string }> = {
-          parentId: assignmentData.supplierId,
-          childId: assignmentData.categoryId,
-          ...(assignmentData.comment !== undefined && { comment: assignmentData.comment }),
-          ...(assignmentData.link !== undefined && { link: assignmentData.link })
+        const requestBody: AssignmentRequest<Wholesaler, Omit<WholesalerCategory, "wholesaler_id">> = {
+          parentId: supplierId,
+          childId: category.category_id,
+          data: category
         };
         const response = await client.apiFetch<AssignmentSuccessData<WholesalerCategory>>(
           '/api/supplier-categories',
@@ -260,7 +259,7 @@ export function getSupplierApi(client: ApiClient) {
         );
         return response;
       } catch (err) {
-        log.error(`[${operationId}] Failed.`, { assignmentData, error: getErrorMessage(err) });
+        log.error(`[${operationId}] Failed.`, {supplierId, category, error: getErrorMessage(err) });
         throw err;
       } finally {
         supplierLoadingOperations.finish(operationId);

@@ -34,13 +34,19 @@ export const POST: RequestHandler = async ({ request }) => {
     log.info(`[${operationId}] POST /supplier-categories: FN_START`);
 
     try {
-        const body = (await request.json()) as AssignmentRequest<Wholesaler, ProductCategory, { comment?: string; link?: string }>;
-        const { parentId: supplierId, childId: categoryId, comment, link } = body;
+        const body = (await request.json()) as AssignmentRequest<Wholesaler, WholesalerCategory>;
+        const { parentId: supplierId, childId: categoryId, data: wholesalerProductCategory } = body;
         log.info(`[${operationId}] Parsed request body`, { supplierId, categoryId });
 
         if (!supplierId || !categoryId) {
             const errRes: ApiErrorResponse = { success: false, message: 'supplierId (parentId) and categoryId (childId) are required.', status_code: 400, error_code: 'BAD_REQUEST', meta: { timestamp: new Date().toISOString() } };
             log.warn(`[${operationId}] FN_FAILURE: Validation failed - missing IDs.`, { error: errRes });
+            return json(errRes, { status: 400 });
+        }
+
+        if (!wholesalerProductCategory) {
+            const errRes: ApiErrorResponse = { success: false, message: 'Product category data is required.', status_code: 400, error_code: 'BAD_REQUEST', meta: { timestamp: new Date().toISOString() } };
+            log.warn(`[${operationId}] FN_FAILURE: Validation failed - missing product category data.`, { error: errRes });
             return json(errRes, { status: 400 });
         }
 
@@ -68,14 +74,19 @@ export const POST: RequestHandler = async ({ request }) => {
             return json(errRes, { status: 409 });
         }
 
-        const result = await db.request().input('supplierId', supplierId).input('categoryId', categoryId).input('comment', comment || null).input('link', link || null)
+        const result = await db.request().input('supplierId', supplierId)
+            .input('categoryId', categoryId)
+            .input('comment', wholesalerProductCategory.comment || null)
+            .input('link', wholesalerProductCategory.link || null)
             .query('INSERT INTO dbo.wholesaler_categories (wholesaler_id, category_id, comment, link) OUTPUT INSERTED.* VALUES (@supplierId, @categoryId, @comment, @link)');
 
         const response: AssignmentSuccessResponse<WholesalerCategory> = {
             success: true, message: `Category "${category_name}" assigned to supplier "${supplier_name}".`,
             data: {
                 assignment: result.recordset[0] as WholesalerCategory,
-                meta: { assigned_at: new Date().toISOString(), parent_name: supplier_name, child_name: category_name }
+                meta: { assigned_at: new Date().toISOString(), 
+                parent_name: supplier_name, 
+                child_name: category_name }
             },
             meta: { timestamp: new Date().toISOString() }
         };

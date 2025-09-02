@@ -194,15 +194,14 @@
 >
 	<!-- FORM HEADER -->
 	{#snippet header({ data, dirty })}
-		{@const offering = data as WholesalerItemOffering_ProductDef_Category}
 		<div class="form-header">
 			<div>
-				{#if offering.offering_id}
-					<h3>{offering.product_def_title || "Unnamed Product"}</h3>
+				{#if data.offering_id}
+					<h3>{data.product_def_title || "Unnamed Product"}</h3>
 				{:else}
 					<h3>New Product Offering</h3>
 				{/if}
-				<span class="field-hint">ID: {offering.offering_id}</span>
+				<span class="field-hint">ID: {data.offering_id}</span>
 			</div>
 			<div>
 				{#if dirty}

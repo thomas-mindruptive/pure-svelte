@@ -22,6 +22,7 @@
     Wholesaler,
     ProductCategory,
     WholesalerCategory_Category,
+    WholesalerCategory,
   } from "$lib/domain/types";
   import type {
     DeleteStrategy,
@@ -81,17 +82,19 @@
   /**
    * Handler für die Zuweisung einer neuen Kategorie.
    */
-  async function handleCategoryAssigned(category: ProductCategory) {
+  async function handleCategoryAssigned(category: ProductCategory, comment?: string, link?: string) {
     const supplierId = data.supplier.wholesaler_id;
     try {
       log.info(`(SupplierDetailPage) Assigning category`, {
         supplierId,
         categoryId: category.category_id,
       });
-      await supplierApi.assignCategoryToSupplier({
-        supplierId,
-        categoryId: category.category_id,
-      });
+      const wholesalerCategory: Omit<WholesalerCategory, "wholesaler_id"> = {
+        category_id: category.category_id,
+      ...(comment !== undefined ? { comment } : {}),  // Set as "not existing" property due to exactOptionalPropertyTypes=true
+      ...(link !== undefined ? { link } : {}),        // Set as "not existing" property due to exactOptionalPropertyTypes=true
+      };
+      await supplierApi.assignCategoryToSupplier(supplierId, wholesalerCategory);
       addNotification(
         `Category "${category.name}" assigned successfully.`,
         "success",

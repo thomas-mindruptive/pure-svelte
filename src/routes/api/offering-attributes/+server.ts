@@ -34,14 +34,28 @@ export const POST: RequestHandler = async ({ request }) => {
     log.info(`[${operationId}] POST /offering-attributes: FN_START`);
 
     try {
-        const body = (await request.json()) as AssignmentRequest<WholesalerItemOffering, Attribute, { value?: string } >;
-        const { parentId: offeringId, childId: attributeId, value } = body;
-        log.info(`[${operationId}] Parsed request body`, { offeringId, attributeId, value });
+        const body = (await request.json()) as AssignmentRequest<WholesalerItemOffering, Omit<WholesalerOfferingAttribute, "id">>;
+        const { parentId: offeringId, childId: attributeId, data: wholesalerOfferingAttribute } = body;
+        log.info(`[${operationId}] Parsed request body`, { offeringId, attributeId, wholesalerOfferingAttribute });
 
+        // This is an assignment: Both, offeringId (parentId) and attributeId (childId) are required.
         if (!offeringId || !attributeId) {
             const errRes: ApiErrorResponse = {
                 success: false,
                 message: 'offeringId (parentId) and attributeId (childId) are required.',
+                status_code: 400,
+                error_code: 'BAD_REQUEST',
+                meta: { timestamp: new Date().toISOString() }
+            };
+            log.warn(`[${operationId}] FN_FAILURE: Validation failed - missing IDs.`, { error: errRes });
+            return json(errRes, { status: 400 });
+        }
+
+        // The value comes in the wholesalerOfferingAttribute object
+        if (!wholesalerOfferingAttribute || !wholesalerOfferingAttribute.value) {
+            const errRes: ApiErrorResponse = {
+                success: false,
+                message: 'data (WholesalerOfferingAttribute) and data.value are required.',
                 status_code: 400,
                 error_code: 'BAD_REQUEST',
                 meta: { timestamp: new Date().toISOString() }
@@ -107,7 +121,7 @@ export const POST: RequestHandler = async ({ request }) => {
         const result = await db.request()
             .input('offeringId', offeringId)
             .input('attributeId', attributeId)
-            .input('value', value || null)
+            .input('value', wholesalerOfferingAttribute.value || null)
             .query(`
                 INSERT INTO dbo.wholesaler_offering_attributes (offering_id, attribute_id, value) 
                 OUTPUT INSERTED.* 
@@ -152,13 +166,27 @@ export const PUT: RequestHandler = async ({ request }) => {
             childId: number;  // attributeId  
             value?: string;
         };
-        const { parentId: offeringId, childId: attributeId, value } = body as AssignmentUpdateRequest<WholesalerItemOffering, Attribute, { value?: string }>;
-        log.info(`[${operationId}] Parsed request body`, { offeringId, attributeId, value });
+        const { parentId: offeringId, childId: attributeId, data: offeringAttribute }
+            = body as AssignmentUpdateRequest<WholesalerItemOffering, WholesalerOfferingAttribute>;
+        log.info(`[${operationId}] Parsed request body`, { offeringId, attributeId, offeringAttribute });
 
+        // This is an assignment update: Both, offeringId (parentId) and attributeId (childId) are required.
         if (!offeringId || !attributeId) {
             const errRes: ApiErrorResponse = {
                 success: false,
                 message: 'offeringId (parentId) and attributeId (childId) are required.',
+                status_code: 400,
+                error_code: 'BAD_REQUEST',
+                meta: { timestamp: new Date().toISOString() }
+            };
+            log.warn(`[${operationId}] FN_FAILURE: Validation failed - missing IDs.`);
+            return json(errRes, { status: 400 });
+        }
+
+        if (!offeringAttribute?.value) {
+            const errRes: ApiErrorResponse = {
+                success: false,
+                message: 'offeringAttribute and offeringAttribute.value are required.',
                 status_code: 400,
                 error_code: 'BAD_REQUEST',
                 meta: { timestamp: new Date().toISOString() }
@@ -203,7 +231,7 @@ export const PUT: RequestHandler = async ({ request }) => {
         const result = await db.request()
             .input('offeringId', offeringId)
             .input('attributeId', attributeId)
-            .input('value', value)
+            .input('value', offeringAttribute.value)
             .query(`
                 UPDATE dbo.wholesaler_offering_attributes 
                 SET value = @value
@@ -306,7 +334,7 @@ export const DELETE: RequestHandler = async ({ request }) => {
         // Since offering-attribute assignments are leaf nodes in the hierarchy,
         // there are typically no dependencies to check. But we keep the cascade pattern for consistency.
         // In future, there could be dependencies like attribute value history, audit logs, etc.
-        
+
         // Delete the assignment
         const deleteResult = await db.request()
             .input('offeringId', offeringId)
@@ -328,11 +356,11 @@ export const DELETE: RequestHandler = async ({ request }) => {
             return json(errRes, { status: 404 });
         }
 
-        const response: DeleteSuccessResponse<{ 
-            offering_id: number; 
-            attribute_id: number; 
-            offering_title: string; 
-            attribute_name: string 
+        const response: DeleteSuccessResponse<{
+            offering_id: number;
+            attribute_id: number;
+            offering_title: string;
+            attribute_name: string
         }> = {
             success: true,
             message: `Attribute assignment removed successfully.`,

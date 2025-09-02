@@ -159,14 +159,14 @@ export function getOfferingApi(client: ApiClient) {
     /**
      * Creates a new offering-attribute assignment.
      */
-    async createOfferingAttribute(assignmentData: { offering_id: number; attribute_id: number; value?: string; }): Promise<WholesalerOfferingAttribute> {
+    async createOfferingAttribute(assignmentData: Omit<WholesalerOfferingAttribute, 'id'>): Promise<WholesalerOfferingAttribute> {
       const operationId = 'createOfferingAttribute';
       offeringLoadingOperations.start(operationId);
       try {
-        const requestBody: AssignmentRequest<WholesalerItemOffering, Attribute, { value?: string }> = {
+        const requestBody: AssignmentRequest<WholesalerItemOffering, Omit<WholesalerOfferingAttribute, 'id'>> = {
           parentId: assignmentData.offering_id,
           childId: assignmentData.attribute_id,
-          ...(assignmentData.value !== undefined && { value: assignmentData.value })
+          data: assignmentData
         };
         const responseData = await client.apiFetch<AssignmentSuccessData<WholesalerOfferingAttribute>>(
           '/api/offering-attributes',
@@ -185,14 +185,14 @@ export function getOfferingApi(client: ApiClient) {
     /**
      * Updates an existing offering-attribute assignment.
      */
-    async updateOfferingAttribute(offeringId: number, attributeId: number, updates: { value?: string }): Promise<WholesalerOfferingAttribute> {
-      const operationId = `updateOfferingAttribute-${offeringId}-${attributeId}`;
+    async updateOfferingAttribute(offeringAttribute: WholesalerOfferingAttribute): Promise<WholesalerOfferingAttribute> {
+      const operationId = `updateOfferingAttribute-${offeringAttribute.offering_id}-${offeringAttribute.attribute_id}`;
       offeringLoadingOperations.start(operationId);
       try {
-        const requestBody: AssignmentUpdateRequest<WholesalerItemOffering, Attribute, { value?: string }> = {
-          parentId: offeringId,
-          childId: attributeId,
-          ...(updates.value !== undefined && { value: updates.value })
+        const requestBody: AssignmentUpdateRequest<WholesalerItemOffering, WholesalerOfferingAttribute> = {
+          parentId: offeringAttribute.offering_id,
+          childId: offeringAttribute.attribute_id,
+          data: offeringAttribute
         };
         const responseData = await client.apiFetch<AssignmentSuccessData<WholesalerOfferingAttribute>>(
           `/api/offering-attributes`,
@@ -201,7 +201,7 @@ export function getOfferingApi(client: ApiClient) {
         );
         return responseData.assignment;
       } catch (err) {
-        log.error(`[${operationId}] Failed.`, { offeringId, attributeId, updates, error: getErrorMessage(err) });
+        log.error(`[${operationId}] Failed.`, { offeringAttribute, error: getErrorMessage(err) });
         throw err;
       } finally {
         offeringLoadingOperations.finish(operationId);

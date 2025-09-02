@@ -249,7 +249,7 @@
 									}`,
 								);
 								set(
-									"product_def_id",
+									["product_def_id"],
 									Number(
 										(e.currentTarget as HTMLSelectElement)
 											.value,
@@ -297,11 +297,11 @@
 						type="number"
 						step="0.01"
 						placeholder="e.g., 199.99"
-						value={get("price") ?? ""}
+						value={getS("price") ?? ""}
 						class={errors.price ? "error" : ""}
 						oninput={(e) =>
 							set(
-								"price",
+								["price"],
 								(e.currentTarget as HTMLInputElement)
 									.valueAsNumber,
 							)}
@@ -324,7 +324,7 @@
 						type="text"
 						placeholder="e.g., USD"
 						maxlength="3"
-						value={get("currency") ?? ""}
+						value={getS("currency") ?? ""}
 						class={errors.currency ? "error" : ""}
 						oninput={(e) =>
 							set(

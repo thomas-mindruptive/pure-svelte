@@ -55,7 +55,6 @@
 
     // Not needed currently: setS<K extends keyof FormData<T>>(key: K, value: T[K]): void;
     set<P extends NonEmptyPath<FormData<T>>>(
-      obj: T,
       path: readonly [...P],
       value: PathValue<T, P>
     ): void;
@@ -253,7 +252,7 @@
   //   }
   // }
 
-  function set<P extends NonEmptyPath<FormData<T>>>(path: readonly [...P], value: PathValue<FormData<T>, P>) {
+  function internalSet<P extends NonEmptyPath<FormData<T>>>(path: readonly [...P], value: PathValue<FormData<T>, P>) {
     try {
       pathUtils.set<FormData<T>, P>(data, path, value);
     } catch (e) {
@@ -471,7 +470,7 @@
       path: readonly [...P],
       value: PathValue<T, P>
     ): void {
-    set(path, value);
+    internalSet(path, value);
 
     try {
       onChanged?.({ data: safeClone(data), dirty: isDirty() });

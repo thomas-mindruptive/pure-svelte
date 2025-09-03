@@ -27,12 +27,13 @@
     RowActionStrategy,
   } from "$lib/components/grids/Datagrid.types";
 
-  type LoadData = {
+  type OfferingDetailLinks_LoadData = {
+    categoryId: number; // This is needed for the "create" mode.
     offering?: WholesalerItemOffering_ProductDef_Category | null; // CREATE-mode: can be null
     links: WholesalerOfferingLink[];
     availableProducts?: ProductDefinition[]; // This is only needed for the "create" mode: We need the available products for the combobox.
   };
-  let { data } = $props<{ data: LoadData }>();
+  let { data } = $props<{ data: OfferingDetailLinks_LoadData }>();
 
   let newUrl = $state("");
   let newNotes = $state("");
@@ -92,6 +93,7 @@
 </script>
 
 <OfferingDetailWrapper
+  categoryId={data.categoryId}
   offering={data.offering}
   availableProducts={data.availableProducts}
 >

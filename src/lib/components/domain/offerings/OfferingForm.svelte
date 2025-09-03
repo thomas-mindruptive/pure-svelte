@@ -36,7 +36,7 @@
 	// ===== COMPONENT PROPS & TYPES =====
 
 	type ValidationErrors = Record<string, string[]>;
-	export type OfferingFormData = Partial<WholesalerItemOffering_ProductDef_Category>;
+	export type OfferingFormData = Omit<Partial<WholesalerItemOffering_ProductDef_Category>, "supplier_id">;
 
 	const {
 		// Context IDs are required for creating a new offering.
@@ -56,10 +56,10 @@
 		onCancelled,
 		onChanged,
 	} = $props<{
-		supplierId: number;
+		supplierId?: number | undefined;			// Can be undefined in create mode!
 		categoryId: number;
 		availableProducts?: ProductDefinition[];
-		initial?: OfferingFormData;
+		initial?: OfferingFormData | undefined;		// Can be undefined in create mode!
 		disabled?: boolean;
 
 		onSubmitted?: SubmittedCallback;
@@ -195,7 +195,7 @@
 	entity="Offering"
 	initial={initial as OfferingFormData}
 	validate={validateOffering}
-	submit={submitOffering}
+	submitCbk={submitOffering}
 	{disabled}
 	onSubmitted={handleSubmitted}
 	onSubmitError={handleSubmitError}
@@ -398,7 +398,7 @@
 	{/snippet}
 
 	<!-- FORM ACTIONS -->
-	{#snippet actions({ submit, cancel, submitting, dirty })}
+	{#snippet actions({ submitAction, cancel, submitting, dirty })}
 		<div class="form-actions">
 			<button
 				class="secondary-button"
@@ -411,7 +411,7 @@
 			<button
 				class="primary-button"
 				type="button"
-				onclick={() => submit()}
+				onclick={() => submitAction()}
 				disabled={!dirty || submitting}
 				aria-busy={submitting}
 			>

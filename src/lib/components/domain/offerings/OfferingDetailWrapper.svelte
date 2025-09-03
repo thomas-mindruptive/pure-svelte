@@ -19,6 +19,7 @@
     import { addNotification } from "$lib/stores/notifications";
 
 	const {
+		categoryId,		// Especially needed for "create" mode.
 		offering,
 		availableProducts,
 		children,
@@ -29,7 +30,8 @@
 		onCancelled,
 		onChanged,
 	}: {
-		offering: WholesalerItemOffering;
+		categoryId: number;
+		offering?: WholesalerItemOffering;
 		availableProducts: ProductDefinition[];
 		children: Snippet;
 
@@ -46,17 +48,15 @@
 	void onCancelled;
 	void onChanged;
 
-	log.debug(`(OfferingDetailWrapper) Loaded props:`, {
-		offering,
-		availableProducts,
-	});
+	log.debug(`(OfferingDetailWrapper) Loaded props:`, {offering,categoryId, availableProducts});
+
 	// ===== VALIDATE and show errors in UI =====
 
 	let validationError = $state<string | null>(null);
 
-	if (!offering && (!availableProducts || availableProducts.length === 0)) {
+	if (!offering && (!categoryId ||!availableProducts || availableProducts.length === 0)) {
 		const errorMessage =
-			"Dev-error: 'offering' (edit-mode) or 'availableProducts' (for create-mode) must be passed. Both are missing.";
+			"Dev-error: 'offering' (for edit-mode) or 'categoryId', 'availableProducts' (for create-mode) must be passed. All are missing.";
 
 		// Setze die reaktive Fehlervariable.
 		validationError = errorMessage;
@@ -100,10 +100,13 @@
 	<div class="detail-page-layout">
 		<!-- Sektion 1: Das Formular zur Bearbeitung der Offering-Stammdaten -->
 		<div class="grid-section">
+			{#if false}
+				NOTE: offering can be null in "create" mode.
+			{/if}
 			<OfferingForm
 				initial={offering}
-				supplierId={offering.wholesaler_id}
-				categoryId={offering.category_id}
+				supplierId={offering?.wholesaler_id}
+				categoryId={categoryId}
 				{availableProducts}
 				onSubmitted={handleFormSubmitted}
 				onSubmitError={handleSubmitError}

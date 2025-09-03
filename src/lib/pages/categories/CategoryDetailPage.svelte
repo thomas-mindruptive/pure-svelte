@@ -87,7 +87,8 @@
    * Create new offering.
    */
   function handleOfferingCreate() {
-    log.warn(`handleOfferingCreate not yet implemented`);
+    log.info(`Going to OfferDetailPage with "new"`);
+    goto(`${$page.url.pathname}/offerings/new`);
   }
 
   // Strategie-Objekte für das OfferingGrid

@@ -236,7 +236,7 @@
   entity="Wholesaler"
   initial={initial as SupplierFormData}
   validate={validateWholesaler}
-  submit={submitWholesaler}
+  submitCbk={submitWholesaler}
   {disabled}
   onSubmitted={handleSubmitted}
   onSubmitError={handleSubmitError}
@@ -464,7 +464,7 @@
 
   <!-- FORM ACTIONS -->
   <!-- Cancel and Save buttons with proper state management -->
-  {#snippet actions({ submit, cancel, submitting, dirty })}
+  {#snippet actions({ submitAction: submit, cancel, submitting, dirty })}
     <div class="form-actions">
       <button
         class="secondary-button"

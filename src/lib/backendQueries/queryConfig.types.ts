@@ -5,6 +5,7 @@
  */
 
 import type * as Domain from '$lib/domain/domainTypes';
+import type { TableNameToEntityMap } from '$lib/domain/tableToEntityMap';
 import type { aliasedTablesConfig } from './queryConfig';
 
 // --- Type Generation for Compile-Time Safety ---
@@ -13,9 +14,9 @@ export type AliasToEntityMap = {
   // Für jeden Schlüssel (Alias) in unserer `aliasedTablesConfig`...
   [Alias in keyof typeof aliasedTablesConfig]:
     // ...hole den zugehörigen Tabellennamen (z.B. 'dbo.wholesalers')...
-    (typeof aliasedTablesConfig)[Alias]['tableName'] extends keyof Domain.TableNameToEntityMap
+    (typeof aliasedTablesConfig)[Alias]['tableName'] extends keyof TableNameToEntityMap
       // ...und schlage damit den echten Entitäts-Typ (z.B. `Wholesaler`) in unserer Brücken-Map nach.
-      ? Domain.TableNameToEntityMap[(typeof aliasedTablesConfig)[Alias]['tableName']]
+      ? TableNameToEntityMap[(typeof aliasedTablesConfig)[Alias]['tableName']]
       : never;
 } & {
     // Manuelle Erweiterungen für spezielle Fälle wie 'oc' bleiben möglich.

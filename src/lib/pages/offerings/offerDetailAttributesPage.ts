@@ -14,14 +14,14 @@ export async function load({ params, fetch: fetchLoad }: LoadEvent) {
   const categoryId = Number(params.categoryId);
   const supplierId = Number(params.supplierId);
 
-  if (isNaN(offeringId)) {
-    throw error(400, 'Invalid Offering ID');
+  if (isNaN(offeringId) && params.offeringId?.toLowerCase() !== 'new') {
+    throw error(400, 'OfferDetailAttributesPage.load: Invalid Offering ID: Must be number or "new"');
   }
   if (isNaN(categoryId)) {
-    throw error(400, 'Invalid Category ID');
+    throw error(400, 'OfferDetailAttributesPage.load: Invalid Category ID');
   }
   if (isNaN(supplierId)) {
-    throw error(400, 'Invalid Supplier ID');
+    throw error(400, 'OfferDetailAttributesPage.load: Invalid Supplier ID');
   }
 
   log.info(`(OfferDetailAttributesPage) loading all data for offeringId: ${offeringId}, categoryId: ${categoryId}, supplierId: ${supplierId}`);

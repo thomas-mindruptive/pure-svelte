@@ -17,14 +17,14 @@ export async function load({ params, fetch: fetchLoad }: LoadEvent) {
   const categoryId = Number(params.categoryId);
   const supplierId = Number(params.supplierId);
 
-  if (isNaN(offeringId)) {
-    throw error(400, 'Invalid Offering ID');
+  if (isNaN(offeringId) && params.offeringId?.toLowerCase() !== 'new') {
+    throw error(400, 'OfferingDetailLinksPage.loadInvalid Offering ID: Must be number or "new"');
   }
   if (isNaN(categoryId)) {
-    throw error(400, 'Invalid Category ID');
+    throw error(400, 'OfferingDetailLinksPage.load: Invalid Category ID');
   }
   if (isNaN(supplierId)) {
-    throw error(400, 'Invalid Supplier ID');
+    throw error(400, 'OfferingDetailLinksPage.load: Invalid Supplier ID');
   }
 
   log.info(`(OfferDetailLinksPage) loading all data for offeringId: ${offeringId}, categoryId: ${categoryId}, supplierId: ${supplierId}`);
@@ -47,6 +47,7 @@ export async function load({ params, fetch: fetchLoad }: LoadEvent) {
       });
 
       return {
+        categoryId, // Always pass the categoryId from the params. 
         offering,
         links,
         availableProducts
@@ -58,6 +59,7 @@ export async function load({ params, fetch: fetchLoad }: LoadEvent) {
       const availableProducts = await offeringApi.getAvailableProductDefsForOffering(categoryId, supplierId);
 
       return {
+        categoryId, // Always pass the categoryId from the params. Especially important in create mode.
         offering: null, // No initial offering to edit
         links: [],
         availableProducts: availableProducts // Only the "remaining" products

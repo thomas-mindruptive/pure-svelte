@@ -71,8 +71,8 @@
     validate: (path?: string) => Promise<boolean>;
   };
 
-  type ActionsProps = {
-    submit: () => Promise<void>;
+   type ActionsProps = {
+    submitAction: () => Promise<void>;
     cancel: () => void;
     submitting: boolean;
     valid: boolean;
@@ -87,9 +87,9 @@
   const {
     // Data & lifecycle
     initial = {} as FormData<T>,
-    validate, // optional: (data) => { valid, errors? }
-    submit, // required
-    onCancel, // optional (simple callback on cancel)
+    validate,   // optional: (data) => { valid, errors? }
+    submitCbk,  // required
+    onCancel,   // optional (simple callback on cancel)
     autoValidate = "submit" as "submit" | "blur" | "change",
     disabled = false,
     formId = "form",
@@ -109,7 +109,7 @@
   } = $props<{
     initial?: FormData<T>;
     validate?: ValidateFn<T>;
-    submit: SubmitFn<T>;
+    submitCbk: SubmitFn<T>;
     onCancel?: CancelFn<T>;
     autoValidate?: "submit" | "blur" | "change";
     disabled?: boolean;
@@ -127,6 +127,17 @@
     onCancelled?: CancelledCallback<T>;
     onChanged?: ChangedCallback<T>;
   }>();
+
+   log.debug(`(FormShell) props:`, {
+    entity,
+    initial,
+    autoValidate,
+    disabled,
+    hasHeader: !!header,
+    hasFields: !!fields,
+    hasActions: !!actions,
+    hasFooter: !!footer,
+  });
 
   // ---- SAFE CLONING UTILITY ----
 
@@ -405,7 +416,7 @@
 
     try {
       // Inform parent.
-      const result = await submit(safeClone(data));
+      const result = await submitCbk(safeClone(data));
 
       // Update snapshot after successful submission
       const newSnapshot = createSnapshot(data);

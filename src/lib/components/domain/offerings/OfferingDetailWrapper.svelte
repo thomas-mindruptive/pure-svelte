@@ -31,8 +31,8 @@
 		onChanged,
 	}: {
 		categoryId: number;
-		offering?: WholesalerItemOffering;
-		availableProducts: ProductDefinition[];
+		offering?: WholesalerItemOffering | undefined | null;
+		availableProducts: ProductDefinition[] | null | undefined;
 		children: Snippet;
 
 		onSubmitted?: SubmittedCallback;
@@ -88,7 +88,7 @@
 {#if validationError}
 	<!-- Wenn ein Fehler aufgetreten ist, zeige NUR die Fehler-UI an. -->
 	<div class="component-error-boundary">
-		<h3>Komponenten-Fehler</h3>
+		<h3>Error</h3>
 		<p>
 			Component cannot be displayed because it was called with invalid
 			data.

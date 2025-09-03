@@ -8,13 +8,9 @@
     getOfferingApi,
     offeringLoadingState,
   } from "$lib/api/client/offering";
-  import type {
-    WholesalerOfferingAttribute_Attribute,
-    Attribute,
-    WholesalerItemOffering_ProductDef_Category,
-    ProductDefinition,
+  import {
+    type WholesalerOfferingAttribute_Attribute,
   } from "$lib/domain/domainTypes";
-
 
   import "$lib/components/styles/assignment-section.css";
   import "$lib/components/styles/grid-section.css";
@@ -23,15 +19,13 @@
   import OfferingDetailWrapper from "$lib/components/domain/offerings/OfferingDetailWrapper.svelte";
 
   import { ApiClient } from "$lib/api/client/ApiClient";
-    import type { ID, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
+  import type {
+    ID,
+    DeleteStrategy,
+    RowActionStrategy,
+  } from "$lib/components/grids/Datagrid.types";
+  import type { OfferingDetailAttributes_LoadData } from "./offeringDetail.types";
 
-  type OfferingDetailAttributes_LoadData = {
-    categoryId?: number | undefined;                              // This is needed for the "create" mode.
-    offering?: WholesalerItemOffering_ProductDef_Category | null; // CREATE-mode: can be null
-    assignedAttributes: WholesalerOfferingAttribute_Attribute[];
-    availableAttributes: Attribute[];
-    availableProducts?: ProductDefinition[] | null;               // This is only needed for the "create" mode: We need the available products for the combobox.
-  };
   let { data } = $props<{ data: OfferingDetailAttributes_LoadData }>();
 
   log.debug(`(OfferDetailAttributesPage) Loaded data:`, data);

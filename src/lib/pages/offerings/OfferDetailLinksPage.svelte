@@ -8,11 +8,7 @@
     getOfferingApi,
     offeringLoadingState,
   } from "$lib/api/client/offering";
-  import type {
-    WholesalerOfferingLink,
-    WholesalerItemOffering_ProductDef_Category,
-    ProductDefinition,
-  } from "$lib/domain/domainTypes";
+  import type { WholesalerOfferingLink } from "$lib/domain/domainTypes";
 
   import { ApiClient } from "$lib/api/client/ApiClient";
 
@@ -26,14 +22,21 @@
     DeleteStrategy,
     RowActionStrategy,
   } from "$lib/components/grids/Datagrid.types";
+  import {
+    OfferingDetailLinks_LoadDataSchema,
+    type OfferingDetailLinks_LoadData,
+  } from "./offeringDetail.types";
 
-  type OfferingDetailLinks_LoadData = {
-    categoryId: number; // This is needed for the "create" mode.
-    offering?: WholesalerItemOffering_ProductDef_Category | null; // CREATE-mode: can be null
-    links: WholesalerOfferingLink[];
-    availableProducts?: ProductDefinition[]; // This is only needed for the "create" mode: We need the available products for the combobox.
-  };
-  let { data } = $props<{ data: OfferingDetailLinks_LoadData }>();
+  let { data: rawData } = $props<{ data: OfferingDetailLinks_LoadData }>();
+
+  let { data, errors } = $derived.by(() => {
+    const result = OfferingDetailLinks_LoadDataSchema.safeParse(rawData);
+    return {
+      data: result.success ? result.data : null,
+      errors: result.success ? null : result.error.issues,
+      isValid: result.success,
+    };
+  });
 
   let newUrl = $state("");
   let newNotes = $state("");
@@ -64,6 +67,21 @@
     // Das Standardverhalten wird hier programmatisch verhindert.
     event.preventDefault();
 
+    if (!data) {
+      addNotification(
+        "No valid data available. Probably validation failed",
+        "error",
+      );
+      return;
+    }
+    if (!data.offering) {
+      addNotification(
+        "No offering available. Probably CREATE mode => Cannot assign link.",
+        "error",
+      );
+      return;
+    }
+
     if (!newUrl) return;
     isAssigning = true;
     try {
@@ -92,45 +110,54 @@
   };
 </script>
 
-<OfferingDetailWrapper
-  categoryId={data.categoryId}
-  offering={data.offering}
-  availableProducts={data.availableProducts}
->
-  <!-- Der spezifische Inhalt dieser Seite kommt in den Default Slot -->
-  <div class="grid-section">
-    <div class="assignment-section">
-      <h3>Add New Link</h3>
-      <form class="assignment-form" onsubmit={handleAssignLink}>
-        <input
-          type="url"
-          placeholder="https://example.com/product"
-          bind:value={newUrl}
-          required
-          disabled={isAssigning}
-        />
-        <input
-          type="text"
-          placeholder="Optional notes..."
-          bind:value={newNotes}
-          disabled={isAssigning}
-        />
-        <button
-          type="submit"
-          class="primary-button"
-          disabled={isAssigning || !newUrl}
-        >
-          {isAssigning ? "Adding..." : "Add Link"}
-        </button>
-      </form>
-    </div>
+{#if data}
+  <OfferingDetailWrapper
+    categoryId={data.categoryId}
+    offering={data.offering}
+    availableProducts={data.availableProducts}
+  >
+    <!-- Der spezifische Inhalt dieser Seite kommt in den Default Slot -->
+    <div class="grid-section">
+      <div class="assignment-section">
+        <h3>Add New Link</h3>
+        <form class="assignment-form" onsubmit={handleAssignLink}>
+          <input
+            type="url"
+            placeholder="https://example.com/product"
+            bind:value={newUrl}
+            required
+            disabled={isAssigning}
+          />
+          <input
+            type="text"
+            placeholder="Optional notes..."
+            bind:value={newNotes}
+            disabled={isAssigning}
+          />
+          <button
+            type="submit"
+            class="primary-button"
+            disabled={isAssigning || !newUrl}
+          >
+            {isAssigning ? "Adding..." : "Add Link"}
+          </button>
+        </form>
+      </div>
 
-    <h2 style="margin-top: 1.5rem;">Assigned Links</h2>
-    <LinkGrid
-      rows={data.links}
-      loading={$offeringLoadingState}
-      {deleteStrategy}
-      {rowActionStrategy}
-    />
+      <h2 style="margin-top: 1.5rem;">Assigned Links</h2>
+      <LinkGrid
+        rows={data.links}
+        loading={$offeringLoadingState}
+        {deleteStrategy}
+        {rowActionStrategy}
+      />
+    </div>
+  </OfferingDetailWrapper>
+{:else if errors}
+  <div class="component-error-boundary">
+    <h3>Error</h3>
+    {#each errors as error}
+      <p>{error.path.join(".")}: {error.message}</p>
+    {/each}
   </div>
-</OfferingDetailWrapper>
+{/if}

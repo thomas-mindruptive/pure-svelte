@@ -56,10 +56,10 @@
 		onCancelled,
 		onChanged,
 	} = $props<{
-		supplierId?: number | undefined;			// Can be undefined in create mode!
+		supplierId?: number | undefined;							// Can be undefined in create mode!
 		categoryId: number;
-		availableProducts?: ProductDefinition[];
-		initial?: OfferingFormData | undefined;		// Can be undefined in create mode!
+		availableProducts?: ProductDefinition[] | null | undefined;	// Is null or undefined in EDIT mode!
+		initial?: OfferingFormData | undefined | null;				// Can be undefined in create mode!
 		disabled?: boolean;
 
 		onSubmitted?: SubmittedCallback;

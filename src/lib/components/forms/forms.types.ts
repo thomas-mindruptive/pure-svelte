@@ -1,10 +1,8 @@
-// Vereinfachte FormData (oder einfach T direkt verwenden)
 export type FormData<T> = T;
 
 export type Errors = Record<string, string[]>;
 export type ValidateResult = { valid: boolean; errors?: Errors };
 
-// Generic Callback Types
 export type ValidateFn<T = any> = (
     data: FormData<T>,
 ) => ValidateResult | Promise<ValidateResult>;

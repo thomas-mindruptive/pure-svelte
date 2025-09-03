@@ -9,7 +9,7 @@
 import { json, error, type RequestHandler } from '@sveltejs/kit';
 import { log } from '$lib/utils/logger';
 import { buildQuery, executeQuery } from '$lib/server/queryBuilder';
-import { supplierQueryConfig } from '$lib/clientAndBack/queryConfig';
+import { supplierQueryConfig } from '$lib/backendQueries/queryConfig';
 import { mssqlErrorMapper } from '$lib/server/errors/mssqlErrorMapper';
 import type { ApiErrorResponse, QueryRequest, PredefinedQueryRequest, QuerySuccessResponse } from '$lib/api/api.types';
 import { v4 as uuidv4 } from 'uuid';

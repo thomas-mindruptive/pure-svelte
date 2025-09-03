@@ -1,14 +1,19 @@
 <!-- src/lib/components/links/LinkGrid.svelte -->
 <script lang="ts">
   // LinkGrid.svelte (Svelte 5 + Runes) - REFACTORED
-  // 
+  //
   // PURPOSE:
   // Thin wrapper around the reusable Datagrid component for displaying
   // WholesalerOfferingLink data. Now accepts strategy props for consistency.
 
-  import Datagrid from '$lib/components/grids/Datagrid.svelte';
-  import type { WholesalerOfferingLink } from '$lib/domain/domainTypes';
-  import type { ColumnDef, DeleteStrategy, RowActionStrategy, ID } from '../client/Datagrid.types';
+  import Datagrid from "$lib/components/grids/Datagrid.svelte";
+  import type { WholesalerOfferingLink } from "$lib/domain/domainTypes";
+  import type {
+    DeleteStrategy,
+    RowActionStrategy,
+    ColumnDef,
+    ID,
+  } from "../grids/Datagrid.types";
 
   // ===== COMPONENT PROPS (REFACTORED) =====
 
@@ -16,7 +21,7 @@
     rows = [] as WholesalerOfferingLink[],
     loading = false,
     deleteStrategy,
-    rowActionStrategy
+    rowActionStrategy,
   } = $props<{
     rows?: WholesalerOfferingLink[];
     loading?: boolean;
@@ -25,43 +30,41 @@
   }>();
 
   // ===== COLUMN DEFINITIONS (Unchanged) =====
-  
+
   const columns: ColumnDef<WholesalerOfferingLink>[] = [
-    { 
-      key: 'url', 
-      header: 'URL', 
-      sortable: true, 
-      width: '4fr',
-      accessor: (link) => link.url
+    {
+      key: "url",
+      header: "URL",
+      sortable: true,
+      width: "4fr",
+      accessor: (link) => link.url,
     },
-    { 
-      key: 'notes', 
-      header: 'Description', 
-      sortable: false, 
-      width: '3fr',
-      accessor: (link) => link.notes || '—'
+    {
+      key: "notes",
+      header: "Description",
+      sortable: false,
+      width: "3fr",
+      accessor: (link) => link.notes || "—",
     },
-    { 
-      key: 'created_at', 
-      header: 'Added', 
-      sortable: true, 
-      width: '2fr',
+    {
+      key: "created_at",
+      header: "Added",
+      sortable: true,
+      width: "2fr",
       accessor: (link) => {
-        if (!link.created_at) return '—';
+        if (!link.created_at) return "—";
         try {
           return new Date(link.created_at).toLocaleDateString();
         } catch {
           return String(link.created_at);
         }
-      }
-    }
+      },
+    },
   ];
 
   // ===== ID EXTRACTION (Unchanged) =====
-  
-  const getId = (link: WholesalerOfferingLink): ID => 
-    link.link_id;
 
+  const getId = (link: WholesalerOfferingLink): ID => link.link_id;
 </script>
 
 <Datagrid

@@ -1,20 +1,17 @@
 <script lang="ts">
   // Thin wrapper around Datagrid for categoriesAA
 
-
-  import {
-    type ColumnDef,
-    type DeleteStrategy,
-    type RowActionStrategy,
-    type ColumnDefDirect,
-    type ColumnDefWithAccessor,
-    type ID
-  } from "$lib/components/client/Datagrid.types";
-
-    import Datagrid from "$lib/components/grids/Datagrid.svelte";
+  import Datagrid from "$lib/components/grids/Datagrid.svelte";
+  import type {
+    DeleteStrategy,
+    RowActionStrategy,
+    ColumnDef,
+    ColumnDefWithAccessor,
+    ColumnDefDirect,
+    ID,
+  } from "$lib/components/grids/Datagrid.types";
 
   import type { WholesalerCategory_Category } from "$lib/domain/domainTypes";
-
 
   const {
     rows = null, // Can accept null from parent
@@ -22,7 +19,6 @@
     showOfferingCount = true,
     deleteStrategy,
     rowActionStrategy,
-
   } = $props<{
     rows?: WholesalerCategory_Category[] | null;
     loading?: boolean;
@@ -31,33 +27,55 @@
     rowActionStrategy?: RowActionStrategy<WholesalerCategory_Category>;
   }>();
 
-
-
   // Svelte will say that "columns is updated." This is ok because this is jsut a workaorund for not being const.
   let columns: ColumnDef<WholesalerCategory_Category>[] = [];
   if (showOfferingCount) {
-    let colsWithAccessor: ColumnDefWithAccessor<WholesalerCategory_Category>[] = [
-      { key: "category_name", header: "Category Name", sortable: true, width: "3fr", accessor: null },
-      { key: "comment", header: "Comment", sortable: false, width: "2fr", accessor: null },
-      {
-        key: "offering_count",
-        header: "Offerings",
-        sortable: true,
-        width: "1fr",
-        accessor: (r: WholesalerCategory_Category) => (r as any).offering_count || 0,
-      },
-      { key: "link", header: "Link", sortable: false, width: "2fr", accessor: null },
-    ];
+    let colsWithAccessor: ColumnDefWithAccessor<WholesalerCategory_Category>[] =
+      [
+        {
+          key: "category_name",
+          header: "Category Name",
+          sortable: true,
+          width: "3fr",
+          accessor: null,
+        },
+        {
+          key: "comment",
+          header: "Comment",
+          sortable: false,
+          width: "2fr",
+          accessor: null,
+        },
+        {
+          key: "offering_count",
+          header: "Offerings",
+          sortable: true,
+          width: "1fr",
+          accessor: (r: WholesalerCategory_Category) =>
+            (r as any).offering_count || 0,
+        },
+        {
+          key: "link",
+          header: "Link",
+          sortable: false,
+          width: "2fr",
+          accessor: null,
+        },
+      ];
     columns = colsWithAccessor;
   } else {
     let colsDirect: ColumnDefDirect<WholesalerCategory_Category>[] = [
-      { key: "category_name", header: "Category Name", sortable: true, width: "3fr" },
+      {
+        key: "category_name",
+        header: "Category Name",
+        sortable: true,
+        width: "3fr",
+      },
       { key: "comment", header: "Comment", sortable: false, width: "2fr" },
       { key: "link", header: "Link", sortable: false, width: "2fr" },
     ];
     columns = colsDirect;
   }
-  
 
   // Composite key for categories (wholesaler_id + category_id)
   const getId = (r: WholesalerCategory_Category): ID =>

@@ -6,7 +6,7 @@
  * It is now strictly validated against the UNMODIFIED `domain/types.ts`.
  */
 
-import { ComparisonOperator, JoinType, LogicalOperator, type JoinClause, type QueryPayload } from '$lib/clientAndBack/queryGrammar';
+import { ComparisonOperator, JoinType, LogicalOperator, type JoinClause, type QueryPayload } from '$lib/backendQueries/queryGrammar';
 import type { BaseTableConfig, PredefinedQueryConfig } from './queryConfig.types';
 
 

@@ -16,16 +16,10 @@
   import type { Snippet } from "svelte";
   import { log } from "$lib/utils/logger";
   import { requestConfirmation } from "$lib/stores/confirmation";
-  import type {
-    ColumnDef,
-    DeleteStrategy,
-    RowActionStrategy,
-    DryRunResult,
-    ConfirmResult,
-    ID,
-  } from "../client/Datagrid.types";
+
 
     import "$lib/components/styles/grid.css";
+    import type { ID, ColumnDef, DeleteStrategy, RowActionStrategy, DryRunResult, ConfirmResult } from "./Datagrid.types";
 
   // ===== TYPE DEFINITIONS =====
 

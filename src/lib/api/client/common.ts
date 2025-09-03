@@ -8,7 +8,7 @@
  */
 
 import { type ValidationErrors, type QueryRequest } from '../api.types';
-import type { QueryPayload } from '$lib/clientAndBack/queryGrammar';
+import type { QueryPayload } from '$lib/backendQueries/queryGrammar';
 
 /**
  * A custom client-side error class that extends the native Error.

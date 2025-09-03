@@ -11,10 +11,10 @@
 
 import { log } from '$lib/utils/logger';
 import { db } from '$lib/server/db';
-import type { QueryPayload, WhereCondition, WhereConditionGroup, JoinClause, SortDescriptor, FromClause, JoinConditionGroup } from '$lib/clientAndBack/queryGrammar';
-import { isJoinColCondition, isWhereCondition, isWhereConditionGroup } from '$lib/clientAndBack/queryGrammar';
-import type { QueryConfig } from '$lib/clientAndBack/queryConfig';
-import { aliasedTablesConfig } from '$lib/clientAndBack/queryConfig';
+import type { QueryPayload, WhereCondition, WhereConditionGroup, JoinClause, SortDescriptor, FromClause, JoinConditionGroup } from '$lib/backendQueries/queryGrammar';
+import { isJoinColCondition, isWhereCondition, isWhereConditionGroup } from '$lib/backendQueries/queryGrammar';
+import type { QueryConfig } from '$lib/backendQueries/queryConfig';
+import { aliasedTablesConfig } from '$lib/backendQueries/queryConfig';
 
 // --- TYPE DEFINITIONS for internal use ---
 

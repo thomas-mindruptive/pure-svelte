@@ -8,7 +8,8 @@ import {
 	ApiError,
 	type ApiRequestOptions,
 } from './common';
-import { HTTP_STATUS, type ApiErrorResponse, type ApiSuccessResponse } from '../types';
+import type { ApiSuccessResponse, ApiErrorResponse } from '../api.types';
+import { HTTP_STATUS } from '../api.types';
 
 type SvelteKitFetch = typeof fetch;
 

@@ -10,7 +10,7 @@
 import { json, error, type RequestHandler } from '@sveltejs/kit';
 import { log } from '$lib/utils/logger';
 import { buildQuery, executeQuery } from '$lib/server/queryBuilder';
-import { supplierQueryConfig } from '$lib/clientAndBack/queryConfig';
+import { supplierQueryConfig } from '$lib/backendQueries/queryConfig';
 import { mssqlErrorMapper } from '$lib/server/errors/mssqlErrorMapper';
 import type { Attribute } from '$lib/domain/domainTypes';
 import type { ApiErrorResponse, QueryRequest, QuerySuccessResponse } from '$lib/api/api.types';

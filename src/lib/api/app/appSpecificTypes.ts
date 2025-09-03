@@ -6,13 +6,13 @@
  * This provides a clear contract of "what you get" for each API operation.
  */
 
-import type { DeleteSuccessResponse, DeleteConflictResponse, ApiErrorResponse } from '../types';
 import type { 
     Wholesaler, 
     WholesalerCategory_Category, 
     ProductCategory, 
     WholesalerItemOffering 
 } from '$lib/domain/domainTypes';
+import type { DeleteSuccessResponse, DeleteConflictResponse, ApiErrorResponse } from '../api.types';
 
 // =================================================================
 // OPERATION: deleteSupplier

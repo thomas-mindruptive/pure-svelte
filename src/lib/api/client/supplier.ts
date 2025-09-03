@@ -8,7 +8,7 @@
  */
 
 import { log } from '$lib/utils/logger';
-import { ComparisonOperator, LogicalOperator, type QueryPayload } from '$lib/clientAndBack/queryGrammar';
+import { ComparisonOperator, LogicalOperator, type QueryPayload } from '$lib/backendQueries/queryGrammar';
 import type { Wholesaler, WholesalerCategoryWithCount, ProductCategory, WholesalerCategory } from '$lib/domain/domainTypes';
 
 import type { ApiClient } from './ApiClient';

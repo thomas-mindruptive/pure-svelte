@@ -1,12 +1,7 @@
 <script lang="ts">
   // Thin wrapper around Datagrid for wholesalers
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
-  import type {
-    ID,
-    ColumnDef,
-    DeleteStrategy,
-    RowActionStrategy,
-  } from "$lib/components/client/Datagrid.types";
+    import type { DeleteStrategy, RowActionStrategy, ColumnDef, ID } from "$lib/components/grids/Datagrid.types";
   import type { Wholesaler } from "$lib/domain/domainTypes";
 
  const {

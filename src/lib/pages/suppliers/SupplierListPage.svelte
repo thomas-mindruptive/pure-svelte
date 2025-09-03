@@ -14,12 +14,9 @@
     supplierLoadingState,
   } from "$lib/api/client/supplier";
   import type { Wholesaler } from "$lib/domain/domainTypes";
-  import type {
-    DeleteStrategy,
-    RowActionStrategy,
-    ID,
-  } from "$lib/components/client/Datagrid.types";
+
   import { ApiClient } from "$lib/api/client/ApiClient";
+    import type { ID, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
 
   // Die `load`-Funktion aus `supplierListPage.ts` übergibt ihre Daten hierher.
   let { data } = $props<{ data: { suppliers: Wholesaler[] } }>();

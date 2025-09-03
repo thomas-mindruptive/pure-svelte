@@ -7,7 +7,7 @@
  */
 
 import { log } from '$lib/utils/logger';
-import { type QueryPayload } from '$lib/clientAndBack/queryGrammar';
+import { type QueryPayload } from '$lib/backendQueries/queryGrammar';
 import type { ProductDefinition } from '$lib/domain/domainTypes';
 import type { ApiClient } from './ApiClient';
 import { createPostBody, createQueryBody, getErrorMessage } from './common';

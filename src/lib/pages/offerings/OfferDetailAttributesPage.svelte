@@ -14,11 +14,7 @@
     WholesalerItemOffering_ProductDef_Category,
     ProductDefinition,
   } from "$lib/domain/domainTypes";
-  import type {
-    DeleteStrategy,
-    RowActionStrategy,
-    ID,
-  } from "$lib/components/client/Datagrid.types";
+
 
   import "$lib/components/styles/assignment-section.css";
   import "$lib/components/styles/grid-section.css";
@@ -27,6 +23,7 @@
   import OfferingDetailWrapper from "$lib/components/domain/offerings/OfferingDetailWrapper.svelte";
 
   import { ApiClient } from "$lib/api/client/ApiClient";
+    import type { ID, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
 
   type LoadData = {
     offering?: WholesalerItemOffering_ProductDef_Category | null; // CREATE-mode: can be null

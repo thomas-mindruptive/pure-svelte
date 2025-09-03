@@ -24,13 +24,10 @@
     WholesalerCategory_Category,
     WholesalerCategory,
   } from "$lib/domain/domainTypes";
-  import type {
-    DeleteStrategy,
-    RowActionStrategy,
-    ID,
-  } from "$lib/components/client/Datagrid.types";
+
   import { categoryLoadingState } from "$lib/api/client/category";
   import { ApiClient } from "$lib/api/client/ApiClient";
+    import type { ID, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
 
   // Die `load`-Funktion aus `supplierDetailPage.ts` übergibt ihre Daten hierher.
   type LoadData = {
@@ -82,7 +79,11 @@
   /**
    * Handler für die Zuweisung einer neuen Kategorie.
    */
-  async function handleCategoryAssigned(category: ProductCategory, comment?: string, link?: string) {
+  async function handleCategoryAssigned(
+    category: ProductCategory,
+    comment?: string,
+    link?: string,
+  ) {
     const supplierId = data.supplier.wholesaler_id;
     try {
       log.info(`(SupplierDetailPage) Assigning category`, {
@@ -91,10 +92,13 @@
       });
       const wholesalerCategory: Omit<WholesalerCategory, "wholesaler_id"> = {
         category_id: category.category_id,
-      ...(comment !== undefined ? { comment } : {}),  // Set as "not existing" property due to exactOptionalPropertyTypes=true
-      ...(link !== undefined ? { link } : {}),        // Set as "not existing" property due to exactOptionalPropertyTypes=true
+        ...(comment !== undefined ? { comment } : {}), // Set as "not existing" property due to exactOptionalPropertyTypes=true
+        ...(link !== undefined ? { link } : {}), // Set as "not existing" property due to exactOptionalPropertyTypes=true
       };
-      await supplierApi.assignCategoryToSupplier(supplierId, wholesalerCategory);
+      await supplierApi.assignCategoryToSupplier(
+        supplierId,
+        wholesalerCategory,
+      );
       addNotification(
         `Category "${category.name}" assigned successfully.`,
         "success",
@@ -114,8 +118,8 @@
   /**
    * Führt den Löschvorgang für eine Kategoriezuweisung durch.
    */
-  
-   async function handleCategoryDelete(ids: ID[]): Promise<void> {
+
+  async function handleCategoryDelete(ids: ID[]): Promise<void> {
     log.info(`(SupplierDetailPage) Removing category assignments`, { ids });
     let dataChanged = false;
 
@@ -136,14 +140,18 @@
         // HAPPY PATH: Keine Abhängigkeiten, Zuweisung erfolgreich entfernt.
         addNotification(`Category assignment removed.`, "success");
         dataChanged = true;
-      } else if ("cascade_available" in initialResult && initialResult.cascade_available) {
+      } else if (
+        "cascade_available" in initialResult &&
+        initialResult.cascade_available
+      ) {
         // CONFLICT PATH: Abhängigkeiten gefunden, zweites Dialogfenster anzeigen.
-        const offeringCount = (initialResult.dependencies as any)?.offering_count ?? 0;
+        const offeringCount =
+          (initialResult.dependencies as any)?.offering_count ?? 0;
         const confirmed = await requestConfirmation(
           `This category has ${offeringCount} offerings for this supplier. Remove the assignment and all these offerings?`,
           "Confirm Cascade Delete",
         );
-        
+
         if (confirmed) {
           // 2. Wenn bestätigt, den zweiten API-Aufruf mit cascade=true durchführen.
           const cascadeResult = await supplierApi.removeCategoryFromSupplier({
@@ -153,17 +161,26 @@
           });
 
           if (cascadeResult.success) {
-            addNotification("Category assignment and its offerings removed.", "success");
+            addNotification(
+              "Category assignment and its offerings removed.",
+              "success",
+            );
             dataChanged = true;
           } else {
-            addNotification(cascadeResult.message || "Failed to remove assignment.", "error");
+            addNotification(
+              cascadeResult.message || "Failed to remove assignment.",
+              "error",
+            );
           }
         }
         // Wenn der Benutzer hier "Abbrechen" wählt, passiert nichts weiter,
         // und die Funktion beendet sich sauber. Der `finally`-Block im DataGrid wird den "deleting" Status entfernen.
       } else {
-         // UNEXPECTED ERROR PATH: Ein anderer Fehler ist aufgetreten.
-        addNotification(initialResult.message || "Could not remove assignment.", "error");
+        // UNEXPECTED ERROR PATH: Ein anderer Fehler ist aufgetreten.
+        addNotification(
+          initialResult.message || "Could not remove assignment.",
+          "error",
+        );
       }
     }
 
@@ -175,7 +192,6 @@
       });
     }
   }
-
 
   /**
    * Navigiert zur nächsten Hierarchieebene (Angebote).
@@ -238,7 +254,7 @@
 </div>
 
 <style>
-  .form-section{
+  .form-section {
     background: var(--color-background);
     border-radius: 8px;
     border: 1px solid var(--color-border);

@@ -7,7 +7,7 @@
  */
 
 import { log } from '$lib/utils/logger';
-import { ComparisonOperator, JoinType, LogicalOperator, type QueryPayload } from '$lib/clientAndBack/queryGrammar';
+import { ComparisonOperator, JoinType, LogicalOperator, type QueryPayload } from '$lib/backendQueries/queryGrammar';
 import type {
   WholesalerItemOffering,
   WholesalerItemOffering_ProductDef_Category,

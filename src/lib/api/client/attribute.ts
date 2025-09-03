@@ -7,7 +7,7 @@
  */
 
 import { log } from '$lib/utils/logger';
-import { ComparisonOperator, LogicalOperator, type QueryPayload, type WhereCondition, type WhereConditionGroup } from '$lib/clientAndBack/queryGrammar';
+import { ComparisonOperator, LogicalOperator, type QueryPayload, type WhereCondition, type WhereConditionGroup } from '$lib/backendQueries/queryGrammar';
 import type { Attribute } from '$lib/domain/domainTypes';
 
 import type { ApiClient } from './ApiClient';

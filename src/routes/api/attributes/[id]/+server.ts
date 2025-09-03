@@ -10,10 +10,12 @@ import { json, error, type RequestHandler } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { log } from '$lib/utils/logger';
 import { buildQuery, executeQuery } from '$lib/server/queryBuilder';
-import { supplierQueryConfig } from '$lib/clientAndBack/queryConfig';
+//import { supplierQueryConfig } from '$lib/backendQueries/queryConfig';
+import { supplierQueryConfig } from '$lib/backendQueries/queryConfig';
 import { validateAttribute } from '$lib/server/validation/domainValidator';
 import { mssqlErrorMapper } from '$lib/server/errors/mssqlErrorMapper';
-import { LogicalOperator, ComparisonOperator, type QueryPayload, type WhereCondition } from '$lib/clientAndBack/queryGrammar';
+//import { LogicalOperator, ComparisonOperator, type QueryPayload, type WhereCondition } from '$lib/backendQueries/queryGrammar';
+import { type WhereCondition, ComparisonOperator, type QueryPayload, LogicalOperator } from '$lib/backendQueries/queryGrammar';
 import type { Attribute } from '$lib/domain/domainTypes';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -25,6 +27,7 @@ import type {
     QueryRequest,
     QuerySuccessResponse
 } from '$lib/api/api.types';
+
 
 /**
  * Check attribute dependencies (offering-attribute assignments)

@@ -19,12 +19,9 @@
     ProductCategory,
     WholesalerItemOffering_ProductDef_Category,
   } from "$lib/domain/domainTypes";
-  import type {
-    DeleteStrategy,
-    RowActionStrategy,
-    ID,
-  } from "$lib/components/client/Datagrid.types";
+
   import { ApiClient } from "$lib/api/client/ApiClient";
+    import type { ID, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
 
   // Daten aus der `load`-Funktion
   type LoadData = {

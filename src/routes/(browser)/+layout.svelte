@@ -1,9 +1,9 @@
 <!-- src/routes/(browser)/+layout.svelte - FINAL & CORRECTED -->
 <script lang="ts">
-  import HierarchySidebar from "$lib/components/browser/HierarchySidebar.svelte";
+  import HierarchySidebar from "$lib/components/sidebarAndNav/HierarchySidebar.svelte";
   import { goto } from "$app/navigation";
   import { log } from "$lib/utils/logger";
-  import Breadcrumb from "$lib/components/Breadcrumb.svelte";
+  import Breadcrumb from "$lib/components/sidebarAndNav/Breadcrumb.svelte";
 
   let { data, children } = $props();
 

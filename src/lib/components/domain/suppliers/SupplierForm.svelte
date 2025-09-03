@@ -31,11 +31,7 @@
    */
 
   import FormShell, {
-    type CancelledCallback,
-    type ChangedCallback,
-    type SubmitErrorCallback,
-    type SubmittedCallback,
-    type ValidateResult,
+
   } from "$lib/components/forms/FormShell.svelte";
   import { log } from "$lib/utils/logger";
   import type { Wholesaler } from "$lib/domain/types";
@@ -44,6 +40,7 @@
   import { ApiClient } from "$lib/api/client/ApiClient";
   import { getSupplierApi } from "$lib/api/client/supplier";
   import { typeGuard } from "$lib/utils/typeUtils";
+    import type { SubmittedCallback, SubmitErrorCallback, CancelledCallback, ChangedCallback, ValidateResult } from "$lib/components/forms/forms.types";
 
   // ===== COMPONENT PROPS & TYPES =====
 
@@ -81,6 +78,8 @@
   // Silence unused variable warnings - these are used by FormShell via callback props
   onSubmitted;
   onCancelled;
+
+  export type SupplierFormData = Partial<Wholesaler>;
 
   // ===== API =====
 
@@ -235,7 +234,7 @@
 -->
 <FormShell
   entity="Wholesaler"
-  {initial}
+  initial={initial as SupplierFormData}
   validate={validateWholesaler}
   submit={submitWholesaler}
   {disabled}
@@ -277,7 +276,7 @@
 
   <!-- FORM FIELDS -->
   <!-- Responsive 4-column grid layout with comprehensive supplier fields -->
-  {#snippet fields({ data, get, set, errors, markTouched })}
+  {#snippet fields({ data, get, getS, set, errors, markTouched })}
     {typeGuard<Wholesaler>(
       "wholesaler_id",
       "name",
@@ -298,11 +297,11 @@
           <input
             id="wh-name"
             type="text"
-            value={get("name") ?? ""}
+            value={getS("name") ?? ""}
             class={errors.name ? "error" : ""}
             placeholder="Enter supplier name"
             oninput={(e: Event) =>
-              set("name", (e.currentTarget as HTMLInputElement).value)}
+              set(["name"], (e.currentTarget as HTMLInputElement).value)}
             onblur={() => markTouched("name")}
             required
             aria-invalid={errors.name ? "true" : "false"}
@@ -321,10 +320,10 @@
           <input
             id="wh-region"
             type="text"
-            value={get("region") ?? ""}
+            value={getS("region") ?? ""}
             placeholder="e.g. Europe, Asia"
             oninput={(e: Event) =>
-              set("region", (e.currentTarget as HTMLInputElement).value)}
+              set(["region"], (e.currentTarget as HTMLInputElement).value)}
             onblur={() => markTouched("region")}
           />
         </div>
@@ -334,9 +333,9 @@
           <label for="wh-status">Status</label>
           <select
             id="wh-status"
-            value={get("status") ?? ""}
+            value={getS("status") ?? ""}
             onchange={(e: Event) =>
-              set("status", (e.currentTarget as HTMLSelectElement).value)}
+              set(["status"], (e.currentTarget as HTMLSelectElement).value)}
           >
             <option value="">Select status…</option>
             <option value="active">Active</option>
@@ -350,10 +349,10 @@
           <label for="wh-country">Country *</label>
           <select
             id="wh-country"
-            value={get("country") ?? ""}
+            value={getS("region") ?? ""}
             class={errors.country ? "error" : ""}
             onchange={(e: Event) =>
-              set("country", (e.currentTarget as HTMLSelectElement).value)}
+              set(["region"], (e.currentTarget as HTMLSelectElement).value)}
             required
             aria-invalid={errors.country ? "true" : "false"}
             aria-describedby={errors.country ? "err-country" : undefined}
@@ -380,9 +379,9 @@
             <input
               id="wh-dropship"
               type="checkbox"
-              checked={Boolean(get("dropship"))}
+              checked={Boolean(getS("dropship"))}
               onchange={(e: Event) =>
-                set("dropship", (e.currentTarget as HTMLInputElement).checked)}
+                set(["dropship"], (e.currentTarget as HTMLInputElement).checked)}
               required
               aria-invalid={errors.dropship ? "true" : "false"}
               aria-describedby={errors.dropship ? "err-dropship" : undefined}
@@ -409,11 +408,11 @@
             id="wh-email"
             type="email"
             inputmode="email"
-            value={get("email") ?? ""}
+            value={getS("email") ?? ""}
             class={errors.email ? "error" : ""}
             placeholder="contact@supplier.com"
             oninput={(e: Event) =>
-              set("email", (e.currentTarget as HTMLInputElement).value)}
+              set(["email"], (e.currentTarget as HTMLInputElement).value)}
             onblur={() => markTouched("email")}
             aria-invalid={errors.email ? "true" : "false"}
             aria-describedby={errors.email ? "err-email" : undefined}
@@ -431,10 +430,10 @@
           <input
             id="wh-website"
             type="url"
-            value={get("website") ?? ""}
+            value={getS("website") ?? ""}
             placeholder="https://www.supplier.com"
             oninput={(e: Event) =>
-              set("website", (e.currentTarget as HTMLInputElement).value)}
+              set(["website"], (e.currentTarget as HTMLInputElement).value)}
             onblur={() => markTouched("website")}
           />
         </div>
@@ -450,12 +449,13 @@
             rows="4"
             placeholder="Additional notes about this supplier, business terms, contact persons, etc."
             oninput={(e: Event) =>
-              set("b2b_notes", (e.currentTarget as HTMLTextAreaElement).value)}
-            >{get("b2b_notes") ?? ""}</textarea
-          >
+              set(["b2b_notes"], (e.currentTarget as HTMLTextAreaElement).value)}
+            >
+            {getS("b2b_notes") ?? ""}
+          </textarea>
           <!-- Character count feedback for user guidance -->
           <div class="char-count">
-            {(get("b2b_notes") ?? "").length} / 1000 characters
+            {getS("b2b_notes") ?? ""}.length}
           </div>
         </div>
       </div>

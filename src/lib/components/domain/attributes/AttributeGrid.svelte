@@ -6,7 +6,7 @@
   // Thin wrapper around the reusable Datagrid component for displaying
   // WholesalerOfferingAttribute data. Now accepts strategy props for consistency.
   
-  import Datagrid from '$lib/components/client/Datagrid.svelte';
+  import Datagrid from '$lib/components/grids/Datagrid.svelte';
   import type { ColumnDef, DeleteStrategy, RowActionStrategy, ID } from '$lib/components/client/Datagrid.types';
   import type { WholesalerOfferingAttribute_Attribute } from '$lib/domain/types';
 

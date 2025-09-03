@@ -11,7 +11,7 @@
     type ID
   } from "$lib/components/client/Datagrid.types";
 
-    import Datagrid from "$lib/components/client/Datagrid.svelte";
+    import Datagrid from "$lib/components/grids/Datagrid.svelte";
 
   import type { WholesalerCategory_Category } from "$lib/domain/types";
 

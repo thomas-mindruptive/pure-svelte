@@ -111,11 +111,6 @@
     }
   }
 
-  async function handleFormSubmitted() {
-    log.info(`(OfferDetailAttributesPage) Form submitted successfully`);
-    addNotification("Form submitted successfully.", "success");
-  }
-
   // ===== Strategies to be passed to grid =====
 
   const deleteStrategy: DeleteStrategy<WholesalerOfferingAttribute_Attribute> =
@@ -124,13 +119,14 @@
     { click: handleAttributeSelect };
 </script>
 
+{#if false}
+  NOTE: The event handlers like "onSubmitted" are handled by the wrapper
+  istself.
+{/if}
+
 <OfferingDetailWrapper
   offering={data.offering}
   availableProducts={data.availableProducts}
-  onSubmitted={handleFormSubmitted}
-  onSubmitError={handleSubmitError}
-  onCancelled={handleCancelled}
-  onChanged={handleChanged} 
 >
   <!-- Der spezifische Inhalt dieser Seite kommt in den Default Slot -->
   <div class="grid-section">

@@ -328,7 +328,7 @@
 						class={errors.currency ? "error" : ""}
 						oninput={(e) =>
 							set(
-								"currency",
+								["currency"],
 								(
 									e.currentTarget as HTMLInputElement
 								).value.toUpperCase(),
@@ -354,10 +354,10 @@
 						id="offering-size"
 						type="text"
 						placeholder="e.g., 15 inch, Large"
-						value={get("size") ?? ""}
+						value={get(["size"]) ?? ""}
 						oninput={(e) =>
 							set(
-								"size",
+								["size"],
 								(e.currentTarget as HTMLInputElement).value,
 							)}
 						onblur={() => markTouched("size")}
@@ -369,10 +369,10 @@
 						id="offering-dimensions"
 						type="text"
 						placeholder="e.g., 10x20x5 cm"
-						value={get("dimensions") ?? ""}
+						value={getS("dimensions") ?? ""}
 						oninput={(e) =>
 							set(
-								"dimensions",
+								["dimensions"],
 								(e.currentTarget as HTMLInputElement).value,
 							)}
 						onblur={() => markTouched("dimensions")}
@@ -388,9 +388,9 @@
 						placeholder="Internal notes about this specific offering..."
 						oninput={(e) =>
 							set(
-								"comment",
+								["comment"],
 								(e.currentTarget as HTMLTextAreaElement).value,
-							)}>{get("comment") ?? ""}</textarea
+							)}>{getS("comment") ?? ""}</textarea
 					>
 				</div>
 			</div>

@@ -1,6 +1,6 @@
 <script lang="ts">
   // Thin wrapper around Datagrid for wholesalers
-  import Datagrid from "$lib/components/client/Datagrid.svelte";
+  import Datagrid from "$lib/components/grids/Datagrid.svelte";
   import type {
     ID,
     ColumnDef,

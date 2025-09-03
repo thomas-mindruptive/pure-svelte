@@ -7,7 +7,7 @@
   // WholesalerItemOffering_ProductDef_Category data. This component now directly accepts
   // strategy objects, making it a pure presentation component consistent with other grids.
 
-  import Datagrid from '$lib/components/client/Datagrid.svelte';
+  import Datagrid from '$lib/components/grids/Datagrid.svelte';
   import type { ColumnDef, DeleteStrategy, RowActionStrategy, ID } from '$lib/components/client/Datagrid.types';
   import type { WholesalerItemOffering_ProductDef_Category } from '$lib/domain/types';
 

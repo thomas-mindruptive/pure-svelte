@@ -23,7 +23,7 @@
     DryRunResult,
     ConfirmResult,
     ID,
-  } from "./Datagrid.types";
+  } from "../client/Datagrid.types";
 
     import "$lib/components/styles/grid.css";
 

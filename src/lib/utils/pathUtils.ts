@@ -24,9 +24,10 @@ export type PathValue<T, P> = P extends [infer K, ...infer R]
 // Optional: erlaubt auch leere Pfade
 //type PathOrRoot<T> = NonEmptyPath<T> | [];
 
-// ----- GET (Safe Version) ---------------------------------------------------
+// ----- GET ---------------------------------------------------
 
 export function get<T, K extends keyof T>(obj: T, key: K): T[K];
+
 export function get<T, P extends NonEmptyPath<T>>(obj: T, path: readonly [...P]): PathValue<T, P>;
 
 // --- Implementierung (einmal) ---
@@ -47,11 +48,13 @@ export function get<T>(
 
 
 
-// ----- SET -------------------------------------------------------------------
+// ----- SET ----------------------------------------------------
 
 // --- SET: Overloads ---
+
 // 1) Ein einzelner Key
 export function set<T, K extends keyof T>(obj: T, key: K, value: T[K]): void;
+
 // 2) Tiefer Pfad als Tupel
 export function set<T, P extends NonEmptyPath<T>>(
   obj: T,

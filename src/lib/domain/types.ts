@@ -11,6 +11,7 @@ export type Wholesaler = {
   status?: string;             // nullable, maxLength: 100
   dropship: boolean;           // required, default: false
   website?: string;            // nullable, format: uri, maxLength: 2048
+  email?: string;              // nullable, format: email, maxLength: 200
   created_at?: string;         // required, default: SYSUTCDATETIME()
 };
 

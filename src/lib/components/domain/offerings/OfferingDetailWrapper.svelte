@@ -10,7 +10,13 @@
 	import "$lib/components/styles/detail-page-layout.css";
 	import "$lib/components/styles/grid-section.css";
 	import { log } from "$lib/utils/logger";
-	import type { CancelledCallback, ChangedCallback, SubmitErrorCallback, SubmittedCallback } from "$lib/components/forms/forms.types";
+	import type {
+		CancelledCallback,
+		ChangedCallback,
+		SubmitErrorCallback,
+		SubmittedCallback,
+	} from "$lib/components/forms/forms.types";
+    import { addNotification } from "$lib/stores/notifications";
 
 	const {
 		offering,
@@ -27,10 +33,10 @@
 		availableProducts: ProductDefinition[];
 		children: Snippet;
 
-		onSubmitted: SubmittedCallback;
-		onSubmitError: SubmitErrorCallback;
-		onCancelled: CancelledCallback;
-		onChanged: ChangedCallback;
+		onSubmitted?: SubmittedCallback;
+		onSubmitError?: SubmitErrorCallback;
+		onCancelled?: CancelledCallback;
+		onChanged?: ChangedCallback;
 	} = $props();
 
 	// Silence "unused variable" warning for props passed directly to child components.
@@ -58,6 +64,25 @@
 		// Logge den Fehler zusätzlich laut in der Entwicklerkonsole.
 		log.error(`[Component Contract Violation] ${errorMessage}`);
 	}
+
+	async function handleFormSubmitted() {
+		log.info(`(OfferDetailAttributesPage) Form submitted successfully`);
+		addNotification("Form submitted successfully.", "success");
+	}
+
+	async function handleSubmitError() {
+		log.info(`(OfferDetailAttributesPage) Form submission error`);
+		addNotification("Form submission error.", "error");
+	}
+
+	async function handleCancelled() {
+		log.info(`(OfferDetailAttributesPage) Form submission cancelled`);
+		addNotification("Form submission cancelled.", "info");
+	}
+
+	async function handleChanged() {
+		log.info(`(OfferDetailAttributesPage) Form changed`);
+	}
 </script>
 
 {#if validationError}
@@ -80,10 +105,10 @@
 				supplierId={offering.wholesaler_id}
 				categoryId={offering.category_id}
 				{availableProducts}
-				onSubmitted={onSubmitted}
-				onSubmitError={onSubmitError}
-				onCancelled={onCancelled}
-				onChanged={onChanged}
+				onSubmitted={handleFormSubmitted}
+				onSubmitError={handleSubmitError}
+				onCancelled={handleCancelled}
+				onChanged={handleChanged}
 			/>
 		</div>
 

@@ -23,7 +23,7 @@
     ProductCategory,
     WholesalerCategory_Category,
     WholesalerCategory,
-  } from "$lib/domain/types";
+  } from "$lib/domain/domainTypes";
   import type {
     DeleteStrategy,
     RowActionStrategy,

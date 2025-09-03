@@ -11,7 +11,7 @@
     // 3. Fires `onAssigned` event for the parent to handle the API call.
 
     import { log } from "$lib/utils/logger";
-    import type { ProductCategory } from "$lib/domain/types";
+    import type { ProductCategory } from "$lib/domain/domainTypes";
 
     const {
         supplierId,

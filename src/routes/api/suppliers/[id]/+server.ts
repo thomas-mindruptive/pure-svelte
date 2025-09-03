@@ -15,7 +15,7 @@ import { validateWholesaler } from '$lib/server/validation/domainValidator';
 import { mssqlErrorMapper } from '$lib/server/errors/mssqlErrorMapper';
 import { checkWholesalerDependencies } from '$lib/dataModel/dependencyChecks';
 import { LogicalOperator, ComparisonOperator, type QueryPayload, type WhereCondition } from '$lib/clientAndBack/queryGrammar';
-import type { Wholesaler } from '$lib/domain/types';
+import type { Wholesaler } from '$lib/domain/domainTypes';
 import { v4 as uuidv4 } from 'uuid';
 
 import type {
@@ -25,7 +25,7 @@ import type {
     DeleteSuccessResponse,
     QueryRequest,
     QuerySuccessResponse
-} from '$lib/api/types/common';
+} from '$lib/api/api.types';
 
 /**
  * GET /api/suppliers/[id] - Get a single, complete supplier record.

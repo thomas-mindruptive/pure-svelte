@@ -3,7 +3,7 @@
 	import type {
 		ProductDefinition,
 		WholesalerItemOffering,
-	} from "$lib/domain/types";
+	} from "$lib/domain/domainTypes";
 	import OfferingForm from "./OfferingForm.svelte";
 	import type { Snippet } from "svelte";
 

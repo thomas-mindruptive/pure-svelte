@@ -12,7 +12,7 @@
     WholesalerOfferingLink,
     WholesalerItemOffering_ProductDef_Category,
     ProductDefinition,
-  } from "$lib/domain/types";
+  } from "$lib/domain/domainTypes";
   import type {
     DeleteStrategy,
     RowActionStrategy,

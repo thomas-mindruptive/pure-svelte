@@ -1,4 +1,4 @@
-// src/lib/api/types/common.ts
+import type { QueryPayload } from "$lib/backendQueries/queryGrammar";
 
 /**
  * @file Common API Types - ORGANIZED GENERIC TYPE SYSTEM
@@ -6,7 +6,6 @@
  * Uses compile-time validated generic types with automatic field derivation.
  */
 
-import type { QueryPayload } from '$lib/clientAndBack/queryGrammar';
 
 // ===== 1. BASE CONSTANTS & UTILITIES =====
 

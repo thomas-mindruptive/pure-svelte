@@ -11,9 +11,9 @@ import { db } from '$lib/server/db';
 import { log } from '$lib/utils/logger';
 import { validateProductDefinition } from '$lib/server/validation/domainValidator';
 import { mssqlErrorMapper } from '$lib/server/errors/mssqlErrorMapper';
-import type { ProductDefinition } from '$lib/domain/types';
+import type { ProductDefinition } from '$lib/domain/domainTypes';
 import { v4 as uuidv4 } from 'uuid';
-import type { ApiErrorResponse, ApiSuccessResponse } from '$lib/api/types/common';
+import type { ApiErrorResponse, ApiSuccessResponse } from '$lib/api/api.types';
 
 /**
  * POST /api/product-definitions/new

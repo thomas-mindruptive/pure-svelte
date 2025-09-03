@@ -4,7 +4,7 @@
  * @file Domain-Specific Query Configuration types.
  */
 
-import type * as Domain from '$lib/domain/types';
+import type * as Domain from '$lib/domain/domainTypes';
 import type { aliasedTablesConfig } from './queryConfig';
 
 // --- Type Generation for Compile-Time Safety ---

@@ -19,7 +19,7 @@
 		WholesalerItemOffering,
 		ProductDefinition,
 		WholesalerItemOffering_ProductDef_Category,
-	} from "$lib/domain/types";
+	} from "$lib/domain/domainTypes";
 	import { ApiClient } from "$lib/api/client/ApiClient";
 	import { getCategoryApi } from "$lib/api/client/category";
 

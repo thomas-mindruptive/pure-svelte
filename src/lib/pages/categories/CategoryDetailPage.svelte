@@ -18,7 +18,7 @@
   import type {
     ProductCategory,
     WholesalerItemOffering_ProductDef_Category,
-  } from "$lib/domain/types";
+  } from "$lib/domain/domainTypes";
   import type {
     DeleteStrategy,
     RowActionStrategy,

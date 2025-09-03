@@ -12,14 +12,14 @@ import { log } from '$lib/utils/logger';
 import { validateProductDefinition } from '$lib/server/validation/domainValidator';
 import { mssqlErrorMapper } from '$lib/server/errors/mssqlErrorMapper';
 import { checkProductDefinitionDependencies } from '$lib/dataModel/dependencyChecks';
-import type { ProductDefinition } from '$lib/domain/types';
+import type { ProductDefinition } from '$lib/domain/domainTypes';
 import { v4 as uuidv4 } from 'uuid';
 import type {
 	ApiErrorResponse,
 	ApiSuccessResponse,
 	DeleteConflictResponse,
 	DeleteSuccessResponse
-} from '$lib/api/types/common';
+} from '$lib/api/api.types';
 
 /**
  * GET /api/product-definitions/[id]

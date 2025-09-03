@@ -13,7 +13,7 @@
     getSupplierApi,
     supplierLoadingState,
   } from "$lib/api/client/supplier";
-  import type { Wholesaler } from "$lib/domain/types";
+  import type { Wholesaler } from "$lib/domain/domainTypes";
   import type {
     DeleteStrategy,
     RowActionStrategy,

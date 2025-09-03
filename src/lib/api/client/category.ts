@@ -13,7 +13,7 @@ import type {
     ProductDefinition,
     WholesalerItemOffering,
     WholesalerItemOffering_ProductDef_Category
-} from '$lib/domain/types';
+} from '$lib/domain/domainTypes';
 
 import type { ApiClient } from './ApiClient';
 import { createPostBody, createQueryBody, getErrorMessage } from './common';
@@ -21,7 +21,7 @@ import type {
     CreateChildRequest,
     PredefinedQueryRequest,
     QueryResponseData
-} from '$lib/api/types/common';
+} from '$lib/api/api.types';
 import type {
     DeleteCategoryApiResponse,
     DeleteOfferingApiResponse

@@ -13,7 +13,7 @@
 
     import Datagrid from "$lib/components/grids/Datagrid.svelte";
 
-  import type { WholesalerCategory_Category } from "$lib/domain/types";
+  import type { WholesalerCategory_Category } from "$lib/domain/domainTypes";
 
 
   const {

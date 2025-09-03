@@ -11,8 +11,8 @@ import { log } from '$lib/utils/logger';
 import { buildQuery, executeQuery } from '$lib/server/queryBuilder';
 import { supplierQueryConfig } from '$lib/clientAndBack/queryConfig';
 import { mssqlErrorMapper } from '$lib/server/errors/mssqlErrorMapper';
-import type { ProductDefinition } from '$lib/domain/types';
-import type { ApiErrorResponse, QueryRequest, QuerySuccessResponse } from '$lib/api/types/common';
+import type { ProductDefinition } from '$lib/domain/domainTypes';
+import type { ApiErrorResponse, QueryRequest, QuerySuccessResponse } from '$lib/api/api.types';
 import { v4 as uuidv4 } from 'uuid';
 
 /**

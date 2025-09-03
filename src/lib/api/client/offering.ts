@@ -16,7 +16,7 @@ import type {
   WholesalerOfferingLink,
   Attribute,
   ProductDefinition
-} from '$lib/domain/types';
+} from '$lib/domain/domainTypes';
 
 import type { ApiClient } from './ApiClient';
 import { createPostBody, createQueryBody, getErrorMessage } from './common';
@@ -30,7 +30,7 @@ import type {
   RemoveAssignmentRequest,
   CreateChildRequest,
   DeleteRequest
-} from '$lib/api/types/common';
+} from '$lib/api/api.types';
 import { LoadingState } from './loadingState';
 import { productDefinitionLoadingOperations } from './productDefinition';
 

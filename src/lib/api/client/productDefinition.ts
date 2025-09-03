@@ -8,13 +8,13 @@
 
 import { log } from '$lib/utils/logger';
 import { type QueryPayload } from '$lib/clientAndBack/queryGrammar';
-import type { ProductDefinition } from '$lib/domain/types';
+import type { ProductDefinition } from '$lib/domain/domainTypes';
 import type { ApiClient } from './ApiClient';
 import { createPostBody, createQueryBody, getErrorMessage } from './common';
 import type {
 	DeleteApiResponse,
 	QueryResponseData
-} from '$lib/api/types/common';
+} from '$lib/api/api.types';
 import { LoadingState } from './loadingState';
 
 // Create a dedicated loading state manager for this entity.

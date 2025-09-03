@@ -44,7 +44,7 @@ import type {
   WholesalerOfferingLink,
   Attribute,
   ProductDefinition
-} from '$lib/domain/types';
+} from '$lib/domain/domainTypes';
 import { log } from '$lib/utils/logger';
 
 /**

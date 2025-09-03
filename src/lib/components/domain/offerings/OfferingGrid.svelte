@@ -9,7 +9,7 @@
 
   import Datagrid from '$lib/components/grids/Datagrid.svelte';
   import type { ColumnDef, DeleteStrategy, RowActionStrategy, ID } from '$lib/components/client/Datagrid.types';
-  import type { WholesalerItemOffering_ProductDef_Category } from '$lib/domain/types';
+  import type { WholesalerItemOffering_ProductDef_Category } from '$lib/domain/domainTypes';
 
   // ===== COMPONENT PROPS (REFACTORED) =====
 

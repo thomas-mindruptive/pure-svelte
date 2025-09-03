@@ -14,7 +14,7 @@ import { supplierQueryConfig } from '$lib/clientAndBack/queryConfig';
 import { validateAttribute } from '$lib/server/validation/domainValidator';
 import { mssqlErrorMapper } from '$lib/server/errors/mssqlErrorMapper';
 import { LogicalOperator, ComparisonOperator, type QueryPayload, type WhereCondition } from '$lib/clientAndBack/queryGrammar';
-import type { Attribute } from '$lib/domain/types';
+import type { Attribute } from '$lib/domain/domainTypes';
 import { v4 as uuidv4 } from 'uuid';
 
 import type {
@@ -24,7 +24,7 @@ import type {
     DeleteSuccessResponse,
     QueryRequest,
     QuerySuccessResponse
-} from '$lib/api/types/common';
+} from '$lib/api/api.types';
 
 /**
  * Check attribute dependencies (offering-attribute assignments)

@@ -12,7 +12,7 @@ import type {
     WholesalerCategory_Category, 
     ProductCategory, 
     WholesalerItemOffering 
-} from '$lib/domain/types';
+} from '$lib/domain/domainTypes';
 
 // =================================================================
 // OPERATION: deleteSupplier

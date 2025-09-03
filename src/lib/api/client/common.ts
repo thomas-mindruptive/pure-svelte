@@ -7,7 +7,7 @@
  * of the client-side data fetching strategy.
  */
 
-import { type ValidationErrors, type QueryRequest } from '../types/common';
+import { type ValidationErrors, type QueryRequest } from '../api.types';
 import type { QueryPayload } from '$lib/clientAndBack/queryGrammar';
 
 /**

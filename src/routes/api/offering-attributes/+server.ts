@@ -12,7 +12,7 @@ import { json, error, type RequestHandler } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { log } from '$lib/utils/logger';
 import { mssqlErrorMapper } from '$lib/server/errors/mssqlErrorMapper';
-import type { Attribute, WholesalerItemOffering, WholesalerOfferingAttribute } from '$lib/domain/types';
+import type { Attribute, WholesalerItemOffering, WholesalerOfferingAttribute } from '$lib/domain/domainTypes';
 import { v4 as uuidv4 } from 'uuid';
 
 import type {
@@ -22,7 +22,7 @@ import type {
     AssignmentUpdateRequest,
     DeleteSuccessResponse,
     RemoveAssignmentRequest
-} from '$lib/api/types/common';
+} from '$lib/api/api.types';
 
 /**
  * POST /api/offering-attributes

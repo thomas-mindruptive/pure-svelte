@@ -7,7 +7,7 @@
     DeleteStrategy,
     RowActionStrategy,
   } from "$lib/components/client/Datagrid.types";
-  import type { Wholesaler } from "$lib/domain/types";
+  import type { Wholesaler } from "$lib/domain/domainTypes";
 
  const {
     rows = null, // Can accept null from parent

@@ -8,14 +8,14 @@
 
 import { log } from '$lib/utils/logger';
 import { ComparisonOperator, LogicalOperator, type QueryPayload, type WhereCondition, type WhereConditionGroup } from '$lib/clientAndBack/queryGrammar';
-import type { Attribute } from '$lib/domain/types';
+import type { Attribute } from '$lib/domain/domainTypes';
 
 import type { ApiClient } from './ApiClient';
 import { createPostBody, createQueryBody, getErrorMessage } from './common';
 import type {
     DeleteApiResponse,
     QueryResponseData
-} from '$lib/api/types/common';
+} from '$lib/api/api.types';
 import { LoadingState } from './loadingState';
 
 const attributeLoadingManager = new LoadingState();

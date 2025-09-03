@@ -4,7 +4,7 @@ import type {
     WholesalerItemOffering_ProductDef_Category,
     WholesalerCategoryWithCount,
     WholesalerOfferingAttribute_Attribute
-} from "$lib/domain/types";
+} from "$lib/domain/domainTypes";
 
 
 export type MockData = {

@@ -9,7 +9,7 @@
 
 import { log } from '$lib/utils/logger';
 import { ComparisonOperator, LogicalOperator, type QueryPayload } from '$lib/clientAndBack/queryGrammar';
-import type { Wholesaler, WholesalerCategoryWithCount, ProductCategory, WholesalerCategory } from '$lib/domain/types';
+import type { Wholesaler, WholesalerCategoryWithCount, ProductCategory, WholesalerCategory } from '$lib/domain/domainTypes';
 
 import type { ApiClient } from './ApiClient';
 import { createPostBody, createQueryBody, getErrorMessage } from './common';
@@ -19,7 +19,7 @@ import type {
 	AssignmentRequest,
 	RemoveAssignmentRequest,
 	AssignmentSuccessData
-} from '$lib/api/types/common';
+} from '$lib/api/api.types';
 import type { 
     DeleteSupplierApiResponse, 
     RemoveCategoryApiResponse

@@ -13,7 +13,7 @@ import { db } from '$lib/server/db';
 import { log } from '$lib/utils/logger';
 import { validateOfferingLink } from '$lib/server/validation/domainValidator';
 import { mssqlErrorMapper } from '$lib/server/errors/mssqlErrorMapper';
-import type { WholesalerItemOffering, WholesalerOfferingLink } from '$lib/domain/types';
+import type { WholesalerItemOffering, WholesalerOfferingLink } from '$lib/domain/domainTypes';
 import { v4 as uuidv4 } from 'uuid';
 
 import type {
@@ -21,7 +21,7 @@ import type {
     ApiSuccessResponse,
     CreateChildRequest,
     DeleteSuccessResponse
-} from '$lib/api/types/common';
+} from '$lib/api/api.types';
 
 /**
  * POST /api/offering-links

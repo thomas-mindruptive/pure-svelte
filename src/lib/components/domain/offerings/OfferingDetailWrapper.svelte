@@ -4,7 +4,7 @@
 		ProductDefinition,
 		WholesalerItemOffering,
 	} from "$lib/domain/domainTypes";
-	import OfferingForm from "./OfferingForm.svelte";
+	import OfferingForm, { type OfferingFormData } from "./OfferingForm.svelte";
 	import type { Snippet } from "svelte";
 
 	import "$lib/components/styles/detail-page-layout.css";
@@ -65,23 +65,23 @@
 		log.error(`[Component Contract Violation] ${errorMessage}`);
 	}
 
-	async function handleFormSubmitted() {
-		log.info(`(OfferDetailAttributesPage) Form submitted successfully`);
+	async function handleFormSubmitted(p: {data: OfferingFormData;result: unknown;}): Promise<void> {
+		log.info(`(OfferDetailAttributesPage) Form submitted successfully`, p);
 		addNotification("Form submitted successfully.", "success");
 	}
 
-	async function handleSubmitError() {
-		log.info(`(OfferDetailAttributesPage) Form submission error`);
+	async function handleSubmitError(p: {data: OfferingFormData; reason?: string;}): Promise<void> {
+		log.info(`(OfferDetailAttributesPage) Form submission error`, p);
 		addNotification("Form submission error.", "error");
 	}
 
-	async function handleCancelled() {
-		log.info(`(OfferDetailAttributesPage) Form submission cancelled`);
+	async function handleCancelled(p: {data: OfferingFormData; reason?: string;}): Promise<void> {
+		log.info(`(OfferDetailAttributesPage) Form submission cancelled`, p);
 		addNotification("Form submission cancelled.", "info");
 	}
 
-	async function handleChanged() {
-		log.info(`(OfferDetailAttributesPage) Form changed`);
+	async function handleChanged(info: {data: OfferingFormData; dirty: boolean }): Promise<void> {
+		log.info(`(OfferDetailAttributesPage) Form changed`, info);
 	}
 </script>
 

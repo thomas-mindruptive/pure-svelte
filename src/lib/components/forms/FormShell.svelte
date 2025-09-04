@@ -153,9 +153,9 @@
    * Creates a safe deep clone for dirty checking and snapshots
    * Strips potentially problematic properties that can't be cloned
    */
-  function pureDataDeepClone(data: any): Record<string, any> {
+  function pureDataDeepClone(data: any): FormData<T> {
     assertDefined(data, "pureDataDeepClone");
-    return cloneDeep(data);
+    return cloneDeep(data) as FormData<T>;
   }
 
   /**
@@ -182,8 +182,8 @@
    * All form data, validation, and UI state in one reactive container
    */
   const formState = $state({
-    data: pureDataDeepClone(cleanInitial) as FormData<T>,        // Current form data
-    snapshot: pureDataDeepClone(cleanInitial) as FormData<T>,   // Clean snapshot for dirty checking
+    data: pureDataDeepClone(cleanInitial),                      // Current form data
+    snapshot: pureDataDeepClone(cleanInitial),                 // Clean snapshot for dirty checking
     errors: {} as Errors,                                       // Field validation errors
     touched: new Set<string>(),                                 // Fields that have been interacted with
     submitting: false,                                          // Form submission in progress
@@ -377,7 +377,7 @@
       const result = await submitCbk(pureDataClone);
 
       // Update snapshot to mark form as clean
-      formState.snapshot = pureDataClone as FormData<T>;
+      formState.snapshot = pureDataClone;
 
       // Notify parent of successful submission
       try {
@@ -424,7 +424,7 @@
       );
     } finally {
       const detail: { data: FormData<T>; reason?: string } = {
-        data: pureDataDeepClone(formState.data) as FormData<T>,
+        data: pureDataDeepClone(formState.data),
       };
       if (reason !== undefined) detail.reason = reason;
 

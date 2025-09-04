@@ -22,6 +22,7 @@
 		OfferingDetailAttributes_LoadData,
 		OfferingDetailLinks_LoadData,
 	} from "$lib/pages/offerings/offeringDetail.types";
+    import { assertDefined } from "$lib/utils/validation/assertions";
 
 	const {
 		initialLoadedData,
@@ -60,6 +61,7 @@
 		data: WholesalerItemOffering_ProductDef_Category;
 		result: unknown;
 	}): Promise<void> {
+		assertDefined(p, "OfferingFormDetailWrapper.handleFormSubmitted");
 		log.info(`(OfferDetailAttributesPage) Form submitted successfully`, p);
 		addNotification("Form submitted successfully.", "success");
 	}
@@ -68,6 +70,7 @@
 		data: WholesalerItemOffering_ProductDef_Category;
 		reason?: string;
 	}): Promise<void> {
+		assertDefined(p, "OfferingFormDetailWrapper.handleSubmitError");
 		log.info(`(OfferDetailAttributesPage) Form submission error`, p);
 		addNotification("Form submission error.", "error");
 	}
@@ -76,6 +79,7 @@
 		data: WholesalerItemOffering_ProductDef_Category;
 		reason?: string;
 	}): Promise<void> {
+		assertDefined(p, "OfferingFormDetailWrapper.handleCancelled");
 		log.info(`(OfferDetailAttributesPage) Form submission cancelled`, p);
 		addNotification("Form submission cancelled.", "info");
 	}
@@ -84,6 +88,7 @@
 		data: WholesalerItemOffering_ProductDef_Category;
 		dirty: boolean;
 	}): Promise<void> {
+		assertDefined(info, "OfferingFormDetailWrapper.handleChanged");
 		log.info(`(OfferDetailAttributesPage) Form changed`, info);
 	}
 </script>

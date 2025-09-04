@@ -27,6 +27,7 @@
     type OfferingDetailLinks_LoadData,
   } from "./offeringDetail.types";
     import { log } from "$lib/utils/logger";
+    import { assertDefined } from "$lib/utils/validation/assertions";
 
   let { data: rawLoadedData } = $props<{
     data: OfferingDetailLinks_LoadData;
@@ -67,6 +68,7 @@
   const offeringApi = getOfferingApi(client);
 
   async function handleLinkDelete(ids: ID[]): Promise<void> {
+    assertDefined(ids, "OfferDetailLinksPage.handleLinkDelete");
     for (const id of ids) {
       await offeringApi.deleteOfferingLink(Number(id));
     }
@@ -75,6 +77,7 @@
   }
 
   function handleLinkSelect(link: WholesalerOfferingLink) {
+    assertDefined(link, "OfferDetailLinksPage.handleLinkSelect");
     addNotification(
       `Editing for link "${link.url}" not yet implemented.`,
       "info",
@@ -82,6 +85,7 @@
   }
 
   async function handleAssignLink(event: SubmitEvent) {
+    assertDefined(event, "OfferDetailLinksPage.handleAssignLink");
     // Das Standardverhalten wird hier programmatisch verhindert.
     event.preventDefault();
 

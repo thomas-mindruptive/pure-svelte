@@ -38,6 +38,7 @@
 		OfferingDetail_LoadDataSchema,
 	} from "$lib/pages/offerings/offeringDetail.types";
 	import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
+    import { assertDefined } from "$lib/utils/validation/assertions";
 
 	// ===== INTERNAL TYPES =====
 
@@ -143,6 +144,8 @@
 	function validateOfferingForSubmit(
 		raw: Record<string, any>,
 	): ValidateResult {
+		assertDefined(raw, "validateOfferingForSubmit");
+
 		const data = raw as WholesalerItemOffering_ProductDef_Category;
 		const errors: ValidationErrors = {};
 
@@ -174,6 +177,8 @@
 	 * Handles form submission, detecting create vs. update mode.
 	 */
 	async function submitOffering(raw: Record<string, any>) {
+		assertDefined(raw, "submitOffering");
+
 		const isUpdateMode = !isCreateMode;
 
 		if (!supplierId || !categoryId) {
@@ -227,6 +232,7 @@
 		data: Record<string, any>;
 		result: unknown;
 	}) {
+		assertDefined(p, "handleSubmitted");
 		log.info(
 			{ component: "OfferingForm", event: "submitted" },
 			"FORM_EVENT",
@@ -238,6 +244,7 @@
 		data: Record<string, any>;
 		error: unknown;
 	}) {
+		assertDefined
 		log.warn(`Submit error: ${String(p.error)}`, {
 			component: "OfferingForm",
 			event: "submitError",
@@ -249,6 +256,7 @@
 		data: Record<string, any>;
 		reason?: string;
 	}) {
+		assertDefined(p, "handleCancelled");
 		log.debug(
 			{ component: "OfferingForm", event: "cancelled" },
 			"FORM_EVENT",
@@ -257,6 +265,7 @@
 	}
 
 	function handleChanged(p: { data: Record<string, any>; dirty: boolean }) {
+		assertDefined(p, "handleChanged");
 		log.debug(
 			{ component: "OfferingForm", event: "changed", dirty: p.dirty },
 			"FORM_EVENT",

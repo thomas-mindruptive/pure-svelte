@@ -27,6 +27,7 @@
     type OfferingDetailAttributes_LoadData,
   } from "./offeringDetail.types";
   import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
+    import { assertDefined } from "$lib/utils/validation/assertions";
 
   let { data: rawLoadedData } = $props<{
     data: OfferingDetailAttributes_LoadData;
@@ -71,6 +72,7 @@
   // ===== API CALLS =====
 
   async function handleAttributeDelete(ids: ID[]): Promise<void> {
+    assertDefined(ids, "OfferingDetailAttributesPage.handleAttributeDelete");
     log.info(`(OfferDetailAttributesPage) Deleting attribute assignments`, {
       ids,
     });
@@ -96,6 +98,7 @@
   function handleAttributeSelect(
     attribute: WholesalerOfferingAttribute_Attribute,
   ) {
+    assertDefined(attribute, "OfferingDetailAttributesPage.handleAttributeSelect");
     addNotification(
       `Editing for "${attribute.attribute_name}" not yet implemented.`,
       "info",
@@ -103,6 +106,7 @@
   }
 
   async function handleAssignAttribute(event: SubmitEvent) {
+    assertDefined(event, "OfferingDetailAttributesPage.handleAssignAttribute");
     event.preventDefault();
     if (!selectedAttributeId) {
       addNotification("Please select an attribute.", "error");

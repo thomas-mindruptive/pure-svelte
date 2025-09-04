@@ -117,7 +117,7 @@
 
 	$effect(() => {
 		if (errors) {
-			console.error(`(OfferingForm) Validation errors:`, errors);
+			log.error(`(OfferingForm) Validation errors:`, errors);
 		} else {
 			log.debug(
 				`(OfferingForm) Validated data OK:`,

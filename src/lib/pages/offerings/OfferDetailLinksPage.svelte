@@ -26,6 +26,7 @@
     OfferingDetailLinks_LoadDataSchema,
     type OfferingDetailLinks_LoadData,
   } from "./offeringDetail.types";
+    import { log } from "$lib/utils/logger";
 
   let { data: rawLoadedData } = $props<{
     data: OfferingDetailLinks_LoadData;
@@ -44,7 +45,7 @@
 
   $effect(() => {
     if (errors) {
-      console.error(`(OfferDetailLinksPage) Validation errors:`, errors);
+      log.error(`(OfferDetailLinksPage) Validation errors:`, errors);
     } else {
       log.debug(
         `(OfferDetailLinksPage) Validated data OK:`,

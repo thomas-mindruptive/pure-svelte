@@ -48,7 +48,7 @@
 
   $effect(() => {
     if (errors) {
-      console.error(`(OfferDetailAttributesPage) Validation errors:`, errors);
+      log.error(`(OfferDetailAttributesPage) Validation errors:`, errors);
     } else {
       log.debug(
         `(OfferDetailAttributesPage) Validated data OK:`,

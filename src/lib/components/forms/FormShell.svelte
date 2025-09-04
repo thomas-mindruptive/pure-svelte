@@ -40,6 +40,7 @@
     ChangedCallback,
   } from "./forms.types";
   import type { FormData } from "./forms.types";
+    import { assertDefined } from "$lib/utils/validation/assertions";
 
   // ===== FORM HANDLER TYPES =====
 
@@ -146,6 +147,7 @@
    * Falls back to JSON clone if structuredClone fails
    */
   function safeClone<T extends Record<string, any>>(obj: T): T {
+    assertDefined(obj, "safeClone");
     try {
       return structuredClone(obj);
     } catch (error) {
@@ -174,6 +176,7 @@
    * Strips potentially problematic properties
    */
   function createSnapshot(data: FormData<T>): Record<string, any> {
+    assertDefined(data, "createSnapshot");
     const cleaned: Record<string, any> = {};
 
     for (const [key, value] of Object.entries(data)) {

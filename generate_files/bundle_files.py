@@ -7,7 +7,7 @@ START_DIR = Path(__file__).parent.parent.resolve()
 OUTPUT_FILE = Path(__file__).parent.resolve() / "generated" / "bundle.txt"
 
 # --- Optionen ---
-TREE_ONLY = True  # Wenn True: nur Verzeichnisstruktur schreiben und beenden
+TREE_ONLY = False  # Wenn True: nur Verzeichnisstruktur schreiben und beenden
 TREE_OUTPUT_FILE = Path(__file__).parent.resolve() / "generated" / "tree.txt"
 TREE_INCLUDE_ALL_FILES = (
     False  # Alle Dateien listen (nicht nur EXTENSIONS) beim Struktur-Output
@@ -35,7 +35,6 @@ EXCLUDE_PATTERNS = [
     "tools",
     "node_modules",
     "lib/server",
-    "api/routes",
     ".git",
     ".venv",
     ".vscode",

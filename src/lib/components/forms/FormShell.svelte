@@ -27,6 +27,7 @@
   import { log } from "$lib/utils/logger";
   import * as pathUtils from "$lib/utils/pathUtils";
   import type { NonEmptyPath, PathValue } from "$lib/utils/pathUtils";
+  import { cloneDeep } from "lodash-es";
 
   import type {
     Errors,
@@ -141,93 +142,74 @@
 
   // ---- SAFE CLONING UTILITY ----
 
-  /**
-   * Safely clones form data, handling DataCloneError from non-cloneable objects
-   * Falls back to JSON clone if structuredClone fails
-   */
-  function safeClone<T extends Record<string, any>>(obj: T): T {
-    assertDefined(obj, "safeClone");
-    try {
-      return structuredClone(obj);
-    } catch (error) {
-      log.warn("structuredClone failed, using JSON fallback", {
-        entity,
-        obj,
-        error: String(error),
-      });
-
-      try {
-        // JSON fallback: works for most form data but loses functions/dates
-        return JSON.parse(JSON.stringify(obj));
-      } catch (jsonError) {
-        log.error("JSON clone also failed, using shallow copy", {
-          entity,
-          error: String(jsonError),
-        });
-
-        // Last resort: shallow copy
-        return { ...obj } as T;
-      }
-    }
-  }
 
   /**
    * Creates a clean snapshot for dirty checking
    * Strips potentially problematic properties
    */
-  function createSnapshot(data: FormData<T>): Record<string, any> {
+  function pureDataDeepClone(data: any): Record<string, any> {
     assertDefined(data, "createSnapshot");
-    const cleaned: Record<string, any> = {};
-
-    for (const [key, value] of Object.entries(data)) {
-      // Skip known problematic types
-      if (value === null || value === undefined) {
-        cleaned[key] = value;
-      } else if (typeof value === "object" && value instanceof Date) {
-        cleaned[key] = value.toISOString(); // Convert dates to strings
-      } else if (typeof value === "object" && value.constructor === Object) {
-        cleaned[key] = createSnapshot(value); // Recursively clean nested objects
-      } else if (Array.isArray(value)) {
-        cleaned[key] = value.map((item) =>
-          typeof item === "object" && item !== null
-            ? createSnapshot(item)
-            : item,
-        );
-      } else if (["string", "number", "boolean"].includes(typeof value)) {
-        cleaned[key] = value;
-      }
-      // Skip functions, DOM elements, circular references, etc.
-    }
-
+    const cleaned: Record<string, any> = cloneDeep(data);
     return cleaned;
+
+    // OLD!:
+    // for (const [key, value] of Object.entries(data)) {
+    //   // Skip known problematic types
+    //   if (value === null || value === undefined) {
+    //     cleaned[key] = value;
+    //   } else if (typeof value === "object" && value instanceof Date) {
+    //     cleaned[key] = value.toISOString(); // Convert dates to strings
+    //   } else if (typeof value === "object" && value.constructor === Object) {
+    //     cleaned[key] = createSnapshot(value); // Recursively clean nested objects
+    //   } else if (Array.isArray(value)) {
+    //     cleaned[key] = value.map((item) =>
+    //       typeof item === "object" && item !== null
+    //         ? createSnapshot(item)
+    //         : item,
+    //     );
+    //   } else if (["string", "number", "boolean"].includes(typeof value)) {
+    //     cleaned[key] = value;
+    //   }
+    //   // Skip functions, DOM elements, circular references, etc.
+    // }
   }
 
   // ---- State (Runes) ----
-  const cleanInitial = createSnapshot(initial ?? ({} as FormData<T>));
-  const data = $state<FormData<T>>(safeClone(cleanInitial) as any);
-  const snapshot = $state<FormData<T>>(safeClone(cleanInitial) as any); // for dirty check
-  const errors = $state<Errors>({});
-  const touched = $state<Set<string>>(new Set());
-  let submitting = $state(false);
-  let validating = $state(false);
+  const cleanInitial = pureDataDeepClone(initial ?? ({} as FormData<T>));
+
+  const formState = $state({
+    data: pureDataDeepClone(cleanInitial) as FormData<T>,
+    snapshot: pureDataDeepClone(cleanInitial) as FormData<T>, // for dirty check
+    errors: {} as Errors,
+    touched: new Set<string>(),
+    submitting: false,
+    validating: false,
+  });
+
+  // const data = $state<FormData<T>>(pureDataDeepClone(cleanInitial) as any);
+  // const snapshot = $state<FormData<T>>(pureDataDeepClone(cleanInitial) as any); // for dirty check
+  // const errors = $state<Errors>({});
+  // const touched = $state<Set<string>>(new Set());
+  // let submitting = $state(false);
+  // let validating = $state(false);
 
   let formEl: HTMLFormElement;
 
   const headerProps = $derived.by(
     (): HeaderProps<T> => ({
-      data,
+      data: formState.data,
       dirty: isDirty(),
     }),
   );
 
   const fieldsProps = $derived.by(
     (): FieldsProps<T> => ({
-      data,
+      data: formState.data,
       set: handleInput,
       get,
       getS,
-      errors,
-      touched,
+      errors: formState.errors,
+      touched: formState.touched,
       markTouched,
       validate: runValidate,
     }),
@@ -237,8 +219,8 @@
     (): ActionsProps => ({
       submitAction: doSubmit,
       cancel: () => doCancel("button"),
-      submitting,
-      valid: Object.keys(errors).length === 0,
+      submitting: formState.submitting,
+      valid: Object.keys(formState.errors).length === 0,
       dirty: isDirty(),
       disabled,
     }),
@@ -268,8 +250,8 @@
       entity,
       autoValidate,
       cleanInitial,
-      data,
-      snapshot,
+      data: formState.data,
+      snapshot: formState.snapshot,
     });
     return () => formEl?.removeEventListener("keydown", keyHandler);
   });
@@ -302,7 +284,7 @@
     value: PathValue<FormData<T>, P>,
   ) {
     try {
-      pathUtils.set<FormData<T>, P>(data, path, value);
+      pathUtils.set<FormData<T>, P>(formState.data, path, value);
     } catch (e) {
       log.error(
         { component: "FormShell", entity, path, error: coerceMessage(e) },
@@ -315,7 +297,7 @@
     path: readonly [...P],
   ): PathValue<FormData<T>, P> | undefined {
     try {
-      const res = pathUtils.get(data, path);
+      const res = pathUtils.get(formState.data, path);
       return res;
     } catch (e) {
       log.error("get failed", {
@@ -332,7 +314,7 @@
     key: K,
   ): FormData<T>[K] | undefined {
     try {
-      const res = pathUtils.get(data, key);
+      const res = pathUtils.get(formState.data, key);
       return res;
     } catch (e) {
       log.error("get failed", {
@@ -366,9 +348,9 @@
   function isDirty(): boolean {
     try {
       // Use safe comparison for dirty checking
-      const currentSnapshot = createSnapshot(data);
+      const currentSnapshot = pureDataDeepClone(formState.data);
       const isDirty =
-        JSON.stringify(currentSnapshot) !== JSON.stringify(snapshot);
+        JSON.stringify(currentSnapshot) !== JSON.stringify(formState.snapshot);
       return isDirty;
     } catch {
       log.warn(
@@ -381,32 +363,32 @@
 
   function clearErrors(paths?: string[]) {
     if (!paths || paths.length === 0) {
-      for (const k in errors) delete errors[k];
+      for (const k in formState.errors) delete formState.errors[k];
       return;
     }
-    for (const p of paths) delete errors[p];
+    for (const p of paths) delete formState.errors[p];
   }
 
   function setFieldErrors(path: string, msgs: string[]) {
-    errors[path] = msgs;
+    formState.errors[path] = msgs;
   }
 
   async function runValidate(path?: string): Promise<boolean> {
     if (!validate) return true;
-    validating = true;
+    formState.validating = true;
     try {
-      const res = await validate(data);
+      const res = await validate(formState.data);
       if (res?.errors) {
         if (path) {
           const msgs = res.errors[path] ?? [];
           clearErrors([path]);
           if (msgs.length) setFieldErrors(path, msgs);
         } else {
-          for (const k in errors) delete errors[k];
-          Object.assign(errors, res.errors);
+          for (const k in formState.errors) delete formState.errors[k];
+          formState.errors = res.errors;
         }
       } else {
-        for (const k in errors) delete errors[k];
+        for (const k in formState.errors) delete formState.errors[k];
       }
       return !!res?.valid;
     } catch (e) {
@@ -416,12 +398,12 @@
       );
       return true; // fail-open on validator errors
     } finally {
-      validating = false;
+      formState.validating = false;
     }
   }
 
   function markTouched(path: string) {
-    touched.add(path);
+    formState.touched.add(path);
     if (autoValidate === "blur") {
       // run validation for this field only; ignore result
       void runValidate(path);
@@ -431,16 +413,16 @@
   // ---- Orchestration ----
   async function doSubmit(): Promise<void> {
     log.debug(`(FormShell) doSubmit called`, { entity });
-    if (disabled || submitting) return;
-    submitting = true;
+    if (disabled || formState.submitting) return;
+    formState.submitting = true;
 
     if (autoValidate === "submit" || autoValidate === "change") {
       const ok = await runValidate();
       if (!ok) {
-        submitting = false;
+        formState.submitting = false;
         try {
           onSubmitError?.({
-            data: safeClone(data),
+            data: pureDataDeepClone(formState.data),
             error: new Error("Validation failed before submission."),
           });
         } catch (e) {
@@ -454,15 +436,17 @@
     }
 
     try {
-      // Inform parent.
-      const result = await submitCbk(safeClone(data));
+      const pureDataClone = pureDataDeepClone(formState.data);
 
-      // Update snapshot after successful submission
-      const newSnapshot = createSnapshot(data);
-      Object.assign(snapshot, newSnapshot);
+      // Inform parent. Parent MUST NOT modify the clone!
+      const result = await submitCbk(pureDataClone);
+
+      // Svelte handles reactivity!
+      formState.snapshot = pureDataClone as FormData<T>;
 
       try {
-        onSubmitted?.({ data: safeClone(data), result });
+        // Inform parent via callback prop. Parent MUST NOT modify the clone!
+        onSubmitted?.({ data: pureDataClone, result });
       } catch (e) {
         log.error(
           { component: "FormShell", entity, error: coerceMessage(e) },
@@ -478,7 +462,7 @@
       );
 
       try {
-        onSubmitError?.({ data: safeClone(data), error: e });
+        onSubmitError?.({ data: pureDataDeepClone(formState.data), error: e });
       } catch (e) {
         log.error(
           { component: "FormShell", entity, error: coerceMessage(e) },
@@ -486,14 +470,14 @@
         );
       }
     } finally {
-      submitting = false;
+      formState.submitting = false;
     }
   }
 
   function doCancel(reason?: string) {
     log.debug(`Cancelled - ${reason}`);
     try {
-      onCancel?.(safeClone(data));
+      onCancel?.(pureDataDeepClone(formState.data));
     } catch (e) {
       log.warn(
         { component: "FormShell", entity, error: coerceMessage(e) },
@@ -501,7 +485,7 @@
       );
     } finally {
       const detail: { data: FormData<T>; reason?: string } = {
-        data: safeClone(data),
+        data: pureDataDeepClone(formState.data) as FormData<T>,
       };
       if (reason !== undefined) detail.reason = reason;
 
@@ -523,7 +507,7 @@
     internalSet(path, value);
 
     try {
-      onChanged?.({ data: safeClone(data), dirty: isDirty() });
+      onChanged?.({ data: pureDataDeepClone(formState.data), dirty: isDirty() });
     } catch (e) {
       log.error(
         { component: "FormShell", entity, error: coerceMessage(e) },
@@ -545,7 +529,7 @@
     e.preventDefault();
     void doSubmit();
   }}
-  aria-busy={submitting || validating}
+  aria-busy={formState.submitting || formState.validating}
 >
   <!-- Header area -->
   <div class="pc-grid__toolbar">
@@ -559,10 +543,10 @@
   </div>
 
   <!-- Error summary (polite) -->
-  {#if Object.keys(errors).length > 0}
+  {#if Object.keys(formState.errors).length > 0}
     <div class="pc-grid__empty" aria-live="polite">
       <!-- Compact summary of first messages per field -->
-      {#each Object.entries(errors) as [path, msgs]}
+      {#each Object.entries(formState.errors) as [path, msgs]}
         <div><strong>{path}</strong>: {msgs[0]}</div>
       {/each}
     </div>
@@ -586,17 +570,17 @@
         class="pc-grid__btn"
         type="button"
         onclick={() => doCancel("button")}
-        disabled={submitting || disabled}
+        disabled={formState.submitting || disabled}
       >
         Cancel
       </button>
       <button
         class="pc-grid__btn pc-grid__btn--danger"
         type="submit"
-        disabled={submitting || disabled}
-        aria-busy={submitting}
+        disabled={formState.submitting || disabled}
+        aria-busy={formState.submitting}
       >
-        {#if submitting}<span class="pc-grid__spinner" aria-hidden="true"
+        {#if formState.submitting}<span class="pc-grid__spinner" aria-hidden="true"
           ></span>{/if}
         Save
       </button>
@@ -604,6 +588,6 @@
   </div>
 
   {#if footer}
-    {@render footer({ data })}
+    {@render footer({ data: formState.data })}
   {/if}
 </form>

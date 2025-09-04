@@ -47,7 +47,8 @@ export async function load({ params, fetch: fetchLoad }: LoadEvent) {
       });
 
       return {
-        categoryId, // Always pass the categoryId from the params. 
+        supplierId, // Always pass from the params.
+        categoryId, // Always pass from the params.
         offering,
         links,
         availableProducts
@@ -59,7 +60,8 @@ export async function load({ params, fetch: fetchLoad }: LoadEvent) {
       const availableProducts = await offeringApi.getAvailableProductDefsForOffering(categoryId, supplierId);
 
       return {
-        categoryId, // Always pass the categoryId from the params. Especially important in create mode.
+        supplierId, // Always pass from the params.
+        categoryId, // Always pass from the params.
         offering: null, // No initial offering to edit
         links: [],
         availableProducts: availableProducts // Only the "remaining" products

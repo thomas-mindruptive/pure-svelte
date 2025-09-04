@@ -117,6 +117,7 @@
 {/if}
 
 <OfferingDetailWrapper
+  supplierId={data.supplierId}
   categoryId={data.categoryId}
   offering={data.offering}
   availableProducts={data.availableProducts}

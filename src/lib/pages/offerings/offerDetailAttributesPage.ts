@@ -44,6 +44,8 @@ export async function load({ params, fetch: fetchLoad }: LoadEvent) {
       ]);
 
       return {
+        supplierId, // Always pass from the params.
+        categoryId, // Always pass from the params.
         offering,
         assignedAttributes,
         availableAttributes,
@@ -55,6 +57,8 @@ export async function load({ params, fetch: fetchLoad }: LoadEvent) {
       const availableProducts = await offeringApi.getAvailableProductDefsForOffering(categoryId, supplierId);
 
       return {
+        supplierId, // Always pass from the params.
+        categoryId, // Always pass from the params.
         offering: null, // Not initial offering to edit
         availableAttributes: [],
         assignedAttributes: [],

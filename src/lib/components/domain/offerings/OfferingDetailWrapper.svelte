@@ -4,7 +4,7 @@
 		ProductDefinition,
 		WholesalerItemOffering,
 	} from "$lib/domain/domainTypes";
-	import OfferingForm, { type OfferingFormData } from "./OfferingForm.svelte";
+
 	import type { Snippet } from "svelte";
 
 	import "$lib/components/styles/detail-page-layout.css";
@@ -17,8 +17,11 @@
 		SubmittedCallback,
 	} from "$lib/components/forms/forms.types";
     import { addNotification } from "$lib/stores/notifications";
+	import OfferingForm from "./OfferingForm.svelte";
+    import type { OfferingFormData } from "./OfferingFormTypes";
 
 	const {
+		supplierId,
 		categoryId,		// Especially needed for "create" mode.
 		offering,
 		availableProducts,
@@ -30,6 +33,7 @@
 		onCancelled,
 		onChanged,
 	}: {
+		supplierId: number;
 		categoryId: number;
 		offering?: WholesalerItemOffering | undefined | null;
 		availableProducts: ProductDefinition[] | null | undefined;
@@ -105,7 +109,7 @@
 			{/if}
 			<OfferingForm
 				initial={offering}
-				supplierId={offering?.wholesaler_id}
+				supplierId={supplierId}
 				categoryId={categoryId}
 				{availableProducts}
 				onSubmitted={handleFormSubmitted}

@@ -1,5 +1,7 @@
 <!-- src/lib/components/domain/offerings/OfferingForm.svelte -->
 <script lang="ts">
+	import type { OfferingFormData } from "./OfferingFormTypes";
+
 	/**
 	 * OfferingForm Component (Svelte 5 + Runes)
 	 *
@@ -13,12 +15,12 @@
 	 * - Uses the ApiClient factory pattern for type-safe, SSR-safe API calls.
 	 */
 
+	// ===== IMPORTS =====
 	import FormShell from "$lib/components/forms/FormShell.svelte";
 	import { log } from "$lib/utils/logger";
 	import type {
 		WholesalerItemOffering,
 		ProductDefinition,
-		WholesalerItemOffering_ProductDef_Category,
 	} from "$lib/domain/domainTypes";
 	import { ApiClient } from "$lib/api/client/ApiClient";
 	import { getCategoryApi } from "$lib/api/client/category";
@@ -33,12 +35,43 @@
 		ValidateResult,
 	} from "$lib/components/forms/forms.types";
 
-	// ===== COMPONENT PROPS & TYPES =====
+	// ===== INTERNAL TYPES =====
 
 	type ValidationErrors = Record<string, string[]>;
-	export type OfferingFormData = Omit<Partial<WholesalerItemOffering_ProductDef_Category>, "supplier_id">;
 
-	const {
+	/**
+	 * Component Props Interface
+	 *
+	 * Handles both CREATE and EDIT modes for offerings:
+	 * - CREATE mode: initial is undefined/null, requires categoryId + availableProducts
+	 * - EDIT mode: initial contains existing offering data, availableProducts may be null
+	 */
+	interface OfferingFormProps {
+		// Supplier/Wholesaler ID  - required for creating new offerings
+		supplierId: number;
+
+		// Category ID - required for creating new offerings
+		categoryId: number;
+
+		// Available products for CREATE mode dropdown. Is null or undefined in EDIT mode
+		availableProducts?: ProductDefinition[] | null | undefined;
+
+		// Initial data; presence of 'offering_id' determines create/edit mode
+		initial?: OfferingFormData | undefined | null;
+
+		// Form disabled state
+		disabled?: boolean;
+
+		// Svelte 5 component-callback props
+		onSubmitted?: SubmittedCallback;
+		onSubmitError?: SubmitErrorCallback;
+		onCancelled?: CancelledCallback;
+		onChanged?: ChangedCallback;
+	}
+
+	// ===== COMPONENT PROPS =====
+
+	let {
 		// Context IDs are required for creating a new offering.
 		supplierId,
 		categoryId,
@@ -46,8 +79,7 @@
 		// The list of products that can be selected for this offering.
 		availableProducts = [] as ProductDefinition[],
 
-		// Initial data; presence of 'offering_id' determines create/edit mode.
-		initial = {} as OfferingFormData,
+		initial,
 		disabled = false,
 
 		// Svelte 5 component-callback props
@@ -55,18 +87,11 @@
 		onSubmitError,
 		onCancelled,
 		onChanged,
-	} = $props<{
-		supplierId?: number | undefined;							// Can be undefined in create mode!
-		categoryId: number;
-		availableProducts?: ProductDefinition[] | null | undefined;	// Is null or undefined in EDIT mode!
-		initial?: OfferingFormData | undefined | null;				// Can be undefined in create mode!
-		disabled?: boolean;
+	}: OfferingFormProps = $props();
 
-		onSubmitted?: SubmittedCallback;
-		onSubmitError?: SubmitErrorCallback;
-		onCancelled?: CancelledCallback;
-		onChanged?: ChangedCallback;
-	}>();
+	// ===== DERIVED STATE =====
+
+	const isCreateMode = $derived(!initial);
 
 	// ===== API CLIENT SETUP =====
 
@@ -156,7 +181,7 @@
 			{ component: "OfferingForm", event: "submitted" },
 			"FORM_EVENT",
 		);
-		onSubmitted?.(p.data);
+		onSubmitted?.(p);
 	}
 
 	function handleSubmitError(p: {
@@ -188,8 +213,9 @@
 		);
 		onChanged?.(p);
 	}
-
 </script>
+
+<!-- ===== FORM SHELL COMPONENT ===== -->
 
 <FormShell
 	entity="Offering"
@@ -202,7 +228,7 @@
 	onCancelled={handleCancelled}
 	onChanged={handleChanged}
 >
-	<!-- FORM HEADER -->
+	<!-- ===== FORM HEADER SECTION ===== -->
 	{#snippet header({ data, dirty })}
 		<div class="form-header">
 			<div>
@@ -223,26 +249,27 @@
 		</div>
 	{/snippet}
 
-	<!-- FORM FIELDS -->
+	<!-- ===== FORM FIELDS SECTION ===== -->
 	{#snippet fields({ data, get, getS, set, errors, markTouched })}
 		<div class="form-body">
 			<div class="form-grid">
-				<!-- Product Definition (Required) -->
+
+				<!-- ===== PRODUCT DEFINITION (Required) ===== -->
 				<div class="form-group span-4">
 					{#if false}
-						<!-- 
-					         If no offering_id => "CREATE" mode => Show available product_definitions 
-						     (== all which are not yet assigned to this supplier+category) 
-						-->
+						If no offering_id => "CREATE" mode => Show available
+						product_definitions (== all which are not yet assigned
+						to this supplier+category)
 					{/if}
-					{#if availableProducts.length > 0 && !get(["offering_id"])}
+
+					{#if isCreateMode}
 						<label for="offering-product">Product *</label>
 						<select
 							id="offering-product"
 							value={getS("product_def_id")}
 							class={errors.product_def_id ? "error" : ""}
 							onchange={(e) => {
-								log.info(
+								log.debug(
 									`onchange: Product selected: ${
 										(e.currentTarget as HTMLSelectElement)
 											.value
@@ -266,7 +293,8 @@
 							<option value="" disabled
 								>Select a product...</option
 							>
-							{#each availableProducts as product (product.product_def_id)}
+							
+							{#each availableProducts ?? [] as product (product.product_def_id)}
 								<option value={product.product_def_id}
 									>{product.title}</option
 								>
@@ -289,7 +317,7 @@
 					{/if}
 				</div>
 
-				<!-- Price & Currency -->
+				<!-- ===== PRICE & CURRENCY SECTION ===== -->
 				<div class="form-group span-2">
 					<label for="offering-price">Price</label>
 					<input
@@ -347,7 +375,7 @@
 					{/if}
 				</div>
 
-				<!-- Size & Dimensions -->
+				<!-- ===== SIZE & DIMENSIONS SECTION ===== -->
 				<div class="form-group span-2">
 					<label for="offering-size">Size</label>
 					<input
@@ -379,7 +407,7 @@
 					/>
 				</div>
 
-				<!-- Comment Section -->
+				<!-- ===== COMMENT SECTION ===== -->
 				<div class="form-group span-4">
 					<label for="offering-comment">Comment</label>
 					<textarea
@@ -397,7 +425,7 @@
 		</div>
 	{/snippet}
 
-	<!-- FORM ACTIONS -->
+	<!-- ===== FORM ACTIONS SECTION ===== -->
 	{#snippet actions({ submitAction, cancel, submitting, dirty })}
 		<div class="form-actions">
 			<button

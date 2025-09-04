@@ -33,6 +33,8 @@
 
   log.debug(`(OfferDetailAttributesPage) Loaded data:`, rawLoadedData);
 
+  // ===== VALIDATION =====
+
   let { data, errors } = $derived.by(() => {
     const result =
       OfferingDetailAttributes_LoadDataSchema.safeParse(rawLoadedData);
@@ -42,6 +44,14 @@
       isValid: result.success,
     };
   });
+
+  $effect(() => {
+    if (errors) {
+      console.log(errors); // Reaktiv!
+    }
+  });
+
+  // ===== STATE =====
 
   let selectedAttributeId: number | null = $state(null);
   let attributeValue: string = $state("");
@@ -143,7 +153,8 @@
   istself.
 {/if}
 
-{#if data}
+{#if !errors && data}
+  {#if false}Comment "&& data" for type safety{/if}
   <OfferingDetailWrapper
     initialLoadedData={data}
     availableProducts={data.availableProducts}

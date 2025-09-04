@@ -56,24 +56,6 @@
 
 	// ===== VALIDATE and show errors in UI =====
 
-	let validationError = $state<string | null>(null);
-
-	// TODO: Validate against OfferingDetailLinksAndAttribute_LoadDataSchema
-
-	if (
-		!initialLoadedData.offering &&
-		(!initialLoadedData.categoryId || !availableProducts || availableProducts.length === 0)
-	) {
-		const errorMessage =
-			"Dev-error: 'offering' (for edit-mode) or 'categoryId', 'availableProducts' (for create-mode) must be passed. All are missing.";
-
-		// Setze die reaktive Fehlervariable.
-		validationError = errorMessage;
-
-		// Logge den Fehler zusätzlich laut in der Entwicklerkonsole.
-		log.error(`[Component Contract Violation] ${errorMessage}`);
-	}
-
 	async function handleFormSubmitted(p: {
 		data: WholesalerItemOffering_ProductDef_Category;
 		result: unknown;
@@ -106,35 +88,22 @@
 	}
 </script>
 
-{#if validationError}
-	<!-- Wenn ein Fehler aufgetreten ist, zeige NUR die Fehler-UI an. -->
-	<div class="component-error-boundary">
-		<h3>Error</h3>
-		<p>
-			Component cannot be displayed because it was called with invalid
-			data.
-		</p>
-		<!-- Diese detaillierte Meldung ist super für die Entwicklung -->
-		<pre>{validationError}</pre>
+<div class="detail-page-layout">
+	<!-- Sektion 1: Das Formular zur Bearbeitung der Offering-Stammdaten -->
+	<div class="grid-section">
+		{#if false}
+			NOTE: offering can be null in "create" mode.
+		{/if}
+		<OfferingForm
+			{initialLoadedData}
+			{availableProducts}
+			onSubmitted={handleFormSubmitted}
+			onSubmitError={handleSubmitError}
+			onCancelled={handleCancelled}
+			onChanged={handleChanged}
+		/>
 	</div>
-{:else}
-	<div class="detail-page-layout">
-		<!-- Sektion 1: Das Formular zur Bearbeitung der Offering-Stammdaten -->
-		<div class="grid-section">
-			{#if false}
-				NOTE: offering can be null in "create" mode.
-			{/if}
-			<OfferingForm
-				{initialLoadedData}
-				{availableProducts}
-				onSubmitted={handleFormSubmitted}
-				onSubmitError={handleSubmitError}
-				onCancelled={handleCancelled}
-				onChanged={handleChanged}
-			/>
-		</div>
 
-		<!-- Sektion 2: Der Slot für die spezifische untergeordnete Verwaltung -->
-		{@render children()}
-	</div>
-{/if}
+	<!-- Sektion 2: Der Slot für die spezifische untergeordnete Verwaltung -->
+	{@render children()}
+</div>

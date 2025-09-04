@@ -31,6 +31,8 @@
     data: OfferingDetailLinks_LoadData;
   }>();
 
+  // ===== VALIDATION =====
+
   let { data, errors } = $derived.by(() => {
     const result = OfferingDetailLinks_LoadDataSchema.safeParse(rawLoadedData);
     return {
@@ -39,6 +41,8 @@
       isValid: result.success,
     };
   });
+
+  // ===== STATE =====
 
   let newUrl = $state("");
   let newNotes = $state("");
@@ -112,7 +116,13 @@
   };
 </script>
 
-{#if data}
+{#if false}
+  NOTE: The event handlers like "onSubmitted" are handled by the wrapper
+  istself.
+{/if}
+
+{#if !errors && data}
+  {#if false}Comment: "&& data" for type safety{/if}
   <OfferingDetailWrapper
     initialLoadedData={data}
     availableProducts={data.availableProducts}

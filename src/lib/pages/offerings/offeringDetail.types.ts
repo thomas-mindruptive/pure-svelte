@@ -16,7 +16,7 @@ export const OfferingDetail_LoadDataSchema = z.object({
         WholesalerItemOffering_ProductDef_CategorySchema.nullable().optional(),       // CREATE-mode: can be null
 });
 
-export type OfferingDetail_LoadDataSchema = z.infer<typeof OfferingDetail_LoadDataSchema>;
+export type OfferingDetail_LoadData = z.infer<typeof OfferingDetail_LoadDataSchema>;
 
 // ===== OFFERING DETAIL ATTRIBUTES LOAD DATA =====
 
@@ -39,3 +39,8 @@ export const OfferingDetailLinks_LoadDataSchema = OfferingDetail_LoadDataSchema.
 });
 
 export type OfferingDetailLinks_LoadData = z.infer<typeof OfferingDetailLinks_LoadDataSchema>;
+
+// ===== UNION OF ALL LOAD DATA =====
+export const OfferingDetailLinksAndAttribute_LoadDataSchema = OfferingDetailAttributes_LoadDataSchema.extend(OfferingDetailLinks_LoadDataSchema);
+
+export type OfferingDetailLinksAndAttribute_LoadData = z.infer<typeof OfferingDetailLinksAndAttribute_LoadDataSchema>;

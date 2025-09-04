@@ -19,7 +19,7 @@
 	import type {
 		WholesalerItemOffering,
 		ProductDefinition,
-        WholesalerItemOffering_ProductDef_Category,
+		WholesalerItemOffering_ProductDef_Category,
 	} from "$lib/domain/domainTypes";
 	import { ApiClient } from "$lib/api/client/ApiClient";
 	import { getCategoryApi } from "$lib/api/client/category";
@@ -33,6 +33,10 @@
 		ChangedCallback,
 		ValidateResult,
 	} from "$lib/components/forms/forms.types";
+	import {
+		type OfferingDetail_LoadData,
+		OfferingDetail_LoadDataSchema,
+	} from "$lib/pages/offerings/offeringDetail.types";
 
 	// ===== INTERNAL TYPES =====
 
@@ -46,17 +50,11 @@
 	 * - EDIT mode: initial contains existing offering data, availableProducts may be null
 	 */
 	interface OfferingFormProps {
-		// Supplier/Wholesaler ID  - mandatory for both create and edit modes
-		supplierId: number;
-
-		// Category ID - mandatory for both create and edit modes
-		categoryId: number;
+		// Initial loaded data - will be validated against schema
+		initialLoadedData: OfferingDetail_LoadData;
 
 		// Available products for CREATE mode dropdown. Is null or undefined in EDIT mode
 		availableProducts?: ProductDefinition[] | null | undefined;
-
-		// Initial data; presence determines create/edit mode
-		initialOfferingData?: WholesalerItemOffering_ProductDef_Category | undefined | null;
 
 		// Form disabled state
 		disabled?: boolean;
@@ -71,10 +69,8 @@
 	// ===== COMPONENT PROPS =====
 
 	let {
-		supplierId,
-		categoryId,
+		initialLoadedData,
 		availableProducts = [] as ProductDefinition[],
-		initialOfferingData: initial,
 		disabled = false,
 		onSubmitted,
 		onSubmitError,
@@ -84,18 +80,28 @@
 
 	// ===== Schema validation =====
 
-	// let { data, errors } = $derived.by(() => {
-	// 	const result = OfferingDetailAttributes.safeParse(rawData);
-	// 	return {
-	// 		data: result.success ? result.data : null,
-	// 		errors: result.success ? null : result.error.issues,
-	// 		isValid: result.success,
-	// 	};
-	// });
+	let { supplierId, categoryId, initialValidatedOfferingData, validatedData, errors } = $derived.by(
+		() => {
+			const result =
+				OfferingDetail_LoadDataSchema.safeParse(initialLoadedData);
+			return {
+				validatedData: result.success ? result.data : null,
+				errors: result.success ? null : result.error.issues,
+				isValid: result.success,
+				initialValidatedOfferingData: result.success
+					? (result.data?.offering ?? null)
+					: null,
+				supplierId: result.success ? (result.data?.supplierId ?? null) : null,
+				categoryId: result.success ? (result.data?.categoryId ?? null) : null,
+			};
+		},
+	);
+	void validatedData;
+	void errors
 
 	// ===== DERIVED STATE =====
 
-	const isCreateMode = $derived(!initial);
+	const isCreateMode = $derived(!initialValidatedOfferingData);
 
 	// ===== API CLIENT SETUP =====
 
@@ -140,6 +146,15 @@
 	 */
 	async function submitOffering(raw: Record<string, any>) {
 		const isUpdateMode = !isCreateMode;
+
+		if (!supplierId || !categoryId) {
+			const errorMsg =
+				"Cannot submit offering: Missing supplierId or categoryId context. " +
+				"This should never happen if the component is used correctly." + 
+				" => OfferingDetail_LoadDataSchema validation should have caught it. ";
+			log.error(`(OfferingForm) ${errorMsg}`, { raw });
+			throw new Error(errorMsg);
+		}
 
 		// Ensure contextual IDs are included in the data payload.
 		const dataToSubmit: Omit<WholesalerItemOffering, "offering_id"> = {
@@ -225,7 +240,7 @@
 
 <FormShell
 	entity="Offering"
-	initial={initial as WholesalerItemOffering_ProductDef_Category}
+	initial={initialValidatedOfferingData as WholesalerItemOffering_ProductDef_Category}
 	validate={validateOffering}
 	submitCbk={submitOffering}
 	{disabled}

@@ -2,7 +2,7 @@
 <script lang="ts">
 	import type {
 		ProductDefinition,
-        WholesalerItemOffering_ProductDef_Category,
+		WholesalerItemOffering_ProductDef_Category,
 	} from "$lib/domain/domainTypes";
 
 	import type { Snippet } from "svelte";
@@ -16,13 +16,15 @@
 		SubmitErrorCallback,
 		SubmittedCallback,
 	} from "$lib/components/forms/forms.types";
-    import { addNotification } from "$lib/stores/notifications";
+	import { addNotification } from "$lib/stores/notifications";
 	import OfferingForm from "./OfferingForm.svelte";
-  
+	import type {
+		OfferingDetailAttributes_LoadData,
+		OfferingDetailLinks_LoadData,
+	} from "$lib/pages/offerings/offeringDetail.types";
+
 	const {
-		supplierId,
-		categoryId,		// Especially needed for "create" mode.
-		initialOfferingData: offering,
+		initialLoadedData,
 		availableProducts,
 		children,
 
@@ -32,12 +34,11 @@
 		onCancelled,
 		onChanged,
 	}: {
-		supplierId: number;
-		categoryId: number;
-		initialOfferingData?: WholesalerItemOffering_ProductDef_Category | undefined | null;
+		initialLoadedData:
+			| OfferingDetailLinks_LoadData
+			| OfferingDetailAttributes_LoadData;
 		availableProducts: ProductDefinition[] | null | undefined;
 		children: Snippet;
-
 		onSubmitted?: SubmittedCallback;
 		onSubmitError?: SubmitErrorCallback;
 		onCancelled?: CancelledCallback;
@@ -51,13 +52,18 @@
 	void onCancelled;
 	void onChanged;
 
-	log.debug(`(OfferingDetailWrapper) Loaded props:`, {offering,categoryId, availableProducts});
+	log.debug(`(OfferingDetailWrapper) Loaded props:`, { initialLoadedData });
 
 	// ===== VALIDATE and show errors in UI =====
 
 	let validationError = $state<string | null>(null);
 
-	if (!offering && (!categoryId ||!availableProducts || availableProducts.length === 0)) {
+	// TODO: Validate against OfferingDetailLinksAndAttribute_LoadDataSchema
+
+	if (
+		!initialLoadedData.offering &&
+		(!initialLoadedData.categoryId || !availableProducts || availableProducts.length === 0)
+	) {
 		const errorMessage =
 			"Dev-error: 'offering' (for edit-mode) or 'categoryId', 'availableProducts' (for create-mode) must be passed. All are missing.";
 
@@ -68,22 +74,34 @@
 		log.error(`[Component Contract Violation] ${errorMessage}`);
 	}
 
-	async function handleFormSubmitted(p: {data: WholesalerItemOffering_ProductDef_Category;result: unknown;}): Promise<void> {
+	async function handleFormSubmitted(p: {
+		data: WholesalerItemOffering_ProductDef_Category;
+		result: unknown;
+	}): Promise<void> {
 		log.info(`(OfferDetailAttributesPage) Form submitted successfully`, p);
 		addNotification("Form submitted successfully.", "success");
 	}
 
-	async function handleSubmitError(p: {data: WholesalerItemOffering_ProductDef_Category; reason?: string;}): Promise<void> {
+	async function handleSubmitError(p: {
+		data: WholesalerItemOffering_ProductDef_Category;
+		reason?: string;
+	}): Promise<void> {
 		log.info(`(OfferDetailAttributesPage) Form submission error`, p);
 		addNotification("Form submission error.", "error");
 	}
 
-	async function handleCancelled(p: {data: WholesalerItemOffering_ProductDef_Category; reason?: string;}): Promise<void> {
+	async function handleCancelled(p: {
+		data: WholesalerItemOffering_ProductDef_Category;
+		reason?: string;
+	}): Promise<void> {
 		log.info(`(OfferDetailAttributesPage) Form submission cancelled`, p);
 		addNotification("Form submission cancelled.", "info");
 	}
 
-	async function handleChanged(info: {data: WholesalerItemOffering_ProductDef_Category; dirty: boolean }): Promise<void> {
+	async function handleChanged(info: {
+		data: WholesalerItemOffering_ProductDef_Category;
+		dirty: boolean;
+	}): Promise<void> {
 		log.info(`(OfferDetailAttributesPage) Form changed`, info);
 	}
 </script>
@@ -107,9 +125,7 @@
 				NOTE: offering can be null in "create" mode.
 			{/if}
 			<OfferingForm
-				initialOfferingData={offering}
-				supplierId={supplierId}
-				categoryId={categoryId}
+				{initialLoadedData}
 				{availableProducts}
 				onSubmitted={handleFormSubmitted}
 				onSubmitError={handleSubmitError}

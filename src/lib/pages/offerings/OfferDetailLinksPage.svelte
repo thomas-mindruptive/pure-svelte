@@ -27,7 +27,9 @@
     type OfferingDetailLinks_LoadData,
   } from "./offeringDetail.types";
 
-  let { data: rawLoadedData } = $props<{ data: OfferingDetailLinks_LoadData }>();
+  let { data: rawLoadedData } = $props<{
+    data: OfferingDetailLinks_LoadData;
+  }>();
 
   let { data, errors } = $derived.by(() => {
     const result = OfferingDetailLinks_LoadDataSchema.safeParse(rawLoadedData);
@@ -112,9 +114,7 @@
 
 {#if data}
   <OfferingDetailWrapper
-    supplierId={data.supplierId}  
-    categoryId={data.categoryId}
-    initialOfferingData={data.offering}
+    initialLoadedData={data}
     availableProducts={data.availableProducts}
   >
     <!-- Der spezifische Inhalt dieser Seite kommt in den Default Slot -->

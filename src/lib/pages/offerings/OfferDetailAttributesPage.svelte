@@ -27,12 +27,15 @@
     type OfferingDetailAttributes_LoadData,
   } from "./offeringDetail.types";
 
-  let { data: rawLoadedData } = $props<{ data: OfferingDetailAttributes_LoadData }>();
+  let { data: rawLoadedData } = $props<{
+    data: OfferingDetailAttributes_LoadData;
+  }>();
 
   log.debug(`(OfferDetailAttributesPage) Loaded data:`, rawLoadedData);
 
   let { data, errors } = $derived.by(() => {
-    const result = OfferingDetailAttributes_LoadDataSchema.safeParse(rawLoadedData);
+    const result =
+      OfferingDetailAttributes_LoadDataSchema.safeParse(rawLoadedData);
     return {
       data: result.success ? result.data : null,
       errors: result.success ? null : result.error.issues,
@@ -142,9 +145,7 @@
 
 {#if data}
   <OfferingDetailWrapper
-    supplierId={data.supplierId}
-    categoryId={data.categoryId}
-    initialOfferingData={data.offering}
+    initialLoadedData={data}
     availableProducts={data.availableProducts}
   >
     <!-- Der spezifische Inhalt dieser Seite kommt in den Default Slot -->

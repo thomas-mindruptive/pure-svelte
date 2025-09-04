@@ -22,7 +22,7 @@
 	const {
 		supplierId,
 		categoryId,		// Especially needed for "create" mode.
-		offering,
+		initialOfferingData: offering,
 		availableProducts,
 		children,
 
@@ -34,7 +34,7 @@
 	}: {
 		supplierId: number;
 		categoryId: number;
-		offering?: WholesalerItemOffering_ProductDef_Category | undefined | null;
+		initialOfferingData?: WholesalerItemOffering_ProductDef_Category | undefined | null;
 		availableProducts: ProductDefinition[] | null | undefined;
 		children: Snippet;
 
@@ -107,7 +107,7 @@
 				NOTE: offering can be null in "create" mode.
 			{/if}
 			<OfferingForm
-				initial={offering}
+				initialOfferingData={offering}
 				supplierId={supplierId}
 				categoryId={categoryId}
 				{availableProducts}

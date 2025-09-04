@@ -4,6 +4,7 @@ import { ApiClient } from '$lib/api/client/ApiClient';
 import { getOfferingApi } from '$lib/api/client/offering';
 import { log } from '$lib/utils/logger';
 import { error, type LoadEvent } from '@sveltejs/kit';
+import type { OfferingDetailLinks_LoadData } from './offeringDetail.types';
 
 
 /**
@@ -59,13 +60,15 @@ export async function load({ params, fetch: fetchLoad }: LoadEvent) {
       // and have NOT YET been assigned to supplier.
       const availableProducts = await offeringApi.getAvailableProductDefsForOffering(categoryId, supplierId);
 
-      return {
+      const loadData: OfferingDetailLinks_LoadData = {
         supplierId, // Always pass from the params.
         categoryId, // Always pass from the params.
         offering: null, // No initial offering to edit
         links: [],
         availableProducts: availableProducts // Only the "remaining" products
       };
+
+      return loadData;
     }
   } catch (err: any) {
     log.error(`Failed to load data for offeringId: ${offeringId}`, err);

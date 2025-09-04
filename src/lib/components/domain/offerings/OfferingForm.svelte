@@ -56,7 +56,7 @@
 		availableProducts?: ProductDefinition[] | null | undefined;
 
 		// Initial data; presence determines create/edit mode
-		initial?: WholesalerItemOffering_ProductDef_Category | undefined | null;
+		initialOfferingData?: WholesalerItemOffering_ProductDef_Category | undefined | null;
 
 		// Form disabled state
 		disabled?: boolean;
@@ -74,7 +74,7 @@
 		supplierId,
 		categoryId,
 		availableProducts = [] as ProductDefinition[],
-		initial,
+		initialOfferingData: initial,
 		disabled = false,
 		onSubmitted,
 		onSubmitError,

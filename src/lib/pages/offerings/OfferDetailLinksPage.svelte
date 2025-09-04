@@ -27,10 +27,10 @@
     type OfferingDetailLinks_LoadData,
   } from "./offeringDetail.types";
 
-  let { data: rawData } = $props<{ data: OfferingDetailLinks_LoadData }>();
+  let { data: rawLoadedData } = $props<{ data: OfferingDetailLinks_LoadData }>();
 
   let { data, errors } = $derived.by(() => {
-    const result = OfferingDetailLinks_LoadDataSchema.safeParse(rawData);
+    const result = OfferingDetailLinks_LoadDataSchema.safeParse(rawLoadedData);
     return {
       data: result.success ? result.data : null,
       errors: result.success ? null : result.error.issues,
@@ -114,7 +114,7 @@
   <OfferingDetailWrapper
     supplierId={data.supplierId}  
     categoryId={data.categoryId}
-    offering={data.offering}
+    initialOfferingData={data.offering}
     availableProducts={data.availableProducts}
   >
     <!-- Der spezifische Inhalt dieser Seite kommt in den Default Slot -->

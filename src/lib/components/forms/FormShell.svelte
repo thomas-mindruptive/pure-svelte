@@ -3,7 +3,6 @@
   generics="T extends Record<string, any> = Record<string, any>"
 >
   // FormShell (Svelte 5 + Runes) - FIXED structuredClone Issue
-  // - English comments
   // - Owns data state, dirty/touched tracking, validation, submit/cancel orchestration
   // - Callback props for component events (recommended in Svelte 5):
   //     onSubmitted({ data, result })
@@ -40,7 +39,7 @@
     ChangedCallback,
   } from "./forms.types";
   import type { FormData } from "./forms.types";
-    import { assertDefined } from "$lib/utils/validation/assertions";
+  import { assertDefined } from "$lib/utils/validation/assertions";
 
   // ===== FORM HANDLER TYPES =====
 
@@ -57,14 +56,14 @@
     // Not needed currently: setS<K extends keyof FormData<T>>(key: K, value: T[K]): void;
     set<P extends NonEmptyPath<FormData<T>>>(
       path: readonly [...P],
-      value: PathValue<T, P>
+      value: PathValue<T, P>,
     ): void;
 
     get<P extends NonEmptyPath<FormData<T>>>(
       path: readonly [...P],
     ): PathValue<FormData<T>, P> | undefined;
 
-    getS<K extends keyof FormData<T>>(key: K): T;
+    getS<K extends keyof FormData<T>>(key: K): FormData<T>[K] | undefined;
 
     errors: Errors;
     touched: Set<string>;
@@ -72,7 +71,7 @@
     validate: (path?: string) => Promise<boolean>;
   };
 
-   type ActionsProps = {
+  type ActionsProps = {
     submitAction: () => Promise<void>;
     cancel: () => void;
     submitting: boolean;
@@ -88,9 +87,9 @@
   const {
     // Data & lifecycle
     initial = {} as FormData<T>,
-    validate,   // optional: (data) => { valid, errors? }
-    submitCbk,  // required
-    onCancel,   // optional (simple callback on cancel)
+    validate, // optional: (data) => { valid, errors? }
+    submitCbk, // required
+    onCancel, // optional (simple callback on cancel)
     autoValidate = "submit" as "submit" | "blur" | "change",
     disabled = false,
     formId = "form",
@@ -129,7 +128,7 @@
     onChanged?: ChangedCallback<T>;
   }>();
 
-   log.debug(`(FormShell) props:`, {
+  log.debug(`(FormShell) props:`, {
     entity,
     initial,
     autoValidate,
@@ -153,6 +152,7 @@
     } catch (error) {
       log.warn("structuredClone failed, using JSON fallback", {
         entity,
+        obj,
         error: String(error),
       });
 
@@ -203,7 +203,7 @@
   }
 
   // ---- State (Runes) ----
-  const cleanInitial = createSnapshot(initial);
+  const cleanInitial = createSnapshot(initial ?? ({} as FormData<T>));
   const data = $state<FormData<T>>(safeClone(cleanInitial) as any);
   const snapshot = $state<FormData<T>>(safeClone(cleanInitial) as any); // for dirty check
   const errors = $state<Errors>({});
@@ -212,6 +212,37 @@
   let validating = $state(false);
 
   let formEl: HTMLFormElement;
+
+  const headerProps = $derived.by(
+    (): HeaderProps<T> => ({
+      data,
+      dirty: isDirty(),
+    }),
+  );
+
+  const fieldsProps = $derived.by(
+    (): FieldsProps<T> => ({
+      data,
+      set: handleInput,
+      get,
+      getS,
+      errors,
+      touched,
+      markTouched,
+      validate: runValidate,
+    }),
+  );
+  // ---- Type-safe Actions Props ----
+  const actionsProps = $derived.by(
+    (): ActionsProps => ({
+      submitAction: doSubmit,
+      cancel: () => doCancel("button"),
+      submitting,
+      valid: Object.keys(errors).length === 0,
+      dirty: isDirty(),
+      disabled,
+    }),
+  );
 
   // ---- Keybindings (programmatic to avoid a11y warning) ----
   onMount(() => {
@@ -266,7 +297,10 @@
   //   }
   // }
 
-  function internalSet<P extends NonEmptyPath<FormData<T>>>(path: readonly [...P], value: PathValue<FormData<T>, P>) {
+  function internalSet<P extends NonEmptyPath<FormData<T>>>(
+    path: readonly [...P],
+    value: PathValue<FormData<T>, P>,
+  ) {
     try {
       pathUtils.set<FormData<T>, P>(data, path, value);
     } catch (e) {
@@ -294,7 +328,9 @@
     }
   }
 
-  function getS<K extends keyof FormData<T>>(key: K): T | undefined {
+  function getS<K extends keyof FormData<T>>(
+    key: K,
+  ): FormData<T>[K] | undefined {
     try {
       const res = pathUtils.get(data, key);
       return res;
@@ -481,9 +517,9 @@
   }
 
   function handleInput<P extends NonEmptyPath<FormData<T>>>(
-      path: readonly [...P],
-      value: PathValue<T, P>
-    ): void {
+    path: readonly [...P],
+    value: PathValue<T, P>,
+  ): void {
     internalSet(path, value);
 
     try {
@@ -514,7 +550,7 @@
   <!-- Header area -->
   <div class="pc-grid__toolbar">
     {#if header}
-      {@render header({ data, dirty: isDirty() })}
+      {@render header(headerProps)}
     {:else}
       <!-- Default header (can be overridden) -->
       <strong>{entity}</strong>
@@ -535,16 +571,7 @@
   <!-- Fields region -->
   <div class="pc-grid__scroller" style="padding: 0.5rem 0.75rem;">
     {#if fields}
-      {@render fields({
-        data,
-        set: handleInput /* set(path, value) + fires 'changed' + optional auto-validate */,
-        get,
-        getS,
-        errors,
-        touched,
-        markTouched,
-        validate: runValidate,
-      })}
+      {@render fields(fieldsProps)}
     {:else}
       <em style="color: var(--pc-grid-muted);">No fields snippet provided</em>
     {/if}
@@ -553,14 +580,7 @@
   <!-- Footer / actions -->
   <div class="pc-grid__toolbar" style="justify-content: end; gap: .5rem;">
     {#if actions}
-      {@render actions({
-        submit: doSubmit,
-        cancel: () => doCancel("button"),
-        submitting,
-        valid: Object.keys(errors).length === 0,
-        dirty: isDirty(),
-        disabled,
-      })}
+      {@render actions(actionsProps)}
     {:else}
       <button
         class="pc-grid__btn"

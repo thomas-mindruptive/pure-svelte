@@ -38,7 +38,7 @@
 		OfferingDetail_LoadDataSchema,
 	} from "$lib/pages/offerings/offeringDetail.types";
 	import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
-    import { assertDefined } from "$lib/utils/validation/assertions";
+	import { assertDefined } from "$lib/utils/validation/assertions";
 
 	// ===== INTERNAL TYPES =====
 
@@ -120,10 +120,7 @@
 		if (errors) {
 			log.error(`(OfferingForm) Validation errors:`, errors);
 		} else {
-			log.debug(
-				`(OfferingForm) Validated data OK:`,
-				validatedData,
-			);
+			log.debug(`(OfferingForm) Validated data OK:`, validatedData);
 		}
 	});
 
@@ -244,7 +241,7 @@
 		data: Record<string, any>;
 		error: unknown;
 	}) {
-		assertDefined
+		assertDefined;
 		log.warn(`Submit error: ${String(p.error)}`, {
 			component: "OfferingForm",
 			event: "submitError",
@@ -491,6 +488,14 @@
 
 		<!-- ===== FORM ACTIONS SECTION ===== -->
 		{#snippet actions({ submitAction, cancel, submitting, dirty })}
+			{assertDefined(
+				submitAction,
+				"OfferingForm, actions snippet, submitAction",
+			)}
+			{assertDefined(cancel, "OfferingForm, actions snippet, cancel")}
+			{#if false}
+				DO NOT assert boolean! (submitting and dirty)
+			{/if}
 			<div class="form-actions">
 				<button
 					class="secondary-button"
@@ -503,7 +508,13 @@
 				<button
 					class="primary-button"
 					type="button"
-					onclick={() => submitAction()}
+					onclick={() => {
+						log.debug(
+							`OfferingForm: Save button clicked, calling submitAction()`,
+							submitAction,
+						);
+						submitAction();
+					}}
 					disabled={!dirty || submitting}
 					aria-busy={submitting}
 				>

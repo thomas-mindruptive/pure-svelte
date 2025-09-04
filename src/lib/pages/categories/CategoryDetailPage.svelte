@@ -21,7 +21,11 @@
   } from "$lib/domain/domainTypes";
 
   import { ApiClient } from "$lib/api/client/ApiClient";
-    import type { ID, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
+  import type {
+    ID,
+    DeleteStrategy,
+    RowActionStrategy,
+  } from "$lib/components/grids/Datagrid.types";
 
   // Daten aus der `load`-Funktion
   type LoadData = {
@@ -31,6 +35,10 @@
     assignmentLink?: string;
   };
   let { data } = $props<{ data: LoadData }>();
+  log.info("(CategoryDetailPage) Loaded data:", data);
+  if (!data.category) {
+    log.error("(CategoryDetailPage) data.category is undefined.", data);
+  }
 
   /**
    * Handler zum Löschen von Angeboten.
@@ -103,53 +111,61 @@
     };
 </script>
 
-<div class="detail-page-layout">
-  <div class="detail-header-section">
-    <h1>Offerings in "{data.category.name}"</h1>
-    <p>
-      {data.category.description ||
-        "No description available for this category."}
-    </p>
-    {#if data.assignmentComment}
-      <p class="comment">
-        <strong>Supplier Notes:</strong>
-        {data.assignmentComment}
+{#if data?.category}
+  <div class="detail-page-layout">
+    <div class="detail-header-section">
+      <h1>Offerings in "{data.category.name}"</h1>
+      <p>
+        {data.category.description ||
+          "No description available for this category."}
       </p>
-    {/if}
+      {#if data.assignmentComment}
+        <p class="comment">
+          <strong>Supplier Notes:</strong>
+          {data.assignmentComment}
+        </p>
+      {/if}
+    </div>
+
+    <div class="grid-section">
+      <button class="pc-grid__createbtn" onclick={handleOfferingCreate}
+        >Create Offering</button
+      >
+      <OfferingGrid
+        rows={data.offerings}
+        loading={$categoryLoadingState}
+        {deleteStrategy}
+        {rowActionStrategy}
+      />
+    </div>
   </div>
 
-  <div class="grid-section">
-    <button class="pc-grid__createbtn" onclick={handleOfferingCreate}
-      >Create Offering</button
-    >
-    <OfferingGrid
-      rows={data.offerings}
-      loading={$categoryLoadingState}
-      {deleteStrategy}
-      {rowActionStrategy}
-    />
-  </div>
-</div>
-
-<style>
-  h1 {
-    margin: 0;
-  }
-  p {
-    margin: 0.5rem 0 0 0;
-    color: var(--color-muted);
-    max-width: 80ch;
-  }
-  .comment {
-    font-style: italic;
-    margin-top: 0.75rem;
-    border-left: 3px solid var(--color-primary);
-    padding-left: 1rem;
-    background-color: color-mix(in srgb, var(--color-primary) 5%, transparent);
-  }
-  .grid-section {
-    background: var(--color-background);
-    border-radius: 8px;
-    border: 1px solid var(--color-border);
-  }
-</style>
+  <style>
+    h1 {
+      margin: 0;
+    }
+    p {
+      margin: 0.5rem 0 0 0;
+      color: var(--color-muted);
+      max-width: 80ch;
+    }
+    .comment {
+      font-style: italic;
+      margin-top: 0.75rem;
+      border-left: 3px solid var(--color-primary);
+      padding-left: 1rem;
+      background-color: color-mix(
+        in srgb,
+        var(--color-primary) 5%,
+        transparent
+      );
+    }
+    .grid-section {
+      background: var(--color-background);
+      border-radius: 8px;
+      border: 1px solid var(--color-border);
+    }
+  </style>
+{:else}
+  <div>Loading...</div>
+{/if}

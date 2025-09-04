@@ -36,12 +36,12 @@ export function assertDefined<T>(
   ...paths: pathUtils.NonEmptyPath<T>[]
 ): asserts obj is T {
   if (!obj) {
-    throw new Error(message);
+    throw new Error(`Validation failed: ${message} (object is null or undefined)`);
   }
   
   for (const path of paths) {
     if (!pathUtils.has(obj, path)) {
-      throw new Error(`${message}: Path [${(path as readonly PropertyKey[]).join('.')}] does not exist or is undefined`);
+      throw new Error(`Validation failed: ${message}: Path [${(path as readonly PropertyKey[]).join('.')}] does not exist or is undefined`);
     }
   }
 }

@@ -47,16 +47,16 @@
 	 * - EDIT mode: initial contains existing offering data, availableProducts may be null
 	 */
 	interface OfferingFormProps {
-		// Supplier/Wholesaler ID  - required for creating new offerings
+		// Supplier/Wholesaler ID  - mandatory for both create and edit modes
 		supplierId: number;
 
-		// Category ID - required for creating new offerings
+		// Category ID - mandatory for both create and edit modes
 		categoryId: number;
 
 		// Available products for CREATE mode dropdown. Is null or undefined in EDIT mode
 		availableProducts?: ProductDefinition[] | null | undefined;
 
-		// Initial data; presence of 'offering_id' determines create/edit mode
+		// Initial data; presence determines create/edit mode
 		initial?: OfferingFormData | undefined | null;
 
 		// Form disabled state
@@ -72,17 +72,11 @@
 	// ===== COMPONENT PROPS =====
 
 	let {
-		// Context IDs are required for creating a new offering.
 		supplierId,
 		categoryId,
-
-		// The list of products that can be selected for this offering.
 		availableProducts = [] as ProductDefinition[],
-
 		initial,
 		disabled = false,
-
-		// Svelte 5 component-callback props
 		onSubmitted,
 		onSubmitError,
 		onCancelled,
@@ -135,8 +129,7 @@
 	 * Handles form submission, detecting create vs. update mode.
 	 */
 	async function submitOffering(raw: Record<string, any>) {
-		const id = raw.offering_id as number | undefined;
-		const isUpdate = !!id;
+		const isUpdateMode = !isCreateMode;
 
 		// Ensure contextual IDs are included in the data payload.
 		const dataToSubmit: Omit<WholesalerItemOffering, "offering_id"> = {
@@ -146,14 +139,14 @@
 		};
 
 		log.info(`(OfferingForm) Submitting to category API...`, {
-			isUpdate,
-			id,
+			isUpdate: isUpdateMode,
+			raw
 		});
 
 		try {
 			let offering;
-			if (isUpdate) {
-				offering = await categoryApi.updateOffering(id!, dataToSubmit);
+			if (isUpdateMode) {
+				offering = await categoryApi.updateOffering(raw.id!, dataToSubmit);
 			} else {
 				offering = await categoryApi.createOfferingForCategory(
 					categoryId,
@@ -161,8 +154,8 @@
 				);
 			}
 			log.info(`(OfferingForm) Submitted successfully to category API`, {
-				isUpdate,
-				id,
+				isUpdate: isUpdateMode,
+				raw
 			});
 			return offering;
 		} catch (e) {

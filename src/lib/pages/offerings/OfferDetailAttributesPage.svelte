@@ -8,9 +8,7 @@
     getOfferingApi,
     offeringLoadingState,
   } from "$lib/api/client/offering";
-  import {
-    type WholesalerOfferingAttribute_Attribute,
-  } from "$lib/domain/domainTypes";
+  import { type WholesalerOfferingAttribute_Attribute } from "$lib/domain/domainTypes";
 
   import "$lib/components/styles/assignment-section.css";
   import "$lib/components/styles/grid-section.css";
@@ -24,11 +22,23 @@
     DeleteStrategy,
     RowActionStrategy,
   } from "$lib/components/grids/Datagrid.types";
-  import type { OfferingDetailAttributes_LoadData } from "./offeringDetail.types";
+  import {
+    OfferingDetailAttributes_LoadDataSchema,
+    type OfferingDetailAttributes_LoadData,
+  } from "./offeringDetail.types";
 
-  let { data } = $props<{ data: OfferingDetailAttributes_LoadData }>();
+  let { rawData } = $props<{ data: OfferingDetailAttributes_LoadData }>();
 
-  log.debug(`(OfferDetailAttributesPage) Loaded data:`, data);
+  log.debug(`(OfferDetailAttributesPage) Loaded data:`, rawData);
+
+  let { data, errors } = $derived.by(() => {
+    const result = OfferingDetailAttributes_LoadDataSchema.safeParse(rawData);
+    return {
+      data: result.success ? result.data : null,
+      errors: result.success ? null : result.error.issues,
+      isValid: result.success,
+    };
+  });
 
   let selectedAttributeId: number | null = $state(null);
   let attributeValue: string = $state("");
@@ -79,6 +89,20 @@
       addNotification("Please select an attribute.", "error");
       return;
     }
+    if (!data) {
+      addNotification(
+        "No valid data available. Probably validation failed",
+        "error",
+      );
+      return;
+    }
+    if (!data.offering) {
+      addNotification(
+        "No offering available. Probably CREATE mode => Cannot assign link.",
+        "error",
+      );
+      return;
+    }
     isAssigning = true;
     try {
       const assignmentData = {
@@ -116,45 +140,54 @@
   istself.
 {/if}
 
-<OfferingDetailWrapper
-  supplierId={data.supplierId}
-  categoryId={data.categoryId}
-  offering={data.offering}
-  availableProducts={data.availableProducts}
->
-  <!-- Der spezifische Inhalt dieser Seite kommt in den Default Slot -->
-  <div class="grid-section">
-    <div class="assignment-section">
-      <h3>Assign New Attribute</h3>
-      <form class="assignment-form" onsubmit={handleAssignAttribute}>
-        <select bind:value={selectedAttributeId} disabled={isAssigning}>
-          <option value={null}>Select an attribute...</option>
-          {#each data.availableAttributes as attr (attr.attribute_id)}
-            <option value={attr.attribute_id}>{attr.name}</option>
-          {/each}
-        </select>
-        <input
-          type="text"
-          placeholder="Value (e.g., 'Red')"
-          bind:value={attributeValue}
-          disabled={isAssigning}
-        />
-        <button
-          type="submit"
-          class="primary-button"
-          disabled={isAssigning || !selectedAttributeId}
-        >
-          {isAssigning ? "Assigning..." : "Assign"}
-        </button>
-      </form>
-    </div>
+{#if data}
+  <OfferingDetailWrapper
+    supplierId={data.supplierId}
+    categoryId={data.categoryId}
+    offering={data.offering}
+    availableProducts={data.availableProducts}
+  >
+    <!-- Der spezifische Inhalt dieser Seite kommt in den Default Slot -->
+    <div class="grid-section">
+      <div class="assignment-section">
+        <h3>Assign New Attribute</h3>
+        <form class="assignment-form" onsubmit={handleAssignAttribute}>
+          <select bind:value={selectedAttributeId} disabled={isAssigning}>
+            <option value={null}>Select an attribute...</option>
+            {#each data.availableAttributes as attr (attr.attribute_id)}
+              <option value={attr.attribute_id}>{attr.name}</option>
+            {/each}
+          </select>
+          <input
+            type="text"
+            placeholder="Value (e.g., 'Red')"
+            bind:value={attributeValue}
+            disabled={isAssigning}
+          />
+          <button
+            type="submit"
+            class="primary-button"
+            disabled={isAssigning || !selectedAttributeId}
+          >
+            {isAssigning ? "Assigning..." : "Assign"}
+          </button>
+        </form>
+      </div>
 
-    <h2 style="margin-top: 1.5rem;">Assigned Attributes</h2>
-    <AttributeGrid
-      rows={data.assignedAttributes}
-      loading={$offeringLoadingState}
-      {deleteStrategy}
-      {rowActionStrategy}
-    />
+      <h2 style="margin-top: 1.5rem;">Assigned Attributes</h2>
+      <AttributeGrid
+        rows={data.assignedAttributes}
+        loading={$offeringLoadingState}
+        {deleteStrategy}
+        {rowActionStrategy}
+      />
+    </div>
+  </OfferingDetailWrapper>
+{:else if errors}
+  <div class="component-error-boundary">
+    <h3>Error</h3>
+    {#each errors as error}
+      <p>{error.path.join(".")}: {error.message}</p>
+    {/each}
   </div>
-</OfferingDetailWrapper>
+{/if}

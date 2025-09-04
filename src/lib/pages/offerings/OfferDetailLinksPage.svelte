@@ -42,6 +42,17 @@
     };
   });
 
+  $effect(() => {
+    if (errors) {
+      console.error(`(OfferDetailLinksPage) Validation errors:`, errors);
+    } else {
+      log.debug(
+        `(OfferDetailLinksPage) Validated data OK:`,
+        data,
+      );
+    }
+  });
+
   // ===== STATE =====
 
   let newUrl = $state("");

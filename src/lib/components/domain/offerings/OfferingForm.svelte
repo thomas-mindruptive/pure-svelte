@@ -35,9 +35,9 @@
 	} from "$lib/components/forms/forms.types";
 	import {
 		type OfferingDetail_LoadData,
-		OfferingDetailLinksAndAttribute_LoadDataSchema,
+		OfferingDetail_LoadDataSchema,
 	} from "$lib/pages/offerings/offeringDetail.types";
-	import ValidationWrapper from "$lib/components/validation/validationWrapper.svelte";
+	import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
 
 	// ===== INTERNAL TYPES =====
 
@@ -84,7 +84,6 @@
 		availableProducts,
 		disabled,
 	});
-	// ===== Schema validation =====
 
 	/**
 	 * The schema validates all keys and also conditional dependencies:
@@ -99,9 +98,7 @@
 		validatedData,
 	} = $derived.by(() => {
 		const result =
-			OfferingDetailLinksAndAttribute_LoadDataSchema.safeParse(
-				initialLoadedData,
-			);
+			OfferingDetail_LoadDataSchema.safeParse(initialLoadedData);
 		return {
 			validatedData: result.success ? result.data : null,
 			errors: result.success ? null : result.error.issues,
@@ -118,6 +115,17 @@
 		};
 	});
 
+	$effect(() => {
+		if (errors) {
+			console.error(`(OfferingForm) Validation errors:`, errors);
+		} else {
+			log.debug(
+				`(OfferingForm) Validated data OK:`,
+				validatedData,
+			);
+		}
+	});
+
 	// ===== DERIVED STATE =====
 
 	const isCreateMode = $derived(!initialValidatedOfferingData);
@@ -132,7 +140,9 @@
 	/**
 	 * Validates the offering form data against business rules.
 	 */
-	function validateOffering(raw: Record<string, any>): ValidateResult {
+	function validateOfferingForSubmit(
+		raw: Record<string, any>,
+	): ValidateResult {
 		const data = raw as WholesalerItemOffering_ProductDef_Category;
 		const errors: ValidationErrors = {};
 
@@ -258,254 +268,243 @@
 <!-- ===== FORM SHELL COMPONENT ===== -->
 
 <ValidationWrapper {errors} data={validatedData}>
-	{#if !errors}
-		<FormShell
-			entity="Offering"
-			initial={initialValidatedOfferingData as WholesalerItemOffering_ProductDef_Category}
-			validate={validateOffering}
-			submitCbk={submitOffering}
-			{disabled}
-			onSubmitted={handleSubmitted}
-			onSubmitError={handleSubmitError}
-			onCancelled={handleCancelled}
-			onChanged={handleChanged}
-		>
-			<!-- ===== FORM HEADER SECTION ===== -->
-			{#snippet header({ data, dirty })}
-				<div class="form-header">
-					<div>
-						{#if data.offering_id}
-							<h3>
-								{data.product_def_title || "Unnamed Product"}
-							</h3>
-						{:else}
-							<h3>New Product Offering</h3>
-						{/if}
-						<span class="field-hint">ID: {data.offering_id}</span>
-					</div>
-					<div>
-						{#if dirty}
-							<span class="pc-grid__badge pc-grid__badge--warn"
-								>Unsaved changes</span
-							>
-						{/if}
-					</div>
+	<FormShell
+		entity="Offering"
+		initial={initialValidatedOfferingData as WholesalerItemOffering_ProductDef_Category}
+		validate={validateOfferingForSubmit}
+		submitCbk={submitOffering}
+		{disabled}
+		onSubmitted={handleSubmitted}
+		onSubmitError={handleSubmitError}
+		onCancelled={handleCancelled}
+		onChanged={handleChanged}
+	>
+		<!-- ===== FORM HEADER SECTION ===== -->
+		{#snippet header({ data, dirty })}
+			<div class="form-header">
+				<div>
+					{#if data.offering_id}
+						<h3>
+							{data.product_def_title || "Unnamed Product"}
+						</h3>
+					{:else}
+						<h3>New Product Offering</h3>
+					{/if}
+					<span class="field-hint">ID: {data.offering_id}</span>
 				</div>
-			{/snippet}
+				<div>
+					{#if dirty}
+						<span class="pc-grid__badge pc-grid__badge--warn"
+							>Unsaved changes</span
+						>
+					{/if}
+				</div>
+			</div>
+		{/snippet}
 
-			<!-- ===== FORM FIELDS SECTION ===== -->
-			{#snippet fields({ data, get, getS, set, errors, markTouched })}
-				<div class="form-body">
-					<div class="form-grid">
-						<!-- ===== PRODUCT DEFINITION (Required) ===== -->
-						<div class="form-group span-4">
-							{#if false}
-								If no offering_id => "CREATE" mode => Show
-								available product_definitions (== all which are
-								not yet assigned to this supplier+category)
-							{/if}
+		<!-- ===== FORM FIELDS SECTION ===== -->
+		{#snippet fields({ data, get, getS, set, errors, markTouched })}
+			<div class="form-body">
+				<div class="form-grid">
+					<!-- ===== PRODUCT DEFINITION (Required) ===== -->
+					<div class="form-group span-4">
+						{#if false}
+							If no offering_id => "CREATE" mode => Show available
+							product_definitions (== all which are not yet
+							assigned to this supplier+category)
+						{/if}
 
-							{#if isCreateMode}
-								<label for="offering-product">Product *</label>
-								<select
-									id="offering-product"
-									value={getS("product_def_id")}
-									class={errors.product_def_id ? "error" : ""}
-									onchange={(e) => {
-										log.debug(
-											`onchange: Product selected: ${
-												(
-													e.currentTarget as HTMLSelectElement
-												).value
-											}`,
-										);
-										set(
-											["product_def_id"],
-											Number(
-												(
-													e.currentTarget as HTMLSelectElement
-												).value,
-											),
-										);
-									}}
-									onblur={() => markTouched("product_def_id")}
-									required
-									aria-invalid={!!errors.product_def_id}
-									aria-describedby={errors.product_def_id
-										? "err-product"
-										: undefined}
-								>
-									<option value="" disabled
-										>Select a product...</option
-									>
-
-									{#each availableProducts ?? [] as product (product.product_def_id)}
-										<option value={product.product_def_id}
-											>{product.title}</option
-										>
-									{/each}
-								</select>
-							{:else}
-								<p>
-									{getS("product_def_title") ??
-										"product_def_title missing"}
-								</p>
-								<p class="field-hint">
-									The product cannot be changed for an
-									existing offering.
-								</p>
-							{/if}
-							{#if errors.product_def_id}
-								<div id="err-product" class="error-text">
-									{errors.product_def_id[0]}
-								</div>
-							{/if}
-						</div>
-
-						<!-- ===== PRICE & CURRENCY SECTION ===== -->
-						<div class="form-group span-2">
-							<label for="offering-price">Price</label>
-							<input
-								id="offering-price"
-								type="number"
-								step="0.01"
-								placeholder="e.g., 199.99"
-								value={getS("price") ?? ""}
-								class={errors.price ? "error" : ""}
-								oninput={(e) =>
+						{#if isCreateMode}
+							<label for="offering-product">Product *</label>
+							<select
+								id="offering-product"
+								value={getS("product_def_id")}
+								class={errors.product_def_id ? "error" : ""}
+								onchange={(e) => {
+									log.debug(
+										`onchange: Product selected: ${
+											(
+												e.currentTarget as HTMLSelectElement
+											).value
+										}`,
+									);
 									set(
-										["price"],
-										(e.currentTarget as HTMLInputElement)
-											.valueAsNumber,
-									)}
-								onblur={() => markTouched("price")}
-								aria-invalid={!!errors.price}
-								aria-describedby={errors.price
-									? "err-price"
-									: undefined}
-							/>
-							{#if errors.price}
-								<div id="err-price" class="error-text">
-									{errors.price[0]}
-								</div>
-							{/if}
-						</div>
-						<div class="form-group span-2">
-							<label for="offering-currency">Currency *</label>
-							<input
-								id="offering-currency"
-								type="text"
-								placeholder="e.g., USD"
-								maxlength="3"
-								value={getS("currency") ?? ""}
-								class={errors.currency ? "error" : ""}
-								oninput={(e) =>
-									set(
-										["currency"],
-										(
-											e.currentTarget as HTMLInputElement
-										).value.toUpperCase(),
-									)}
-								onblur={() => markTouched("currency")}
+										["product_def_id"],
+										Number(
+											(
+												e.currentTarget as HTMLSelectElement
+											).value,
+										),
+									);
+								}}
+								onblur={() => markTouched("product_def_id")}
 								required
-								aria-invalid={!!errors.currency}
-								aria-describedby={errors.currency
-									? "err-currency"
+								aria-invalid={!!errors.product_def_id}
+								aria-describedby={errors.product_def_id
+									? "err-product"
 									: undefined}
-							/>
-							{#if errors.currency}
-								<div id="err-currency" class="error-text">
-									{errors.currency[0]}
-								</div>
-							{/if}
-						</div>
-
-						<!-- ===== SIZE & DIMENSIONS SECTION ===== -->
-						<div class="form-group span-2">
-							<label for="offering-size">Size</label>
-							<input
-								id="offering-size"
-								type="text"
-								placeholder="e.g., 15 inch, Large"
-								value={get(["size"]) ?? ""}
-								oninput={(e) =>
-									set(
-										["size"],
-										(e.currentTarget as HTMLInputElement)
-											.value,
-									)}
-								onblur={() => markTouched("size")}
-							/>
-						</div>
-						<div class="form-group span-2">
-							<label for="offering-dimensions">Dimensions</label>
-							<input
-								id="offering-dimensions"
-								type="text"
-								placeholder="e.g., 10x20x5 cm"
-								value={getS("dimensions") ?? ""}
-								oninput={(e) =>
-									set(
-										["dimensions"],
-										(e.currentTarget as HTMLInputElement)
-											.value,
-									)}
-								onblur={() => markTouched("dimensions")}
-							/>
-						</div>
-
-						<!-- ===== COMMENT SECTION ===== -->
-						<div class="form-group span-4">
-							<label for="offering-comment">Comment</label>
-							<textarea
-								id="offering-comment"
-								rows="3"
-								placeholder="Internal notes about this specific offering..."
-								oninput={(e) =>
-									set(
-										["comment"],
-										(e.currentTarget as HTMLTextAreaElement)
-											.value,
-									)}>{getS("comment") ?? ""}</textarea
 							>
-						</div>
+								<option value="" disabled
+									>Select a product...</option
+								>
+
+								{#each availableProducts ?? [] as product (product.product_def_id)}
+									<option value={product.product_def_id}
+										>{product.title}</option
+									>
+								{/each}
+							</select>
+						{:else}
+							<p>
+								{getS("product_def_title") ??
+									"product_def_title missing"}
+							</p>
+							<p class="field-hint">
+								The product cannot be changed for an existing
+								offering.
+							</p>
+						{/if}
+						{#if errors.product_def_id}
+							<div id="err-product" class="error-text">
+								{errors.product_def_id[0]}
+							</div>
+						{/if}
+					</div>
+
+					<!-- ===== PRICE & CURRENCY SECTION ===== -->
+					<div class="form-group span-2">
+						<label for="offering-price">Price</label>
+						<input
+							id="offering-price"
+							type="number"
+							step="0.01"
+							placeholder="e.g., 199.99"
+							value={getS("price") ?? ""}
+							class={errors.price ? "error" : ""}
+							oninput={(e) =>
+								set(
+									["price"],
+									(e.currentTarget as HTMLInputElement)
+										.valueAsNumber,
+								)}
+							onblur={() => markTouched("price")}
+							aria-invalid={!!errors.price}
+							aria-describedby={errors.price
+								? "err-price"
+								: undefined}
+						/>
+						{#if errors.price}
+							<div id="err-price" class="error-text">
+								{errors.price[0]}
+							</div>
+						{/if}
+					</div>
+					<div class="form-group span-2">
+						<label for="offering-currency">Currency *</label>
+						<input
+							id="offering-currency"
+							type="text"
+							placeholder="e.g., USD"
+							maxlength="3"
+							value={getS("currency") ?? ""}
+							class={errors.currency ? "error" : ""}
+							oninput={(e) =>
+								set(
+									["currency"],
+									(
+										e.currentTarget as HTMLInputElement
+									).value.toUpperCase(),
+								)}
+							onblur={() => markTouched("currency")}
+							required
+							aria-invalid={!!errors.currency}
+							aria-describedby={errors.currency
+								? "err-currency"
+								: undefined}
+						/>
+						{#if errors.currency}
+							<div id="err-currency" class="error-text">
+								{errors.currency[0]}
+							</div>
+						{/if}
+					</div>
+
+					<!-- ===== SIZE & DIMENSIONS SECTION ===== -->
+					<div class="form-group span-2">
+						<label for="offering-size">Size</label>
+						<input
+							id="offering-size"
+							type="text"
+							placeholder="e.g., 15 inch, Large"
+							value={get(["size"]) ?? ""}
+							oninput={(e) =>
+								set(
+									["size"],
+									(e.currentTarget as HTMLInputElement).value,
+								)}
+							onblur={() => markTouched("size")}
+						/>
+					</div>
+					<div class="form-group span-2">
+						<label for="offering-dimensions">Dimensions</label>
+						<input
+							id="offering-dimensions"
+							type="text"
+							placeholder="e.g., 10x20x5 cm"
+							value={getS("dimensions") ?? ""}
+							oninput={(e) =>
+								set(
+									["dimensions"],
+									(e.currentTarget as HTMLInputElement).value,
+								)}
+							onblur={() => markTouched("dimensions")}
+						/>
+					</div>
+
+					<!-- ===== COMMENT SECTION ===== -->
+					<div class="form-group span-4">
+						<label for="offering-comment">Comment</label>
+						<textarea
+							id="offering-comment"
+							rows="3"
+							placeholder="Internal notes about this specific offering..."
+							oninput={(e) =>
+								set(
+									["comment"],
+									(e.currentTarget as HTMLTextAreaElement)
+										.value,
+								)}>{getS("comment") ?? ""}</textarea
+						>
 					</div>
 				</div>
-			{/snippet}
+			</div>
+		{/snippet}
 
-			<!-- ===== FORM ACTIONS SECTION ===== -->
-			{#snippet actions({ submitAction, cancel, submitting, dirty })}
-				<div class="form-actions">
-					<button
-						class="secondary-button"
-						type="button"
-						onclick={cancel}
-						disabled={submitting}
-					>
-						Cancel
-					</button>
-					<button
-						class="primary-button"
-						type="button"
-						onclick={() => submitAction()}
-						disabled={!dirty || submitting}
-						aria-busy={submitting}
-					>
-						{#if submitting}
-							<span class="pc-grid__spinner" aria-hidden="true"
-							></span>
-						{/if}
-						Save Offering
-					</button>
-				</div>
-			{/snippet}
-		</FormShell>
-	{:else if errors}
-		<div class="component-error-boundary">
-			<h3>Error</h3>
-			{#each errors as error}
-				<p>{error.path.join(".")}: {error.message}</p>
-			{/each}
-		</div>
-	{/if}
+		<!-- ===== FORM ACTIONS SECTION ===== -->
+		{#snippet actions({ submitAction, cancel, submitting, dirty })}
+			<div class="form-actions">
+				<button
+					class="secondary-button"
+					type="button"
+					onclick={cancel}
+					disabled={submitting}
+				>
+					Cancel
+				</button>
+				<button
+					class="primary-button"
+					type="button"
+					onclick={() => submitAction()}
+					disabled={!dirty || submitting}
+					aria-busy={submitting}
+				>
+					{#if submitting}
+						<span class="pc-grid__spinner" aria-hidden="true"
+						></span>
+					{/if}
+					Save Offering
+				</button>
+			</div>
+		{/snippet}
+	</FormShell>
 </ValidationWrapper>

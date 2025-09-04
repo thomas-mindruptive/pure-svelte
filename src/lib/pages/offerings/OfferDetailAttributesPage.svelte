@@ -26,6 +26,7 @@
     OfferingDetailAttributes_LoadDataSchema,
     type OfferingDetailAttributes_LoadData,
   } from "./offeringDetail.types";
+  import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
 
   let { data: rawLoadedData } = $props<{
     data: OfferingDetailAttributes_LoadData;
@@ -47,7 +48,12 @@
 
   $effect(() => {
     if (errors) {
-      console.log(errors); // Reaktiv!
+      console.error(`(OfferDetailAttributesPage) Validation errors:`, errors);
+    } else {
+      log.debug(
+        `(OfferDetailAttributesPage) Validated data OK:`,
+        data,
+      );
     }
   });
 
@@ -153,11 +159,13 @@
   istself.
 {/if}
 
-{#if !errors && data}
-  {#if false}Comment "&& data" for type safety{/if}
+<ValidationWrapper {errors} {data}>
+  {#if false}
+    Comment: Below, we use "data!" for type safety. This is safe because the ValidationWrapper
+    does not render in case of errors.{/if}
   <OfferingDetailWrapper
-    initialLoadedData={data}
-    availableProducts={data.availableProducts}
+    initialLoadedData={data!}
+    availableProducts={data!.availableProducts}
   >
     <!-- Der spezifische Inhalt dieser Seite kommt in den Default Slot -->
     <div class="grid-section">
@@ -166,7 +174,7 @@
         <form class="assignment-form" onsubmit={handleAssignAttribute}>
           <select bind:value={selectedAttributeId} disabled={isAssigning}>
             <option value={null}>Select an attribute...</option>
-            {#each data.availableAttributes as attr (attr.attribute_id)}
+            {#each data!.availableAttributes as attr (attr.attribute_id)}
               <option value={attr.attribute_id}>{attr.name}</option>
             {/each}
           </select>
@@ -188,18 +196,11 @@
 
       <h2 style="margin-top: 1.5rem;">Assigned Attributes</h2>
       <AttributeGrid
-        rows={data.assignedAttributes}
+        rows={data!.assignedAttributes}
         loading={$offeringLoadingState}
         {deleteStrategy}
         {rowActionStrategy}
       />
     </div>
   </OfferingDetailWrapper>
-{:else if errors}
-  <div class="component-error-boundary">
-    <h3>Error</h3>
-    {#each errors as error}
-      <p>{error.path.join(".")}: {error.message}</p>
-    {/each}
-  </div>
-{/if}
+</ValidationWrapper>

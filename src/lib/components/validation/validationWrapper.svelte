@@ -1,6 +1,9 @@
 <!-- ValidationWrapper.svelte -->
 <script>
+    import { log } from "$lib/utils/logger";
+
   let { errors, data, children } = $props();
+  log.debug(`(ValidationWrapper) Props:`, { errors, data });
 </script>
 
 {#if errors}

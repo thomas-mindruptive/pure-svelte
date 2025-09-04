@@ -1,7 +1,5 @@
 <!-- src/lib/components/domain/offerings/OfferingForm.svelte -->
 <script lang="ts">
-	import type { OfferingFormData } from "./OfferingFormTypes";
-
 	/**
 	 * OfferingForm Component (Svelte 5 + Runes)
 	 *
@@ -21,6 +19,7 @@
 	import type {
 		WholesalerItemOffering,
 		ProductDefinition,
+        WholesalerItemOffering_ProductDef_Category,
 	} from "$lib/domain/domainTypes";
 	import { ApiClient } from "$lib/api/client/ApiClient";
 	import { getCategoryApi } from "$lib/api/client/category";
@@ -57,7 +56,7 @@
 		availableProducts?: ProductDefinition[] | null | undefined;
 
 		// Initial data; presence determines create/edit mode
-		initial?: OfferingFormData | undefined | null;
+		initial?: WholesalerItemOffering_ProductDef_Category | undefined | null;
 
 		// Form disabled state
 		disabled?: boolean;
@@ -83,6 +82,17 @@
 		onChanged,
 	}: OfferingFormProps = $props();
 
+	// ===== Schema validation =====
+
+	// let { data, errors } = $derived.by(() => {
+	// 	const result = OfferingDetailAttributes.safeParse(rawData);
+	// 	return {
+	// 		data: result.success ? result.data : null,
+	// 		errors: result.success ? null : result.error.issues,
+	// 		isValid: result.success,
+	// 	};
+	// });
+
 	// ===== DERIVED STATE =====
 
 	const isCreateMode = $derived(!initial);
@@ -98,7 +108,7 @@
 	 * Validates the offering form data against business rules.
 	 */
 	function validateOffering(raw: Record<string, any>): ValidateResult {
-		const data = raw as OfferingFormData;
+		const data = raw as WholesalerItemOffering_ProductDef_Category;
 		const errors: ValidationErrors = {};
 
 		if (!data.product_def_id) {
@@ -140,13 +150,16 @@
 
 		log.info(`(OfferingForm) Submitting to category API...`, {
 			isUpdate: isUpdateMode,
-			raw
+			raw,
 		});
 
 		try {
 			let offering;
 			if (isUpdateMode) {
-				offering = await categoryApi.updateOffering(raw.id!, dataToSubmit);
+				offering = await categoryApi.updateOffering(
+					raw.id!,
+					dataToSubmit,
+				);
 			} else {
 				offering = await categoryApi.createOfferingForCategory(
 					categoryId,
@@ -155,7 +168,7 @@
 			}
 			log.info(`(OfferingForm) Submitted successfully to category API`, {
 				isUpdate: isUpdateMode,
-				raw
+				raw,
 			});
 			return offering;
 		} catch (e) {
@@ -212,7 +225,7 @@
 
 <FormShell
 	entity="Offering"
-	initial={initial as OfferingFormData}
+	initial={initial as WholesalerItemOffering_ProductDef_Category}
 	validate={validateOffering}
 	submitCbk={submitOffering}
 	{disabled}
@@ -246,7 +259,6 @@
 	{#snippet fields({ data, get, getS, set, errors, markTouched })}
 		<div class="form-body">
 			<div class="form-grid">
-
 				<!-- ===== PRODUCT DEFINITION (Required) ===== -->
 				<div class="form-group span-4">
 					{#if false}
@@ -286,7 +298,7 @@
 							<option value="" disabled
 								>Select a product...</option
 							>
-							
+
 							{#each availableProducts ?? [] as product (product.product_def_id)}
 								<option value={product.product_def_id}
 									>{product.title}</option

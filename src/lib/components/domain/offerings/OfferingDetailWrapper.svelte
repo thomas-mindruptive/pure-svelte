@@ -2,7 +2,7 @@
 <script lang="ts">
 	import type {
 		ProductDefinition,
-		WholesalerItemOffering,
+        WholesalerItemOffering_ProductDef_Category,
 	} from "$lib/domain/domainTypes";
 
 	import type { Snippet } from "svelte";
@@ -18,8 +18,7 @@
 	} from "$lib/components/forms/forms.types";
     import { addNotification } from "$lib/stores/notifications";
 	import OfferingForm from "./OfferingForm.svelte";
-    import type { OfferingFormData } from "./OfferingFormTypes";
-
+  
 	const {
 		supplierId,
 		categoryId,		// Especially needed for "create" mode.
@@ -35,7 +34,7 @@
 	}: {
 		supplierId: number;
 		categoryId: number;
-		offering?: WholesalerItemOffering | undefined | null;
+		offering?: WholesalerItemOffering_ProductDef_Category | undefined | null;
 		availableProducts: ProductDefinition[] | null | undefined;
 		children: Snippet;
 
@@ -69,22 +68,22 @@
 		log.error(`[Component Contract Violation] ${errorMessage}`);
 	}
 
-	async function handleFormSubmitted(p: {data: OfferingFormData;result: unknown;}): Promise<void> {
+	async function handleFormSubmitted(p: {data: WholesalerItemOffering_ProductDef_Category;result: unknown;}): Promise<void> {
 		log.info(`(OfferDetailAttributesPage) Form submitted successfully`, p);
 		addNotification("Form submitted successfully.", "success");
 	}
 
-	async function handleSubmitError(p: {data: OfferingFormData; reason?: string;}): Promise<void> {
+	async function handleSubmitError(p: {data: WholesalerItemOffering_ProductDef_Category; reason?: string;}): Promise<void> {
 		log.info(`(OfferDetailAttributesPage) Form submission error`, p);
 		addNotification("Form submission error.", "error");
 	}
 
-	async function handleCancelled(p: {data: OfferingFormData; reason?: string;}): Promise<void> {
+	async function handleCancelled(p: {data: WholesalerItemOffering_ProductDef_Category; reason?: string;}): Promise<void> {
 		log.info(`(OfferDetailAttributesPage) Form submission cancelled`, p);
 		addNotification("Form submission cancelled.", "info");
 	}
 
-	async function handleChanged(info: {data: OfferingFormData; dirty: boolean }): Promise<void> {
+	async function handleChanged(info: {data: WholesalerItemOffering_ProductDef_Category; dirty: boolean }): Promise<void> {
 		log.info(`(OfferDetailAttributesPage) Form changed`, info);
 	}
 </script>

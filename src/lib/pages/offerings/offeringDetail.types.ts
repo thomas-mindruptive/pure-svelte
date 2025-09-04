@@ -41,6 +41,39 @@ export const OfferingDetailLinks_LoadDataSchema = OfferingDetail_LoadDataSchema.
 export type OfferingDetailLinks_LoadData = z.infer<typeof OfferingDetailLinks_LoadDataSchema>;
 
 // ===== UNION OF ALL LOAD DATA =====
-export const OfferingDetailLinksAndAttribute_LoadDataSchema = OfferingDetailAttributes_LoadDataSchema.extend(OfferingDetailLinks_LoadDataSchema);
+
+export const OfferingDetailLinksAndAttribute_LoadDataSchema = z.intersection(
+    OfferingDetailAttributes_LoadDataSchema,
+    OfferingDetailLinks_LoadDataSchema)
+    .superRefine((d: OfferingDetailLinksAndAttribute_LoadData, ctx) => {
+        type LoadDataKey = Extract<keyof OfferingDetailLinksAndAttribute_LoadData, string>;
+        const availableProducts: LoadDataKey = "availableProducts";
+        const offering: LoadDataKey = "offering";
+        if (d.offering && (d.availableProducts?.length ?? 0 > 0)) {
+            ctx.addIssue({
+                code: "custom",
+                message: "If 'offering' is present, availableProducts must be null|undefined or empty.",
+                path: [offering],
+            });
+            ctx.addIssue({
+                code: "custom",
+                message: "If 'offering' is present, availableProducts must be null|undefined or empty.",
+                path: [availableProducts],
+            });
+        }
+        if (!d.offering && (!d.availableProducts || d.availableProducts.length === 0)) {
+            ctx.addIssue({
+                code: "custom",
+                message: "If 'offering' is null|undefined, availableProducts must be a non-empty array.",
+                path: [offering],
+            });
+        }
+        ctx.addIssue({
+            code: "custom",
+            message: "If 'offering' is null|undefined, availableProducts must be a non-empty array.",
+            path: [availableProducts],
+        })
+    }
+    );
 
 export type OfferingDetailLinksAndAttribute_LoadData = z.infer<typeof OfferingDetailLinksAndAttribute_LoadDataSchema>;

@@ -35,7 +35,7 @@
 	} from "$lib/components/forms/forms.types";
 	import {
 		type OfferingDetail_LoadData,
-		OfferingDetail_LoadDataSchema,
+        OfferingDetailLinksAndAttribute_LoadDataSchema,
 	} from "$lib/pages/offerings/offeringDetail.types";
 
 	// ===== INTERNAL TYPES =====
@@ -80,10 +80,15 @@
 
 	// ===== Schema validation =====
 
+	/**
+	 * The schema validates all keys and also conditional dependencies:
+	 * - In CREATE mode (no initial offering), availableProducts are required.
+	 * - In EDIT mode (initial offering), availableProducts must be null or undefined or empty.
+	 */
 	let { supplierId, categoryId, initialValidatedOfferingData, validatedData, errors } = $derived.by(
 		() => {
 			const result =
-				OfferingDetail_LoadDataSchema.safeParse(initialLoadedData);
+				OfferingDetailLinksAndAttribute_LoadDataSchema.safeParse(initialLoadedData);
 			return {
 				validatedData: result.success ? result.data : null,
 				errors: result.success ? null : result.error.issues,

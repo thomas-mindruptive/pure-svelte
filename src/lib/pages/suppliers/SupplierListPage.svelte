@@ -50,6 +50,7 @@
 
     // We define a self-contained async function to handle the promise lifecycle.
     // This is a robust pattern for managing async operations inside an effect.
+    log.debug(`Before processPromise`);
     const processPromise = async () => {
       // a. Reset the state each time a new promise is processed.
       isLoading = true;
@@ -60,6 +61,7 @@
         // b. Await the promise to get the data.
         if (!aborted) {
           resolvedSuppliers = await data.suppliers;
+              log.debug(`Suppliers promise resolved successfully.`);
         }
       } catch (rawError: any) {
         // c. If the promise rejects, perform the robust error handling.

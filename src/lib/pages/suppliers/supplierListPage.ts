@@ -17,7 +17,7 @@ import { DEFAULT_SUPPLIER_QUERY, getSupplierApi } from '$lib/api/client/supplier
  * ⚠️⚠️⚠️
  */
 export function load({ fetch }: LoadEvent) {
-  log.info(`(SupplierListPage) loading suppliers...`);
+  log.info(`Kicking of promise for loading suppliers...`);
 
   // 1. Create an ApiClient instance with the context-aware `fetch`.
   const client = new ApiClient(fetch);

@@ -31,6 +31,7 @@ EXTENSIONS = {
 }
 
 EXCLUDE_PATTERNS = [
+    "routes",
     "tmp",
     "tools",
     "node_modules",

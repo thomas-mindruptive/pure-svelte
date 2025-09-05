@@ -221,9 +221,11 @@
 	}
 	function handleChanged(p: { data: Record<string, any>; dirty: boolean }) {
 		//assertDefined(p, "handleChanged");
-		log.info("handleChanged",
-			{ component: "OfferingForm", event: "changed", dirty: p.dirty }
-		);
+		log.info("handleChanged", {
+			component: "OfferingForm",
+			event: "changed",
+			dirty: p.dirty,
+		});
 		onChanged?.(p);
 	}
 </script>
@@ -353,11 +355,11 @@
 							placeholder="e.g., USD"
 							maxlength="3"
 							minlength="3"
+							pattern={"[A-Za-z]{3}"}
 							title="Enter a 3-letter currency code"
 							value={getS("currency") ?? ""}
 							class:error={errors.currency}
 							oninput={(e) => {
-								console.log("Input triggered!");
 								const value =
 									e.currentTarget.value.toUpperCase();
 								set(["currency"], value);

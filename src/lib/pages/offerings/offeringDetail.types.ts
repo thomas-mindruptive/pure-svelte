@@ -5,13 +5,9 @@ import {
     ProductDefinitionSchema,
     WholesalerOfferingLinkSchema
 } from "$lib/domain/domainTypes";
+import type { PromisifyComplex } from "$lib/utils/typeUtils";
 import z from "zod";
 
-// ===== UTILITY TYPES =====
-
-type Promisify<T> = {
-  [K in keyof T]: Promise<T[K]>
-}
 
 // ===== OFFERING DETAIL ATTRIBUTES BASE DATA =====
 
@@ -24,7 +20,7 @@ export const OfferingDetail_LoadDataSchema = z.object({
 });
 
 export type OfferingDetail_LoadData = z.infer<typeof OfferingDetail_LoadDataSchema>;
-export type OfferingDetail_LoadDataAsync = Promisify<OfferingDetail_LoadData>;
+export type OfferingDetail_LoadDataAsync = PromisifyComplex<OfferingDetail_LoadData>;
 
 // ===== OFFERING DETAIL ATTRIBUTES LOAD DATA =====
 
@@ -37,7 +33,7 @@ export const OfferingDetailAttributes_LoadDataSchema = OfferingDetail_LoadDataSc
 export type OfferingDetailAttributes_LoadData = z.infer<
     typeof OfferingDetailAttributes_LoadDataSchema
 >;
-export type OfferingDetailAttributes_LoadDataAsync = Promisify<OfferingDetailAttributes_LoadData>;
+export type OfferingDetailAttributes_LoadDataAsync = PromisifyComplex<OfferingDetailAttributes_LoadData>;
 
 // ===== OFFERING DETAIL LINKS LOAD DATA =====
 
@@ -48,7 +44,7 @@ export const OfferingDetailLinks_LoadDataSchema = OfferingDetail_LoadDataSchema.
 });
 
 export type OfferingDetailLinks_LoadData = z.infer<typeof OfferingDetailLinks_LoadDataSchema>;
-export type OfferingDetailLinks_LoadDataAsync = Promisify<OfferingDetailLinks_LoadData>;
+export type OfferingDetailLinks_LoadDataAsync = PromisifyComplex<OfferingDetailLinks_LoadData>;
 
 // ===== UNION OF ALL LOAD DATA - NOT needed currently =====
 

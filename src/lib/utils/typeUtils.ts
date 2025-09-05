@@ -22,3 +22,25 @@ import { keys } from "lodash-es"
  * @param _keys - A list of keys that must be valid properties of `T`. They are unused at runtime.
  */
 export function typeGuard<T extends object>(..._keys: (keyof T)[]) { void keys(_keys) }
+
+// Takes a type and converts props to promises wirh exception of "Exclude".
+export type Promisify<T> = {
+  [K in keyof T]: Promise<T[K]>
+}
+
+// Takes a type and converts props to promises wirh exception of "Exclude".
+export type PromisifyExcept<T, Exclude extends keyof T = never> = {
+  [K in keyof T]: K extends Exclude ? T[K] : Promise<T[K]>
+}
+// Example:
+// type OfferingDetail_LoadDataAsync = Promisify
+//   OfferingDetail_LoadData, 
+//   'supplierId' | 'categoryId'
+// >;
+
+// Takes a type and converts non-primitive types to promises.
+export type PromisifyComplex<T> = {
+  [K in keyof T]: T[K] extends string | number | boolean | null | undefined 
+    ? T[K]                    // ← Primitives stay
+    : Promise<T[K]>           // ← Complex types become Promise
+}

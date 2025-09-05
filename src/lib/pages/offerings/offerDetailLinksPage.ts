@@ -4,7 +4,7 @@ import { ApiClient } from '$lib/api/client/ApiClient';
 import { getOfferingApi } from '$lib/api/client/offering';
 import { log } from '$lib/utils/logger';
 import { error, type LoadEvent } from '@sveltejs/kit';
-import type { OfferingDetailLinks_LoadData } from './offeringDetail.types';
+import type { OfferingDetailLinks_LoadDataAsync } from './offeringDetail.types';
 
 
 /**
@@ -17,6 +17,8 @@ export async function load({ params, fetch: fetchLoad }: LoadEvent) {
   const offeringId = Number(params.offeringId);
   const categoryId = Number(params.categoryId);
   const supplierId = Number(params.supplierId);
+
+  // ⚠️ There is not try/catch because we return promises!
 
   if (isNaN(offeringId) && params.offeringId?.toLowerCase() !== 'new') {
     throw error(400, 'OfferingDetailLinksPage.loadInvalid Offering ID: Must be number or "new"');
@@ -33,47 +35,33 @@ export async function load({ params, fetch: fetchLoad }: LoadEvent) {
   const client = new ApiClient(fetchLoad);
   const offeringApi = getOfferingApi(client);
 
-  try {
-    // EDIT MODE
-    if (offeringId) {
-      const [offering, links, availableProducts] = await Promise.all([
-        offeringApi.loadOffering(offeringId),
-        offeringApi.loadOfferingLinks(offeringId),
-        offeringApi.getAvailableProductDefsForOffering(categoryId, supplierId)
-      ]);
-      log.info(`(OfferDetailLinksPage) Loaded data for offeringId: ${offeringId}`, {
-        offering,
-        links,
-        availableProducts
-      });
-
-      return {
-        supplierId, // Always pass from the params.
-        categoryId, // Always pass from the params.
-        offering,
-        links,
-        availableProducts
-      };
-    } else {
-      // CREATE MODE
+  // EDIT MODE
+  if (offeringId) {
+    const asyncLoadData: OfferingDetailLinks_LoadDataAsync = {
+      supplierId, // Always pass from the params.
+      categoryId, // Always pass from the params.
+      offering: offeringApi.loadOffering(offeringId),
+      links: offeringApi.loadOfferingLinks(offeringId),
       // API loads only those product definitions that are available for the selected category and supplier 
       // and have NOT YET been assigned to supplier.
-      const availableProducts = await offeringApi.getAvailableProductDefsForOffering(categoryId, supplierId);
-
-      const loadData: OfferingDetailLinks_LoadData = {
-        supplierId, // Always pass from the params.
-        categoryId, // Always pass from the params.
-        offering: null, // No initial offering to edit
-        links: [],
-        availableProducts: availableProducts // Only the "remaining" products
-      };
-
-      return loadData;
+      availableProducts: offeringApi.getAvailableProductDefsForOffering(categoryId, supplierId)
     }
-  } catch (err: any) {
-    log.error(`Failed to load data for offeringId: ${offeringId}`, err);
-    const status = err.status ?? err?.response?.status ?? 500;
-    const msg = err?.response?.details || err?.message || 'Failed to load category';
-    throw error(status, msg);
+    log.info(`(OfferDetailLinksPage) Kicked off loading promises offeringId: ${offeringId}`);
+    return asyncLoadData
+  } else {
+
+    // CREATE MODE
+    const asyncLoadData: OfferingDetailLinks_LoadDataAsync = {
+      supplierId, // Always pass from the params.
+      categoryId, // Always pass from the params.
+      offering: Promise.resolve(null), // No initial offering to edit
+      links: Promise.resolve([]),
+      // API loads only those product definitions that are available for the selected category and supplier 
+      // and have NOT YET been assigned to supplier.
+      availableProducts: offeringApi.getAvailableProductDefsForOffering(categoryId, supplierId)
+      // Only the "remaining" products
+    };
+
+    return asyncLoadData;
   }
 }

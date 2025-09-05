@@ -1,7 +1,7 @@
 // src/lib/pages/suppliers/supplierListPage.ts
 
 import { log } from '$lib/utils/logger';
-import { error, type LoadEvent } from '@sveltejs/kit';
+import { type LoadEvent } from '@sveltejs/kit';
 
 // Import the new dependencies
 import { ApiClient } from '$lib/api/client/ApiClient';
@@ -10,32 +10,28 @@ import { DEFAULT_SUPPLIER_QUERY, getSupplierApi } from '$lib/api/client/supplier
 /**
  * Loads the data required for the Supplier List Page.
  * This function is called by SvelteKit when the /suppliers route is loaded.
+ * ⚠️⚠️⚠️
+ * NOTE: We use the streaming/"App Shell" model: load MUST NEVER block, because it prevents naviation!
+ * This is not suitable for a modern SPA-like app!
+ * => We return the promise, the respective "shell" component MUST handle the error.
+ * ⚠️⚠️⚠️
  */
-export async function load({ fetch }: LoadEvent) {
+export function load({ fetch }: LoadEvent) {
   log.info(`(SupplierListPage) loading suppliers...`);
 
-  try {
-    // 1. Create an ApiClient instance with the context-aware `fetch`.
-    const client = new ApiClient(fetch);
+  // 1. Create an ApiClient instance with the context-aware `fetch`.
+  const client = new ApiClient(fetch);
 
-    // 2. Get the supplier-specific API methods from the factory.
-    const supplierApi = getSupplierApi(client);
+  // 2. Get the supplier-specific API methods from the factory.
+  const supplierApi = getSupplierApi(client);
 
-    // 3. Call the API method. The call is now clean and doesn't need `fetch`.
-    const suppliers = await supplierApi.loadSuppliers({
-      ...DEFAULT_SUPPLIER_QUERY,
-      orderBy: [{ key: 'name', direction: 'asc' }],
-    });
+  // 3. Call the API method. The call is now clean and doesn't need `fetch`.
+  const suppliers = supplierApi.loadSuppliers({
+    ...DEFAULT_SUPPLIER_QUERY,
+    orderBy: [{ key: 'name', direction: 'asc' }],
+  });
 
-    // The returned data is available in the UI via the `data` prop.
-    return {
-      suppliers
-    };
-  } catch (err: any) {
-    log.error(`(SupplierListPage) Failed to load suppliers`, { err });
-    // Throws a SvelteKit-specific error, which displays a proper error page.
-    const status = err.status ?? err?.response?.status ?? 500;
-    const msg = err?.response?.details || err?.message || 'Failed to load category';
-    throw error(status, msg);
-  }
+  // ⚠️ Return the promise. Target component must handle it!
+  return {suppliers};
+
 }

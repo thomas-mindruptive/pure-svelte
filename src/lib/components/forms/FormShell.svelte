@@ -29,6 +29,7 @@
     FormData,
   } from "./forms.types";
 
+
   // ========================================================================
   // TYPE DEFINITIONS
   // ========================================================================
@@ -36,8 +37,8 @@
   /**
    * Props passed to the header snippet
    */
-  interface HeaderProps<T> { 
-    data: FormData<T>; 
+  interface HeaderProps<T> {
+    data: FormData<T>;
     dirty: boolean;
   }
 
@@ -46,13 +47,13 @@
    */
   interface FieldsProps<T> {
     data: FormData<T>;
-    
+
     // Path-based setters/getters for nested data
     set<P extends NonEmptyPath<FormData<T>>>(
       path: readonly [...P],
       value: PathValue<T, P>,
     ): void;
-    
+
     get<P extends NonEmptyPath<FormData<T>>>(
       path: readonly [...P],
     ): PathValue<FormData<T>, P> | undefined;
@@ -82,7 +83,7 @@
   /**
    * Props passed to the footer snippet
    */
-  interface FooterProps<T> { 
+  interface FooterProps<T> {
     data: FormData<T>;
   }
 
@@ -95,7 +96,7 @@
     validate?: ValidateFn<T>;
     submitCbk: SubmitFn<T>;
     onCancel?: CancelFn<T>;
-    
+
     // Configuration
     autoValidate?: "submit" | "blur" | "change";
     disabled?: boolean;
@@ -126,7 +127,7 @@
     submitCbk,
     onCancel,
 
-    // Form behavior configuration  
+    // Form behavior configuration
     autoValidate = "submit" as "submit" | "blur" | "change",
     disabled = false,
     formId = "form",
@@ -182,12 +183,12 @@
    * All form data, validation, and UI state in one reactive container
    */
   const formState = $state({
-    data: pureDataDeepClone(cleanInitial),                      // Current form data
-    snapshot: pureDataDeepClone(cleanInitial),                 // Clean snapshot for dirty checking
-    errors: {} as Errors,                                       // Field validation errors
-    touched: new Set<string>(),                                 // Fields that have been interacted with
-    submitting: false,                                          // Form submission in progress
-    validating: false,                                          // Validation in progress
+    data: pureDataDeepClone(cleanInitial), // Current form data
+    snapshot: pureDataDeepClone(cleanInitial), // Clean snapshot for dirty checking
+    errors: {} as Errors, // Field validation errors
+    touched: new Set<string>(), // Fields that have been interacted with
+    submitting: false, // Form submission in progress
+    validating: false, // Validation in progress
   });
 
   // Form DOM element reference for keyboard event handling
@@ -196,6 +197,34 @@
   // ========================================================================
   // CORE DATA MANIPULATION
   // ========================================================================
+
+  /**
+   * Handle input changes with validation and change notifications
+   */
+  export function set<P extends NonEmptyPath<FormData<T>>>(
+    path: readonly [...P],
+    value: PathValue<T, P>,
+  ): void {
+    internalSet(path, value);
+
+    // Notify parent of data change
+    try {
+      onChanged?.({
+        data: pureDataDeepClone(formState.data),
+        dirty: isDirty(),
+      });
+    } catch (e) {
+      log.error(
+        { component: "FormShell", entity, error: coerceMessage(e) },
+        "onChanged threw",
+      );
+    }
+
+    // Auto-validate on change if configured
+    if (autoValidate === "change") {
+      void runValidate(path.join("."));
+    }
+  }
 
   /**
    * Internal setter for nested path-based updates
@@ -217,7 +246,7 @@
   /**
    * Get value at nested path
    */
-  function get<P extends NonEmptyPath<FormData<T>>>(
+  export function get<P extends NonEmptyPath<FormData<T>>>(
     path: readonly [...P],
   ): PathValue<FormData<T>, P> | undefined {
     try {
@@ -236,7 +265,7 @@
   /**
    * Get value by simple key (top-level properties)
    */
-  function getS<K extends keyof FormData<T>>(
+  export function getS<K extends keyof FormData<T>>(
     key: K,
   ): FormData<T>[K] | undefined {
     try {
@@ -258,7 +287,9 @@
   function isDirty(): boolean {
     try {
       const currentSnapshot = pureDataDeepClone(formState.data);
-      return JSON.stringify(currentSnapshot) !== JSON.stringify(formState.snapshot);
+      return (
+        JSON.stringify(currentSnapshot) !== JSON.stringify(formState.snapshot)
+      );
     } catch {
       log.warn(
         { component: "FormShell", entity },
@@ -295,7 +326,7 @@
    */
   async function runValidate(path?: string): Promise<boolean> {
     if (!validate) return true;
-    
+
     formState.validating = true;
     try {
       const res = await validate(formState.data);
@@ -347,7 +378,7 @@
   async function doSubmit(): Promise<void> {
     log.debug(`(FormShell) doSubmit called`, { entity });
     if (disabled || formState.submitting) return;
-    
+
     formState.submitting = true;
 
     // Pre-submit validation if configured
@@ -414,7 +445,7 @@
    */
   function doCancel(reason?: string) {
     log.debug(`Cancelled - ${reason}`);
-    
+
     try {
       onCancel?.(pureDataDeepClone(formState.data));
     } catch (e) {
@@ -439,31 +470,6 @@
     }
   }
 
-  /**
-   * Handle input changes with validation and change notifications
-   */
-  function handleInput<P extends NonEmptyPath<FormData<T>>>(
-    path: readonly [...P],
-    value: PathValue<T, P>,
-  ): void {
-    internalSet(path, value);
-
-    // Notify parent of data change
-    try {
-      onChanged?.({ data: pureDataDeepClone(formState.data), dirty: isDirty() });
-    } catch (e) {
-      log.error(
-        { component: "FormShell", entity, error: coerceMessage(e) },
-        "onChanged threw",
-      );
-    }
-
-    // Auto-validate on change if configured
-    if (autoValidate === "change") {
-      void runValidate(path.join("."));
-    }
-  }
-
   // ========================================================================
   // DERIVED PROPERTIES
   // ========================================================================
@@ -484,7 +490,7 @@
   const fieldsProps = $derived.by(
     (): FieldsProps<T> => ({
       data: formState.data,
-      set: handleInput,
+      set: set,
       get,
       getS,
       errors: formState.errors,
@@ -541,7 +547,7 @@
       data: formState.data,
       snapshot: formState.snapshot,
     });
-    
+
     return () => formEl?.removeEventListener("keydown", keyHandler);
   });
 
@@ -621,7 +627,9 @@
         disabled={formState.submitting || disabled}
         aria-busy={formState.submitting}
       >
-        {#if formState.submitting}<span class="pc-grid__spinner" aria-hidden="true"
+        {#if formState.submitting}<span
+            class="pc-grid__spinner"
+            aria-hidden="true"
           ></span>{/if}
         Save
       </button>

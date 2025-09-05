@@ -1,96 +1,120 @@
-<!-- src/lib/pages/suppliers/SupplierListPage.svelte -->
 <script lang="ts">
-  import { goto } from "$app/navigation";
-  import { log } from "$lib/utils/logger";
-  import { addNotification } from "$lib/stores/notifications";
-  import { requestConfirmation } from "$lib/stores/confirmation";
+  // --- Component & Type Imports ---
+  // The SupplierGrid is the primary UI component for displaying the data.
+  import SupplierGrid from '$lib/components/domain/suppliers/SupplierGrid.svelte';
+  // We need the supplierLoadingState to show loading for on-page actions like 'delete'.
+  import { supplierLoadingState, getSupplierApi } from '$lib/api/client/supplier';
+  import type { Wholesaler } from '$lib/domain/domainTypes';
 
-  // Komponenten
-  import SupplierGrid from "$lib/components/domain/suppliers/SupplierGrid.svelte";
+  // --- SvelteKit & Utility Imports ---
+  // `goto` is used for programmatic navigation (e.g., after clicking a row).
+  import { goto } from '$app/navigation';
+  // The application's standard logger.
+  import { log } from '$lib/utils/logger';
+  // UI feedback helpers for success/error messages and confirmation dialogs.
+  import { addNotification } from '$lib/stores/notifications';
+  import { requestConfirmation } from '$lib/stores/confirmation';
+  
+  // --- API & Strategy Imports ---
+  // The ApiClient is the foundation for making SSR-safe fetch requests.
+  import { ApiClient } from '$lib/api/client/ApiClient';
+  // Types for the strategy pattern used by the generic DataGrid component.
+  import type { ID, DeleteStrategy, RowActionStrategy } from '$lib/components/grids/Datagrid.types';
 
-  // API & Typen
-  import {
-    getSupplierApi,
-    supplierLoadingState,
-  } from "$lib/api/client/supplier";
-  import type { Wholesaler } from "$lib/domain/domainTypes";
+  // --- PROPS ---
+  // 1. The `data` prop receives the promise streamed from the non-blocking `load` function.
+  //    It is NOT the resolved array of suppliers, but the promise that will resolve to it.
+  let { data } = $props<{ data: { suppliers: Promise<Wholesaler[]> } }>();
 
-  import { ApiClient } from "$lib/api/client/ApiClient";
-    import type { ID, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
+  // --- LOCAL COMPONENT STATE ---
+  // These top-level `let` variables are made reactive by Svelte 5.
+  // They will hold the resolved state of the promise.
+  let resolvedSuppliers = $state<Wholesaler[]>([]);
+  let isLoading = $state(true); // The component always starts in a loading state.
+  // A structured object to hold a clean, UI-friendly error if the promise rejects.
+   let loadingError = $state<{ message: string; status: number } | null>(null);
+  
+  // --- ASYNCHRONOUS LOGIC HANDLING ---
+  // 2. This `$effect` is the core of the solution. It runs whenever the `data.suppliers`
+  //    promise changes (e.g., on initial load or after an `invalidateAll` call).
+  $effect(() => {
+    // We define a self-contained async function to handle the promise lifecycle.
+    // This is a robust pattern for managing async operations inside an effect.
+    const processPromise = async () => {
+      // a. Reset the state each time a new promise is processed.
+      isLoading = true;
+      loadingError = null;
+      resolvedSuppliers = []; // Clear old data to prevent stale UI
 
-  // Die `load`-Funktion aus `supplierListPage.ts` übergibt ihre Daten hierher.
-  let { data } = $props<{ data: { suppliers: Wholesaler[] } }>();
+      try {
+        // b. Await the promise to get the data.
+        resolvedSuppliers = await data.suppliers;
+      } catch (rawError: any) {
+        // c. If the promise rejects, perform the robust error handling.
+        //    This logic was previously in the `load` function.
+        const status = rawError.status ?? 500;
+        const message = rawError.body?.message || rawError.message || 'An unknown error occurred while loading suppliers.';
+        
+        // Set the clean error state for the UI to display.
+        loadingError = { message, status };
 
-  // 1. Create an ApiClient instance with client `fetch`.
+        // Log the full, raw error object for debugging purposes.
+        log.error("(SupplierListPage) Promise rejected while loading suppliers", { rawError });
+      } finally {
+        // d. Always set loading to false when the process is complete (success or fail).
+        isLoading = false;
+      }
+    };
+
+    // e. Execute the promise handling function.
+    processPromise();
+  });
+
+  // --- EVENT HANDLERS & STRATEGIES ---
+  // 3. These functions handle user interactions within the grid. They remain unchanged.
   const client = new ApiClient(fetch);
-
-  // 2. Get the supplier-specific API methods from the factory.
   const supplierApi = getSupplierApi(client);
 
-  /**
-   * Navigiert zur Detailansicht eines ausgewählten Lieferanten.
-   * Dies wird durch die `rowActionStrategy` des Grids aufgerufen.
-   */
-  function handleSupplierSelect(supplier: Wholesaler) {
-    log.info(
-      `(SupplierListPage) Navigating to detail for supplierId: ${supplier.wholesaler_id}`,
-    );
+  function handleSupplierSelect(supplier: Wholesaler): void {
+    log.info(`(SupplierListPage) Navigating to detail for supplierId: ${supplier.wholesaler_id}`);
     goto(`/suppliers/${supplier.wholesaler_id}`);
   }
 
-  /**
-   * Führt den Löschvorgang für einen oder mehrere Lieferanten durch.
-   * Implementiert den im README beschriebenen 2-stufigen Löschprozess.
-   * Dies wird durch die `deleteStrategy` des Grids aufgerufen.
-   */
   async function handleSupplierDelete(ids: ID[]): Promise<void> {
     log.info(`(SupplierListPage) Deleting suppliers`, { ids });
     let dataChanged = false;
 
     for (const id of ids) {
       const numericId = Number(id);
-
-      // 1. Optimistischer Versuch ohne Kaskadierung
       const result = await supplierApi.deleteSupplier(numericId, false);
 
       if (result.success) {
-        addNotification(
-          `Supplier "${result.data.deleted_resource.name}" deleted.`,
-          "success",
-        );
+        addNotification(`Supplier "${result.data.deleted_resource.name}" deleted.`, "success");
         dataChanged = true;
       } else if ("cascade_available" in result && result.cascade_available) {
-        // 2. Konflikt erhalten, nach Kaskadierung fragen
         const dependencies = (result.dependencies as string[]).join(", ");
         const confirmed = await requestConfirmation(
           `Supplier has dependencies: ${dependencies}. Delete with all related data?`,
-          "Confirm Cascade Delete",
+          "Confirm Cascade Delete"
         );
 
         if (confirmed) {
-          const cascadeResult = await supplierApi.deleteSupplier(
-            numericId,
-            true,
-          );
+          const cascadeResult = await supplierApi.deleteSupplier(numericId, true);
           if (cascadeResult.success) {
             addNotification("Supplier and related data deleted.", "success");
             dataChanged = true;
           }
         }
       } else {
-        // Anderer Fehler
         addNotification(`Could not delete supplier (ID: ${id}).`, "error");
       }
     }
 
     if (dataChanged) {
-      // "Fire and Forget": Neu laden, ohne auf das Ergebnis zu warten,
-      // um Race Conditions im UI zu vermeiden.
       goto("/suppliers", { invalidateAll: true });
     }
   }
 
-  // Strategie-Objekte für das Datagrid
   const deleteStrategy: DeleteStrategy<Wholesaler> = {
     execute: handleSupplierDelete,
   };
@@ -102,19 +126,29 @@
 
 <div class="page-content-wrapper">
   <h1>Suppliers</h1>
-  <p>
-    Select a supplier to view their details and manage their product categories.
-  </p>
+  <p>Select a supplier to view their details and manage their product categories.</p>
 
-  <SupplierGrid
-    rows={data.suppliers}
-    loading={$supplierLoadingState}
-    {deleteStrategy}
-    {rowActionStrategy}
-  />
+  <!-- 
+    4. The template is now extremely simple and clean. It is purely presentational,
+       containing no complex logic. It just renders the current state.
+  -->
+  {#if loadingError}
+    <div class="component-error-boundary">
+      <h3>Error Loading Suppliers (Status: {loadingError.status})</h3>
+      <p>{loadingError.message}</p>
+    </div>
+  {:else}
+    <SupplierGrid
+      rows={resolvedSuppliers}
+      loading={isLoading || $supplierLoadingState}
+      {deleteStrategy}
+      {rowActionStrategy}
+    />
+  {/if}
 </div>
 
 <style>
+  /* These styles define the layout for this specific page component. */
   .page-content-wrapper {
     padding: 1.5rem;
     display: flex;

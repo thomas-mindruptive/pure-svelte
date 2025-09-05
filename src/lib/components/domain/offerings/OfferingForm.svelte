@@ -133,6 +133,30 @@
 	const client = new ApiClient(fetch);
 	const categoryApi = getCategoryApi(client);
 
+	// ===== FORM INIT =====
+
+	let formShell: InstanceType<
+		typeof FormShell<WholesalerItemOffering_ProductDef_Category>
+	>;
+
+	// As soon as product defs are loaded: Set first one as default into product def combo.
+	$effect(() => {
+		// Dieser Effekt wird ausgeführt, wann immer sich `isCreateMode` oder `availableProducts` ändert.
+		if (isCreateMode && availableProducts && availableProducts.length > 0) {
+			// Hole das erste Produkt aus der Liste.
+			const firstProduct = availableProducts[0];
+
+			if (firstProduct && formShell) {
+				log.debug(
+					`(OfferingForm) Initializing product_def_id to first available product: ${firstProduct.product_def_id}`,
+				);
+				// Rufe die `set`-Methode der FormShell-Instanz direkt auf,
+				// um den Initialzustand zu setzen.
+				formShell.set(["product_def_id"], firstProduct.product_def_id);
+			}
+		}
+	});
+
 	// ===== VALIDATION LOGIC =====
 
 	/**
@@ -275,6 +299,7 @@
 
 <ValidationWrapper {errors} data={validatedData}>
 	<FormShell
+		bind:this={formShell}
 		entity="Offering"
 		initial={initialValidatedOfferingData as WholesalerItemOffering_ProductDef_Category}
 		validate={validateOfferingForSubmit}

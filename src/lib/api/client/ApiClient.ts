@@ -65,6 +65,7 @@ export class ApiClient {
 			}
 
 			if (response.ok) {
+				log.debug(`Parsed data:`, parsedData)
 				return (parsedData as ApiSuccessResponse<TSuccessData>).data;
 			} else {
 				// Bei Fehlern den gesamten geparsten Body als Detail an den ApiError anhängen.

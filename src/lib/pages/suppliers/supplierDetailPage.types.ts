@@ -1,0 +1,48 @@
+// src/lib/pages/suppliers/supplierDetailPage.types.ts
+
+/**
+ * @file Type definitions for the Supplier Detail Page.
+ * @description Defines the data structures for both the resolved data used by the Svelte component
+ * and the asynchronous promise-based data returned by the `load` function.
+ * This ensures type safety throughout the data-loading lifecycle.
+ */
+
+import { z } from 'zod';
+import {
+	WholesalerSchema,
+	WholesalerCategory_CategorySchema,
+	ProductCategorySchema
+} from '$lib/domain/domainTypes';
+import type { PromisifyComplex } from '$lib/utils/typeUtils';
+
+// --- Zod Schema for Runtime Validation ---
+
+/**
+ * Defines the schema for the fully resolved data required by the Supplier Detail Page.
+ * This is used to validate the data shape after all promises from the `load` function have been resolved.
+ */
+export const SupplierDetailPage_LoadDataSchema = z.object({
+	/** The core supplier entity being displayed. */
+	supplier: WholesalerSchema,
+
+	/** The list of categories already assigned to this supplier, enriched with category details. */
+	assignedCategories: z.array(WholesalerCategory_CategorySchema),
+
+	/** The list of categories available for assignment to this supplier. */
+	availableCategories: z.array(ProductCategorySchema)
+});
+
+// --- TypeScript Type Exports ---
+
+/**
+ * The type representing the final, resolved data structure for the page.
+ * This is inferred directly from the Zod schema to ensure consistency.
+ */
+export type SupplierDetailPage_LoadData = z.infer<typeof SupplierDetailPage_LoadDataSchema>;
+
+/**
+ * The asynchronous version of the load data, where complex properties are Promises.
+ * This is the exact type that the `load` function will return and the Svelte component
+ * will receive as its `data` prop.
+ */
+export type SupplierDetailPage_LoadDataAsync = PromisifyComplex<SupplierDetailPage_LoadData>;

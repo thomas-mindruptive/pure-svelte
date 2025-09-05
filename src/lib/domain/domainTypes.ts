@@ -7,6 +7,7 @@ export const LevelSchema = z.enum(['wholesalers', 'categories', 'offerings', 'at
 export const WholesalerSchema = z.object({
   wholesaler_id: z.number().int().positive(),
   name: z.string().max(200),
+  country: z.string().max(200).nullable().optional(),
   region: z.string().max(200).nullable().optional(),
   b2b_notes: z.string().max(1000).nullable().optional(),
   status: z.string().max(100).nullable().optional(),

@@ -49,19 +49,20 @@ export const POST: RequestHandler = async ({ request }) => {
 		}
 
 		// 3. Use the sanitized data from the validator for the database operation.
-		const { name, region, status, dropship, website, b2b_notes } = validation.sanitized as Partial<Wholesaler>;
+		const { name, country, region, status, dropship, website, b2b_notes } = validation.sanitized as Partial<Wholesaler>;
 
 		// 4. Execute the INSERT query and use 'OUTPUT INSERTED.*' to get the new record back.
 		const result = await db
 			.request()
 			.input('name', name)
+			.input('country', country)
 			.input('region', region)
 			.input('status', status)
 			.input('dropship', dropship)
 			.input('website', website)
 			.input('b2b_notes', b2b_notes)
 			.query(
-				'INSERT INTO dbo.wholesalers (name, region, status, dropship, website, b2b_notes) OUTPUT INSERTED.* VALUES (@name, @region, @status, @dropship, @website, @b2b_notes)'
+				'INSERT INTO dbo.wholesalers (name, country, region, status, dropship, website, b2b_notes) OUTPUT INSERTED.* VALUES (@name, @country, @region, @status, @dropship, @website, @b2b_notes)'
 			);
 
 		if (result.recordset.length === 0) {

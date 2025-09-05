@@ -163,6 +163,7 @@ const DOMAIN_SCHEMAS: {
     requiredOnUpdate: [], // No required fields for updates (PATCH-style)
     constraints: {
       name: COMMON_CONSTRAINTS.shortText,
+      country: COMMON_CONSTRAINTS.shortText,
       region: COMMON_CONSTRAINTS.shortText,
       status: COMMON_CONSTRAINTS.status,
       website: COMMON_CONSTRAINTS.url,

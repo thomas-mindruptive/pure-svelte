@@ -160,9 +160,9 @@ export const PUT: RequestHandler = async ({ params, request }) => {
             return json(errRes, { status: 400 });
         }
 
-        const { name, region, status, dropship, website, b2b_notes } = validation.sanitized as Partial<Wholesaler>;
-        const result = await db.request().input('id', id).input('name', name).input('region', region).input('status', status).input('dropship', dropship).input('website', website).input('b2b_notes', b2b_notes)
-            .query('UPDATE dbo.wholesalers SET name=@name, region=@region, status=@status, dropship=@dropship, website=@website, b2b_notes=@b2b_notes OUTPUT INSERTED.* WHERE wholesaler_id = @id');
+        const { name, country, region, status, dropship, website, b2b_notes } = validation.sanitized as Partial<Wholesaler>;
+        const result = await db.request().input('id', id).input('name', name).input("country", country).input('region', region).input('status', status).input('dropship', dropship).input('website', website).input('b2b_notes', b2b_notes)
+            .query('UPDATE dbo.wholesalers SET name=@name, country=@country, region=@region, status=@status, dropship=@dropship, website=@website, b2b_notes=@b2b_notes OUTPUT INSERTED.* WHERE wholesaler_id = @id');
 
         if (result.recordset.length === 0) {
             const errRes: ApiErrorResponse = { success: false, message: `Supplier with ID ${id} not found.`, status_code: 404, error_code: 'NOT_FOUND', meta: { timestamp: new Date().toISOString() } };

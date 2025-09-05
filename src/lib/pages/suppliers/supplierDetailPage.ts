@@ -4,44 +4,38 @@ import { log } from '$lib/utils/logger';
 import { error, type LoadEvent } from '@sveltejs/kit';
 import { getSupplierApi } from '$lib/api/client/supplier';
 import { ApiClient } from '$lib/api/client/ApiClient';
+// NEW: Import the asynchronous data type
+import type { SupplierDetailPage_LoadDataAsync } from './supplierDetailPage.types';
 
 /**
- * Lädt alle Daten für die Lieferanten-Detailseite.
- * Führt drei API-Aufrufe parallel aus, um die Ladezeit zu optimieren.
+ * Loads all data for the Supplier Detail Page using the non-blocking "app shell" pattern.
+ * This function returns immediately with an object of promises.
+ * The corresponding Svelte component is responsible for resolving these promises.
+ *
+ * @param params Contains the supplierId from the URL.
+ * @param loadEventFetch The context-aware fetch function from SvelteKit.
+ * @returns An object where each property is a promise for the required data.
  */
-export async function load({ params, fetch: loadEventFetch }: LoadEvent) {
-  const supplierId = Number(params.supplierId);
-  if (isNaN(supplierId)) {
-    throw error(400, 'Invalid Supplier ID');
-  }
+export function load({ params, fetch: loadEventFetch }: LoadEvent): SupplierDetailPage_LoadDataAsync {
+	const supplierId = Number(params.supplierId);
+	if (isNaN(supplierId)) {
+		// This error is thrown immediately as it's a client-side validation error.
+		throw error(400, 'Invalid Supplier ID');
+	}
 
-  log.info(`(SupplierDetailPage) loading all data for supplierId: ${supplierId}`);
+	log.info(`(SupplierDetailPage) Kicking off non-blocking load for supplierId: ${supplierId}`);
 
-  // 1. Create an ApiClient instance with the context-aware `fetch`.
-  const client = new ApiClient(loadEventFetch);
+	// Create an ApiClient instance with the context-aware `fetch`.
+	const client = new ApiClient(loadEventFetch);
 
-  // 2. Get the supplier-specific API methods from the factory.
-  const supplierApi = getSupplierApi(client);
+	// Get the supplier-specific API methods from the factory.
+	const supplierApi = getSupplierApi(client);
 
-  try {
-    // Führe alle notwendigen Datenabrufe parallel aus.
-    const [supplier, assignedCategories, availableCategories] = await Promise.all([
-      supplierApi.loadSupplier(supplierId),
-      supplierApi.loadCategoriesForSupplier(supplierId),
-      supplierApi.loadAvailableCategoriesForSupplier(supplierId)
-    ]);
-
-    // Gib alle geladenen Daten an die UI-Komponente weiter.
-    return {
-      supplier,
-      assignedCategories,
-      availableCategories
-    };
-
-  } catch (err: any) {
-    log.error(`(SupplierDetailPage) Failed to load data for supplierId: ${supplierId}`, { err });
-    const status = err.status ?? err?.response?.status ?? 500;
-    const msg = err?.response?.details || err?.message || 'Failed to load category';
-    throw error(status, msg);
-  }
+	// ⚠️ Return the object of promises directly without `await`.
+	//    The page component will handle resolving and error states.
+	return {
+		supplier: supplierApi.loadSupplier(supplierId),
+		assignedCategories: supplierApi.loadCategoriesForSupplier(supplierId),
+		availableCategories: supplierApi.loadAvailableCategoriesForSupplier(supplierId)
+	};
 }

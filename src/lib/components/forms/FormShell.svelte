@@ -29,7 +29,6 @@
     FormData,
   } from "./forms.types";
 
-
   // ========================================================================
   // TYPE DEFINITIONS
   // ========================================================================
@@ -209,15 +208,18 @@
 
     // Notify parent of data change
     try {
+      log.debug(`Before calling parent's onChanged: `, onChanged);
       onChanged?.({
         data: pureDataDeepClone(formState.data),
         dirty: isDirty(),
       });
+      log.debug("AFTER calling parent's onChanged");
     } catch (e) {
-      log.error(
-        { component: "FormShell", entity, error: coerceMessage(e) },
-        "onChanged threw",
-      );
+      log.error("onChanged threw error", {
+        component: "FormShell",
+        entity,
+        error: coerceMessage(e),
+      });
     }
 
     // Auto-validate on change if configured
@@ -233,6 +235,7 @@
     path: readonly [...P],
     value: PathValue<FormData<T>, P>,
   ) {
+    log.debug(`path: ${path}, value: `, value);
     try {
       pathUtils.set<FormData<T>, P>(formState.data, path, value);
     } catch (e) {
@@ -387,6 +390,7 @@
       if (!ok) {
         formState.submitting = false;
         try {
+          log.warn(`Validation failed. Data: `, formState.data);
           onSubmitError?.({
             data: pureDataDeepClone(formState.data),
             error: new Error("Validation failed before submission."),

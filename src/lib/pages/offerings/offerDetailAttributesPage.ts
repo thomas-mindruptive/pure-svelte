@@ -27,14 +27,13 @@ export function load({ params, fetch: fetchLoad }: LoadEvent) {
     throw error(400, 'OfferDetailAttributesPage.load: Invalid Supplier ID');
   }
 
-  log.info(`(OfferDetailAttributesPage) loading all data for offeringId: ${offeringId}, categoryId: ${categoryId}, supplierId: ${supplierId}`);
-
   // API
   const client = new ApiClient(fetchLoad);
   const offeringApi = getOfferingApi(client);
 
   // EDIT MODE
   if (offeringId) {
+    log.info(`Kicking off promises for EDIT mode: offeringId: ${offeringId}, categoryId: ${categoryId}, supplierId: ${supplierId}`);
     const asyncLoadData: OfferingDetailAttributes_LoadDataAsync =
     {
       supplierId, // Always pass from the params.
@@ -48,19 +47,19 @@ export function load({ params, fetch: fetchLoad }: LoadEvent) {
 
     };
     return asyncLoadData;
-  } else {
-    // CREATE MODE
-    // API loads only those product definitions that are available for the selected category and supplier 
-    // and have NOT YET been assigned to supplier.
-    const availableProducts = offeringApi.getAvailableProductDefsForOffering(categoryId, supplierId);
 
+  } else {
+    log.info(`Kicking off promises for CREATE mode: offeringId: ${offeringId}, categoryId: ${categoryId}, supplierId: ${supplierId}`);
+    // CREATE MODE
     const asyncLoadData: OfferingDetailAttributes_LoadDataAsync = {
       supplierId, // Always pass from the params.
       categoryId, // Always pass from the params.
       offering: Promise.resolve(null), // Not initial offering to edit
       availableAttributes: Promise.resolve([]),
       assignedAttributes: Promise.resolve([]),
-      availableProducts: availableProducts // Only the "remaining" products
+      // API loads only those product definitions that are available for the selected category and supplier 
+      // and have NOT YET been assigned to supplier.
+      availableProducts: offeringApi.getAvailableProductDefsForOffering(categoryId, supplierId)
     };
 
     return asyncLoadData;

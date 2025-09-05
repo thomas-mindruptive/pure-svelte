@@ -1,190 +1,197 @@
 <!-- src/lib/pages/offerings/OfferDetailLinksPage.svelte -->
 <script lang="ts">
-  import { addNotification } from "$lib/stores/notifications";
-  import { invalidateAll } from "$app/navigation";
+	import { addNotification } from '$lib/stores/notifications';
+	import { invalidateAll } from '$app/navigation';
+	import LinkGrid from '$lib/components/links/LinkGrid.svelte';
+	import { getOfferingApi, offeringLoadingState } from '$lib/api/client/offering';
+	import type { WholesalerOfferingLink } from '$lib/domain/domainTypes';
+	import { ApiClient } from '$lib/api/client/ApiClient';
+	import '$lib/components/styles/assignment-section.css';
+	import '$lib/components/styles/grid-section.css';
+	import '$lib/components/styles/detail-page-layout.css';
+	import '$lib/components/styles/form-elements.css';
+	import OfferingDetailWrapper from '$lib/components/domain/offerings/OfferingDetailWrapper.svelte';
+	import type { ID, DeleteStrategy, RowActionStrategy } from '$lib/components/grids/Datagrid.types';
+	import {
+		OfferingDetailLinks_LoadDataSchema,
+		type OfferingDetailLinks_LoadData,
+		type OfferingDetailLinks_LoadDataAsync
+	} from './offeringDetail.types';
+	import { log } from '$lib/utils/logger';
+	import { assertDefined } from '$lib/utils/validation/assertions';
 
-  import LinkGrid from "$lib/components/links/LinkGrid.svelte";
-  import {
-    getOfferingApi,
-    offeringLoadingState,
-  } from "$lib/api/client/offering";
-  import type { WholesalerOfferingLink } from "$lib/domain/domainTypes";
+	// --- PROPS ---
+	let { data } = $props<{ data: OfferingDetailLinks_LoadDataAsync }>();
 
-  import { ApiClient } from "$lib/api/client/ApiClient";
+	// --- LOKALER, REAKTIVER ZUSTAND ---
+	let resolvedData = $state<OfferingDetailLinks_LoadData | null>(null);
+	let isLoading = $state(true);
+	let loadingError = $state<{ message: string; status?: number } | null>(null);
 
-  import "$lib/components/styles/assignment-section.css";
-  import "$lib/components/styles/grid-section.css";
-  import "$lib/components/styles/detail-page-layout.css";
-  import "$lib/components/styles/form-elements.css";
-  import OfferingDetailWrapper from "$lib/components/domain/offerings/OfferingDetailWrapper.svelte";
-  import type {
-    ID,
-    DeleteStrategy,
-    RowActionStrategy,
-  } from "$lib/components/grids/Datagrid.types";
-  import {
-    OfferingDetailLinks_LoadDataSchema,
-    type OfferingDetailLinks_LoadData,
-  } from "./offeringDetail.types";
-    import { log } from "$lib/utils/logger";
-    import { assertDefined } from "$lib/utils/validation/assertions";
+	// --- DATENVERARBEITUNG mit $effect ---
+	$effect(() => {
+		let aborted = false;
+		const processPromises = async () => {
+			isLoading = true;
+			loadingError = null;
+			resolvedData = null;
 
-  let { data: rawLoadedData } = $props<{
-    data: OfferingDetailLinks_LoadData;
-  }>();
+			try {
+				const [offering, links, availableProducts] = await Promise.all([
+					data.offering,
+					data.links,
+					data.availableProducts
+				]);
 
-  // ===== VALIDATION =====
+				if (aborted) return;
 
-  let { data, errors } = $derived.by(() => {
-    const result = OfferingDetailLinks_LoadDataSchema.safeParse(rawLoadedData);
-    return {
-      data: result.success ? result.data : null,
-      errors: result.success ? null : result.error.issues,
-      isValid: result.success,
-    };
-  });
+				const dataToValidate = {
+					supplierId: data.supplierId,
+					categoryId: data.categoryId,
+					offering,
+					links,
+					availableProducts
+				};
 
-  $effect(() => {
-    if (errors) {
-      log.error(`(OfferDetailLinksPage) Validation errors:`, errors);
-    } else {
-      log.debug(
-        `(OfferDetailLinksPage) Validated data OK:`,
-        data,
-      );
-    }
-  });
+				const validationResult = OfferingDetailLinks_LoadDataSchema.safeParse(dataToValidate);
 
-  // ===== STATE =====
+				if (!validationResult.success) {
+					log.error('(OfferDetailLinksPage) Zod validation failed', validationResult.error.issues);
+					throw new Error('Received invalid data structure from the API.');
+				}
 
-  let newUrl = $state("");
-  let newNotes = $state("");
-  let isAssigning = $state(false);
+				resolvedData = validationResult.data;
+			} catch (rawError: any) {
+				if (aborted) return;
+				const status = rawError.status ?? 500;
+				const message = rawError.message || 'Failed to load or validate link details.';
+				loadingError = { message, status };
+				log.error('(OfferDetailLinksPage) Promise processing failed', { rawError });
+			} finally {
+				if (!aborted) {
+					isLoading = false;
+				}
+			}
+		};
 
-  // 1. Create an ApiClient instance with the client `fetch`.
-  const client = new ApiClient(fetch);
+		processPromises();
+		return () => {
+			aborted = true;
+		};
+	});
 
-  // 2. Get the supplier-specific API methods from the factory.
-  const offeringApi = getOfferingApi(client);
+	// --- STATE & API ---
+	let newUrl = $state('');
+	let newNotes = $state('');
+	let isAssigning = $state(false);
 
-  async function handleLinkDelete(ids: ID[]): Promise<void> {
-    assertDefined(ids, "OfferDetailLinksPage.handleLinkDelete");
-    for (const id of ids) {
-      await offeringApi.deleteOfferingLink(Number(id));
-    }
-    addNotification("Link(s) deleted.", "success");
-    invalidateAll();
-  }
+	const client = new ApiClient(fetch);
+	const offeringApi = getOfferingApi(client);
 
-  function handleLinkSelect(link: WholesalerOfferingLink) {
-    assertDefined(link, "OfferDetailLinksPage.handleLinkSelect");
-    addNotification(
-      `Editing for link "${link.url}" not yet implemented.`,
-      "info",
-    );
-  }
+	// --- API-AUFRUFE ---
+	async function handleLinkDelete(ids: ID[]): Promise<void> {
+		assertDefined(ids, 'OfferDetailLinksPage.handleLinkDelete');
+		for (const id of ids) {
+			await offeringApi.deleteOfferingLink(Number(id));
+		}
+		addNotification('Link(s) deleted.', 'success');
+		invalidateAll();
+	}
 
-  async function handleAssignLink(event: SubmitEvent) {
-    assertDefined(event, "OfferDetailLinksPage.handleAssignLink");
-    // Das Standardverhalten wird hier programmatisch verhindert.
-    event.preventDefault();
+	function handleLinkSelect(link: WholesalerOfferingLink) {
+		assertDefined(link, 'OfferDetailLinksPage.handleLinkSelect');
+		addNotification(`Editing for link "${link.url}" not yet implemented.`, 'info');
+	}
 
-    if (!data) {
-      addNotification(
-        "No valid data available. Probably validation failed",
-        "error",
-      );
-      return;
-    }
-    if (!data.offering) {
-      addNotification(
-        "No offering available. Probably CREATE mode => Cannot assign link.",
-        "error",
-      );
-      return;
-    }
+	async function handleAssignLink(event: SubmitEvent) {
+		assertDefined(event, 'OfferDetailLinksPage.handleAssignLink');
+		event.preventDefault();
 
-    if (!newUrl) return;
-    isAssigning = true;
-    try {
-      const linkData: Omit<WholesalerOfferingLink, "link_id"> = {
-        offering_id: data.offering.offering_id,
-        url: newUrl,
-        ...(newNotes && { notes: newNotes }),
-      };
-      await offeringApi.createOfferingLink(linkData);
+		if (!resolvedData || !resolvedData.offering) {
+			addNotification('An offering must be saved before assigning links.', 'error');
+			return;
+		}
 
-      addNotification("Link added.", "success");
-      newUrl = "";
-      newNotes = "";
-      await invalidateAll();
-    } finally {
-      isAssigning = false;
-    }
-  }
+		if (!newUrl) return;
+		isAssigning = true;
+		try {
+			const linkData: Omit<WholesalerOfferingLink, 'link_id'> = {
+				offering_id: resolvedData.offering.offering_id,
+				url: newUrl,
+				...(newNotes && { notes: newNotes })
+			};
+			await offeringApi.createOfferingLink(linkData);
 
-  const deleteStrategy: DeleteStrategy<WholesalerOfferingLink> = {
-    execute: handleLinkDelete,
-  };
+			addNotification('Link added.', 'success');
+			newUrl = '';
+			newNotes = '';
+			await invalidateAll();
+		} finally {
+			isAssigning = false;
+		}
+	}
 
-  const rowActionStrategy: RowActionStrategy<WholesalerOfferingLink> = {
-    click: handleLinkSelect,
-  };
+	// --- GRID STRATEGIES ---
+	const deleteStrategy: DeleteStrategy<WholesalerOfferingLink> = {
+		execute: handleLinkDelete
+	};
+	const rowActionStrategy: RowActionStrategy<WholesalerOfferingLink> = {
+		click: handleLinkSelect
+	};
 </script>
 
-{#if false}
-  NOTE: The event handlers like "onSubmitted" are handled by the wrapper
-  istself.
-{/if}
+<!-- TEMPLATE mit bedingtem Rendering -->
+{#if loadingError}
+	<div class="component-error-boundary">
+		<h3>Error Loading Data (Status: {loadingError.status})</h3>
+		<p>{loadingError.message}</p>
+	</div>
+{:else if isLoading || !resolvedData}
+	<div class="detail-page-layout">Loading link details...</div>
+{:else}
+	<OfferingDetailWrapper
+		initialLoadedData={resolvedData}
+		availableProducts={resolvedData.availableProducts}
+	>
+		<div class="grid-section">
+			<div class="assignment-section">
+				<h3>Add New Link</h3>
+				{#if !resolvedData.offering}
+					<p class="field-hint">
+						You must save the new offering first before you can add links.
+					</p>
+				{/if}
+				<form class="assignment-form" onsubmit={handleAssignLink}>
+					<input
+						type="url"
+						placeholder="https://example.com/product"
+						bind:value={newUrl}
+						required
+						disabled={isAssigning || !resolvedData.offering}
+					/>
+					<input
+						type="text"
+						placeholder="Optional notes..."
+						bind:value={newNotes}
+						disabled={isAssigning || !resolvedData.offering}
+					/>
+					<button
+						type="submit"
+						class="primary-button"
+						disabled={isAssigning || !newUrl || !resolvedData.offering}
+					>
+						{isAssigning ? 'Adding...' : 'Add Link'}
+					</button>
+				</form>
+			</div>
 
-{#if !errors && data}
-  {#if false}Comment: "&& data" for type safety{/if}
-  <OfferingDetailWrapper
-    initialLoadedData={data}
-    availableProducts={data.availableProducts}
-  >
-    <!-- Der spezifische Inhalt dieser Seite kommt in den Default Slot -->
-    <div class="grid-section">
-      <div class="assignment-section">
-        <h3>Add New Link</h3>
-        <form class="assignment-form" onsubmit={handleAssignLink}>
-          <input
-            type="url"
-            placeholder="https://example.com/product"
-            bind:value={newUrl}
-            required
-            disabled={isAssigning}
-          />
-          <input
-            type="text"
-            placeholder="Optional notes..."
-            bind:value={newNotes}
-            disabled={isAssigning}
-          />
-          <button
-            type="submit"
-            class="primary-button"
-            disabled={isAssigning || !newUrl}
-          >
-            {isAssigning ? "Adding..." : "Add Link"}
-          </button>
-        </form>
-      </div>
-
-      <h2 style="margin-top: 1.5rem;">Assigned Links</h2>
-      <LinkGrid
-        rows={data.links}
-        loading={$offeringLoadingState}
-        {deleteStrategy}
-        {rowActionStrategy}
-      />
-    </div>
-  </OfferingDetailWrapper>
-{:else if errors}
-  <div class="component-error-boundary">
-    <h3>Error</h3>
-    {#each errors as error}
-      <p>{error.path.join(".")}: {error.message}</p>
-    {/each}
-  </div>
+			<h2 style="margin-top: 1.5rem;">Assigned Links</h2>
+			<LinkGrid
+				rows={resolvedData.links}
+				loading={$offeringLoadingState}
+				{deleteStrategy}
+				{rowActionStrategy}
+			/>
+		</div>
+	</OfferingDetailWrapper>
 {/if}

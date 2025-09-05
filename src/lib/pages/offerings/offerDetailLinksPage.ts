@@ -30,13 +30,12 @@ export async function load({ params, fetch: fetchLoad }: LoadEvent) {
     throw error(400, 'OfferingDetailLinksPage.load: Invalid Supplier ID');
   }
 
-  log.info(`(OfferDetailLinksPage) loading all data for offeringId: ${offeringId}, categoryId: ${categoryId}, supplierId: ${supplierId}`);
-
   const client = new ApiClient(fetchLoad);
   const offeringApi = getOfferingApi(client);
 
   // EDIT MODE
   if (offeringId) {
+    log.info(`Kicking off promises for EDIT mode: offeringId: ${offeringId}, categoryId: ${categoryId}, supplierId: ${supplierId}`);
     const asyncLoadData: OfferingDetailLinks_LoadDataAsync = {
       supplierId, // Always pass from the params.
       categoryId, // Always pass from the params.
@@ -48,8 +47,9 @@ export async function load({ params, fetch: fetchLoad }: LoadEvent) {
     }
     log.info(`(OfferDetailLinksPage) Kicked off loading promises offeringId: ${offeringId}`);
     return asyncLoadData
-  } else {
 
+  } else {
+    log.info(`Kicking off promises for CREATE mode: offeringId: ${offeringId}, categoryId: ${categoryId}, supplierId: ${supplierId}`);
     // CREATE MODE
     const asyncLoadData: OfferingDetailLinks_LoadDataAsync = {
       supplierId, // Always pass from the params.

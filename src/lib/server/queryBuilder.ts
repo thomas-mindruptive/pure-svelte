@@ -15,6 +15,7 @@ import type { QueryPayload, WhereCondition, WhereConditionGroup, JoinClause, Sor
 import { isJoinColCondition, isWhereCondition, isWhereConditionGroup } from '$lib/backendQueries/queryGrammar';
 import type { QueryConfig } from '$lib/backendQueries/queryConfig';
 import { aliasedTablesConfig } from '$lib/backendQueries/queryConfig';
+import type { Transaction } from 'mssql';
 
 // --- TYPE DEFINITIONS for internal use ---
 
@@ -203,9 +204,10 @@ export function buildQuery<T>(
  * @param parameters A record of parameters to be safely injected by the driver.
  * @returns A promise that resolves to an array of query result objects.
  */
-export async function executeQuery(sql: string, parameters: Parameters): Promise<Record<string, unknown>[]> {
+export async function executeQuery(sql: string, parameters: Parameters, options?: { transaction?: Transaction }): Promise<Record<string, unknown>[]> {
 	try {
-		const request = db.request();
+		const requestSource = options?.transaction || db;
+		const request = requestSource.request();
 		for (const key in parameters) {
 			request.input(key, parameters[key]);
 		}

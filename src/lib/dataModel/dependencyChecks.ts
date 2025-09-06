@@ -170,3 +170,38 @@ export async function checkProductDefinitionDependencies(productDefId: number): 
     });
     return dependencies;
 }
+
+/**
+ * Check offering dependencies (attributes and links)
+ */
+export async function checkOfferingDependencies(offeringId: number): Promise<string[]> {
+    const dependencies: string[] = [];
+
+    // Check offering attributes
+    const attributesCheck = await db.request()
+        .input('offeringId', offeringId)
+        .query(`
+            SELECT COUNT(*) as count 
+            FROM dbo.wholesaler_offering_attributes 
+            WHERE offering_id = @offeringId
+        `);
+
+    if (attributesCheck.recordset[0].count > 0) {
+        dependencies.push(`${attributesCheck.recordset[0].count} offering attributes`);
+    }
+
+    // Check offering links
+    const linksCheck = await db.request()
+        .input('offeringId', offeringId)
+        .query(`
+            SELECT COUNT(*) as count 
+            FROM dbo.wholesaler_offering_links 
+            WHERE offering_id = @offeringId
+        `);
+
+    if (linksCheck.recordset[0].count > 0) {
+        dependencies.push(`${linksCheck.recordset[0].count} offering links`);
+    }
+
+    return dependencies;
+}

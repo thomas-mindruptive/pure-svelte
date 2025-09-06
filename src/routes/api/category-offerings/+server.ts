@@ -12,7 +12,7 @@ import { db } from '$lib/server/db';
 import { log } from '$lib/utils/logger';
 import { validateOffering } from '$lib/server/validation/domainValidator';
 import { mssqlErrorMapper } from '$lib/server/errors/mssqlErrorMapper';
-import type { ProductCategory, WholesalerItemOffering } from '$lib/domain/domainTypes';
+import type { ProductCategory, WholesalerItemOffering, WholesalerItemOffering_ProductDef_Category } from '$lib/domain/domainTypes';
 import { v4 as uuidv4 } from 'uuid';
 
 import type {
@@ -24,42 +24,11 @@ import type {
     RemoveAssignmentRequest
 } from '$lib/api/api.types';
 import { buildQuery, executeQuery } from '$lib/server/queryBuilder';
-import type { QueryPayload } from '$lib/backendQueries/queryGrammar';
+import { ComparisonOperator, type QueryPayload } from '$lib/backendQueries/queryGrammar';
+import { supplierQueryConfig } from '$lib/backendQueries/queryConfig';
+import { checkOfferingDependencies } from '$lib/dataModel/dependencyChecks';
 
-/**
- * Check offering dependencies (attributes and links)
- */
-async function checkOfferingDependencies(offeringId: number): Promise<string[]> {
-    const dependencies: string[] = [];
 
-    // Check offering attributes
-    const attributesCheck = await db.request()
-        .input('offeringId', offeringId)
-        .query(`
-            SELECT COUNT(*) as count 
-            FROM dbo.wholesaler_offering_attributes 
-            WHERE offering_id = @offeringId
-        `);
-
-    if (attributesCheck.recordset[0].count > 0) {
-        dependencies.push(`${attributesCheck.recordset[0].count} offering attributes`);
-    }
-
-    // Check offering links
-    const linksCheck = await db.request()
-        .input('offeringId', offeringId)
-        .query(`
-            SELECT COUNT(*) as count 
-            FROM dbo.wholesaler_offering_links 
-            WHERE offering_id = @offeringId
-        `);
-
-    if (linksCheck.recordset[0].count > 0) {
-        dependencies.push(`${linksCheck.recordset[0].count} offering links`);
-    }
-
-    return dependencies;
-}
 
 /**
  * POST /api/category-offerings
@@ -69,6 +38,8 @@ export const POST: RequestHandler = async ({ request }) => {
     log.infoHeader("POST /api/category-offerings");
     const operationId = uuidv4();
     log.info(`[${operationId}] POST /category-offerings: FN_START`);
+
+    const transaction = db.transaction();
 
     try {
         // 1. Expect the request body to be CreateChildRequest.
@@ -134,7 +105,7 @@ export const POST: RequestHandler = async ({ request }) => {
         } = validation.sanitized as Partial<Omit<WholesalerItemOffering, 'offering_id'>>
 
         // 4. Verify that supplier and category exist and are related
-        const relationCheck = await db.request()
+        const relationCheck = await transaction.request()
             .input('wholesalerId', wholesaler_id)
             .input('categoryId', category_id)
             .query(`
@@ -186,11 +157,8 @@ export const POST: RequestHandler = async ({ request }) => {
             return json(errRes, { status: 400 });
         }
 
-        // todo: begin transaction
-
         // 5. Execute the INSERT query and use 'OUTPUT INSERTED.*' to get the new record back.
-        const result = await db
-            .request()
+        const result = await transaction.request()
             .input('wholesaler_id', wholesaler_id)
             .input('category_id', category_id)
             .input('product_def_id', product_def_id)
@@ -214,21 +182,48 @@ export const POST: RequestHandler = async ({ request }) => {
             throw error(500, 'Failed to create offering after database operation.');
         }
 
-
-
         const newOffering = result.recordset[0] as WholesalerItemOffering;
+        const newOfferingId = newOffering.offering_id
 
-        let where = ...
-        const offeringPlusProductDefQuery = buildQuery(... predefinedquery...)
-        const offeringPlusProductDef = executeQuery(...)
+        // ===== JOIN QUERY TO RETRIEVE OFFERING + PRODCUT_DEF_TITLE =====
 
-        // todo: end transaction, also in "finally"
+        const queryPayloadOfferingPlusProdDef: QueryPayload<WholesalerItemOffering_ProductDef_Category> = {
+            select: [
+                // Select all columns from the offering itself (alias 'wio')
+                'wio.offering_id', 'wio.wholesaler_id', 'wio.category_id', 'wio.product_def_id',
+                'wio.price', 'wio.currency', 'wio.size', 'wio.dimensions', 'wio.comment', 'wio.created_at',
+                // And the title from the joined product definition (alias 'pd')
+                'pd.title AS product_def_title'
+            ],
+            where: {
+                key: 'wio.offering_id',
+                whereCondOp: ComparisonOperator.EQUALS,
+                val: newOfferingId
+            },
+            limit: 1
+        };
 
-        // 6. Format the successful response with a 201 Created status.
+        const { sql: builtSql, parameters } = buildQuery(
+            queryPayloadOfferingPlusProdDef,
+            supplierQueryConfig,
+            'wholesaler_item_offering_product_def' // <-- KORREKTER NAME WIRD VERWENDET
+        );
+
+        const fullObjectResult = await executeQuery(builtSql, parameters, { transaction });
+
+        if (!fullObjectResult || fullObjectResult.length === 0) {
+            throw new Error(`Could not retrieve the newly created offering (ID: ${newOfferingId}) using the predefined query.`);
+        }
+
+        const newOfferingFull = fullObjectResult[0] as WholesalerItemOffering_ProductDef_Category;
+
+        await transaction.commit();
+        log.debug(`[${operationId}] Transaction committed successfully.`);
+
         const response: ApiSuccessResponse<{ offering: WholesalerItemOffering }> = {
             success: true,
-            message: `Offering created successfully in category "${category_name}" for supplier "${supplier_name}".`,
-            data: { offering: newOffering },
+            message: `Offering created successfully in category "${category_name}" for supplier "${supplier_name}". Returning offering including product_def_title`,
+            data: { offering: newOfferingFull },
             meta: { timestamp: new Date().toISOString() }
         };
 
@@ -238,6 +233,7 @@ export const POST: RequestHandler = async ({ request }) => {
     } catch (err: unknown) {
         const { status, message } = mssqlErrorMapper.mapToHttpError(err);
         log.error(`[${operationId}] FN_EXCEPTION: Unhandled error during offering creation.`, { error: err });
+        await transaction.rollback();
         throw error(status, message);
     }
 };

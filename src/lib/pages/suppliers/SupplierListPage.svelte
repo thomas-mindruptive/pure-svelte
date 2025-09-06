@@ -156,7 +156,7 @@
 
   function handleSupplierCreate() {
     log.info(`Going to SupplierDetailPage with "new"`);
-    goto(`${$page.url.pathname}/suppliers/new`);
+    goto(`${$page.url.pathname}/new`);
   }
 
   // ===== GRID STRATEGIES =====

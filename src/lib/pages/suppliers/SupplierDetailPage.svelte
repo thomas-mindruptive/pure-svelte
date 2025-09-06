@@ -22,7 +22,7 @@
 		ProductCategory,
 		WholesalerCategory_Category,
 		WholesalerCategory,
-        Wholesaler,
+		Wholesaler,
 	} from "$lib/domain/domainTypes";
 	import { categoryLoadingState } from "$lib/api/client/category";
 	import { ApiClient } from "$lib/api/client/ApiClient";
@@ -42,7 +42,9 @@
 	// --- PROPS ---
 
 	// The component now receives the object with promises from the `load` function.
-	let { data } = $props<{ data: SupplierDetailPage_LoadDataAsync }>();
+	let { data }: { data: SupplierDetailPage_LoadDataAsync } = $props<{
+		data: SupplierDetailPage_LoadDataAsync;
+	}>();
 
 	// --- LOCAL REACTIVE STATE ---
 
@@ -52,7 +54,7 @@
 	let loadingError = $state<{ message: string; status?: number } | null>(
 		null,
 	);
-	const isCreateMode = $derived(!(resolvedData?.supplier));
+	const isCreateMode = $derived(!resolvedData?.supplier);
 
 	// --- DATA PROCESSING with $effect (NEW) ---
 
@@ -130,59 +132,65 @@
 	const client = new ApiClient(fetch);
 	const supplierApi = getSupplierApi(client);
 
-async function handleFormSubmitted(info: { data: Wholesaler, result: unknown }) {
-    addNotification(
-        `Supplier saved successfully.`,
-        "success",
-    );
+	async function handleFormSubmitted(info: {
+		data: Wholesaler;
+		result: unknown;
+	}) {
+		addNotification(`Supplier saved successfully.`, "success");
 
-    if (isCreateMode) {
-        log.info("Submit successful in CREATE mode. Navigating to edit page...");
+		if (isCreateMode) {
+			log.info(
+				"Submit successful in CREATE mode. Navigating to edit page...",
+			);
 
-        // Get the new ID from the event data. 
-        // Thanks to our FormShell fix, info.data is the complete object from the API.
-        const newSupplierId = info.data?.wholesaler_id;
+			// Get the new ID from the event data.
+			// Thanks to our FormShell fix, info.data is the complete object from the API.
+			const newSupplierId = info.data?.wholesaler_id;
 
-        if (newSupplierId) {
-            // Build the new "edit mode" URL.
-            const newUrl = `/suppliers/${newSupplierId}`;
+			if (newSupplierId) {
+				// Build the new "edit mode" URL.
+				const newUrl = `/suppliers/${newSupplierId}`;
 
-            // Navigate to the new URL to switch to edit mode.
-            // invalidateAll is crucial to re-run the load function with the new ID.
-            await goto(newUrl, { invalidateAll: true });
-
-        } else {
-            // This is a fallback case in case the API response was malformed.
-            log.error("Could not redirect after create: new wholesaler_id is missing from response.", { data: info.data });
-            addNotification("Could not redirect to edit page, returning to list.", "error");
-            // Do not go to suppliers because we are in an invalid state.
-        }
-    } else {
-        log.info("Submit successful in EDIT mode. Remaining on page.");
-        // If it was an update, we do nothing else. The user stays on the current edit page.
-    }
-}
-
-	async function handleFormSubmitError(info: { data: Wholesaler, error: unknown }) {
-		log.error(`Form submit error`, info.error);
-		addNotification(
-			`Form submit error: ${info.error}`,
-			"error",
-		);
+				// Navigate to the new URL to switch to edit mode.
+				// invalidateAll is crucial to re-run the load function with the new ID.
+				await goto(newUrl, { invalidateAll: true });
+			} else {
+				// This is a fallback case in case the API response was malformed.
+				log.error(
+					"Could not redirect after create: new wholesaler_id is missing from response.",
+					{ data: info.data },
+				);
+				addNotification(
+					"Could not redirect to edit page, returning to list.",
+					"error",
+				);
+				// Do not go to suppliers because we are in an invalid state.
+			}
+		} else {
+			log.info("Submit successful in EDIT mode. Remaining on page.");
+			// If it was an update, we do nothing else. The user stays on the current edit page.
+		}
 	}
 
-	async function handleFormCancelled(info:{data: Wholesaler, reason?: string }) {
+	async function handleFormSubmitError(info: {
+		data: Wholesaler;
+		error: unknown;
+	}) {
+		log.error(`Form submit error`, info.error);
+		addNotification(`Form submit error: ${info.error}`, "error");
+	}
+
+	async function handleFormCancelled(info: {
+		data: Wholesaler;
+		reason?: string;
+	}) {
 		log.debug(`Form cancelled`);
-		addNotification(
-			`Form cancelled.`,
-			"info",
-		);
+		addNotification(`Form cancelled.`, "info");
 	}
 
 	async function handleFormChanged(event: { data: Record<string, any> }) {
 		log.debug(`Form changed`);
 	}
-	
 
 	/**
 	 * Handles the assignment of a new category.
@@ -234,7 +242,8 @@ async function handleFormSubmitted(info: { data: Wholesaler, result: unknown }) 
 	 */
 	async function handleCategoryDelete(ids: ID[]): Promise<void> {
 		if (!resolvedData?.supplier) {
-			const msg = "Cannot delete catagory in create mode or when supplier not yet loaded.";
+			const msg =
+				"Cannot delete catagory in create mode or when supplier not yet loaded.";
 			addNotification(msg, "error");
 			throw new Error(msg);
 		}
@@ -334,6 +343,7 @@ async function handleFormSubmitted(info: { data: Wholesaler, result: unknown }) 
 	<div class="detail-page-layout">
 		<!-- Section 1: Supplier details form -->
 		<div class="form-section">
+			<h1>***************************</h1>
 			<SupplierForm
 				initial={resolvedData.supplier}
 				disabled={$supplierLoadingState}
@@ -347,31 +357,43 @@ async function handleFormSubmitted(info: { data: Wholesaler, result: unknown }) 
 		<!-- Section 2: Assign new categories -->
 		<div class="assignment-section">
 			{#if resolvedData.supplier}
-			<CategoryAssignment
-				supplierId={resolvedData.supplier.wholesaler_id}
-				availableCategories={resolvedData.availableCategories}
-				loading={$categoryLoadingState}
-				onAssigned={handleCategoryAssigned}
-				onError={(msg) => addNotification(msg, "error")}
-			/>
+				<CategoryAssignment
+					supplierId={resolvedData.supplier.wholesaler_id}
+					availableCategories={resolvedData.availableCategories}
+					loading={$categoryLoadingState}
+					onAssigned={handleCategoryAssigned}
+					onError={(msg) => addNotification(msg, "error")}
+				/>
 			{:else}
-				<p>Category assignment will be available after supplier has been saved.</p>
+				<p>
+					Category assignment selection will be available after
+					supplier has been saved.
+				</p>
 			{/if}
 		</div>
 
 		<!-- Section 3: Grid of assigned categories -->
+
 		<div class="grid-section">
-			<h2>Assigned Categories</h2>
-			<p>
-				Products this supplier can offer are organized by these
-				categories. Click a category to manage its product offerings.
-			</p>
-			<CategoryGrid
-				rows={resolvedData.assignedCategories}
-				loading={$categoryLoadingState}
-				{deleteStrategy}
-				{rowActionStrategy}
-			/>
+			{#if resolvedData.supplier}
+				<h2>Assigned Categories</h2>
+				<p>
+					Products this supplier can offer are organized by these
+					categories. Click a category to manage its product
+					offerings.
+				</p>
+				<CategoryGrid
+					rows={resolvedData.assignedCategories}
+					loading={$categoryLoadingState}
+					{deleteStrategy}
+					{rowActionStrategy}
+				/>
+			{:else}
+				<p>
+					Assigned categories will be available after supplier has
+					been saved.
+				</p>
+			{/if}
 		</div>
 	</div>
 {/if}

@@ -27,7 +27,7 @@ export const SupplierDetail_LoadDataSchema = z.object({
 });
 
 export type SupplierDetail_LoadData = z.infer<typeof SupplierDetail_LoadDataSchema>;
-export type OfferingDetail_LoadDataAsync = PromisifyComplex<SupplierDetail_LoadData>;
+export type SupplierDetail_LoadDataAsync = PromisifyComplex<SupplierDetail_LoadData>;
 
 /**
  * Defines the schema for the fully resolved data required by the Supplier Detail Page.

@@ -5,7 +5,7 @@
 
 	import FormShell from "$lib/components/forms/FormShell.svelte";
 	import { log } from "$lib/utils/logger";
-	import type { Wholesaler } from "$lib/domain/domainTypes";
+	import { WholesalerSchema, type Wholesaler } from "$lib/domain/domainTypes";
 	import "$lib/components/styles/form.css";
 	import "$lib/components/styles/grid.css";
 	import { ApiClient } from "$lib/api/client/ApiClient";
@@ -17,11 +17,12 @@
 		ChangedCallback,
 		ValidateResult,
 	} from "$lib/components/forms/forms.types";
-	import { SupplierDetail_LoadDataSchema } from "$lib/pages/suppliers/supplierDetailPage.types";
-    import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
-    import { assertDefined } from "$lib/utils/validation/assertions";
+	import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
+	import { assertDefined } from "$lib/utils/validation/assertions";
 
 	type ValidationErrors = Record<string, string[]>;
+
+	// ===== PROPS =====
 
 	const {
 		initial,
@@ -39,26 +40,39 @@
 		onChanged?: ChangedCallback;
 	}>();
 
-	export type SupplierFormData = Partial<Wholesaler>;
+	type SupplierFormData = Partial<Wholesaler>;
+
+		
+	// ===== API =====
 
 	const client = new ApiClient(fetch);
 	const supplierApi = getSupplierApi(client);
 
+	// ===== VALIDATE TO SCHEMA =====
+
 	let { initialValidateSupplierData, errors, validatedData } = $derived.by(
 		() => {
-			const result = SupplierDetail_LoadDataSchema.safeParse(initial);
+			// NOTE: our initial data is ONLY a wholesaler, not the complete SupplierDetail_LoadDataSchema.
+			const result = WholesalerSchema.nullable().safeParse(initial);
+			if (result.error) {
+				log.error(`Validation of supplier data to WholesalerSchema failed.`, result.error);
+			}
 			return {
 				validatedData: result.success ? result.data : null,
 				errors: result.success ? null : result.error.issues,
 				isValid: result.success,
 				initialValidateSupplierData: result.success
-					? (result.data?.supplier ?? null)
+					? (result.data ?? null)
 					: null,
 			};
 		},
 	);
 
+	// ===== STATE =====
+
 	const isCreateMode = $derived(!initialValidateSupplierData);
+
+	// ===== VALIDATE =====
 
 	// Diese Funktion bleibt für Geschäftslogik, die HTML nicht kann.
 	function validateWholesaler(raw: Record<string, any>): ValidateResult {
@@ -87,6 +101,8 @@
 		};
 	}
 
+	// ===== FORM CALLBACKS =====
+
 	async function submitWholesaler(raw: Record<string, any>) {
 		log.debug(`Submitting wholesaler`, raw);
 		const data = raw as SupplierFormData;
@@ -94,8 +110,14 @@
 		try {
 			if (isUpdate) {
 				const { wholesaler_id, created_at, ...updateData } = data;
-				assertDefined(wholesaler_id, "wholesaler_id is required for update");
-				return await supplierApi.updateSupplier(wholesaler_id, updateData);
+				assertDefined(
+					wholesaler_id,
+					"wholesaler_id is required for update",
+				);
+				return await supplierApi.updateSupplier(
+					wholesaler_id,
+					updateData,
+				);
 			} else {
 				return await supplierApi.createSupplier(data);
 			}
@@ -128,13 +150,14 @@
 	}) {
 		onCancelled?.(p);
 	}
-	
+
 	function handleChanged(p: { data: Record<string, any>; dirty: boolean }) {
 		onChanged?.(p);
 	}
 </script>
 
 <ValidationWrapper {errors} data={validatedData}>
+	<h1>Supplier Form #################</h1>
 	<FormShell
 		entity="Wholesaler"
 		initial={initial as SupplierFormData}

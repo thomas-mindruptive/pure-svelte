@@ -21,7 +21,7 @@
 	import { assertDefined } from '$lib/utils/validation/assertions';
 
 	// --- PROPS ---
-	let { data } = $props<{ data: OfferingDetailLinks_LoadDataAsync }>();
+	let { data }:{data: OfferingDetailLinks_LoadDataAsync} = $props<{ data: OfferingDetailLinks_LoadDataAsync }>();
 
 	// --- LOKALER, REAKTIVER ZUSTAND ---
 	let resolvedData = $state<OfferingDetailLinks_LoadData | null>(null);

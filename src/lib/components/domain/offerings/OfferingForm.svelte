@@ -63,6 +63,8 @@
 		disabled,
 	});
 
+	// ===== LOAD DATA ASYNC =====
+
 	let {
 		supplierId,
 		categoryId,
@@ -96,13 +98,19 @@
 		}
 	});
 
+	// ===== STATE =====
+
 	const isCreateMode = $derived(!initialValidatedOfferingData);
-	const client = new ApiClient(fetch);
-	const categoryApi = getCategoryApi(client);
 	let formShell: InstanceType<
 		typeof FormShell<WholesalerItemOffering_ProductDef_Category>
 	>;
+	
+	// ===== API =====
 
+	const client = new ApiClient(fetch);
+	const categoryApi = getCategoryApi(client);
+
+	// Set the default product definition in create mode.
 	$effect(() => {
 		if (isCreateMode && availableProducts && availableProducts.length > 0) {
 			const firstProduct = availableProducts[0];

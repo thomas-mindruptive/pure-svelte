@@ -24,7 +24,7 @@
 
 	// --- PROPS ---
 	// Empfängt das Objekt mit den Promises aus der `load`-Funktion.
-	let { data } = $props<{ data: OfferingDetailAttributes_LoadDataAsync }>();
+	let { data }: {data: OfferingDetailAttributes_LoadDataAsync } = $props<{ data: OfferingDetailAttributes_LoadDataAsync }>();
 
 	// --- LOKALER, REAKTIVER ZUSTAND ---
 	// Speichert das Ergebnis der Promise-Auflösung.

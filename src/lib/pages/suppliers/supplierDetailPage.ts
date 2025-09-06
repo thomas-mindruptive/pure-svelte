@@ -37,18 +37,20 @@ export function load({ params, fetch: loadEventFetch }: LoadEvent): SupplierDeta
 
 	// EDIT mode
 	if (supplierId) {
-		return {
+		const loadDataAsync: SupplierDetailPage_LoadDataAsync = {
 			supplier: supplierApi.loadSupplier(supplierId),
 			assignedCategories: supplierApi.loadCategoriesForSupplier(supplierId),
 			availableCategories: supplierApi.loadAvailableCategoriesForSupplier(supplierId)
 		};
+		return loadDataAsync;
 	}
 	// CREATE mode
 	else {
-		return {
+		const loadDataAsync: SupplierDetailPage_LoadDataAsync = {
 			supplier: Promise.resolve(null),
-			assignedCategories: supplierApi.loadCategoriesForSupplier(supplierId),
-			availableCategories: supplierApi.loadAvailableCategoriesForSupplier(supplierId)
+			assignedCategories: Promise.resolve([]),
+			availableCategories: Promise.resolve([]),
 		};
+		return loadDataAsync;
 	}
 }

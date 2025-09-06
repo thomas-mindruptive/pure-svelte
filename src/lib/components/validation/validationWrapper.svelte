@@ -13,6 +13,6 @@
       <p>{error.path.join(".")}: {error.message}</p>
     {/each}
   </div>
-{:else if data}
+{:else}
   {@render children()}
 {/if}

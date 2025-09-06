@@ -381,10 +381,10 @@ export function validateDomainEntity<T extends Record<string, unknown>>(
   options: ValidationOptions
 ): ValidationResult {
   log.debug(`Validating`, {data, options});
-  const { mode, entity, context } = options;
+  const { mode, entity = 'entity', context } = options;
 
   // Get entity type from generic or infer from data
-  const entityType = entity || inferEntityType(data);
+  const entityType = inferEntityType(data);
   const schema = DOMAIN_SCHEMAS[entityType as keyof typeof DOMAIN_SCHEMAS] as ValidationSchema<T> | undefined;
 
   if (!schema) {

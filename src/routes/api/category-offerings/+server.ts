@@ -42,6 +42,9 @@ export const POST: RequestHandler = async ({ request }) => {
     const transaction = db.transaction();
 
     try {
+        log.info(`**************************** Begin transaction`);
+        await transaction.begin()
+
         // 1. Expect the request body to be CreateChildRequest.
         const chilRequestData = (await request.json()) as CreateChildRequest<ProductCategory, Omit<WholesalerItemOffering, 'offering_id'>>;
         const categoryId = chilRequestData.parentId;
@@ -200,6 +203,7 @@ export const POST: RequestHandler = async ({ request }) => {
                 whereCondOp: ComparisonOperator.EQUALS,
                 val: newOfferingId
             },
+            orderBy: [{ key: 'wio.offering_id', direction: 'asc' }],
             limit: 1
         };
 

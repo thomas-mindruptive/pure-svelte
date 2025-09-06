@@ -12,6 +12,7 @@ import type {
     ProductCategory,
     ProductDefinition,
     WholesalerItemOffering,
+    WholesalerItemOffering_ProductDef,
     WholesalerItemOffering_ProductDef_Category
 } from '$lib/domain/domainTypes';
 
@@ -233,7 +234,7 @@ export function getCategoryApi(client: ApiClient) {
         /**
          * Creates a new offering for a category.
          */
-        async createOfferingForCategory(categoryId: number, offeringData: Omit<WholesalerItemOffering, 'offering_id'>): Promise<WholesalerItemOffering> {
+        async createOfferingForCategory(categoryId: number, offeringData: Omit<WholesalerItemOffering, 'offering_id'>): Promise<WholesalerItemOffering_ProductDef> {
             const operationId = 'createOfferingForCategory';
             categoryLoadingOperations.start(operationId);
             try {
@@ -241,7 +242,7 @@ export function getCategoryApi(client: ApiClient) {
                     parentId: categoryId,
                     data: offeringData
                 };
-                const responseData = await client.apiFetch<{ offering: WholesalerItemOffering }>(
+                const responseData = await client.apiFetch<{ offering: WholesalerItemOffering_ProductDef }>(
                     '/api/category-offerings',
                     { method: 'POST', body: createPostBody(requestBody) },
                     { context: operationId }

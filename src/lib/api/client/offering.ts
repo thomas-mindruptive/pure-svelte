@@ -39,8 +39,6 @@ const offeringLoadingManager = new LoadingState();
 export const offeringLoadingState = offeringLoadingManager.isLoadingStore;
 export const offeringLoadingOperations = offeringLoadingManager;
 
-export type OfferingWithDetails = WholesalerItemOffering_ProductDef_Category;
-export type AttributeWithDetails = WholesalerOfferingAttribute_Attribute;
 
 /**
  * Factory function to create an offering-specific API client.
@@ -55,11 +53,12 @@ export function getOfferingApi(client: ApiClient) {
     /**
      * Loads a single offering with all its details by ID.
      */
-    async loadOffering(offeringId: number): Promise<OfferingWithDetails> {
+    async loadOffering(offeringId: number): Promise<WholesalerItemOffering_ProductDef_Category> {
+      log.info(`API, Loading offering: ${offeringId}`);
       const operationId = `loadOffering-${offeringId}`;
       offeringLoadingOperations.start(operationId);
       try {
-        const responseData = await client.apiFetch<{ offering: OfferingWithDetails }>(
+        const responseData = await client.apiFetch<{ offering: WholesalerItemOffering_ProductDef_Category }>(
           `/api/offerings/${offeringId}`,
           { method: 'GET' },
           { context: operationId }
@@ -78,7 +77,7 @@ export function getOfferingApi(client: ApiClient) {
     /**
      * Loads all attributes assigned to a specific offering.
      */
-    async loadOfferingAttributes(offeringId: number): Promise<AttributeWithDetails[]> {
+    async loadOfferingAttributes(offeringId: number): Promise<WholesalerOfferingAttribute_Attribute[]> {
       const operationId = `loadOfferingAttributes-${offeringId}`;
       offeringLoadingOperations.start(operationId);
       try {
@@ -93,12 +92,12 @@ export function getOfferingApi(client: ApiClient) {
             orderBy: [{ key: 'a.name', direction: 'asc' }]
           }
         };
-        const responseData = await client.apiFetch<QueryResponseData<AttributeWithDetails>>(
+        const responseData = await client.apiFetch<QueryResponseData<WholesalerOfferingAttribute_Attribute>>(
           '/api/query',
           { method: 'POST', body: createPostBody(request) },
           { context: operationId }
         );
-        return responseData.results as AttributeWithDetails[];
+        return responseData.results as WholesalerOfferingAttribute_Attribute[];
       } catch (err) {
         log.error(`[${operationId}] Failed.`, { offeringId, error: getErrorMessage(err) });
         throw err;

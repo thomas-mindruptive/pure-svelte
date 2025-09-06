@@ -127,6 +127,22 @@ export const supplierQueryConfig: QueryConfig = {
         }
       ]
     },
+    'wholesaler_item_offering_product_def': {
+      from: 'dbo.wholesaler_item_offerings wio',
+      joins: [
+        {
+          type: JoinType.INNER,
+          table: 'dbo.product_definitions',
+          alias: 'pd',
+          on: {
+            joinCondOp: LogicalOperator.AND,
+            conditions: [
+              { columnA: 'wio.product_def_id', op: ComparisonOperator.EQUALS, columnB: 'pd.product_def_id' }
+            ]
+          }
+        }
+      ]
+    },
     'offering_attributes': {
       from: 'dbo.wholesaler_item_offerings wio',
       joins: [

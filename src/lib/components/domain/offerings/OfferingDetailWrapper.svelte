@@ -10,50 +10,43 @@
 	import "$lib/components/styles/detail-page-layout.css";
 	import "$lib/components/styles/grid-section.css";
 	import { log } from "$lib/utils/logger";
-	import type {
-		CancelledCallback,
-		ChangedCallback,
-		SubmitErrorCallback,
-		SubmittedCallback,
-	} from "$lib/components/forms/forms.types";
 	import { addNotification } from "$lib/stores/notifications";
 	import OfferingForm from "./OfferingForm.svelte";
 	import type {
 		OfferingDetailAttributes_LoadData,
 		OfferingDetailLinks_LoadData,
 	} from "$lib/pages/offerings/offeringDetail.types";
-    import { assertDefined } from "$lib/utils/validation/assertions";
+	import { assertDefined } from "$lib/utils/validation/assertions";
+    import { goto } from "$app/navigation";
 
-	const {
-		initialLoadedData,
-		availableProducts,
-		children,
 
-		// Svelte 5 component-callback props
-		onSubmitted,
-		onSubmitError,
-		onCancelled,
-		onChanged,
-	}: {
+	// ===== PROPS =====
+
+	type OfferingDetailWrapperProps = {
 		initialLoadedData:
 			| OfferingDetailLinks_LoadData
 			| OfferingDetailAttributes_LoadData;
 		availableProducts: ProductDefinition[] | null | undefined;
 		children: Snippet;
-		onSubmitted?: SubmittedCallback;
-		onSubmitError?: SubmitErrorCallback;
-		onCancelled?: CancelledCallback;
-		onChanged?: ChangedCallback;
-	} = $props();
+		// We do not expose the "on" handlers because we handle them themselves, not the page!
+		// onSubmitted?: SubmittedCallback;
+		// onSubmitError?: SubmitErrorCallback;
+		// onCancelled?: CancelledCallback;
+		// onChanged?: ChangedCallback;
+	};
 
-	// Silence "unused variable" warning for props passed directly to child components.
-	// This is a deliberate signal to the compiler.
-	void onSubmitted;
-	void onSubmitError;
-	void onCancelled;
-	void onChanged;
+	const {
+		initialLoadedData,
+		availableProducts,
+		children,
+	}: OfferingDetailWrapperProps = $props();
+
 
 	log.debug(`(OfferingDetailWrapper) Loaded props:`, { initialLoadedData });
+
+	// ===== STATE =====
+
+	const isCreateMode = $derived(!(initialLoadedData?.offering));
 
 	// ===== EVENT HANDLERS =====
 
@@ -64,6 +57,21 @@
 		assertDefined(p, "OfferingFormDetailWrapper.handleFormSubmitted");
 		log.info(`(OfferDetailAttributesPage) Form submitted successfully`, p);
 		addNotification("Form submitted successfully.", "success");
+    if (isCreateMode) {
+        // 1. Benötigte IDs extrahieren
+        const newOffering = p.data; // 
+        const newOfferingId = newOffering?.offering_id;
+        const { supplierId, categoryId } = initialLoadedData;
+
+        // Defensive: Ensure ids. 
+        if (newOfferingId && supplierId && categoryId) {
+            const newUrl = `/suppliers/${supplierId}/categories/${categoryId}/offerings/${newOfferingId}`;
+            await goto(newUrl, { invalidateAll: true });
+        } else {
+            log.error("Could not redirect after create: Missing IDs.", { newOfferingId, supplierId, categoryId });
+            addNotification("Could not redirect to edit page.", "error");
+        }
+    }
 	}
 
 	async function handleSubmitError(p: {
@@ -92,6 +100,8 @@
 		log.info(`(OfferDetailAttributesPage) Form changed`, info);
 	}
 </script>
+
+<!----- TEMPLATE ----->
 
 <div class="detail-page-layout">
 	<!-- Sektion 1: Das Formular zur Bearbeitung der Offering-Stammdaten -->

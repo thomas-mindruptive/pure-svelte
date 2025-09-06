@@ -144,29 +144,29 @@
 
 	// ===== SUBMISSION LOGIC =====
 
-	async function submitOffering(raw: Record<string, any>) {
-		assertDefined(raw, "submitOffering");
+	async function submitOffering(formStateCloneOfExistingOffering: Record<string, any>) {
+		assertDefined(formStateCloneOfExistingOffering, "submitOffering");
 		const isUpdateMode = !isCreateMode;
 		if (!supplierId || !categoryId) {
 			const errorMsg =
 				"Cannot submit offering: Missing supplierId or categoryId context. This should never happen if the component is used correctly. => OfferingDetail_LoadDataSchema validation should have caught it.";
-			log.error(`(OfferingForm) ${errorMsg}`, { raw });
+			log.error(`(OfferingForm) ${errorMsg}`, { raw: formStateCloneOfExistingOffering });
 			throw new Error(errorMsg);
 		}
 		const dataToSubmit: Omit<WholesalerItemOffering, "offering_id"> = {
-			...(raw as WholesalerItemOffering),
+			...(formStateCloneOfExistingOffering as WholesalerItemOffering),
 			wholesaler_id: supplierId,
 			category_id: categoryId,
 		};
-		log.info(`(OfferingForm) Submitting to category API...`, {
+		log.warn(`(OfferingForm) Submitting to API...`, {
 			isUpdate: isUpdateMode,
-			raw,
+			raw: formStateCloneOfExistingOffering,
 		});
 		try {
 			let offering;
 			if (isUpdateMode) {
 				// Assert that the id exists in update mode
-				const id = (raw as WholesalerItemOffering).offering_id;
+				const id = (formStateCloneOfExistingOffering as WholesalerItemOffering).offering_id;
 				assertDefined(id, "offering_id is required for update");
 				offering = await categoryApi.updateOffering(id, dataToSubmit);
 			} else {
@@ -177,7 +177,8 @@
 			}
 			log.info(`(OfferingForm) Submitted successfully to category API`, {
 				isUpdate: isUpdateMode,
-				raw,
+				raw: formStateCloneOfExistingOffering,
+				offering
 			});
 			return offering;
 		} catch (e) {
@@ -321,12 +322,13 @@
 					</div>
 
 					<div class="form-group span-2">
-						<label for="offering-price">Price</label>
+						<label for="offering-price">Price*</label>
 						<input
 							id="offering-price"
 							type="number"
 							step="0.01"
 							min="0"
+							required
 							placeholder="e.g., 199.99"
 							value={getS("price") ?? ""}
 							class:error={errors.price}

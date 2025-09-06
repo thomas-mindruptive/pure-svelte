@@ -23,6 +23,8 @@ import type {
     DeleteSuccessResponse,
     RemoveAssignmentRequest
 } from '$lib/api/api.types';
+import { buildQuery, executeQuery } from '$lib/server/queryBuilder';
+import type { QueryPayload } from '$lib/backendQueries/queryGrammar';
 
 /**
  * Check offering dependencies (attributes and links)
@@ -184,6 +186,8 @@ export const POST: RequestHandler = async ({ request }) => {
             return json(errRes, { status: 400 });
         }
 
+        // todo: begin transaction
+
         // 5. Execute the INSERT query and use 'OUTPUT INSERTED.*' to get the new record back.
         const result = await db
             .request()
@@ -210,7 +214,15 @@ export const POST: RequestHandler = async ({ request }) => {
             throw error(500, 'Failed to create offering after database operation.');
         }
 
+
+
         const newOffering = result.recordset[0] as WholesalerItemOffering;
+
+        let where = ...
+        const offeringPlusProductDefQuery = buildQuery(... predefinedquery...)
+        const offeringPlusProductDef = executeQuery(...)
+
+        // todo: end transaction, also in "finally"
 
         // 6. Format the successful response with a 201 Created status.
         const response: ApiSuccessResponse<{ offering: WholesalerItemOffering }> = {

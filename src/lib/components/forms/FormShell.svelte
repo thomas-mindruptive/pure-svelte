@@ -408,23 +408,26 @@
     try {
       const pureDataClone = pureDataDeepClone(formState.data);
 
-      // Call parent's submit handler
+      // Call parent's submit handler, pass "old" data for information.
       const result = await submitCbk(pureDataClone);
 
-      // Update snapshot to mark form as clean
-      formState.snapshot = pureDataClone;
+      // Check if the API returned a valid object to update the state with.
+      if (result && typeof result === "object") {
+        const newObjectClone = pureDataDeepClone(result as T);
 
-      // Notify parent of successful submission
-      try {
-        onSubmitted?.({ data: pureDataClone, result });
-      } catch (e) {
-        log.error(
-          { component: "FormShell", entity, error: coerceMessage(e) },
-          "onSubmitted threw",
-        );
+        // 1. First, update the internal state to be consistent.
+        formState.data = newObjectClone;
+        formState.snapshot = newObjectClone; // Update snapshot to reset dirty state.
+
+        // 2. Then, notify the parent component with the new, consistent state.
+        onSubmitted?.({ data: newObjectClone, result });
+        log.info("FORM_SUBMITTED", { entity, newObjectClone });
+      } else {
+        // Fallback if API returns no data: just mark the form as clean.
+        log.error(`submitCbk did not return a valid object. Should not happen.`, {result})
+        formState.snapshot = pureDataClone;
+        // Do not call onsubmitted because we are in an invalid state. 
       }
-
-      log.info({ component: "FormShell", entity }, "FORM_SUBMITTED");
     } catch (e) {
       log.error(
         { component: "FormShell", entity, error: coerceMessage(e) },

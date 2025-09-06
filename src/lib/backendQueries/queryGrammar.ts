@@ -33,7 +33,7 @@ export interface JoinColCondition {
 	columnB: AllQualifiedColumns | AllAliasedColumns;
 }
 
-// E.g. on columnA = columnB AND columnA = "hugo"
+// E.g. on columnA = columnB AND columnA = "hugo" where columnA = ...
 export interface JoinConditionGroup {
 	joinCondOp: LogicalOperator;
 	conditions: (JoinColCondition | JoinConditionGroup | WhereCondition<unknown> | WhereConditionGroup<unknown>)[];

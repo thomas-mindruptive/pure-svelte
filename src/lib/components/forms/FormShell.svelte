@@ -19,15 +19,16 @@
   // Types
   import type {
     Errors,
-    ValidateFn,
-    SubmitFn,
-    CancelFn,
+    ValidateCallback,
+    SubmitCallback,
+    CancelCallback,
     SubmittedCallback,
     SubmitErrorCallback,
     CancelledCallback,
     ChangedCallback,
     FormData,
   } from "./forms.types";
+    import { coerceErrorMessage } from "$lib/utils/errorUtils";
 
   // ========================================================================
   // TYPE DEFINITIONS
@@ -92,9 +93,9 @@
   interface FormShellProps<T> {
     // Data and validation
     initial?: FormData<T>;
-    validate?: ValidateFn<T>;
-    submitCbk: SubmitFn<T>;
-    onCancel?: CancelFn<T>;
+    validate?: ValidateCallback<T>;
+    submitCbk: SubmitCallback<T>;
+    onCancel?: CancelCallback<T>;
 
     // Configuration
     autoValidate?: "submit" | "blur" | "change";
@@ -162,12 +163,13 @@
    * Safely converts any error to a readable string message
    */
   function coerceMessage(e: unknown): string {
-    if (e instanceof Error) return e.message;
-    try {
-      return JSON.stringify(e);
-    } catch {
-      return String(e);
-    }
+    return coerceErrorMessage(e);
+    // if (e instanceof Error) return e.message;
+    // try {
+    //   return JSON.stringify(e);
+    // } catch {
+    //   return String(e);
+    // }
   }
 
   // ========================================================================

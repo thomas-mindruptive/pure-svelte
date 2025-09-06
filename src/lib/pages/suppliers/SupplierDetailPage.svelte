@@ -22,6 +22,7 @@
 		ProductCategory,
 		WholesalerCategory_Category,
 		WholesalerCategory,
+        Wholesaler,
 	} from "$lib/domain/domainTypes";
 	import { categoryLoadingState } from "$lib/api/client/category";
 	import { ApiClient } from "$lib/api/client/ApiClient";
@@ -51,8 +52,10 @@
 	let loadingError = $state<{ message: string; status?: number } | null>(
 		null,
 	);
+	const isCreateMode = $derived(!(resolvedData?.supplier));
 
 	// --- DATA PROCESSING with $effect (NEW) ---
+
 	// This is the core of the async pattern. It runs whenever the `data` prop changes.
 	$effect(() => {
 		let aborted = false;
@@ -122,17 +125,64 @@
 		};
 	});
 
-	// --- EVENT HANDLERS & STRATEGIES (Unchanged logic, adapted to use `resolvedData`) ---
+	// --- EVENT HANDLERS & STRATEGIES  ---
 
 	const client = new ApiClient(fetch);
 	const supplierApi = getSupplierApi(client);
 
-	async function handleFormSubmitted(event: { data: Record<string, any> }) {
+async function handleFormSubmitted(info: { data: Wholesaler, result: unknown }) {
+    addNotification(
+        `Supplier saved successfully.`,
+        "success",
+    );
+
+    if (isCreateMode) {
+        log.info("Submit successful in CREATE mode. Navigating to edit page...");
+
+        // Get the new ID from the event data. 
+        // Thanks to our FormShell fix, info.data is the complete object from the API.
+        const newSupplierId = info.data?.wholesaler_id;
+
+        if (newSupplierId) {
+            // Build the new "edit mode" URL.
+            const newUrl = `/suppliers/${newSupplierId}`;
+
+            // Navigate to the new URL to switch to edit mode.
+            // invalidateAll is crucial to re-run the load function with the new ID.
+            await goto(newUrl, { invalidateAll: true });
+
+        } else {
+            // This is a fallback case in case the API response was malformed.
+            log.error("Could not redirect after create: new wholesaler_id is missing from response.", { data: info.data });
+            addNotification("Could not redirect to edit page, returning to list.", "error");
+            // Do not go to suppliers because we are in an invalid state.
+        }
+    } else {
+        log.info("Submit successful in EDIT mode. Remaining on page.");
+        // If it was an update, we do nothing else. The user stays on the current edit page.
+    }
+}
+
+	async function handleFormSubmitError(info: { data: Wholesaler, error: unknown }) {
+		log.error(`Form submit error`, info.error);
 		addNotification(
-			`Supplier updated successfully.`,
-			"success",
+			`Form submit error: ${info.error}`,
+			"error",
 		);
 	}
+
+	async function handleFormCancelled(info:{data: Wholesaler, reason?: string }) {
+		log.debug(`Form cancelled`);
+		addNotification(
+			`Form cancelled.`,
+			"info",
+		);
+	}
+
+	async function handleFormChanged(event: { data: Record<string, any> }) {
+		log.debug(`Form changed`);
+	}
+	
 
 	/**
 	 * Handles the assignment of a new category.
@@ -288,9 +338,9 @@
 				initial={resolvedData.supplier}
 				disabled={$supplierLoadingState}
 				onSubmitted={handleFormSubmitted}
-				onCancelled={() => goto("/suppliers")}
-				onSubmitError={() => log.warn("Supplier form submission error")}
-				onChanged={() => log.debug("Supplier form changed")}
+				onCancelled={handleFormCancelled}
+				onSubmitError={handleFormSubmitError}
+				onChanged={handleFormChanged}
 			/>
 		</div>
 

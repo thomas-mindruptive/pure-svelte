@@ -1,31 +1,31 @@
-export type FormData<T> = T;
-
 export type Errors = Record<string, string[]>;
 export type ValidateResult = { valid: boolean; errors?: Errors };
 
-export type ValidateFn<T = any> = (
-    data: FormData<T>,
+export type FormData<T> = T;
+
+export type ValidateCallback<T = any> = (
+    data: T,
 ) => ValidateResult | Promise<ValidateResult>;
 
-export type SubmitFn<T = any> = (data: FormData<T>) => unknown | Promise<unknown>;
-export type CancelFn<T = any> = (data: FormData<T>) => void | Promise<void>;
+export type SubmitCallback<T = any> = (data: T) => unknown | Promise<unknown>;
+export type CancelCallback<T = any> = (data: T) => void | Promise<void>;
 
 export type SubmittedCallback<T = any> = (p: {
-    data: FormData<T>;
+    data: T;
     result: unknown;
 }) => void;
 
 export type CancelledCallback<T = any> = (p: {
-    data: FormData<T>;
+    data: T;
     reason?: string;
 }) => void;
 
 export type SubmitErrorCallback<T = any> = (info: {
-    data: FormData<T>;
+    data: T;
     error: unknown;
 }) => void;
 
 export type ChangedCallback<T = any> = (p: { 
-    data: FormData<T>; 
+    data: T; 
     dirty: boolean 
 }) => void;

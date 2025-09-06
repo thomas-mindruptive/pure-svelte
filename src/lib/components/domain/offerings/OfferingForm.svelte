@@ -63,7 +63,6 @@
 		disabled,
 	});
 
-	// KORREKTUR 1: `validatedData` wird hier jetzt korrekt deklariert.
 	let {
 		supplierId,
 		categoryId,
@@ -117,6 +116,7 @@
 	});
 
 	// ===== VALIDATION LOGIC =====
+
 	function validateOfferingForSubmit(
 		raw: Record<string, any>,
 	): ValidateResult {
@@ -143,6 +143,7 @@
 	}
 
 	// ===== SUBMISSION LOGIC =====
+
 	async function submitOffering(raw: Record<string, any>) {
 		assertDefined(raw, "submitOffering");
 		const isUpdateMode = !isCreateMode;

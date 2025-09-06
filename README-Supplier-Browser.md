@@ -26,9 +26,12 @@
 ---
 
 ## TODOS (UPDATED)
-* Refactor OfferDetail... pages to the async/app shell loading pattern.
-* Refactor other pages to this pattern.
+* Update SupplierDetailPage and OfferingDetail*Page to GOTO the "edit mode" link. I.e. it should not stay in crate mode because:
+  * SupplierDetailPage: Cannot assign categories as long as in create mode.
+  * Offering: Can modify prouct definition combo => Could render offering useless. E.g. define a filed which does not applay to product. 
+* Refactor categoryDetialPAge to async load patern.
 * Add routes for adding new objects: suppliers
+
 *   **Finalize CSS Refactoring:** Ensure all pages correctly import and use the new pattern-based CSS files (`detail-page-layout.css`, etc.) and that all duplicate local styles have been removed.
 *   **Audit API Clients for SSR Safety:** Verify that all `LoadingState` method calls (`.start()`, `.finish()`) are wrapped in an `if (browser)` check. **(DEFERRED: Current pattern works, but this is good practice for client-only actions).**
 *   **Audit `load` Functions:** Verify that all `load` functions correctly pass the `fetch` function from the `LoadEvent` to the `ApiClient`.

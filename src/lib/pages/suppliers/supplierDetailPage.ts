@@ -18,7 +18,8 @@ import type { SupplierDetailPage_LoadDataAsync } from './supplierDetailPage.type
  */
 export function load({ params, fetch: loadEventFetch }: LoadEvent): SupplierDetailPage_LoadDataAsync {
 	const supplierId = Number(params.supplierId);
-	if (isNaN(supplierId)) {
+
+	if (isNaN(supplierId) && params.supplierId?.toLowerCase() !== 'new') {
 		// This error is thrown immediately as it's a client-side validation error.
 		throw error(400, 'Invalid Supplier ID');
 	}
@@ -33,9 +34,21 @@ export function load({ params, fetch: loadEventFetch }: LoadEvent): SupplierDeta
 
 	// ⚠️ Return the object of promises directly without `await`.
 	//    The page component will handle resolving and error states.
-	return {
-		supplier: supplierApi.loadSupplier(supplierId),
-		assignedCategories: supplierApi.loadCategoriesForSupplier(supplierId),
-		availableCategories: supplierApi.loadAvailableCategoriesForSupplier(supplierId)
-	};
+
+	// EDIT mode
+	if (supplierId) {
+		return {
+			supplier: supplierApi.loadSupplier(supplierId),
+			assignedCategories: supplierApi.loadCategoriesForSupplier(supplierId),
+			availableCategories: supplierApi.loadAvailableCategoriesForSupplier(supplierId)
+		};
+	}
+	// CREATE mode
+	else {
+		return {
+			supplier: Promise.resolve(null),
+			assignedCategories: supplierApi.loadCategoriesForSupplier(supplierId),
+			availableCategories: supplierApi.loadAvailableCategoriesForSupplier(supplierId)
+		};
+	}
 }

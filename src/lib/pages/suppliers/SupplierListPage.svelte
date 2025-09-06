@@ -27,6 +27,9 @@
     DeleteStrategy,
     RowActionStrategy,
   } from "$lib/components/grids/Datagrid.types";
+    import { page } from "$app/stores";
+  
+
 
   // --- PROPS ---
   // 1. The `data` prop receives the promise streamed from the non-blocking `load` function.
@@ -61,7 +64,7 @@
         // b. Await the promise to get the data.
         if (!aborted) {
           resolvedSuppliers = await data.suppliers;
-              log.debug(`Suppliers promise resolved successfully.`);
+          log.debug(`Suppliers promise resolved successfully.`);
         }
       } catch (rawError: any) {
         // c. If the promise rejects, perform the robust error handling.
@@ -99,7 +102,8 @@
     };
   });
 
-  // --- EVENT HANDLERS & STRATEGIES ---
+  // ===== EVENT HANDLERS =====
+
   // 3. These functions handle user interactions within the grid. They remain unchanged.
   const client = new ApiClient(fetch);
   const supplierApi = getSupplierApi(client);
@@ -152,6 +156,13 @@
     }
   }
 
+  function handleSupplierCreate() {
+    log.info(`Going to SupplierDetailPage with "new"`);
+    goto(`${$page.url.pathname}/suppliers/new`);
+  }
+
+  // ===== GRID STRATEGIES =====
+
   const deleteStrategy: DeleteStrategy<Wholesaler> = {
     execute: handleSupplierDelete,
   };
@@ -160,6 +171,8 @@
     click: handleSupplierSelect,
   };
 </script>
+
+<!----- TEMPLATE ----->
 
 <div class="page-content-wrapper">
   <h1>Suppliers</h1>
@@ -177,6 +190,9 @@
       <p>{loadingError.message}</p>
     </div>
   {:else}
+    <button class="pc-grid__createbtn" onclick={handleSupplierCreate}
+      >Create Supplier</button
+    >
     <SupplierGrid
       rows={resolvedSuppliers}
       loading={isLoading || $supplierLoadingState}

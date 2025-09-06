@@ -15,7 +15,7 @@ export function load({ params, fetch: fetchLoad }: LoadEvent) {
   const categoryId = Number(params.categoryId);
   const supplierId = Number(params.supplierId);
 
-  // ⚠️ There is not try/catch because we return promises!
+  // ⚠️ There is no try/catch because we return promises!
 
   if (isNaN(offeringId) && params.offeringId?.toLowerCase() !== 'new') {
     throw error(400, 'OfferDetailAttributesPage.load: Invalid Offering ID: Must be number or "new"');
@@ -48,9 +48,10 @@ export function load({ params, fetch: fetchLoad }: LoadEvent) {
     };
     return asyncLoadData;
 
-  } else {
-    log.info(`Kicking off promises for CREATE mode: offeringId: ${offeringId}, categoryId: ${categoryId}, supplierId: ${supplierId}`);
-    // CREATE MODE
+  } 
+  // CREATE MODE
+  else {
+    log.info(`Kicking off promises for CREATE mode: offeringId: ${offeringId}, categoryId: ${categoryId}, supplierId: ${supplierId}`);  
     const asyncLoadData: OfferingDetailAttributes_LoadDataAsync = {
       supplierId, // Always pass from the params.
       categoryId, // Always pass from the params.

@@ -99,7 +99,8 @@
     goto(`${$page.url.pathname}/offerings/new`);
   }
 
-  // Strategie-Objekte für das OfferingGrid
+  // ===== GRID STRATEGIES =====
+
   const deleteStrategy: DeleteStrategy<WholesalerItemOffering_ProductDef_Category> =
     {
       execute: handleOfferingDelete,
@@ -110,6 +111,8 @@
       click: handleOfferingSelect,
     };
 </script>
+
+<!----- TEMPLATE ----->
 
 {#if data?.category}
   <div class="detail-page-layout">
@@ -139,33 +142,29 @@
       />
     </div>
   </div>
-
-  <style>
-    h1 {
-      margin: 0;
-    }
-    p {
-      margin: 0.5rem 0 0 0;
-      color: var(--color-muted);
-      max-width: 80ch;
-    }
-    .comment {
-      font-style: italic;
-      margin-top: 0.75rem;
-      border-left: 3px solid var(--color-primary);
-      padding-left: 1rem;
-      background-color: color-mix(
-        in srgb,
-        var(--color-primary) 5%,
-        transparent
-      );
-    }
-    .grid-section {
-      background: var(--color-background);
-      border-radius: 8px;
-      border: 1px solid var(--color-border);
-    }
-  </style>
 {:else}
   <div>Loading...</div>
 {/if}
+
+<style>
+  h1 {
+    margin: 0;
+  }
+  p {
+    margin: 0.5rem 0 0 0;
+    color: var(--color-muted);
+    max-width: 80ch;
+  }
+  .comment {
+    font-style: italic;
+    margin-top: 0.75rem;
+    border-left: 3px solid var(--color-primary);
+    padding-left: 1rem;
+    background-color: color-mix(in srgb, var(--color-primary) 5%, transparent);
+  }
+  .grid-section {
+    background: var(--color-background);
+    border-radius: 8px;
+    border: 1px solid var(--color-border);
+  }
+</style>

@@ -15,20 +15,29 @@ import {
 } from '$lib/domain/domainTypes';
 import type { PromisifyComplex } from '$lib/utils/typeUtils';
 
-// --- Zod Schema for Runtime Validation ---
+// --- Zod Schema ---
+
+/**
+ * Supplier detail, e.g. for SullierForm
+ */
+export const SupplierDetail_LoadDataSchema = z.object({
+	// The core supplier entity being displayed.
+	// Optional for CREATE mode!
+	supplier: z.optional(WholesalerSchema).nullable(),
+});
+
+export type SupplierDetail_LoadData = z.infer<typeof SupplierDetail_LoadDataSchema>;
+export type OfferingDetail_LoadDataAsync = PromisifyComplex<SupplierDetail_LoadData>;
 
 /**
  * Defines the schema for the fully resolved data required by the Supplier Detail Page.
  * This is used to validate the data shape after all promises from the `load` function have been resolved.
  */
-export const SupplierDetailPage_LoadDataSchema = z.object({
-	/** The core supplier entity being displayed. */
-	supplier: WholesalerSchema,
-
-	/** The list of categories already assigned to this supplier, enriched with category details. */
+export const SupplierDetailPage_LoadDataSchema = SupplierDetail_LoadDataSchema.extend({
+	// The list of categories already assigned to this supplier, enriched with category details. 
 	assignedCategories: z.array(WholesalerCategory_CategorySchema),
 
-	/** The list of categories available for assignment to this supplier. */
+	// The list of categories available for assignment to this supplier. 
 	availableCategories: z.array(ProductCategorySchema)
 });
 

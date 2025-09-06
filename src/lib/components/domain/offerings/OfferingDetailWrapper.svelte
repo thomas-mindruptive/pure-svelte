@@ -55,7 +55,7 @@
 
 	log.debug(`(OfferingDetailWrapper) Loaded props:`, { initialLoadedData });
 
-	// ===== VALIDATE and show errors in UI =====
+	// ===== EVENT HANDLERS =====
 
 	async function handleFormSubmitted(p: {
 		data: WholesalerItemOffering_ProductDef_Category;
@@ -97,7 +97,7 @@
 	<!-- Sektion 1: Das Formular zur Bearbeitung der Offering-Stammdaten -->
 	<div class="grid-section">
 		{#if false}
-			NOTE: offering can be null in "create" mode.
+			NOTE: offering/initialLoadedData can be null in "create" mode.
 		{/if}
 		<OfferingForm
 			{initialLoadedData}

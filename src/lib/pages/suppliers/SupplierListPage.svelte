@@ -27,9 +27,7 @@
     DeleteStrategy,
     RowActionStrategy,
   } from "$lib/components/grids/Datagrid.types";
-    import { page } from "$app/stores";
-  
-
+  import { page } from "$app/stores";
 
   // --- PROPS ---
   // 1. The `data` prop receives the promise streamed from the non-blocking `load` function.
@@ -190,15 +188,17 @@
       <p>{loadingError.message}</p>
     </div>
   {:else}
-    <button class="pc-grid__createbtn" onclick={handleSupplierCreate}
-      >Create Supplier</button
-    >
-    <SupplierGrid
-      rows={resolvedSuppliers}
-      loading={isLoading || $supplierLoadingState}
-      {deleteStrategy}
-      {rowActionStrategy}
-    />
+    <div class="grid-section">
+      <button class="pc-grid__createbtn" onclick={handleSupplierCreate}
+        >Create Supplier</button
+      >
+      <SupplierGrid
+        rows={resolvedSuppliers}
+        loading={isLoading || $supplierLoadingState}
+        {deleteStrategy}
+        {rowActionStrategy}
+      />
+    </div>
   {/if}
 </div>
 

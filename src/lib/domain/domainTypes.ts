@@ -11,7 +11,7 @@ export const WholesalerSchema = z.object({
   region: z.string().max(200).nullable().optional(),
   b2b_notes: z.string().max(1000).nullable().optional(),
   status: z.string().max(100).nullable().optional(),
-  dropship: z.boolean().default(false),
+  dropship: z.boolean().nullable().optional().default(false),
   website: z.string().url().max(2048).nullable().optional(),
   email: z.string().email().max(200).nullable().optional(),
   created_at: z.string().optional()

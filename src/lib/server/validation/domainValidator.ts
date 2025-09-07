@@ -159,7 +159,7 @@ const DOMAIN_SCHEMAS: {
   productDefinition: ValidationSchema<ProductDefinition>;
 } = {
   wholesaler: {
-    requiredOnCreate: ['name', 'dropship'],
+    requiredOnCreate: ['name'],
     requiredOnUpdate: [], // No required fields for updates (PATCH-style)
     constraints: {
       name: COMMON_CONSTRAINTS.shortText,

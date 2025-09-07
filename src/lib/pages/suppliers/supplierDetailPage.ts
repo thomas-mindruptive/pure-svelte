@@ -24,7 +24,7 @@ export function load({ params, fetch: loadEventFetch }: LoadEvent): SupplierDeta
 		throw error(400, 'Invalid Supplier ID');
 	}
 
-	log.info(`(SupplierDetailPage) Kicking off non-blocking load for supplierId: ${supplierId}`);
+	log.info(`Kicking off non-blocking load for supplierId: ${supplierId}`);
 
 	// Create an ApiClient instance with the context-aware `fetch`.
 	const client = new ApiClient(loadEventFetch);

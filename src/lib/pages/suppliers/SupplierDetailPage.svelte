@@ -92,7 +92,7 @@
 
 				if (!validationResult.success) {
 					log.error(
-						"(SupplierDetailPage) Zod validation failed",
+						"Zod validation failed",
 						validationResult.error.issues,
 					);
 					// Treat a validation failure as a loading error.
@@ -110,7 +110,7 @@
 				const message =
 					rawError.message || "Failed to load supplier details.";
 				loadingError = { message, status };
-				log.error("(SupplierDetailPage) Promise processing failed", {
+				log.error("Promise processing failed", {
 					rawError,
 				});
 			} finally {
@@ -229,7 +229,7 @@
 			// Reload the page to refresh both assigned and available category grids.
 			await goto(`/suppliers/${supplierId}`, { invalidateAll: true });
 		} catch (error) {
-			log.error(`(SupplierDetailPage) Failed to assign category`, {
+			log.error(`Failed to assign category`, {
 				supplierId,
 				error,
 			});
@@ -330,7 +330,7 @@
 	};
 </script>
 
-<!-- TEMPLATE (NEW) with conditional rendering based on loading state -->
+<!-- TEMPLATE  with conditional rendering based on loading state -->
 {#if loadingError}
 	<div class="component-error-boundary">
 		<h3>Error Loading Supplier (Status: {loadingError.status})</h3>

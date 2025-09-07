@@ -39,7 +39,7 @@ export const POST: RequestHandler = async ({ request }) => {
         if (!validation.isValid) {
             const errRes: ApiErrorResponse = {
                 success: false,
-                message: 'Validation failed. Please check the provided data.',
+                message: `Server validation failed. Please check the provided data: ${JSON.stringify(validation.errors)}`,
                 status_code: 400,
                 error_code: 'VALIDATION_ERROR',
                 errors: validation.errors,

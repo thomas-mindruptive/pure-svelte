@@ -9,6 +9,7 @@ import type {
   ProductCategory,
   WholesalerItemOffering,
 } from '../domain/domainTypes'
+import { log } from '$lib/utils/logger'
 
 describe('FluentQueryBuilder with Real Domain Types', () => {
   
@@ -34,6 +35,8 @@ describe('FluentQueryBuilder with Real Domain Types', () => {
       expect(whereGroup.conditions[0].key).toBe('status')
       expect(whereGroup.conditions[0].whereCondOp).toBe('=')
       expect(whereGroup.conditions[0].val).toBe('active')
+
+      log.info(`Built payload:`, JSON.stringify(payload, undefined, "    "));
     })
 
     it('should build product category query', () => {

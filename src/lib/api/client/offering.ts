@@ -6,8 +6,13 @@
  * This module follows the Factory Pattern to ensure SSR safety.
  */
 
-import { log } from '$lib/utils/logger';
-import { ComparisonOperator, JoinType, LogicalOperator, type QueryPayload } from '$lib/backendQueries/queryGrammar';
+import { log } from "$lib/utils/logger";
+import {
+  ComparisonOperator,
+  JoinType,
+  LogicalOperator,
+  type QueryPayload,
+} from "$lib/backendQueries/queryGrammar";
 import type {
   WholesalerItemOffering,
   WholesalerItemOffering_ProductDef_Category,
@@ -15,11 +20,11 @@ import type {
   WholesalerOfferingAttribute_Attribute,
   WholesalerOfferingLink,
   Attribute,
-  ProductDefinition
-} from '$lib/domain/domainTypes';
+  ProductDefinition,
+} from "$lib/domain/domainTypes";
 
-import type { ApiClient } from './ApiClient';
-import { createPostBody, createQueryBody, getErrorMessage } from './common';
+import type { ApiClient } from "./ApiClient";
+import { createPostBody, createQueryBody, getErrorMessage } from "./common";
 import type {
   DeleteApiResponse,
   PredefinedQueryRequest,
@@ -29,16 +34,15 @@ import type {
   AssignmentUpdateRequest,
   RemoveAssignmentRequest,
   CreateChildRequest,
-  DeleteRequest
-} from '$lib/api/api.types';
-import { LoadingState } from './loadingState';
-import { productDefinitionLoadingOperations } from './productDefinition';
-
+  DeleteRequest,
+} from "$lib/api/api.types";
+import { LoadingState } from "./loadingState";
+import { productDefinitionLoadingOperations } from "./productDefinition";
+import { Query } from "$lib/backendQueries/fluentQueryBuilder";
 
 const offeringLoadingManager = new LoadingState();
 export const offeringLoadingState = offeringLoadingManager.isLoadingStore;
 export const offeringLoadingOperations = offeringLoadingManager;
-
 
 /**
  * Factory function to create an offering-specific API client.
@@ -47,20 +51,23 @@ export const offeringLoadingOperations = offeringLoadingManager;
  */
 export function getOfferingApi(client: ApiClient) {
   const api = {
-
     // ===== OFFERING ENTITY LOAD =====
 
     /**
      * Loads a single offering with all its details by ID.
      */
-    async loadOffering(offeringId: number): Promise<WholesalerItemOffering_ProductDef_Category> {
+    async loadOffering(
+      offeringId: number
+    ): Promise<WholesalerItemOffering_ProductDef_Category> {
       log.info(`API, Loading offering: ${offeringId}`);
       const operationId = `loadOffering-${offeringId}`;
       offeringLoadingOperations.start(operationId);
       try {
-        const responseData = await client.apiFetch<{ offering: WholesalerItemOffering_ProductDef_Category }>(
+        const responseData = await client.apiFetch<{
+          offering: WholesalerItemOffering_ProductDef_Category;
+        }>(
           `/api/offerings/${offeringId}`,
-          { method: 'GET' },
+          { method: "GET" },
           { context: operationId }
         );
         return responseData.offering;
@@ -77,29 +84,48 @@ export function getOfferingApi(client: ApiClient) {
     /**
      * Loads all attributes assigned to a specific offering.
      */
-    async loadOfferingAttributes(offeringId: number): Promise<WholesalerOfferingAttribute_Attribute[]> {
+    async loadOfferingAttributes(
+      offeringId: number
+    ): Promise<WholesalerOfferingAttribute_Attribute[]> {
       const operationId = `loadOfferingAttributes-${offeringId}`;
       offeringLoadingOperations.start(operationId);
       try {
         const request: PredefinedQueryRequest = {
-          namedQuery: 'offering_attributes',
+          namedQuery: "offering_attributes",
           payload: {
             select: [
-              'woa.offering_id', 'woa.attribute_id', 'woa.value',
-              'a.name AS attribute_name', 'a.description AS attribute_description'
+              "woa.offering_id",
+              "woa.attribute_id",
+              "woa.value",
+              "a.name AS attribute_name",
+              "a.description AS attribute_description",
             ],
-            where: { whereCondOp: LogicalOperator.AND, conditions: [{ key: 'wio.offering_id', whereCondOp: ComparisonOperator.EQUALS, val: offeringId }] },
-            orderBy: [{ key: 'a.name', direction: 'asc' }]
-          }
+            where: {
+              whereCondOp: LogicalOperator.AND,
+              conditions: [
+                {
+                  key: "wio.offering_id",
+                  whereCondOp: ComparisonOperator.EQUALS,
+                  val: offeringId,
+                },
+              ],
+            },
+            orderBy: [{ key: "a.name", direction: "asc" }],
+          },
         };
-        const responseData = await client.apiFetch<QueryResponseData<WholesalerOfferingAttribute_Attribute>>(
-          '/api/query',
-          { method: 'POST', body: createPostBody(request) },
+        const responseData = await client.apiFetch<
+          QueryResponseData<WholesalerOfferingAttribute_Attribute>
+        >(
+          "/api/query",
+          { method: "POST", body: createPostBody(request) },
           { context: operationId }
         );
         return responseData.results as WholesalerOfferingAttribute_Attribute[];
       } catch (err) {
-        log.error(`[${operationId}] Failed.`, { offeringId, error: getErrorMessage(err) });
+        log.error(`[${operationId}] Failed.`, {
+          offeringId,
+          error: getErrorMessage(err),
+        });
         throw err;
       } finally {
         offeringLoadingOperations.finish(operationId);
@@ -111,21 +137,25 @@ export function getOfferingApi(client: ApiClient) {
      * Note: This method queries the ATTRIBUTES master data.
      */
     async loadAvailableAttributes(): Promise<Attribute[]> {
-      const operationId = 'loadAvailableAttributes';
+      const operationId = "loadAvailableAttributes";
       offeringLoadingOperations.start(operationId);
       try {
         const query: QueryPayload<Attribute> = {
-          select: ['attribute_id', 'name', 'description'],
-          orderBy: [{ key: 'name', direction: 'asc' }]
+          select: ["attribute_id", "name", "description"],
+          orderBy: [{ key: "name", direction: "asc" }],
         };
-        const responseData = await client.apiFetch<QueryResponseData<Attribute>>(
-          '/api/attributes',
-          { method: 'POST', body: createQueryBody(query) },
+        const responseData = await client.apiFetch<
+          QueryResponseData<Attribute>
+        >(
+          "/api/attributes",
+          { method: "POST", body: createQueryBody(query) },
           { context: operationId }
         );
         return responseData.results as Attribute[];
       } catch (err) {
-        log.error(`[${operationId}] Failed to load available attributes.`, { error: getErrorMessage(err) });
+        log.error(`[${operationId}] Failed to load available attributes.`, {
+          error: getErrorMessage(err),
+        });
         throw err;
       } finally {
         offeringLoadingOperations.finish(operationId);
@@ -135,20 +165,29 @@ export function getOfferingApi(client: ApiClient) {
     /**
      * Gets available attributes that are not yet assigned to a specific offering.
      */
-    async getAvailableAttributesForOffering(offeringId: number): Promise<Attribute[]> {
+    async getAvailableAttributesForOffering(
+      offeringId: number
+    ): Promise<Attribute[]> {
       const operationId = `getAvailableAttributesForOffering-${offeringId}`;
       offeringLoadingOperations.start(operationId);
       try {
         const [allAttributes, assignedAttributes] = await Promise.all([
           api.loadAvailableAttributes(),
-          api.loadOfferingAttributes(offeringId)
+          api.loadOfferingAttributes(offeringId),
         ]);
 
-        const assignedIds = new Set(assignedAttributes.map(a => a.attribute_id));
-        const availableAttributes = allAttributes.filter(attr => !assignedIds.has(attr.attribute_id));
+        const assignedIds = new Set(
+          assignedAttributes.map((a) => a.attribute_id)
+        );
+        const availableAttributes = allAttributes.filter(
+          (attr) => !assignedIds.has(attr.attribute_id)
+        );
         return availableAttributes;
       } catch (err) {
-        log.error(`[${operationId}] Failed.`, { offeringId, error: getErrorMessage(err) });
+        log.error(`[${operationId}] Failed.`, {
+          offeringId,
+          error: getErrorMessage(err),
+        });
         throw err;
       } finally {
         offeringLoadingOperations.finish(operationId);
@@ -158,23 +197,33 @@ export function getOfferingApi(client: ApiClient) {
     /**
      * Creates a new offering-attribute assignment.
      */
-    async createOfferingAttribute(assignmentData: Omit<WholesalerOfferingAttribute, 'id'>): Promise<WholesalerOfferingAttribute> {
-      const operationId = 'createOfferingAttribute';
+    async createOfferingAttribute(
+      assignmentData: Omit<WholesalerOfferingAttribute, "id">
+    ): Promise<WholesalerOfferingAttribute> {
+      const operationId = "createOfferingAttribute";
       offeringLoadingOperations.start(operationId);
       try {
-        const requestBody: AssignmentRequest<WholesalerItemOffering, Omit<WholesalerOfferingAttribute, 'id'>> = {
+        const requestBody: AssignmentRequest<
+          WholesalerItemOffering,
+          Omit<WholesalerOfferingAttribute, "id">
+        > = {
           parentId: assignmentData.offering_id,
           childId: assignmentData.attribute_id,
-          data: assignmentData
+          data: assignmentData,
         };
-        const responseData = await client.apiFetch<AssignmentSuccessData<WholesalerOfferingAttribute>>(
-          '/api/offering-attributes',
-          { method: 'POST', body: createPostBody(requestBody) },
+        const responseData = await client.apiFetch<
+          AssignmentSuccessData<WholesalerOfferingAttribute>
+        >(
+          "/api/offering-attributes",
+          { method: "POST", body: createPostBody(requestBody) },
           { context: operationId }
         );
         return responseData.assignment;
       } catch (err) {
-        log.error(`[${operationId}] Failed.`, { assignmentData, error: getErrorMessage(err) });
+        log.error(`[${operationId}] Failed.`, {
+          assignmentData,
+          error: getErrorMessage(err),
+        });
         throw err;
       } finally {
         offeringLoadingOperations.finish(operationId);
@@ -184,23 +233,33 @@ export function getOfferingApi(client: ApiClient) {
     /**
      * Updates an existing offering-attribute assignment.
      */
-    async updateOfferingAttribute(offeringAttribute: WholesalerOfferingAttribute): Promise<WholesalerOfferingAttribute> {
+    async updateOfferingAttribute(
+      offeringAttribute: WholesalerOfferingAttribute
+    ): Promise<WholesalerOfferingAttribute> {
       const operationId = `updateOfferingAttribute-${offeringAttribute.offering_id}-${offeringAttribute.attribute_id}`;
       offeringLoadingOperations.start(operationId);
       try {
-        const requestBody: AssignmentUpdateRequest<WholesalerItemOffering, WholesalerOfferingAttribute> = {
+        const requestBody: AssignmentUpdateRequest<
+          WholesalerItemOffering,
+          WholesalerOfferingAttribute
+        > = {
           parentId: offeringAttribute.offering_id,
           childId: offeringAttribute.attribute_id,
-          data: offeringAttribute
+          data: offeringAttribute,
         };
-        const responseData = await client.apiFetch<AssignmentSuccessData<WholesalerOfferingAttribute>>(
+        const responseData = await client.apiFetch<
+          AssignmentSuccessData<WholesalerOfferingAttribute>
+        >(
           `/api/offering-attributes`,
-          { method: 'PUT', body: createPostBody(requestBody) },
+          { method: "PUT", body: createPostBody(requestBody) },
           { context: operationId }
         );
         return responseData.assignment;
       } catch (err) {
-        log.error(`[${operationId}] Failed.`, { offeringAttribute, error: getErrorMessage(err) });
+        log.error(`[${operationId}] Failed.`, {
+          offeringAttribute,
+          error: getErrorMessage(err),
+        });
         throw err;
       } finally {
         offeringLoadingOperations.finish(operationId);
@@ -210,22 +269,48 @@ export function getOfferingApi(client: ApiClient) {
     /**
      * Deletes an offering-attribute assignment.
      */
-    async deleteOfferingAttribute(offeringId: number, attributeId: number, cascade = false): Promise<DeleteApiResponse<{ offering_id: number; attribute_id: number; attribute_name: string }, string[]>> {
+    async deleteOfferingAttribute(
+      offeringId: number,
+      attributeId: number,
+      cascade = false
+    ): Promise<
+      DeleteApiResponse<
+        { offering_id: number; attribute_id: number; attribute_name: string },
+        string[]
+      >
+    > {
       const operationId = `deleteOfferingAttribute-${offeringId}-${attributeId}`;
       offeringLoadingOperations.start(operationId);
       try {
-        const requestBody: RemoveAssignmentRequest<WholesalerItemOffering, Attribute> = {
+        const requestBody: RemoveAssignmentRequest<
+          WholesalerItemOffering,
+          Attribute
+        > = {
           parentId: offeringId,
           childId: attributeId,
-          cascade
+          cascade,
         };
-        return await client.apiFetchUnion<DeleteApiResponse<{ offering_id: number; attribute_id: number; attribute_name: string }, string[]>>(
-          '/api/offering-attributes',
-          { method: 'DELETE', body: createPostBody(requestBody) },
+        return await client.apiFetchUnion<
+          DeleteApiResponse<
+            {
+              offering_id: number;
+              attribute_id: number;
+              attribute_name: string;
+            },
+            string[]
+          >
+        >(
+          "/api/offering-attributes",
+          { method: "DELETE", body: createPostBody(requestBody) },
           { context: operationId }
         );
       } catch (err) {
-        log.error(`[${operationId}] Failed.`, { offeringId, attributeId, cascade, error: getErrorMessage(err) });
+        log.error(`[${operationId}] Failed.`, {
+          offeringId,
+          attributeId,
+          cascade,
+          error: getErrorMessage(err),
+        });
         throw err;
       } finally {
         offeringLoadingOperations.finish(operationId);
@@ -237,27 +322,52 @@ export function getOfferingApi(client: ApiClient) {
     /**
      * Loads all links for a specific offering.
      */
-    async loadOfferingLinks(offeringId: number): Promise<WholesalerOfferingLink[]> {
+    async loadOfferingLinks(
+      offeringId: number
+    ): Promise<WholesalerOfferingLink[]> {
       const operationId = `loadOfferingLinks-${offeringId}`;
       offeringLoadingOperations.start(operationId);
       try {
         const request: PredefinedQueryRequest = {
-          namedQuery: 'offering_links',
+          namedQuery: "offering_links",
           payload: {
-            select: ['wol.link_id', 'wol.offering_id', 'wol.url', 'wol.notes', 'wol.created_at'],
-            where: { whereCondOp: LogicalOperator.AND, conditions: [{ key: 'wio.offering_id', whereCondOp: ComparisonOperator.EQUALS, val: offeringId }] },
-            orderBy: [{ key: 'wol.created_at', direction: 'desc' }]
-          }
+            select: [
+              "wol.link_id",
+              "wol.offering_id",
+              "wol.url",
+              "wol.notes",
+              "wol.created_at",
+            ],
+            where: {
+              whereCondOp: LogicalOperator.AND,
+              conditions: [
+                {
+                  key: "wio.offering_id",
+                  whereCondOp: ComparisonOperator.EQUALS,
+                  val: offeringId,
+                },
+              ],
+            },
+            orderBy: [{ key: "wol.created_at", direction: "desc" }],
+          },
         };
-        const responseData = await client.apiFetch<QueryResponseData<WholesalerOfferingLink>>(
-          '/api/query',
-          { method: 'POST', body: createPostBody(request) },
+        const responseData = await client.apiFetch<
+          QueryResponseData<WholesalerOfferingLink>
+        >(
+          "/api/query",
+          { method: "POST", body: createPostBody(request) },
           { context: operationId }
         );
-        log.info(`[${operationId}] Loaded ${responseData.results.length} links for offering ${offeringId}.`, responseData.results);
+        log.info(
+          `[${operationId}] Loaded ${responseData.results.length} links for offering ${offeringId}.`,
+          responseData.results
+        );
         return responseData.results as WholesalerOfferingLink[];
       } catch (err) {
-        log.error(`[${operationId}] Failed.`, { offeringId, error: getErrorMessage(err) });
+        log.error(`[${operationId}] Failed.`, {
+          offeringId,
+          error: getErrorMessage(err),
+        });
         throw err;
       } finally {
         offeringLoadingOperations.finish(operationId);
@@ -267,22 +377,32 @@ export function getOfferingApi(client: ApiClient) {
     /**
      * Creates a new offering link.
      */
-    async createOfferingLink(linkData: Omit<WholesalerOfferingLink, 'link_id'>): Promise<WholesalerOfferingLink> {
-      const operationId = 'createOfferingLink';
+    async createOfferingLink(
+      linkData: Omit<WholesalerOfferingLink, "link_id">
+    ): Promise<WholesalerOfferingLink> {
+      const operationId = "createOfferingLink";
       offeringLoadingOperations.start(operationId);
       try {
-        const requestBody: CreateChildRequest<WholesalerItemOffering, Omit<WholesalerOfferingLink, 'link_id'>> = {
+        const requestBody: CreateChildRequest<
+          WholesalerItemOffering,
+          Omit<WholesalerOfferingLink, "link_id">
+        > = {
           parentId: linkData.offering_id,
-          data: linkData
+          data: linkData,
         };
-        const responseData = await client.apiFetch<{ link: WholesalerOfferingLink }>(
-          '/api/offering-links',
-          { method: 'POST', body: createPostBody(requestBody) },
+        const responseData = await client.apiFetch<{
+          link: WholesalerOfferingLink;
+        }>(
+          "/api/offering-links",
+          { method: "POST", body: createPostBody(requestBody) },
           { context: operationId }
         );
         return responseData.link;
       } catch (err) {
-        log.error(`[${operationId}] Failed.`, { linkData, error: getErrorMessage(err) });
+        log.error(`[${operationId}] Failed.`, {
+          linkData,
+          error: getErrorMessage(err),
+        });
         throw err;
       } finally {
         offeringLoadingOperations.finish(operationId);
@@ -292,19 +412,28 @@ export function getOfferingApi(client: ApiClient) {
     /**
      * Updates an existing offering link.
      */
-    async updateOfferingLink(linkId: number, updates: Partial<Omit<WholesalerOfferingLink, 'link_id'>>): Promise<WholesalerOfferingLink> {
+    async updateOfferingLink(
+      linkId: number,
+      updates: Partial<Omit<WholesalerOfferingLink, "link_id">>
+    ): Promise<WholesalerOfferingLink> {
       const operationId = `updateOfferingLink-${linkId}`;
       offeringLoadingOperations.start(operationId);
       try {
         const rb = { link_id: linkId, ...updates };
-        const responseData = await client.apiFetch<{ link: WholesalerOfferingLink }>(
+        const responseData = await client.apiFetch<{
+          link: WholesalerOfferingLink;
+        }>(
           `/api/offering-links`,
-          { method: 'PUT', body: createPostBody(rb) },
+          { method: "PUT", body: createPostBody(rb) },
           { context: operationId }
         );
         return responseData.link;
       } catch (err) {
-        log.error(`[${operationId}] Failed.`, { linkId, updates, error: getErrorMessage(err) });
+        log.error(`[${operationId}] Failed.`, {
+          linkId,
+          updates,
+          error: getErrorMessage(err),
+        });
         throw err;
       } finally {
         offeringLoadingOperations.finish(operationId);
@@ -314,21 +443,30 @@ export function getOfferingApi(client: ApiClient) {
     /**
      * Deletes an offering link.
      */
-    async deleteOfferingLink(linkId: number, cascade = false): Promise<DeleteApiResponse<{ link_id: number; url: string }, string[]>> {
+    async deleteOfferingLink(
+      linkId: number,
+      cascade = false
+    ): Promise<DeleteApiResponse<{ link_id: number; url: string }, string[]>> {
       const operationId = `deleteOfferingLink-${linkId}`;
       offeringLoadingOperations.start(operationId);
       try {
         const requestBody: DeleteRequest<WholesalerOfferingLink> = {
           id: linkId,
-          cascade
+          cascade,
         };
-        return await client.apiFetchUnion<DeleteApiResponse<{ link_id: number; url: string }, string[]>>(
-          '/api/offering-links',
-          { method: 'DELETE', body: createPostBody(requestBody) },
+        return await client.apiFetchUnion<
+          DeleteApiResponse<{ link_id: number; url: string }, string[]>
+        >(
+          "/api/offering-links",
+          { method: "DELETE", body: createPostBody(requestBody) },
           { context: operationId }
         );
       } catch (err) {
-        log.error(`[${operationId}] Failed.`, { linkId, cascade, error: getErrorMessage(err) });
+        log.error(`[${operationId}] Failed.`, {
+          linkId,
+          cascade,
+          error: getErrorMessage(err),
+        });
         throw err;
       } finally {
         offeringLoadingOperations.finish(operationId);
@@ -338,7 +476,7 @@ export function getOfferingApi(client: ApiClient) {
     /**
      * Loads product definitions for a specific category that a given supplier has NOT yet created an offering for.
      * This is achieved via a client-constructed anti-join query sent to the generic /api/query endpoint.
-     * 
+     *
      * @param categoryId The ID of the category to check within.
      * @param supplierId The ID of the supplier for whom to check for existing offerings.
      * @returns A promise that resolves to an array of available ProductDefinition objects.
@@ -349,68 +487,90 @@ export function getOfferingApi(client: ApiClient) {
     ): Promise<ProductDefinition[]> {
       const operationId = `getAvailableProductDefsForOffering-${categoryId}-${supplierId}`;
       productDefinitionLoadingOperations.start(operationId);
+
       try {
-        const antiJoinQuery: QueryPayload<ProductDefinition> = {
-          from: { table: 'dbo.product_definitions', alias: 'pd' },
-          select: ['pd.product_def_id', 'pd.title', 'pd.description', 'pd.category_id'],
-          joins: [
-            {
-              type: JoinType.LEFT,
-              table: 'dbo.wholesaler_item_offerings',
-              alias: 'wio',
-              on: {
-                joinCondOp: "AND",
-                conditions: [
-                  // Standard JOIN condition
-                  {
-                    columnA: 'pd.product_def_id',
-                    op: "=",
-                    columnB: 'wio.product_def_id'
-                  },
-                  // Dynamic parameter injected into the ON clause
-                  {
-                    key: 'wio.wholesaler_id',
-                    whereCondOp: ComparisonOperator.EQUALS,
-                    val: supplierId
-                  }
-                ]
-              }
-            }
-          ],
-          where: {
-            whereCondOp: LogicalOperator.AND,
-            conditions: [
-              // The core of the anti-join: only return rows where the JOIN found no match
-              {
-                key: 'wio.offering_id',
-                whereCondOp: ComparisonOperator.IS_NULL
-              },
-              {
-                key: 'pd.category_id', // `pd` ist der Alias für `dbo.product_definitions`
-                whereCondOp: ComparisonOperator.EQUALS,
-                val: categoryId // Die ID der aktuellen Kategorie aus den Funktionsargumenten
-              }
-            ]
-          },
-          orderBy: [{ key: 'pd.title', direction: 'asc' }]
-        };
+        // prettier-ignore
+        const payload = Query.for<ProductDefinition>()
+          .from('dbo.product_definitions', 'pd')
+          .select(['pd.product_def_id', 'pd.title', 'pd.description', 'pd.category_id'])
+          .leftJoin('dbo.wholesaler_item_offerings', 'wio')
+            .onCondition('pd.product_def_id', '=', 'wio.product_def_id')
+            .onCondition('wio.wholesaler_id', '=', supplierId)
+          .where()
+            .and('wio.offering_id', 'IS NULL')
+            .and('pd.category_id', '=', categoryId)
+          .orderBy('pd.title', 'asc')
+          .build()
+
+        const antiJoinQuery = payload;
+        void JoinType;
+
+        // const antiJoinQuery: QueryPayload<ProductDefinition> = {
+        //   from: { table: 'dbo.product_definitions', alias: 'pd' },
+        //   select: ['pd.product_def_id', 'pd.title', 'pd.description', 'pd.category_id'],
+        //   joins: [
+        //     {
+        //       type: JoinType.LEFT,
+        //       table: 'dbo.wholesaler_item_offerings',
+        //       alias: 'wio',
+        //       on: {
+        //         joinCondOp: "AND",
+        //         conditions: [
+        //           // Standard JOIN condition
+        //           {
+        //             columnA: 'pd.product_def_id',
+        //             op: "=",
+        //             columnB: 'wio.product_def_id'
+        //           },
+        //           // Dynamic parameter injected into the ON clause
+        //           {
+        //             key: 'wio.wholesaler_id',
+        //             whereCondOp: ComparisonOperator.EQUALS,
+        //             val: supplierId
+        //           }
+        //         ]
+        //       }
+        //     }
+        //   ],
+        //   where: {
+        //     whereCondOp: LogicalOperator.AND,
+        //     conditions: [
+        //       // The core of the anti-join: only return rows where the JOIN found no match
+        //       {
+        //         key: 'wio.offering_id',
+        //         whereCondOp: ComparisonOperator.IS_NULL
+        //       },
+        //       {
+        //         key: 'pd.category_id', // `pd` ist der Alias für `dbo.product_definitions`
+        //         whereCondOp: ComparisonOperator.EQUALS,
+        //         val: categoryId // Die ID der aktuellen Kategorie aus den Funktionsargumenten
+        //       }
+        //     ]
+        //   },
+        //   orderBy: [{ key: 'pd.title', direction: 'asc' }]
+        // };
 
         // This complex query is sent to the generic /api/query endpoint
-        const responseData = await client.apiFetch<QueryResponseData<ProductDefinition>>(
-          '/api/query',
-          { method: 'POST', body: createQueryBody(antiJoinQuery) },
+        const responseData = await client.apiFetch<
+          QueryResponseData<ProductDefinition>
+        >(
+          "/api/query",
+          { method: "POST", body: createQueryBody(antiJoinQuery) },
           { context: operationId }
         );
 
         return responseData.results as ProductDefinition[];
       } catch (err) {
-        log.error(`[${operationId}] Failed.`, { categoryId, supplierId, error: getErrorMessage(err) });
+        log.error(`[${operationId}] Failed.`, {
+          categoryId,
+          supplierId,
+          error: getErrorMessage(err),
+        });
         throw err;
       } finally {
         productDefinitionLoadingOperations.finish(operationId);
       }
     },
-
 
     // ===== UTILITY FUNCTIONS =====
 
@@ -418,7 +578,10 @@ export function getOfferingApi(client: ApiClient) {
      * Creates a composite ID for attribute grid operations.
      * This is used by the DataGrid component for row identification.
      */
-    createAttributeCompositeId: (offeringId: number, attributeId: number): string => {
+    createAttributeCompositeId: (
+      offeringId: number,
+      attributeId: number
+    ): string => {
       return `${offeringId}-${attributeId}`;
     },
 
@@ -426,23 +589,30 @@ export function getOfferingApi(client: ApiClient) {
      * Parses a composite ID back to offering and attribute IDs.
      * This is used when processing grid selection events.
      */
-    parseAttributeCompositeId: (compositeId: string): { offeringId: number; attributeId: number } | null => {
+    parseAttributeCompositeId: (
+      compositeId: string
+    ): { offeringId: number; attributeId: number } | null => {
       try {
-        const [offeringIdStr, attributeIdStr] = compositeId.split('-');
+        const [offeringIdStr, attributeIdStr] = compositeId.split("-");
         const offeringId = Number(offeringIdStr);
         const attributeId = Number(attributeIdStr);
 
         if (isNaN(offeringId) || isNaN(attributeId)) {
-          log.warn('Failed to parse attribute composite ID: invalid numbers', { compositeId });
+          log.warn("Failed to parse attribute composite ID: invalid numbers", {
+            compositeId,
+          });
           return null;
         }
 
         return { offeringId, attributeId };
       } catch (error) {
-        log.error('Failed to parse attribute composite ID', { compositeId, error: getErrorMessage(error) });
+        log.error("Failed to parse attribute composite ID", {
+          compositeId,
+          error: getErrorMessage(error),
+        });
         return null;
       }
-    }
-  }
+    },
+  };
   return api;
 }

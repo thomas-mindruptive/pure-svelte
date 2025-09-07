@@ -343,7 +343,6 @@
 	<div class="detail-page-layout">
 		<!-- Section 1: Supplier details form -->
 		<div class="form-section">
-			<h1>***************************</h1>
 			<SupplierForm
 				initial={resolvedData.supplier}
 				disabled={$supplierLoadingState}

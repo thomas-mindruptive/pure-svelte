@@ -157,7 +157,6 @@
 </script>
 
 <ValidationWrapper {errors} data={validatedData}>
-	<h1>Supplier Form #################</h1>
 	<FormShell
 		entity="Wholesaler"
 		initial={initial as SupplierFormData}

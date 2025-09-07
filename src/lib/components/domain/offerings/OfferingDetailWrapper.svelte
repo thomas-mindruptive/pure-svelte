@@ -55,7 +55,7 @@
 		result: unknown;
 	}): Promise<void> {
 		assertDefined(p, "OfferingFormDetailWrapper.handleFormSubmitted");
-		log.info(`(OfferDetailAttributesPage) Form submitted successfully`, p);
+		log.info(`Form submitted successfully`, p);
 		addNotification("Form submitted successfully.", "success");
     if (isCreateMode) {
         // 1. Benötigte IDs extrahieren
@@ -79,7 +79,7 @@
 		reason?: string;
 	}): Promise<void> {
 		assertDefined(p, "OfferingFormDetailWrapper.handleSubmitError");
-		log.info(`(OfferDetailAttributesPage) Form submission error`, p);
+		log.info(`Form submission error`, p);
 		addNotification("Form submission error.", "error");
 	}
 
@@ -88,7 +88,7 @@
 		reason?: string;
 	}): Promise<void> {
 		assertDefined(p, "OfferingFormDetailWrapper.handleCancelled");
-		log.info(`(OfferDetailAttributesPage) Form submission cancelled`, p);
+		log.info(`Form submission cancelled`, p);
 		addNotification("Form submission cancelled.", "info");
 	}
 
@@ -97,7 +97,7 @@
 		dirty: boolean;
 	}): Promise<void> {
 		assertDefined(info, "OfferingFormDetailWrapper.handleChanged");
-		log.info(`(OfferDetailAttributesPage) Form changed`, info);
+		log.info(`Form changed`, info);
 	}
 </script>
 

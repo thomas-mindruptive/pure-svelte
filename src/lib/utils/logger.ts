@@ -1,116 +1,189 @@
 // src/lib/utils/logger.ts
-/**
- * Minimal, isomorphic logger using only console.* with caller info.
- * Erweiterung: *Ln Methoden, die vor der Ausgabe eine Leerzeile einfügen.
- */
+/* eslint-disable no-console */
+import {
+  LogLevel, type MetaPreset, type LoggerConfig,
+  type AppLogger, type CallerInfo, type LogArgs
+} from './logger.types';
+import { LOGGER_DEFAULT_CONFIG } from './logger.config';
 
-type LogValue =
-    | string
-    | number
-    | boolean
-    | null
-    | undefined
-    | Record<string, unknown>
-    | unknown[]
-    | Error
-    | unknown;
+/** SSR-safe environment flag. */
+const isServer = typeof window === 'undefined';
 
-type LogArgs = LogValue[];
+/** Parse caller function and file:line; strip cache-busting query (?t=...). */
+function parseCaller(skipLevels: number): CallerInfo | null {
+  try {
+    const stack = new Error().stack;
+    if (!stack) return null;
+    const lines = stack.split('\n');
+    // [0] Error, [1] current fn; start scanning a bit deeper
+    for (let i = 2 + skipLevels; i < Math.min(lines.length, 14); i++) {
+      const line = lines[i]!.trim();
+      const m = line.match(/at\s+(?:(.*)\s+\()?(.*):(\d+):(\d+)\)?/);
+      if (!m) continue;
+      const fn = m[1] || '<anonymous>';
+      let file = m[2] || '';
+      const lineNo = m[3];
 
-export interface AppLogger {
-    debug: (...args: LogArgs) => void;
-    info: (...args: LogArgs) => void;
-    warn: (...args: LogArgs) => void;
-    error: (...args: LogArgs) => void;
+      // Remove trailing Vite/webpack cachebusting
+      file = file.replace(/\?t=\d+$/, '');
 
-    // Print with newline
-    debugLn: (...args: LogArgs) => void;
-    infoLn: (...args: LogArgs) => void;
-    warnLn: (...args: LogArgs) => void;
-    errorLn: (...args: LogArgs) => void;
-
-    // Do not print meta info like time, function name...
-    debugRaw: (...args: LogArgs) => void;
-    infoRaw: (...args: LogArgs) => void;
-    warnRaw: (...args: LogArgs) => void;
-    errorRaw: (...args: LogArgs) => void;
-
-    infoHeader: (...args: LogArgs) => void;
+      const parts = file.split(/[\\/]/);
+      const short = parts.slice(-2).join('/') || file;
+      return { functionName: fn, displayPath: `${short}:${lineNo}` };
+    }
+  } catch { /* ignore */ }
+  return null;
 }
 
-interface CallerInfo {
-    functionName: string;
-    displayPath: string; // shortened "folder/file.ts:line"
+/** Map level to a bound console method. */
+function levelToConsole(level: LogLevel): (...args: unknown[]) => void {
+  switch (level) {
+    case LogLevel.ERROR:    return console.error.bind(console);
+    case LogLevel.WARN:     return console.warn.bind(console);
+    case LogLevel.INFO:     return console.info.bind(console);
+    case LogLevel.DEBUG:    return console.debug.bind(console);
+    case LogLevel.DETDEBUG: return console.debug.bind(console);
+    default:                return console.log.bind(console);
+  }
 }
 
-/** Hilfsfunktion: Stacktrace parsen für CallerInfo */
-function getCallerInfo(skipLevels = 0): CallerInfo | null {
-    try {
-        const stack = new Error().stack;
-        if (!stack) return null;
+/** Create a new logger with the given seed config. */
+export function createLogger(seed?: Partial<LoggerConfig>): AppLogger {
+  // Make a mutable config object, seeded with defaults.
+  const cfg: LoggerConfig = {
+    level: LogLevel.INFO,
+    meta: 'time+level+location',
+    skipFrames: 0,
+    clientHeaderCss: 'color:#0ea5e9',
+    serverHeaderAnsiColor: '\x1b[36m',
+    serverAnsiReset: '\x1b[0m',
+    scope: null,
+    ...(seed ?? {}),
+  };
 
-        const lines = stack.split('\n');
-        const start = 2 + skipLevels; // skip "Error" + wrapper
-        for (let i = start; i < Math.min(lines.length, 12); i++) {
-            const line = lines[i]!.trim();
-            const m = line.match(/at\s+(?:(.*)\s+\()?(.*):(\d+):(\d+)\)?/);
-            if (!m) continue;
+  /** Core print helper. Applies level gate, builds prefix, prints payload. */
+  function _print(level: LogLevel, newline: boolean, forceRaw: boolean, ...args: LogArgs) {
+    if (level > cfg.level) return;
+    const emit = levelToConsole(level);
+    if (newline) emit('');
 
-            const fn = m[1] || '<anonymous>';
-            const file = m[2] || '';
-            const lineNo = m[3];
-            const parts = file.split(/[\\/]/);
-            const short = parts.slice(-2).join('/') || file;
+    // If meta is disabled for this call or globally
+    if (forceRaw || cfg.meta === 'none') {
+      emit(...args);
+      return;
+    }
 
-            return {
-                functionName: fn,
-                displayPath: `${short}:${lineNo}`
-            };
-        }
-    } catch { /* ignore */ }
-    return null;
-}
+    // Build prefix according to preset
+    let prefix = '';
+    const levelTag = `[${LogLevel[level]}]`;
 
-/** Basis-Wrapper für console.* */
-function wrap(consoleMethod: (...args: unknown[]) => void, insertNewline = false, printMetaInfo = true) {
-    return (...args: LogArgs) => {
-        const caller = getCallerInfo(1);
-        if (insertNewline) consoleMethod(''); // ← Leerzeile
+    let location = '';
+    if (cfg.meta.includes('location')) {
+      const caller = parseCaller(2 + cfg.skipFrames); // 2: _print wrapper + bound fn
+      if (caller) location = ` <${caller.functionName}> (${caller.displayPath})`;
+    }
 
-        if (caller) {
-            if (printMetaInfo) {
-                const style = 'color:#888;';
-                const metaInfo = `%c<${caller.functionName}> (${caller.displayPath})`;
-                consoleMethod(metaInfo, style, ...args);
-            } else {
-                consoleMethod(...args);
-            }
-        } else {
-            consoleMethod(...args);
-        }
+    switch (cfg.meta as MetaPreset) {
+      case 'level':
+        prefix = levelTag;
+        break;
+      case 'location':
+        prefix = `${location}`.trim();
+        break;
+      case 'level+location':
+        prefix = `${levelTag}${cfg.scope ? ` ${cfg.scope}` : ''}${location}`;
+        break;
+      case 'time+level+location': {
+        const ts = new Date().toISOString();
+        prefix = `${ts} ${levelTag}${cfg.scope ? ` ${cfg.scope}` : ''}${location}`;
+        break;
+      }
+      // 'none' is handled above
+    }
+
+    if (!isServer) {
+      emit(`%c${prefix}`, 'color:#888;', ...args);
+    } else {
+      emit(prefix, ...args);
+    }
+  }
+
+  /** Header block: NO meta; server uses ANSI color, client uses CSS color. */
+  function infoHeaderImpl(...args: LogArgs) {
+    const line = '=======================================================';
+    if (isServer) {
+      const C = cfg.serverHeaderAnsiColor || '';
+      const R = cfg.serverAnsiReset || '';
+      console.info('');
+      console.info(`${C}${line}${R}`);
+      console.info(...args);
+      console.info(`${C}${line}${R}`);
+    } else {
+      const css = cfg.clientHeaderCss || '';
+      console.info('');
+      console.info(`%c${line}`, css);
+      console.info(...args);
+      console.info(`%c${line}`, css);
+    }
+  }
+
+  /** Build level functions with .ln and .raw variants. */
+  function mk(level: LogLevel) {
+    const fn = (...args: LogArgs) => _print(level, false, false, ...args);
+    (fn as any).ln  = (...args: LogArgs) => _print(level, true,  false, ...args);
+    (fn as any).raw = (...args: LogArgs) => _print(level, false, true,  ...args);
+    return fn as ((...args: LogArgs) => void) & {
+      ln: (...args: LogArgs) => void;
+      raw: (...args: LogArgs) => void;
     };
+  }
+
+  const e  = mk(LogLevel.ERROR);
+  const w  = mk(LogLevel.WARN);
+  const i  = mk(LogLevel.INFO);
+  const d  = mk(LogLevel.DEBUG);
+  const dd = mk(LogLevel.DETDEBUG);
+
+  const api: AppLogger = {
+    // Standard
+    error: e, warn: w, info: i, debug: d, detdebug: dd,
+    // Newline
+    errorLn: e.ln, warnLn: w.ln, infoLn: i.ln, debugLn: d.ln, detdebugLn: dd.ln,
+    // Raw
+    errorRaw: e.raw, warnRaw: w.raw, infoRaw: i.raw, debugRaw: d.raw, detdebugRaw: dd.raw,
+    // Header
+    infoHeader: infoHeaderImpl,
+
+    // Utilities
+    bind(scope: string): AppLogger {
+      // Create a child logger sharing config values
+      const child = createLogger(cfg);
+      const nextScope = cfg.scope ? `${cfg.scope}/${scope}` : scope;
+      child.setConfig({ scope: nextScope });
+      // nudge skipFrames so location points to userland after wrapper
+      child.setConfig({ skipFrames: (child.getConfig().skipFrames ?? 0) + 1 });
+      return child;
+    },
+
+    setConfig(next: Partial<LoggerConfig>) {
+      Object.assign(cfg, next || {});
+    },
+
+    getConfig() {
+      return Object.freeze({ ...cfg });
+    },
+
+    getMeta(extraSkip = 0) {
+      return parseCaller(2 + cfg.skipFrames + (extraSkip >= 0 ? extraSkip : 0));
+    },
+  };
+
+  return api;
 }
 
-export const log: AppLogger = {
-    debug: wrap(console.debug),
-    info: wrap(console.info),
-    warn: wrap(console.warn),
-    error: wrap(console.error),
+/** Shared logger instance using external defaults (no circular import). */
+export const log: AppLogger = createLogger(LOGGER_DEFAULT_CONFIG);
 
-    debugLn: wrap(console.debug, true),
-    infoLn: wrap(console.info, true),
-    warnLn: wrap(console.warn, true),
-    errorLn: wrap(console.error, true),
-
-    debugRaw: wrap(console.debug, false, false),
-    infoRaw: wrap(console.info, false, false),
-    warnRaw: wrap(console.warn, false, false),
-    errorRaw: wrap(console.error, false, false),
-
-    infoHeader(...args) {
-        this.infoRaw("");
-        this.infoRaw("=======================================================");
-        this.infoRaw(args);
-        this.infoRaw("=======================================================");
-    },
-};
+/** Helper re-exports (optional) */
+export function setConfig(next: Partial<LoggerConfig>) { log.setConfig(next); }
+export function bind(scope: string): AppLogger { return log.bind(scope); }

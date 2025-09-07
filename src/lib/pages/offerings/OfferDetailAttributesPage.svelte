@@ -64,7 +64,7 @@
 
 				if (!validationResult.success) {
 					log.error(
-						'(OfferDetailAttributesPage) Zod validation failed',
+						'Zod validation failed',
 						validationResult.error.issues
 					);
 					throw new Error('Received invalid data structure from the API.');
@@ -76,7 +76,7 @@
 				const status = rawError.status ?? 500;
 				const message = rawError.message || 'Failed to load or validate offering details.';
 				loadingError = { message, status };
-				log.error('(OfferDetailAttributesPage) Promise processing failed', { rawError });
+				log.error('Promise processing failed', { rawError });
 			} finally {
 				if (!aborted) {
 					isLoading = false;
@@ -101,7 +101,7 @@
 	// --- API-AUFRUFE ---
 	async function handleAttributeDelete(ids: ID[]): Promise<void> {
 		assertDefined(ids, 'OfferingDetailAttributesPage.handleAttributeDelete');
-		log.info(`(OfferDetailAttributesPage) Deleting attribute assignments`, {
+		log.info(`Deleting attribute assignments`, {
 			ids
 		});
 		let dataChanged = false;
@@ -154,7 +154,7 @@
 			attributeValue = '';
 			await invalidateAll();
 		} catch (error) {
-			log.error(`(OfferDetailAttributesPage) Failed to assign attribute`, { error });
+			log.error(`Failed to assign attribute`, { error });
 			addNotification('Failed to assign attribute.', 'error');
 		} finally {
 			isAssigning = false;

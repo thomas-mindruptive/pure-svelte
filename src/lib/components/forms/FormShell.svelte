@@ -210,7 +210,7 @@
 
     // Notify parent of data change
     try {
-      log.debug(`Before calling parent's onChanged: `, onChanged);
+      log.debug(`Before calling parent's onChanged`);
       onChanged?.({
         data: pureDataDeepClone(formState.data),
         dirty: isDirty(),

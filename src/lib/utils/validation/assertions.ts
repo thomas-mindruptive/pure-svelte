@@ -4,7 +4,9 @@
  * Uses pathUtils for deep property checking with compile-time type safety.
  */
 
-import * as pathUtils from '$lib/utils/pathUtils'; // for usage examples
+
+import { get, has } from "../pathUtils";
+import type { WithDefinedPaths, NonEmptyPath } from "../pathUtils.types";
 
 // -----------------------------------------------------------------------------
 // ASSERTION GUARD (THROWS)
@@ -16,16 +18,17 @@ import * as pathUtils from '$lib/utils/pathUtils'; // for usage examples
 export function assertDefined<T>(
   obj: T | null | undefined, 
   message: string
-): asserts obj is T;
+): asserts obj is NonNullable<T>;
 
 /**
  * Assert that object exists and specified paths are defined. Throws on failure.
+ * Returns type where specified paths are guaranteed to be non-null/undefined.
  */
-export function assertDefined<T>(
+export function assertDefined<T, const Paths extends readonly (readonly PropertyKey[])[]>(
   obj: T | null | undefined, 
   message: string,
-  ...paths: pathUtils.NonEmptyPath<T>[]
-): asserts obj is T;
+  ...paths: Paths
+): asserts obj is WithDefinedPaths<NonNullable<T>, Paths>;
 
 /**
  * Runtime implementation for both overloads.
@@ -33,15 +36,28 @@ export function assertDefined<T>(
 export function assertDefined<T>(
   obj: T | null | undefined, 
   message: string,
-  ...paths: pathUtils.NonEmptyPath<T>[]
+  ...paths: readonly PropertyKey[][]
 ): asserts obj is T {
   if (!obj) {
     throw new Error(`Validation failed: ${message} (object is null or undefined)`);
   }
   
   for (const path of paths) {
-    if (!pathUtils.has(obj, path)) {
-      throw new Error(`Validation failed: ${message}: Path [${(path as readonly PropertyKey[]).join('.')}] does not exist or is undefined`);
+    // Check if path exists
+    if (!has(obj, path as NonEmptyPath<T>)) {
+      const pathStr = path.join('.');
+      throw new Error(
+        `Validation failed: ${message}: Path [${pathStr}] does not exist or is undefined`
+      );
+    }
+    
+    // Additional null check - has only checks existence, not null
+    const value = get(obj, path as NonEmptyPath<T>);
+    if (value === null || value === undefined) {
+      const pathStr = path.join('.');
+      throw new Error(
+        `Validation failed: ${message}: Path [${pathStr}] is null or undefined`
+      );
     }
   }
 }
@@ -53,25 +69,102 @@ export function assertDefined<T>(
 /**
  * Check if object is not null/undefined. Returns boolean.
  */
-export function isDefined<T>(obj: T | null | undefined): obj is T;
+export function isDefined<T>(obj: T | null | undefined): obj is NonNullable<T>;
 
 /**
  * Check if object exists and specified paths are defined. Returns boolean.
+ * Returns type predicate with guaranteed path types.
  */
-export function isDefined<T>(
+export function isDefined<T, const Paths extends readonly (readonly PropertyKey[])[]>(
   obj: T | null | undefined, 
-  ...paths: pathUtils.NonEmptyPath<T>[]
-): obj is T;
+  ...paths: Paths
+): obj is WithDefinedPaths<NonNullable<T>, Paths>;
 
 /**
  * Runtime implementation for both overloads.
  */
 export function isDefined<T>(
   obj: T | null | undefined, 
-  ...paths: pathUtils.NonEmptyPath<T>[]
+  ...paths: readonly PropertyKey[][]
 ): obj is T {
   if (!obj) return false;
-  return paths.every(path => pathUtils.has(obj, path));
+  
+  return paths.every(path => {
+    // Check if path exists
+    if (!has(obj, path as NonEmptyPath<T>)) return false;
+    
+    // Check if value is not null/undefined
+    const value = get(obj, path as NonEmptyPath<T>);
+    return value !== null && value !== undefined;
+  });
+}
+
+// -----------------------------------------------------------------------------
+// ADDITIONAL UTILITY ASSERTIONS
+// -----------------------------------------------------------------------------
+
+/**
+ * Assert that a path exists and is not null, but allow undefined.
+ * Useful for optional properties that shouldn't be null when present.
+ */
+export function assertNotNull<T, const Paths extends readonly (readonly PropertyKey[])[]>(
+  obj: T | null | undefined,
+  message: string,
+  ...paths: Paths
+): asserts obj is WithDefinedPaths<NonNullable<T>, Paths> {
+  if (!obj) {
+    throw new Error(`Validation failed: ${message} (object is null or undefined)`);
+  }
+  
+  for (const path of paths) {
+    if (has(obj, path as NonEmptyPath<T>)) {
+      const value = get(obj, path as NonEmptyPath<T>);
+      if (value === null) {
+        const pathStr = path.join('.');
+        throw new Error(
+          `Validation failed: ${message}: Path [${pathStr}] is null (undefined is allowed)`
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Assert that at least one of the specified paths is defined.
+ */
+export function assertAnyDefined<T>(
+  obj: T | null | undefined,
+  message: string,
+  paths: readonly (readonly PropertyKey[])[]
+): asserts obj is NonNullable<T> {
+  if (!obj) {
+    throw new Error(`Validation failed: ${message} (object is null or undefined)`);
+  }
+  
+  const hasAny = paths.some(path => {
+    if (!has(obj, path as NonEmptyPath<T>)) return false;
+    const value = get(obj, path as NonEmptyPath<T>);
+    return value !== null && value !== undefined;
+  });
+  
+  if (!hasAny) {
+    const pathStrs = paths.map(p => p.join('.'));
+    throw new Error(
+      `Validation failed: ${message}\n` +
+      `None of the required paths are defined: [${pathStrs.join(', ')}]`
+    );
+  }
+}
+
+/**
+ * Assert that all specified paths exist and are not null/undefined.
+ */
+export function assertAllDefined<T, const Paths extends readonly (readonly PropertyKey[])[]>(
+  obj: T | null | undefined,
+  message: string,
+  paths: Paths
+): asserts obj is WithDefinedPaths<NonNullable<T>, Paths> {
+  assertDefined(obj, message, ...paths);
 }
 
 // -----------------------------------------------------------------------------
@@ -79,40 +172,49 @@ export function isDefined<T>(
 // -----------------------------------------------------------------------------
 
 /*
-interface User {
-  profile: {
-    address: {
-      street: string;
-      city: string;
-    };
+interface ResolvedData {
+  offering: {
+    offering_id: string;
     name: string;
+    details?: {
+      description: string;
+      price: number | null;
+    };
+  } | null;
+  user: {
+    id: string;
+    profile?: {
+      name: string;
+    } | null;
   };
-  id: number;
+  metadata?: {
+    timestamp: string;
+  };
 }
 
-const user: User | null = getUser();
+const resolvedData: ResolvedData | null = getResolvedData();
 
-// Boolean checks
-if (isDefined(user)) {
-  // TS knows: user is not null
+// ✅ WORKING EXAMPLES:
+
+// Basic assertion - guarantees resolvedData is not null
+assertDefined(resolvedData, "resolvedData must exist");
+// Type: ResolvedData (not null)
+
+// Path assertion - guarantees offering is not null
+assertDefined(resolvedData, "reloadAttributes:resolvedData.offering", ["offering"]);
+// Type: ResolvedData & { offering: NonNullable<ResolvedData['offering']> }
+// Now: resolvedData.offering.offering_id ✅ (no "possibly null" error!)
+
+// Multiple paths
+assertDefined(resolvedData, "Required data missing", 
+  ["offering"], 
+  ["user", "profile"]
+);
+// Now both resolvedData.offering.offering_id and resolvedData.user.profile.name work!
+
+// Boolean type guard version
+if (isDefined(resolvedData, ["offering"])) {
+  // TypeScript knows: resolvedData.offering is definitely not null
+  console.log(resolvedData.offering.offering_id); // ✅ No error!
 }
-
-if (isDefined(user, ['profile', 'name'], ['id'])) {
-  // TS knows: user.profile.name and user.id exist
-}
-
-// Assertion checks (throws on failure) - message always required as second param
-assertDefined(user, "User must be authenticated");
-assertDefined(user, "User profile incomplete", ['profile', 'address', 'street']);
-
-try {
-  assertDefined(apiResponse, "API response invalid", ['data'], ['status']);
-  processData(apiResponse.data);
-} catch (error) {
-  handleValidationError(error);
-}
-
-// FormShell usage
-assertDefined(initial, "FormShell requires valid initial data");
-const cleanInitial = createSnapshot(initial);
 */

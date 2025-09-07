@@ -1,36 +1,47 @@
 <!-- src/lib/pages/offerings/OfferDetailAttributesPage.svelte -->
 <script lang="ts">
-	import { log } from '$lib/utils/logger';
-	import { addNotification } from '$lib/stores/notifications';
-	import { invalidateAll } from '$app/navigation';
-	import AttributeGrid from '$lib/components/domain/attributes/AttributeGrid.svelte';
-	import { getOfferingApi, offeringLoadingState } from '$lib/api/client/offering';
-	import type { WholesalerOfferingAttribute_Attribute } from '$lib/domain/domainTypes';
+	import { log } from "$lib/utils/logger";
+	import { addNotification } from "$lib/stores/notifications";
+	import { invalidateAll } from "$app/navigation";
+	import AttributeGrid from "$lib/components/domain/attributes/AttributeGrid.svelte";
+	import {
+		getOfferingApi,
+		offeringLoadingState,
+	} from "$lib/api/client/offering";
+	import type { WholesalerOfferingAttribute_Attribute } from "$lib/domain/domainTypes";
 
-	import '$lib/components/styles/assignment-section.css';
-	import '$lib/components/styles/grid-section.css';
-	import '$lib/components/styles/detail-page-layout.css';
-	import '$lib/components/styles/form-elements.css';
-	import OfferingDetailWrapper from '$lib/components/domain/offerings/OfferingDetailWrapper.svelte';
+	import "$lib/components/styles/assignment-section.css";
+	import "$lib/components/styles/grid-section.css";
+	import "$lib/components/styles/detail-page-layout.css";
+	import "$lib/components/styles/form-elements.css";
+	import OfferingDetailWrapper from "$lib/components/domain/offerings/OfferingDetailWrapper.svelte";
 
-	import { ApiClient } from '$lib/api/client/ApiClient';
-	import type { ID, DeleteStrategy, RowActionStrategy } from '$lib/components/grids/Datagrid.types';
+	import { ApiClient } from "$lib/api/client/ApiClient";
+	import type {
+		ID,
+		DeleteStrategy,
+		RowActionStrategy,
+	} from "$lib/components/grids/Datagrid.types";
 	import {
 		OfferingDetailAttributes_LoadDataSchema,
 		type OfferingDetailAttributes_LoadData,
-		type OfferingDetailAttributes_LoadDataAsync
-	} from './offeringDetail.types';
-	import { assertDefined } from '$lib/utils/validation/assertions';
+		type OfferingDetailAttributes_LoadDataAsync,
+	} from "./offeringDetail.types";
+	import { assertDefined } from "$lib/utils/validation/assertions";
 
 	// --- PROPS ---
 	// Empfängt das Objekt mit den Promises aus der `load`-Funktion.
-	let { data }: {data: OfferingDetailAttributes_LoadDataAsync } = $props<{ data: OfferingDetailAttributes_LoadDataAsync }>();
+	let { data }: { data: OfferingDetailAttributes_LoadDataAsync } = $props<{
+		data: OfferingDetailAttributes_LoadDataAsync;
+	}>();
 
 	// --- LOKALER, REAKTIVER ZUSTAND ---
 	// Speichert das Ergebnis der Promise-Auflösung.
 	let resolvedData = $state<OfferingDetailAttributes_LoadData | null>(null);
 	let isLoading = $state(true);
-	let loadingError = $state<{ message: string; status?: number } | null>(null);
+	let loadingError = $state<{ message: string; status?: number } | null>(
+		null,
+	);
 
 	// --- DATENVERARBEITUNG mit $effect ---
 	$effect(() => {
@@ -41,13 +52,17 @@
 			resolvedData = null;
 
 			try {
-				const [offering, assignedAttributes, availableAttributes, availableProducts] =
-					await Promise.all([
-						data.offering,
-						data.assignedAttributes,
-						data.availableAttributes,
-						data.availableProducts
-					]);
+				const [
+					offering,
+					assignedAttributes,
+					availableAttributes,
+					availableProducts,
+				] = await Promise.all([
+					data.offering,
+					data.assignedAttributes,
+					data.availableAttributes,
+					data.availableProducts,
+				]);
 
 				if (aborted) return;
 
@@ -57,26 +72,33 @@
 					offering,
 					assignedAttributes,
 					availableAttributes,
-					availableProducts
+					availableProducts,
 				};
 
-				const validationResult = OfferingDetailAttributes_LoadDataSchema.safeParse(dataToValidate);
+				const validationResult =
+					OfferingDetailAttributes_LoadDataSchema.safeParse(
+						dataToValidate,
+					);
 
 				if (!validationResult.success) {
 					log.error(
-						'Zod validation failed',
-						validationResult.error.issues
+						"Zod validation failed",
+						validationResult.error.issues,
 					);
-					throw new Error('Received invalid data structure from the API.');
+					throw new Error(
+						"Received invalid data structure from the API.",
+					);
 				}
 
 				resolvedData = validationResult.data;
 			} catch (rawError: any) {
 				if (aborted) return;
 				const status = rawError.status ?? 500;
-				const message = rawError.message || 'Failed to load or validate offering details.';
+				const message =
+					rawError.message ||
+					"Failed to load or validate offering details.";
 				loadingError = { message, status };
-				log.error('Promise processing failed', { rawError });
+				log.error("Promise processing failed", { rawError });
 			} finally {
 				if (!aborted) {
 					isLoading = false;
@@ -92,51 +114,98 @@
 
 	// --- STATE & API ---
 	let selectedAttributeId: number | null = $state(null);
-	let attributeValue: string = $state('');
+	let attributeValue: string = $state("");
 	let isAssigning = $state(false);
 
 	const client = new ApiClient(fetch);
 	const offeringApi = getOfferingApi(client);
 
+	// --- HELPERS ---
+
+	/**
+	 * Reload attributes, e.g. after creating a news one.
+	 * Set them into the state.
+	 */
+	async function reloadAttributes() {
+		log.info("Re-fetching attribute lists after assignment...");
+
+		assertDefined(resolvedData, "reloadAttributes:resolvedData.offering", ["offering"]);
+
+		const [updatedAssigned, updatedAvailable] = await Promise.all([
+			offeringApi.loadOfferingAttributes(
+				resolvedData.offering.offering_id,
+			),
+			offeringApi.getAvailableAttributesForOffering(
+				resolvedData.offering.offering_id,
+			),
+		]);
+
+		resolvedData.assignedAttributes = updatedAssigned;
+		resolvedData.availableAttributes = updatedAvailable;
+
+		log.info("Local state updated. UI will refresh seamlessly.");
+	}
+
 	// --- API-AUFRUFE ---
+
 	async function handleAttributeDelete(ids: ID[]): Promise<void> {
-		assertDefined(ids, 'OfferingDetailAttributesPage.handleAttributeDelete');
+		assertDefined(
+			ids,
+			"OfferingDetailAttributesPage.handleAttributeDelete",
+		);
 		log.info(`Deleting attribute assignments`, {
-			ids
+			ids,
 		});
 		let dataChanged = false;
 		for (const id of ids) {
 			const parsed = offeringApi.parseAttributeCompositeId(String(id));
 			if (!parsed) continue;
 			const { offeringId, attributeId } = parsed;
-			const result = await offeringApi.deleteOfferingAttribute(offeringId, attributeId);
+			const result = await offeringApi.deleteOfferingAttribute(
+				offeringId,
+				attributeId,
+			);
 			if (result.success) {
-				addNotification(`Attribute assignment deleted.`, 'success');
+				addNotification(`Attribute assignment deleted.`, "success");
 				dataChanged = true;
 			} else {
-				addNotification(`Could not delete attribute assignment.`, 'error');
+				addNotification(
+					`Could not delete attribute assignment.`,
+					"error",
+				);
 			}
 		}
 		if (dataChanged) invalidateAll();
 	}
 
-	function handleAttributeSelect(attribute: WholesalerOfferingAttribute_Attribute) {
-		assertDefined(attribute, 'OfferingDetailAttributesPage.handleAttributeSelect');
+	function handleAttributeSelect(
+		attribute: WholesalerOfferingAttribute_Attribute,
+	) {
+		assertDefined(
+			attribute,
+			"OfferingDetailAttributesPage.handleAttributeSelect",
+		);
 		addNotification(
 			`Editing for "${attribute.attribute_name}" not yet implemented.`,
-			'info'
+			"info",
 		);
 	}
 
 	async function handleAssignAttribute(event: SubmitEvent) {
-		assertDefined(event, 'OfferingDetailAttributesPage.handleAssignAttribute');
+		assertDefined(
+			event,
+			"OfferingDetailAttributesPage.handleAssignAttribute",
+		);
 		event.preventDefault();
 		if (!selectedAttributeId) {
-			addNotification('Please select an attribute.', 'error');
+			addNotification("Please select an attribute.", "error");
 			return;
 		}
 		if (!resolvedData || !resolvedData.offering) {
-			addNotification('An offering must be saved before assigning attributes.', 'error');
+			addNotification(
+				"An offering must be saved before assigning attributes.",
+				"error",
+			);
 			return;
 		}
 		isAssigning = true;
@@ -144,30 +213,34 @@
 			const assignmentData = {
 				offering_id: resolvedData.offering.offering_id,
 				attribute_id: selectedAttributeId,
-				...(attributeValue && { value: attributeValue })
+				...(attributeValue && { value: attributeValue }),
 			};
 
 			await offeringApi.createOfferingAttribute(assignmentData);
 
-			addNotification('Attribute assigned successfully.', 'success');
+			addNotification("Attribute assigned successfully.", "success");
 			selectedAttributeId = null;
-			attributeValue = '';
-			await invalidateAll();
+			attributeValue = "";
+
+			// Reload and set state.
+			await reloadAttributes();
 		} catch (error) {
 			log.error(`Failed to assign attribute`, { error });
-			addNotification('Failed to assign attribute.', 'error');
+			addNotification("Failed to assign attribute.", "error");
 		} finally {
 			isAssigning = false;
 		}
 	}
 
 	// --- GRID STRATEGIES ---
-	const deleteStrategy: DeleteStrategy<WholesalerOfferingAttribute_Attribute> = {
-		execute: handleAttributeDelete
-	};
-	const rowActionStrategy: RowActionStrategy<WholesalerOfferingAttribute_Attribute> = {
-		click: handleAttributeSelect
-	};
+	const deleteStrategy: DeleteStrategy<WholesalerOfferingAttribute_Attribute> =
+		{
+			execute: handleAttributeDelete,
+		};
+	const rowActionStrategy: RowActionStrategy<WholesalerOfferingAttribute_Attribute> =
+		{
+			click: handleAttributeSelect,
+		};
 </script>
 
 <!-- TEMPLATE mit bedingtem Rendering -->
@@ -184,35 +257,48 @@
 		availableProducts={resolvedData.availableProducts}
 	>
 		<div class="grid-section">
+			<!----- ASSGIN ATTRIBUTE ----->
+
 			<div class="assignment-section">
 				<h3>Assign New Attribute</h3>
 				{#if !resolvedData.offering}
 					<p class="field-hint">
-						You must save the new offering first before you can assign attributes.
+						You must save the new offering first before you can
+						assign attributes.
 					</p>
 				{/if}
 				<form class="assignment-form" onsubmit={handleAssignAttribute}>
-					<select bind:value={selectedAttributeId} disabled={isAssigning || !resolvedData.offering}>
+					<select
+						bind:value={selectedAttributeId}
+						disabled={isAssigning || !resolvedData.offering}
+					>
 						<option value={null}>Select an attribute...</option>
 						{#each resolvedData.availableAttributes as attr (attr.attribute_id)}
-							<option value={attr.attribute_id}>{attr.name}</option>
+							<option value={attr.attribute_id}
+								>{attr.name}</option
+							>
 						{/each}
 					</select>
 					<input
 						type="text"
 						placeholder="Value (e.g., 'Red')"
+						required
 						bind:value={attributeValue}
 						disabled={isAssigning || !resolvedData.offering}
 					/>
 					<button
 						type="submit"
 						class="primary-button"
-						disabled={isAssigning || !selectedAttributeId || !resolvedData.offering}
+						disabled={isAssigning ||
+							!selectedAttributeId ||
+							!resolvedData.offering}
 					>
-						{isAssigning ? 'Assigning...' : 'Assign'}
+						{isAssigning ? "Assigning..." : "Assign"}
 					</button>
 				</form>
 			</div>
+
+			<!----- ATTRIBUTE GRID ----->
 
 			<h2 style="margin-top: 1.5rem;">Assigned Attributes</h2>
 			<AttributeGrid

@@ -7,32 +7,10 @@
  * - get / set / has: runtime helpers with compile-time type safety
  */
 
-import { assertDefined } from "./validation/assertions";
+import type { NonEmptyPath, PathValue } from './pathUtils.types';
 
-// -----------------------------------------------------------------------------
-// TYPE UTILITIES
-// -----------------------------------------------------------------------------
-
-// All possible (non-empty) paths through T as tuples
-export type NonEmptyPath<T> = T extends Record<string | number, any>
-  ? {
-    [K in keyof T]-?: T[K] extends Record<string | number, any>
-    ? [K] | [K, ...NonEmptyPath<T[K]>] // dive deeper if nested object
-    : [K];                             // leaf property
-  }[keyof T]
-  : never;
-
-// Value type at the end of a path P inside T
-export type PathValue<T, P> = P extends [infer K, ...infer R]
-  ? K extends keyof T
-  ? R extends []     // no more keys → return leaf type
-  ? T[K]
-  : PathValue<T[K], R> // recurse into child type
-  : never
-  : never;
-
-// Optional variant: also allow empty paths (root object itself)
-// type PathOrRoot<T> = NonEmptyPath<T> | [];
+// Re-export types for convenience
+export type { NonEmptyPath, PathValue } from './pathUtils.types';
 
 // -----------------------------------------------------------------------------
 // GET
@@ -58,8 +36,13 @@ export function get<T>(
   obj: T,
   keyOrPath: PropertyKey | readonly PropertyKey[]
 ) {
-  assertDefined(obj, "PathUtils.get: Object must be defined");
-  assertDefined(keyOrPath, "PathUtils.get: keyOrPath must be defined");
+  // Simple validation without circular dependency
+  if (!obj) {
+    throw new Error("PathUtils.get: Object must be defined");
+  }
+  if (keyOrPath == null) {
+    throw new Error("PathUtils.get: keyOrPath must be defined");
+  }
 
   // Normalize input to array
   const keys = (Array.isArray(keyOrPath) ? keyOrPath : [keyOrPath]) as readonly PropertyKey[];
@@ -101,9 +84,16 @@ export function set<T>(
   keyOrPath: PropertyKey | readonly PropertyKey[],
   value: unknown
 ): void {
-  assertDefined(obj, "PathUtils.set: Object must be defined");
-  assertDefined(keyOrPath, "PathUtils.set: keyOrPath must be defined");
-  assertDefined(value, "PathUtils.set: value must be defined");
+  // Simple validation without circular dependency
+  if (!obj) {
+    throw new Error("PathUtils.set: Object must be defined");
+  }
+  if (keyOrPath == null) {
+    throw new Error("PathUtils.set: keyOrPath must be defined");
+  }
+  if (value === undefined) {
+    throw new Error("PathUtils.set: value must be defined");
+  }
 
   if (Array.isArray(keyOrPath)) {
     const path = keyOrPath;
@@ -148,7 +138,7 @@ export function has<T, P extends NonEmptyPath<T>>(
   obj: T,
   path: readonly [...P]
 ): boolean {
-  // Do not "assertDefined" here, because it uses "has" => circular.
+  // Simple check without circular dependencies
   try {
     let cur: unknown = obj;
 
@@ -175,60 +165,16 @@ export function getOrRoot<T>(
   obj: T,
   path: readonly PropertyKey[]
 ): unknown {
-  assertDefined(obj, "PathUtils.getOrRoot: Object must be defined");
-  assertDefined(path, "PathUtils.getOrRoot: path must be defined");
+  // Simple validation without circular dependency
+  if (!obj) {
+    throw new Error("PathUtils.getOrRoot: Object must be defined");
+  }
+  if (path == null) {
+    throw new Error("PathUtils.getOrRoot: path must be defined");
+  }
 
   if (path.length === 0) {
     return obj; // return root object
   }
   return get(obj, path as NonEmptyPath<T>);
 }
-
-// -----------------------------------------------------------------------------
-// SAMPLE USAGE
-// -----------------------------------------------------------------------------
-
-// interface Offer {
-//   customer: {
-//     address: {
-//       street: string;
-//       city: string;
-//       dummy?: string; // optional field
-//     };
-//     name: string;
-//   };
-//   price: number;
-// }
-
-// const offer: Offer = {
-//   customer: {
-//     address: { street: "Main St", city: "Berlin" },
-//     name: "Alice",
-//   },
-//   price: 100,
-// };
-
-// console.log("pathUtils demo");
-
-// // GET → correctly inferred as string | undefined (because dummy is optional)
-// const dummy = get(offer, ["customer", "address", "dummy"]);
-// console.log("dummy:", dummy);
-
-// // GET → correctly inferred as string
-// const street = get(offer, ["customer", "address", "street"]);
-// console.log("street:", street);
-
-// // GET by single key
-// const customer = get(offer, "customer");
-// console.log(`Customer from single:`, JSON.stringify(customer));
-
-// // SET → expects a string (matches the path type)
-// set(offer, ["customer", "address", "dummy"], "Broadway");
-// console.log(`Modified (dummy set):`, JSON.stringify(offer));
-
-// // SET by single key
-// set(offer, "customer", { address: { street: "New St", city: "New City" }, name: "New Name" });
-// console.log(`Modified (whole customer):`, JSON.stringify(offer));
-
-// // ❌ Compile-time error (expects string, receives number)
-// // set(offer, ["customer", "address", "street"], 123);

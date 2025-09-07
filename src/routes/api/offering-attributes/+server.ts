@@ -55,7 +55,7 @@ export const POST: RequestHandler = async ({ request }) => {
         if (!wholesalerOfferingAttribute || !wholesalerOfferingAttribute.value) {
             const errRes: ApiErrorResponse = {
                 success: false,
-                message: 'data (WholesalerOfferingAttribute) and data.value are required.',
+                message: 'Server validation: wholesalerOfferingAttribute.value is required.',
                 status_code: 400,
                 error_code: 'BAD_REQUEST',
                 meta: { timestamp: new Date().toISOString() }

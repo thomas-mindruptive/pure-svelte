@@ -359,12 +359,12 @@ export function getOfferingApi(client: ApiClient) {
               table: 'dbo.wholesaler_item_offerings',
               alias: 'wio',
               on: {
-                joinCondOp: LogicalOperator.AND,
+                joinCondOp: "AND",
                 conditions: [
                   // Standard JOIN condition
                   {
                     columnA: 'pd.product_def_id',
-                    op: ComparisonOperator.EQUALS,
+                    op: "=",
                     columnB: 'wio.product_def_id'
                   },
                   // Dynamic parameter injected into the ON clause

@@ -20,7 +20,7 @@ export enum JoinType { INNER = 'INNER JOIN', LEFT = 'LEFT JOIN', RIGHT = 'RIGHT 
 // --- Base Interface for Joins ---
 
 export interface JoinClause {
-	type: JoinType;
+	type: JoinType | `${JoinType}`;
 	table: string;
 	alias?: string;
 	on: JoinConditionGroup; // dieselbe Struktur wie WHERE-Bedingungen
@@ -29,13 +29,13 @@ export interface JoinClause {
 // E.g. on columnA = columnB
 export interface JoinColCondition {
 	columnA: AllQualifiedColumns | AllAliasedColumns;
-	op: ComparisonOperator;
+	op: ComparisonOperator | `${ComparisonOperator}`;
 	columnB: AllQualifiedColumns | AllAliasedColumns;
 }
 
 // E.g. on columnA = columnB AND columnA = "hugo" where columnA = ...
 export interface JoinConditionGroup {
-	joinCondOp: LogicalOperator;
+	joinCondOp: LogicalOperator | `${LogicalOperator}`;
 	conditions: (JoinColCondition | JoinConditionGroup | WhereCondition<unknown> | WhereConditionGroup<unknown>)[];
 }
 
@@ -48,12 +48,12 @@ export interface JoinSortDescriptor {
 
 export interface WhereCondition<T> {
 	key: keyof T & string | AllQualifiedColumns | AllAliasedColumns;
-	whereCondOp: ComparisonOperator;
+	whereCondOp: ComparisonOperator | `${ComparisonOperator}`;
 	val?: unknown | unknown[];
 }
 
 export interface WhereConditionGroup<T> {
-	whereCondOp: LogicalOperator;
+	whereCondOp: LogicalOperator | `${LogicalOperator}`;
 	conditions: (WhereCondition<T> | WhereConditionGroup<T>)[];
 }
 

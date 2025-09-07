@@ -17,8 +17,7 @@
 		OfferingDetailLinks_LoadData,
 	} from "$lib/pages/offerings/offeringDetail.types";
 	import { assertDefined } from "$lib/utils/validation/assertions";
-    import { goto } from "$app/navigation";
-
+	import { goto } from "$app/navigation";
 
 	// ===== PROPS =====
 
@@ -41,12 +40,11 @@
 		children,
 	}: OfferingDetailWrapperProps = $props();
 
-
 	log.debug(`(OfferingDetailWrapper) Loaded props:`, { initialLoadedData });
 
 	// ===== STATE =====
 
-	const isCreateMode = $derived(!(initialLoadedData?.offering));
+	const isCreateMode = $derived(!initialLoadedData?.offering);
 
 	// ===== EVENT HANDLERS =====
 
@@ -56,22 +54,29 @@
 	}): Promise<void> {
 		assertDefined(p, "OfferingFormDetailWrapper.handleFormSubmitted");
 		log.info(`Form submitted successfully`, p);
-		addNotification("Form submitted successfully.", "success");
-    if (isCreateMode) {
-        // 1. Benötigte IDs extrahieren
-        const newOffering = p.data; // 
-        const newOfferingId = newOffering?.offering_id;
-        const { supplierId, categoryId } = initialLoadedData;
+		addNotification("Offering updated successfully.", "success");
+		if (isCreateMode) {
+			// 1. Benötigte IDs extrahieren
+			const newOffering = p.data; //
+			const newOfferingId = newOffering?.offering_id;
+			const { supplierId, categoryId } = initialLoadedData;
 
-        // Defensive: Ensure ids. 
-        if (newOfferingId && supplierId && categoryId) {
-            const newUrl = `/suppliers/${supplierId}/categories/${categoryId}/offerings/${newOfferingId}`;
-            await goto(newUrl, { invalidateAll: true });
-        } else {
-            log.error("Could not redirect after create: Missing IDs.", { newOfferingId, supplierId, categoryId });
-            addNotification("Could not redirect to edit page.", "error");
-        }
-    }
+			// Defensive: Ensure ids.
+			if (newOfferingId && supplierId && categoryId) {
+				const newUrl = `/suppliers/${supplierId}/categories/${categoryId}/offerings/${newOfferingId}`;
+				await goto(newUrl, { invalidateAll: true });
+			} else {
+				log.error("Could not redirect after create: Missing IDs.", {
+					newOfferingId,
+					supplierId,
+					categoryId,
+				});
+				addNotification("Could not redirect to edit page.", "error");
+			}
+		}
+		else {
+			log.info(`Form submitted in EDIT mode. No navigation needed.`, p);
+		}
 	}
 
 	async function handleSubmitError(p: {

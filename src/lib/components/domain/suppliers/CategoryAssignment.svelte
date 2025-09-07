@@ -18,14 +18,14 @@
         availableCategories = [] as ProductCategory[],
         loading = false,
         disabled = false,
-        onAssigned,
+        assignCbk,
         onError,
     } = $props<{
         supplierId: number;
         availableCategories?: ProductCategory[];
         loading?: boolean;
         disabled?: boolean;
-        onAssigned?: (category: ProductCategory) => void;
+        assignCbk?: (category: ProductCategory) => void;
         onError?: (error: string) => void;
     }>();
 
@@ -59,7 +59,7 @@
         try {
             // The parent component is responsible for the API call.
             // This component's only job is to signal the user's intent.
-            onAssigned?.(selectedCategory);
+            assignCbk?.(selectedCategory);
             selectedCategoryId = null; // Reset after assigning
         } catch (error) {
             log.error(

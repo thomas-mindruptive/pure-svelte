@@ -167,6 +167,7 @@
 				// Do not go to suppliers because we are in an invalid state.
 			}
 		} else {
+			// FormShell has already updated its state.
 			log.info("Submit successful in EDIT mode. Remaining on page.");
 			// If it was an update, we do nothing else. The user stays on the current edit page.
 		}
@@ -195,7 +196,7 @@
 	/**
 	 * Handles the assignment of a new category.
 	 */
-	async function handleCategoryAssigned(
+	async function assignCategory(
 		category: ProductCategory,
 		comment?: string,
 		link?: string,
@@ -360,7 +361,7 @@
 					supplierId={resolvedData.supplier.wholesaler_id}
 					availableCategories={resolvedData.availableCategories}
 					loading={$categoryLoadingState}
-					onAssigned={handleCategoryAssigned}
+					assignCbk={assignCategory}
 					onError={(msg) => addNotification(msg, "error")}
 				/>
 			{:else}

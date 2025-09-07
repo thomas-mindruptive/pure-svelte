@@ -125,7 +125,7 @@ export function buildQuery<T>(
 		// Case 1: A predefined, trusted JOIN configuration is used. This is the most secure path.
 		const joinConfig = config.joinConfigurations[namedQuery as keyof typeof config.joinConfigurations];
 		if (!joinConfig) throw new Error(`Named query '${namedQuery}' is not defined.`);
-		fromClause = joinConfig.from;
+		fromClause = `${joinConfig.from.table} ${joinConfig.from.alias} `;
 		fromTableForMetadata = namedQuery;
 		if (joinConfig.joins) {
 			realJoins = [...joinConfig.joins, ...realJoins];

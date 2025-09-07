@@ -9,20 +9,20 @@
 
 import { log } from '$lib/utils/logger';
 import { ComparisonOperator, LogicalOperator, type QueryPayload } from '$lib/backendQueries/queryGrammar';
-import type { Wholesaler, WholesalerCategoryWithCount, ProductCategory, WholesalerCategory } from '$lib/domain/domainTypes';
+import type { Wholesaler, WholesalerCategoryWithCount, ProductCategory, WholesalerCategory, WholesalerCategory_Category } from '$lib/domain/domainTypes';
 
 import type { ApiClient } from './ApiClient';
 import { createPostBody, createQueryBody, getErrorMessage } from './common';
 import type {
-	PredefinedQueryRequest,
-	QueryResponseData,
-	AssignmentRequest,
-	RemoveAssignmentRequest,
-	AssignmentSuccessData
+  PredefinedQueryRequest,
+  QueryResponseData,
+  AssignmentRequest,
+  RemoveAssignmentRequest,
+  AssignmentSuccessData
 } from '$lib/api/api.types';
-import type { 
-    DeleteSupplierApiResponse, 
-    RemoveCategoryApiResponse
+import type {
+  DeleteSupplierApiResponse,
+  RemoveCategoryApiResponse
 } from '$lib/api/app/appSpecificTypes';
 import { LoadingState } from './loadingState';
 //import delay from '$lib/utils/delay';
@@ -36,9 +36,9 @@ export const supplierLoadingOperations = supplierLoadingManager;
  * The default query payload used when fetching a list of suppliers.
  */
 export const DEFAULT_SUPPLIER_QUERY: QueryPayload<Wholesaler> = {
-	select: ['wholesaler_id', 'name', 'region', 'status', 'dropship', 'website', 'created_at'],
-	orderBy: [{ key: 'name', direction: 'asc' }],
-	limit: 100
+  select: ['wholesaler_id', 'name', 'region', 'status', 'dropship', 'website', 'created_at'],
+  orderBy: [{ key: 'name', direction: 'asc' }],
+  limit: 100
 };
 
 /**
@@ -48,7 +48,7 @@ export const DEFAULT_SUPPLIER_QUERY: QueryPayload<Wholesaler> = {
  */
 export function getSupplierApi(client: ApiClient) {
   const api = {
-    
+
     // ===== SUPPLIER MASTER-DATA CRUD =====
 
     /**
@@ -172,7 +172,10 @@ export function getSupplierApi(client: ApiClient) {
           namedQuery: 'supplier_categories',
           payload: {
             select: ['w.wholesaler_id', 'wc.category_id', 'pc.name AS category_name', 'wc.comment', 'wc.link'],
-            where: { whereCondOp: LogicalOperator.AND, conditions: [{ key: 'w.wholesaler_id', whereCondOp: ComparisonOperator.EQUALS, val: supplierId }] },
+            where: {
+              whereCondOp: LogicalOperator.AND, conditions: [
+                { key: 'w.wholesaler_id', whereCondOp: ComparisonOperator.EQUALS, val: supplierId }]
+            },
             orderBy: [{ key: 'pc.name', direction: 'asc' }]
           }
         };
@@ -189,6 +192,47 @@ export function getSupplierApi(client: ApiClient) {
         supplierLoadingOperations.finish(operationId);
       }
     },
+
+    /**
+     * Loads exactly one supplier <-> categories assignment.
+     */
+    async loadCategoryAssignmentForSupplier(supplierId: number, categoryId: number): Promise<WholesalerCategory_Category | null> {
+      const operationId = `loadCategoriesForSupplier-${supplierId}`;
+      supplierLoadingOperations.start(operationId);
+      try {
+        const request: PredefinedQueryRequest = {
+          namedQuery: 'supplier_category->category',
+          payload: {
+            select: ['wc.wholesaler_id', 'wc.category_id', 'pc.name AS category_name', 'wc.comment', 'wc.link'],
+            where: {
+              whereCondOp: LogicalOperator.AND, conditions: [
+                { key: 'wc.wholesaler_id', whereCondOp: ComparisonOperator.EQUALS, val: supplierId },
+                { key: 'wc.category_id', whereCondOp: ComparisonOperator.EQUALS, val: categoryId }
+              ]
+            },
+            orderBy: [{ key: 'pc.name', direction: 'asc' }]
+          }
+        };
+        const responseData = await client.apiFetch<QueryResponseData<WholesalerCategory_Category>>(
+          '/api/query',
+          { method: 'POST', body: createPostBody(request) },
+          { context: operationId }
+        );
+        if (responseData.results?.length > 1) {
+          throw new Error('loadCategoryAssignmentForSupplier: Only one supplier <-> category assignment expectd.');
+        } else if (responseData.results?.length === 1) {
+          return responseData.results[0] as WholesalerCategory_Category;
+        } else {
+          return null;
+        }
+      } catch (err) {
+        log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
+        throw err;
+      } finally {
+        supplierLoadingOperations.finish(operationId);
+      }
+    },
+
 
     /**
      * Loads all available categories from master data.
@@ -219,25 +263,25 @@ export function getSupplierApi(client: ApiClient) {
      * Gets available categories that are not yet assigned to a specific supplier.
      */
     async loadAvailableCategoriesForSupplier(supplierId: number): Promise<ProductCategory[]> {
-        const operationId = `loadAvailableCategoriesForSupplier-${supplierId}`;
-        supplierLoadingOperations.start(operationId);
-        try {
-            const [allCategories, assignedCategories] = await Promise.all([
-                api.loadAvailableCategories(),
-                api.loadCategoriesForSupplier(supplierId)
-            ]);
-    
-            const assignedIds = new Set(assignedCategories.map(c => c.category_id));
-            const availableCategories = allCategories.filter(cat => !assignedIds.has(cat.category_id));
-    
-            log.info(`[${operationId}] Found ${availableCategories.length} available categories for supplier ${supplierId}`);
-            return availableCategories;
-        } catch (err) {
-            log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
-            throw err;
-        } finally {
-            supplierLoadingOperations.finish(operationId);
-        }
+      const operationId = `loadAvailableCategoriesForSupplier-${supplierId}`;
+      supplierLoadingOperations.start(operationId);
+      try {
+        const [allCategories, assignedCategories] = await Promise.all([
+          api.loadAvailableCategories(),
+          api.loadCategoriesForSupplier(supplierId)
+        ]);
+
+        const assignedIds = new Set(assignedCategories.map(c => c.category_id));
+        const availableCategories = allCategories.filter(cat => !assignedIds.has(cat.category_id));
+
+        log.info(`[${operationId}] Found ${availableCategories.length} available categories for supplier ${supplierId}`);
+        return availableCategories;
+      } catch (err) {
+        log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
+        throw err;
+      } finally {
+        supplierLoadingOperations.finish(operationId);
+      }
     },
 
     /**
@@ -259,7 +303,7 @@ export function getSupplierApi(client: ApiClient) {
         );
         return response;
       } catch (err) {
-        log.error(`[${operationId}] Failed.`, {supplierId, category, error: getErrorMessage(err) });
+        log.error(`[${operationId}] Failed.`, { supplierId, category, error: getErrorMessage(err) });
         throw err;
       } finally {
         supplierLoadingOperations.finish(operationId);

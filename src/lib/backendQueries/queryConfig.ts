@@ -7,14 +7,14 @@
  */
 
 import { ComparisonOperator, JoinType, LogicalOperator, type JoinClause, type QueryPayload } from '$lib/backendQueries/queryGrammar';
-import type { BaseTableConfig, PredefinedQueryConfig } from './queryConfig.types';
+import type { BaseTableConfig, PredefinedQueryConfig, ValidFromClause } from './queryConfig.types';
 
 
 export interface QueryConfig {
   allowedTables: BaseTableConfig & PredefinedQueryConfig;
   joinConfigurations?: {
     [viewName: string]: {
-      from: string;
+      from: ValidFromClause;
       joins: JoinClause[];
       exampleQuery?: QueryPayload<unknown>;
     };
@@ -58,7 +58,7 @@ export const supplierQueryConfig: QueryConfig = {
   },
   joinConfigurations: {
     'supplier_categories': {
-      from: 'dbo.wholesalers w',
+      from: {table: 'dbo.wholesalers', alias: 'w'},
       joins: [
         {
           type: JoinType.INNER,
@@ -84,8 +84,24 @@ export const supplierQueryConfig: QueryConfig = {
         }
       ]
     },
+    'supplier_category->category': {
+      from: {table: 'dbo.wholesaler_categories', alias: 'wc'},
+      joins: [
+        {
+          type: JoinType.INNER,
+          table: 'dbo.product_categories',
+          alias: 'pc',
+          on: {
+            joinCondOp: LogicalOperator.AND,
+            conditions: [
+              { columnA: 'wc.category_id', op: ComparisonOperator.EQUALS, columnB: 'pc.category_id' }
+            ]
+          }
+        },
+      ]
+    },
     'category_offerings': {
-      from: 'dbo.product_categories pc',
+      from: {table: 'dbo.product_categories', alias: 'pc'},
       joins: [
         {
           type: JoinType.INNER,
@@ -112,7 +128,7 @@ export const supplierQueryConfig: QueryConfig = {
       ]
     },
     'wholesaler_category_offerings': {
-      from: 'dbo.wholesaler_categories wc',
+      from: {table: 'dbo.wholesaler_categories', alias: 'wc'},
       joins: [
         {
           type: JoinType.INNER,
@@ -128,7 +144,7 @@ export const supplierQueryConfig: QueryConfig = {
       ]
     },
     'wholesaler_item_offering_product_def': {
-      from: 'dbo.wholesaler_item_offerings wio',
+      from: {table: 'dbo.wholesaler_item_offerings', alias: 'wio'},
       joins: [
         {
           type: JoinType.INNER,
@@ -144,7 +160,7 @@ export const supplierQueryConfig: QueryConfig = {
       ]
     },
     'offering_attributes': {
-      from: 'dbo.wholesaler_item_offerings wio',
+      from: {table: 'dbo.wholesaler_item_offerings', alias:'wio'},
       joins: [
         {
           type: JoinType.INNER,
@@ -171,7 +187,7 @@ export const supplierQueryConfig: QueryConfig = {
       ]
     },
     'offering_links': {
-      from: 'dbo.wholesaler_item_offerings wio',
+      from: {table: 'dbo.wholesaler_item_offerings', alias:'wio'},
       joins: [
         {
           type: JoinType.INNER,

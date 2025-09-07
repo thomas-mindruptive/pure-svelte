@@ -2,16 +2,19 @@
 
 import { log } from '$lib/utils/logger';
 import { error, type LoadEvent } from '@sveltejs/kit';
-import { getCategoryApi, type OfferingWithDetails } from '$lib/api/client/category';
-import type { ProductCategory } from '$lib/domain/domainTypes';
+import { getCategoryApi } from '$lib/api/client/category';
+import { getSupplierApi } from '$lib/api/client/supplier';
 import { ApiClient } from '$lib/api/client/ApiClient';
+import type { CategoryDetailPage_LoadDataAsync } from './categoryDetailPage.types';
 
 /**
- * Lädt die Daten für die Kategorie-Detailseite (Angebots-Ansicht).
+ * Loads all data for the Category Detail Page using the non-blocking "app shell" pattern.
+ * This function is now highly efficient, making only two parallel API calls.
  *
- * @param parent - Ermöglicht den Zugriff auf die bereits geladenen Daten aus dem Layout.
+ * @returns An object where each property is a promise for the required data,
+ *          matching the `CategoryDetailPage_LoadDataAsync` type for compile-time safety.
  */
-export async function load({ params, parent, fetch: loadEventFetch }: LoadEvent) {
+export function load({ params, fetch: loadEventFetch }: LoadEvent): CategoryDetailPage_LoadDataAsync {
   const supplierId = Number(params.supplierId);
   const categoryId = Number(params.categoryId);
 
@@ -19,36 +22,18 @@ export async function load({ params, parent, fetch: loadEventFetch }: LoadEvent)
     throw error(400, 'Invalid Supplier or Category ID');
   }
 
-  // Daten vom übergeordneten Layout abrufen, um API-Aufrufe zu sparen.
-  const layoutData = await parent();
-  log.info(`(CategoryDetailPage) loading data for supplierId: ${supplierId}, categoryId: ${categoryId}`);
+  log.info(`(CategoryDetailPage) Kicking off non-blocking load for supplierId: ${supplierId}, categoryId: ${categoryId}`);
 
-  // 1. Create an ApiClient instance with the context-aware `fetch`.
   const client = new ApiClient(loadEventFetch);
-
-  // 2. Get the supplier-specific API methods from the factory.
+  const supplierApi = getSupplierApi(client);
   const categoryApi = getCategoryApi(client);
 
-  try {
-    // Führe die spezifischen API-Aufrufe für diese Seite parallel aus.
-    const [category, offerings] = await Promise.all([
-      categoryApi.loadCategory(categoryId),
-      categoryApi.loadOfferingsForCategory(supplierId, categoryId)
-    ]);
-
-    // Finde die spezifische "Zuweisungsinformation" (Kommentar, Link) aus den Layout-Daten.
-    const assignmentInfo = layoutData.assignedCategories?.find((c: ProductCategory) => c.category_id === categoryId);
-
-    return {
-      category,
-      offerings: offerings as OfferingWithDetails[],
-      assignmentComment: assignmentInfo?.comment,
-      assignmentLink: assignmentInfo?.link
-    };
-  } catch (err: any) {
-    log.error(`Failed to load data`, { supplierId, categoryId, err });
-    const status = err.status ?? err?.response?.status ?? 500;
-    const msg = err?.response?.details || err?.message || 'Failed to load category';
-    throw error(status, msg);
-  }
+  // The function now returns an object that perfectly matches the ...LoadDataAsync type.
+  return {
+    // 1. Fetches the combined assignment and category details in one call.
+    assignmentDetails: supplierApi.loadCategoryAssignmentForSupplier(supplierId, categoryId),
+    
+    // 2. Fetches the list of offerings for this context.
+    offerings: categoryApi.loadOfferingsForCategory(supplierId, categoryId)
+  };
 }

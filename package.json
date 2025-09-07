@@ -15,7 +15,10 @@
 		"// --- TOOL SCRIPTS ---": "",
 		"tools:build": "tsc -p tools/tsconfig.json",
 		"tools:watch": "tsc -p tools/tsconfig.json --watch",
-		"scaffold:page": "npm run tools:build && node tools/dist/scaffold-page.js"
+		"scaffold:page": "npm run tools:build && node tools/dist/scaffold-page.js",
+		"// --- TESTS ---": "",
+		"test": "vitest",
+		"test:run": "vitest run"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-auto": "^6.0.0",
@@ -29,6 +32,7 @@
 		"@types/uuid": "^10.0.0",
 		"@typescript-eslint/eslint-plugin": "^8.40.0",
 		"@typescript-eslint/parser": "^8.40.0",
+		"@vitest/ui": "^3.2.4",
 		"eslint": "^9.33.0",
 		"eslint-plugin-svelte": "^3.11.0",
 		"pino-pretty": "^13.1.1",

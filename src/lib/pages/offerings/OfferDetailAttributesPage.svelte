@@ -2,7 +2,6 @@
 <script lang="ts">
 	import { log } from "$lib/utils/logger";
 	import { addNotification } from "$lib/stores/notifications";
-	import { invalidateAll } from "$app/navigation";
 	import AttributeGrid from "$lib/components/domain/attributes/AttributeGrid.svelte";
 	import {
 		getOfferingApi,
@@ -175,7 +174,9 @@
 				);
 			}
 		}
-		if (dataChanged) invalidateAll();
+		if (dataChanged) {
+			reloadAttributes();
+		}
 	}
 
 	function handleAttributeSelect(

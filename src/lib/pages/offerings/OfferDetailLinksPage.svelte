@@ -1,7 +1,6 @@
 <!-- src/lib/pages/offerings/OfferDetailLinksPage.svelte -->
 <script lang="ts">
 	import { addNotification } from "$lib/stores/notifications";
-	import { invalidateAll } from "$app/navigation";
 	import LinkGrid from "$lib/components/links/LinkGrid.svelte";
 	import {
 		getOfferingApi,
@@ -111,14 +110,43 @@
 	const client = new ApiClient(fetch);
 	const offeringApi = getOfferingApi(client);
 
+	// ===== HELPERS =====
+
+	/**
+	 * Reload links and set them into state.
+	 */
+	async function reloadLinks() {
+		assertDefined(resolvedData, "reloadLinks: resolvedData.offering must be defined", ["offering"]);
+
+		log.info("(OfferDetailLinksPage) Re-fetching links...");
+		const updatedLinks = await offeringApi.loadOfferingLinks(
+			resolvedData.offering.offering_id,
+		);
+		resolvedData.links = updatedLinks;
+		log.info("(OfferDetailLinksPage) Local state updated with new links.");
+	}
+
 	// --- API-AUFRUFE ---
+
 	async function handleLinkDelete(ids: ID[]): Promise<void> {
 		assertDefined(ids, "OfferDetailLinksPage.handleLinkDelete");
+		let dataChanged = false;
+
 		for (const id of ids) {
-			await offeringApi.deleteOfferingLink(Number(id));
+			const result = await offeringApi.deleteOfferingLink(Number(id));
+			
+			if (result.success) {
+				dataChanged = true;
+			} else {
+				// Zeige die Fehlermeldung vom Server an, falls vorhanden.
+				addNotification(result.message ? `Server error: ${result.message}` : 'Could not delete link.', 'error');
+			}
 		}
-		addNotification("Link(s) deleted.", "success");
-		invalidateAll();
+
+		if(dataChanged) {
+			addNotification('Link(s) deleted.', 'success');
+			await reloadLinks();
+		}
 	}
 
 	function handleLinkSelect(link: WholesalerOfferingLink) {
@@ -154,7 +182,7 @@
 			addNotification("Link added.", "success");
 			newUrl = "";
 			newNotes = "";
-			await invalidateAll();
+			reloadLinks();
 		} finally {
 			isAssigning = false;
 		}

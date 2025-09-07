@@ -20,6 +20,7 @@ import type {
     ApiErrorResponse,
     ApiSuccessResponse,
     CreateChildRequest,
+    DeleteRequest,
     DeleteSuccessResponse
 } from '$lib/api/api.types';
 
@@ -273,24 +274,24 @@ export const DELETE: RequestHandler = async ({ request }) => {
 
     try {
         const body = await request.json();
-        const { link_id, cascade = false } = body;
-        log.info(`[${operationId}] Parsed request body`, { link_id, cascade });
+        const { id, cascade = false }: DeleteRequest<WholesalerOfferingLink> = body;
+        log.info(`[${operationId}] Parsed request body`, { id, cascade });
 
-        if (!link_id) {
+        if (!id) {
             const errRes: ApiErrorResponse = {
                 success: false,
-                message: 'link_id is required.',
+                message: 'DELETE /api/offering-links: link_id is required.',
                 status_code: 400,
                 error_code: 'BAD_REQUEST',
                 meta: { timestamp: new Date().toISOString() }
             };
-            log.warn(`[${operationId}] FN_FAILURE: Validation failed - missing link_id.`);
+            log.warn(`[${operationId}] FN_FAILURE: Validation failed - missing id.`);
             return json(errRes, { status: 400 });
         }
 
         // Get link details before deletion
         const linkResult = await db.request()
-            .input('linkId', link_id)
+            .input('linkId', id)
             .query(`
                 SELECT 
                     wol.link_id, 
@@ -305,12 +306,12 @@ export const DELETE: RequestHandler = async ({ request }) => {
         if (linkResult.recordset.length === 0) {
             const errRes: ApiErrorResponse = {
                 success: false,
-                message: `Offering link with ID ${link_id} not found to delete.`,
+                message: `Offering link with ID ${id} not found to delete.`,
                 status_code: 404,
                 error_code: 'NOT_FOUND',
                 meta: { timestamp: new Date().toISOString() }
             };
-            log.warn(`[${operationId}] FN_FAILURE: Link not found during delete.`, { link_id });
+            log.warn(`[${operationId}] FN_FAILURE: Link not found during delete.`, { id });
             return json(errRes, { status: 404 });
         }
 
@@ -318,7 +319,7 @@ export const DELETE: RequestHandler = async ({ request }) => {
 
         // Delete the link (links are leaf nodes in the hierarchy, no dependencies to check)
         const deleteResult = await db.request()
-            .input('linkId', link_id)
+            .input('linkId', id)
             .query('DELETE FROM dbo.wholesaler_offering_links WHERE link_id = @linkId');
 
         if (deleteResult.rowsAffected[0] === 0) {

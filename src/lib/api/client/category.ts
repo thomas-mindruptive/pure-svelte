@@ -20,8 +20,10 @@ import type { ApiClient } from './ApiClient';
 import { createPostBody, createQueryBody, getErrorMessage } from './common';
 import type {
     CreateChildRequest,
+    DeleteRequest,
     PredefinedQueryRequest,
-    QueryResponseData
+    QueryResponseData,
+    RemoveAssignmentRequest
 } from '$lib/api/api.types';
 import type {
     DeleteCategoryApiResponse,
@@ -285,7 +287,12 @@ export function getCategoryApi(client: ApiClient) {
             categoryLoadingOperations.start(operationId);
             try {
                 const url = `/api/category-offerings`;
-                const body = createPostBody({ offering_id: offeringId, cascade });
+                
+                const removeRequest: DeleteRequest<WholesalerItemOffering> = {
+                    id: offeringId,
+                    cascade
+                }
+                const body = createPostBody(removeRequest);
                 return await client.apiFetchUnion<DeleteOfferingApiResponse>(
                     url,
                     { method: 'DELETE', body },

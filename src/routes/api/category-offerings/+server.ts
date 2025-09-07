@@ -20,6 +20,7 @@ import type {
     ApiSuccessResponse,
     CreateChildRequest,
     DeleteConflictResponse,
+    DeleteRequest,
     DeleteSuccessResponse,
     RemoveAssignmentRequest
 } from '$lib/api/api.types';
@@ -367,9 +368,9 @@ export const DELETE: RequestHandler = async ({ request }) => {
     log.info(`[${operationId}] DELETE /category-offerings: FN_START`);
 
     try {
-        const body = (await request.json()) as RemoveAssignmentRequest<ProductCategory, WholesalerItemOffering> & { offering_id: number };
-        const { offering_id, cascade = false } = body;
-        log.info(`[${operationId}] Parsed request body`, { offering_id, cascade });
+        const body: DeleteRequest<WholesalerItemOffering> = await request.json();
+        const { id: offering_id, cascade = false } = body;
+        log.debug(`[${operationId}] Parsed request body`, { offering_id, cascade });
 
         if (!offering_id) {
             const errRes: ApiErrorResponse = {

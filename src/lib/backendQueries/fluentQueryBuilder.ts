@@ -6,13 +6,14 @@ import type {
   JoinClause, 
   WhereCondition, 
   WhereConditionGroup,
-  ComparisonOperator,
-  JoinColCondition
+  JoinColCondition,
+  JoinConditionGroup
 } from './queryGrammar';
 
 // Values (Enums, die zur Laufzeit verwendet werden)
 import { 
   JoinType, 
+  ComparisonOperator,
   LogicalOperator
 } from './queryGrammar';
 
@@ -122,33 +123,75 @@ export class JoinBuilder<T> {
     private joinClause: JoinClause
   ) {}
 
-  onCondition(
+  onColumnCondition(
     columnA: AllQualifiedColumns | AllAliasedColumns,
     op: ComparisonOperator | `${ComparisonOperator}`,
-    columnBOrValue: AllQualifiedColumns | AllAliasedColumns | unknown
+    columnB: AllQualifiedColumns | AllAliasedColumns
   ): this {
-    const isColumn = typeof columnBOrValue === 'string' && 
-                    (columnBOrValue.includes('.') || /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(columnBOrValue));
-
-    if (isColumn) {
-      const joinColCondition: JoinColCondition = {
-        columnA,
-        op,
-        columnB: columnBOrValue as AllQualifiedColumns | AllAliasedColumns
-      };
-      this.joinClause.on.conditions.push(joinColCondition);
-    } else {
-      const whereCondition: WhereCondition<unknown> = {
-        key: columnA,
-        whereCondOp: op,
-        val: columnBOrValue
-      };
-      this.joinClause.on.conditions.push(whereCondition);
-    }
-
+    const joinColCondition: JoinColCondition = {
+      columnA,
+      op,
+      columnB
+    };
+    this.joinClause.on.conditions.push(joinColCondition);
     return this;
   }
 
+  onValueCondition(
+    column: AllQualifiedColumns | AllAliasedColumns,
+    op: ComparisonOperator | `${ComparisonOperator}`,
+    value: unknown | unknown[]
+  ): this {
+    const whereCondition: WhereCondition<unknown> = {
+      key: column,
+      whereCondOp: op,
+      val: value
+    };
+    this.joinClause.on.conditions.push(whereCondition);
+    return this;
+  }
+
+  // Convenience method für einfache OR-Bedingungen
+  orColumnCondition(
+    columnA: AllQualifiedColumns | AllAliasedColumns,
+    op: ComparisonOperator | `${ComparisonOperator}`,
+    columnB: AllQualifiedColumns | AllAliasedColumns
+  ): this {
+    return this.orGroup(group => group.onColumnCondition(columnA, op, columnB));
+  }
+
+  orValueCondition(
+    column: AllQualifiedColumns | AllAliasedColumns,
+    op: ComparisonOperator | `${ComparisonOperator}`,
+    value: unknown | unknown[]
+  ): this {
+    return this.orGroup(group => group.onValueCondition(column, op, value));
+  }
+
+  // Gruppierte JOIN-Bedingungen
+  andGroup(builderFn: (group: JoinConditionBuilder) => void): this {
+    const subGroup: JoinConditionGroup = {
+      joinCondOp: LogicalOperator.AND,
+      conditions: []
+    };
+    const subBuilder = new JoinConditionBuilder(subGroup);
+    builderFn(subBuilder);
+    this.joinClause.on.conditions.push(subGroup);
+    return this;
+  }
+
+  orGroup(builderFn: (group: JoinConditionBuilder) => void): this {
+    const subGroup: JoinConditionGroup = {
+      joinCondOp: LogicalOperator.OR,
+      conditions: []
+    };
+    const subBuilder = new JoinConditionBuilder(subGroup);
+    builderFn(subBuilder);
+    this.joinClause.on.conditions.push(subGroup);
+    return this;
+  }
+
+  // Direkte Übergänge zu anderen Builder
   innerJoin(table: string, alias?: string): JoinBuilder<T> {
     return this.queryBuilder.innerJoin(table, alias);
   }
@@ -183,6 +226,106 @@ export class JoinBuilder<T> {
 
   build(): QueryPayload<T> {
     return this.queryBuilder.build();
+  }
+}
+
+// Builder für JOIN-Bedingungsgruppen
+export class JoinConditionBuilder {
+  constructor(private joinGroup: JoinConditionGroup) {}
+
+  onColumnCondition(
+    columnA: AllQualifiedColumns | AllAliasedColumns,
+    op: ComparisonOperator | `${ComparisonOperator}`,
+    columnB: AllQualifiedColumns | AllAliasedColumns
+  ): this {
+    const joinColCondition: JoinColCondition = {
+      columnA,
+      op,
+      columnB
+    };
+    this.joinGroup.conditions.push(joinColCondition);
+    return this;
+  }
+
+  onValueCondition(
+    column: AllQualifiedColumns | AllAliasedColumns,
+    op: ComparisonOperator | `${ComparisonOperator}`,
+    value: unknown | unknown[]
+  ): this {
+    const whereCondition: WhereCondition<unknown> = {
+      key: column,
+      whereCondOp: op,
+      val: value
+    };
+    this.joinGroup.conditions.push(whereCondition);
+    return this;
+  }
+
+  orColumnCondition(
+    columnA: AllQualifiedColumns | AllAliasedColumns,
+    op: ComparisonOperator | `${ComparisonOperator}`,
+    columnB: AllQualifiedColumns | AllAliasedColumns
+  ): this {
+    if (this.joinGroup.conditions.length > 0) {
+      const newGroup: JoinConditionGroup = {
+        joinCondOp: LogicalOperator.OR,
+        conditions: [{
+          columnA,
+          op,
+          columnB
+        }]
+      };
+      this.joinGroup.conditions.push(newGroup);
+    } else {
+      this.joinGroup.joinCondOp = LogicalOperator.OR;
+      this.onColumnCondition(columnA, op, columnB);
+    }
+    return this;
+  }
+
+  orValueCondition(
+    column: AllQualifiedColumns | AllAliasedColumns,
+    op: ComparisonOperator | `${ComparisonOperator}`,
+    value: unknown | unknown[]
+  ): this {
+    if (this.joinGroup.conditions.length > 0) {
+      const newGroup: JoinConditionGroup = {
+        joinCondOp: LogicalOperator.OR,
+        conditions: [{
+          key: column,
+          whereCondOp: op,
+          val: value
+        }]
+      };
+      this.joinGroup.conditions.push(newGroup);
+    } else {
+      this.joinGroup.joinCondOp = LogicalOperator.OR;
+      this.onValueCondition(column, op, value);
+    }
+    return this;
+  }
+
+  // Verschachtelte Gruppen auch in JOINs
+  andGroup(builderFn: (group: JoinConditionBuilder) => void): this {
+    const subGroup: JoinConditionGroup = {
+      joinCondOp: LogicalOperator.AND,
+      conditions: []
+    };
+    const subBuilder = new JoinConditionBuilder(subGroup);
+    builderFn(subBuilder);
+    this.joinGroup.conditions.push(subGroup);
+    return this;
+  }
+
+  orGroup(builderFn: (group: JoinConditionBuilder) => void): this {
+    const subGroup: JoinConditionGroup = {
+      joinCondOp: LogicalOperator.OR,
+      conditions: []
+    };
+    const subBuilder = new JoinConditionBuilder(subGroup);
+    builderFn(subBuilder);
+    this.joinGroup.conditions.push(subGroup);
+    return this;
   }
 }
 

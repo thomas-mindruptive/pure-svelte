@@ -23,7 +23,6 @@ import type {
     DeleteRequest,
     PredefinedQueryRequest,
     QueryResponseData,
-    RemoveAssignmentRequest
 } from '$lib/api/api.types';
 import type {
     DeleteCategoryApiResponse,

@@ -22,7 +22,6 @@ import type {
     DeleteConflictResponse,
     DeleteRequest,
     DeleteSuccessResponse,
-    RemoveAssignmentRequest
 } from '$lib/api/api.types';
 import { buildQuery, executeQuery } from '$lib/server/queryBuilder';
 import { ComparisonOperator, type QueryPayload } from '$lib/backendQueries/queryGrammar';

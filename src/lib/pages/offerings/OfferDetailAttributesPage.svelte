@@ -223,7 +223,7 @@
 			selectedAttributeId = null;
 			attributeValue = "";
 
-			// Reload and set state.
+			// Reload and set state. await!
 			await reloadAttributes();
 		} catch (error) {
 			log.error(`Failed to assign attribute`, { error });

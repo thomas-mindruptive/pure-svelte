@@ -38,6 +38,7 @@
 		type SupplierDetailPage_LoadData,
 		type SupplierDetailPage_LoadDataAsync,
 	} from "./supplierDetailPage.types";
+	import { assertDefined } from "$lib/utils/validation/assertions";
 
 	// --- PROPS ---
 
@@ -193,6 +194,32 @@
 		log.debug(`Form changed`);
 	}
 
+	// ===== HELPERS =====
+
+	/**
+	 * Reload categories and set them into the state.
+	 */
+	async function reloadCategories() {
+		assertDefined(
+			resolvedData,
+			"reloadCategories: Supplier must be loaded/available",
+			["supplier"]
+		);
+
+		const supplierId = resolvedData.supplier?.wholesaler_id;
+
+		log.info("Re-fetching category lists after assignment...");
+		const [updatedAssigned, updatedAvailable] = await Promise.all([
+			supplierApi.loadCategoriesForSupplier(supplierId),
+			supplierApi.loadAvailableCategoriesForSupplier(supplierId),
+		]);
+		resolvedData.assignedCategories = updatedAssigned;
+		resolvedData.availableCategories = updatedAvailable;
+		log.info("Local state updated. UI will refresh seamlessly.");
+	}
+
+	// ===== BUSINESS LOGIC =====
+
 	/**
 	 * Handles the assignment of a new category.
 	 */
@@ -227,8 +254,8 @@
 				"success",
 			);
 
-			// Reload the page to refresh both assigned and available category grids.
-			await goto(`/suppliers/${supplierId}`, { invalidateAll: true });
+			// await!
+			await reloadCategories();
 		} catch (error) {
 			log.error(`Failed to assign category`, {
 				supplierId,

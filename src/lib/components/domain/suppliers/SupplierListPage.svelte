@@ -42,7 +42,10 @@
   let resolvedSuppliers = $state<Wholesaler[]>([]);
   let isLoading = $state(true); // The component always starts in a loading state.
   // A structured object to hold a clean, UI-friendly error if the promise rejects.
-  let loadingOrValidationError = $state<{ message: string; status: number } | null>(null);
+  let loadingOrValidationError = $state<{
+    message: string;
+    status: number;
+  } | null>(null);
 
   // --- ASYNCHRONOUS LOGIC HANDLING ---
   // This `$effect` is the core of the solution. It runs whenever the `data.suppliers`
@@ -158,7 +161,8 @@
     }
 
     if (dataChanged) {
-      goto("/suppliers", { invalidateAll: true });
+      // Reload and change state.
+      resolvedSuppliers = await supplierApi.loadSuppliers(); 
     }
   }
 
@@ -192,7 +196,9 @@
   -->
   {#if loadingOrValidationError}
     <div class="component-error-boundary">
-      <h3>Error Loading Suppliers (Status: {loadingOrValidationError.status})</h3>
+      <h3>
+        Error Loading Suppliers (Status: {loadingOrValidationError.status})
+      </h3>
       <p>{loadingOrValidationError.message}</p>
     </div>
   {:else}

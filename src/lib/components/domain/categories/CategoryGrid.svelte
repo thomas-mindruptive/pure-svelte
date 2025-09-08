@@ -5,52 +5,48 @@
   import type {
     DeleteStrategy,
     RowActionStrategy,
-    ColumnDefWithAccessor,
-    ColumnDefDirect,
     ID,
-    ColumnDef,
+    ColumnDefDirect,
   } from "$lib/components/grids/Datagrid.types";
 
-  import type { WholesalerCategory_Category } from "$lib/domain/domainTypes";
+  import type { ProductCategory } from "$lib/domain/domainTypes";
 
   const {
     rows = null, // Can accept null from parent
     loading = false,
-    showOfferingCount = true,
     deleteStrategy,
     rowActionStrategy,
   } = $props<{
-    rows?: WholesalerCategory_Category[] | null;
+    rows?: ProductCategory[] | null;
     loading?: boolean;
-    showOfferingCount?: boolean;
-    deleteStrategy: DeleteStrategy<WholesalerCategory_Category>;
-    rowActionStrategy?: RowActionStrategy<WholesalerCategory_Category>;
+    deleteStrategy: DeleteStrategy<ProductCategory>;
+    rowActionStrategy?: RowActionStrategy<ProductCategory>;
   }>();
 
-
   // Svelte will say that "columns is updated." This is ok because this is jsut a workaorund for not being const.
-  const columns = $derived.by((): ColumnDef<WholesalerCategory_Category>[] => {
-    if (showOfferingCount) {
-      const colsWithAccessor: ColumnDefWithAccessor<WholesalerCategory_Category>[] = [
-        { key: "category_name", header: "Category Name", sortable: true, width: "3fr", accessor: null, },
-        { key: "comment", header: "Comment", sortable: false, width: "2fr", accessor: null, },
-        { key: "link", header: "Link", sortable: false, width: "2fr", accessor: null, },
-      ];
-      return colsWithAccessor;
-    } else {
-      const colsDirect: ColumnDefDirect<WholesalerCategory_Category>[] = [
-        { key: "category_name", header: "Category Name", sortable: true, width: "3fr" },
-        { key: "comment", header: "Comment", sortable: false, width: "2fr" },
-        { key: "link", header: "Link", sortable: false, width: "2fr" },
-      ];
-      return colsDirect;
+  const columns: ColumnDefDirect<ProductCategory>[] = [
+    {
+      key: "category_id",
+      header: "id",
+      sortable: true,
+      width: "3fr"
+    },
+    {
+      key: "name",
+      header: "Name",
+      sortable: false,
+      width: "2fr"
+    },
+    {
+      key: "description",
+      header: "description",
+      sortable: true,
+      width: "1fr"
     }
-  });
-
+  ];
 
   // Composite key for categories (wholesaler_id + category_id)
-  const getId = (r: WholesalerCategory_Category): ID =>
-    `${r.wholesaler_id}-${r.category_id}`;
+  const getId = (r: ProductCategory): ID => `${r.category_id}`;
 </script>
 
 <Datagrid

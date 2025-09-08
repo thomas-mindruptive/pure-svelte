@@ -1,6 +1,6 @@
 // Wenn accessor vorhanden: key kann beliebig sein (da accessor die Logik übernimmt)
 export type ColumnDefWithAccessor<T> = {
-    key: string; // beliebig, da accessor die Daten extrahiert
+    key: keyof T; 
     header: string;
     accessor: ((row: T) => unknown ) | null
     sortable?: boolean;
@@ -19,7 +19,7 @@ export type ColumnDefDirect<T> = {
 };
 
 // Union: entweder direct access ODER accessor
-export type ColumnDef<T = unknown> =
+export type ColumnDef<T> =
     | ColumnDefWithAccessor<T>
     | ColumnDefDirect<T>;
 

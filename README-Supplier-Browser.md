@@ -30,7 +30,6 @@ The application's logic is built around a clear, five-level data model. Understa
 - **Purpose**: Products that exist only in a [supplier + category] context.
 - **Key Characteristic**: Cannot be created independently; always require parent context.
 - **API Pattern**: `/api/category-offerings` CREATE/UPDATE/DELETE with `CreateChildRequest`.
-- **NO** `/api/offerings/new` - violates hierarchical principle.
 - **Master Data**: Product definitions via `/api/product-definitions/new`.
 
 #### Level 4: Attributes (Relationship - Attributed)
@@ -91,18 +90,6 @@ export type DeleteRequest<T> = {
 };
 ```
 
-### Option: Adjust AssignmentRequest
-
-This optional semantic adjustment remains for consideration in future API versions.
-
-```typescript
-export type AssignmentRequest<TParent, TChild> = {
-  parentId: TParent[IdField<TParent>];
-  childId: TChild[IdField<TChild>];
-  data?: object // "Attributes" or additionalData for the relationship.
-};
-```
-
 ### Request Pattern Decision Matrix
 
 | Relationship Type | Pattern | Use Case | Example |
@@ -141,7 +128,7 @@ if (requestData.parentId !== requestData.data.category_id) {
 
 ### The Generic Query Endpoint: `/api/query`
 
-The `/api/query` endpoint is a central architectural component that handles all complex relational data access. **Update:** It now expects the `from` clause in a `QueryPayload` to be a structured object: `{ table: string, alias: string }`, which is validated on the server against a central `aliasedTablesConfig`.
+The `/api/query` endpoint is a central architectural component that handles all complex relational data access. It expects the `from` clause in a `QueryPayload` to be a structured object: `{ table: string, alias: string }`, which is validated on the server against a central `aliasedTablesConfig`.
 
 #### Purpose
 - **Complex JOINs**: Multi-table operations that require predefined, optimized query structures. The anti-join to find available products is a prime example of its power.
@@ -150,7 +137,7 @@ The `/api/query` endpoint is a central architectural component that handles all 
 
 ### Master Data Pattern: QueryPayload + Individual CRUD
 
-Master data entities follow a consistent pattern for API interactions. **Update:** List queries are now initiated by the client sending a complete `QueryPayload`, including the `from` object. The typed server endpoint (e.g., `/api/suppliers`) acts as a semantic gatekeeper that enforces the `from` clause.
+Master data entities follow a consistent pattern for API interactions. List queries are initiated by the client sending a complete `QueryPayload`, including the `from` object. The typed server endpoint (e.g., `/api/suppliers`) acts as a semantic gatekeeper that enforces the `from` clause.
 
 ```typescript
 // List with flexible querying
@@ -200,6 +187,16 @@ POST /api/supplier-categories
 }
 ```
 
+#### Deletion Patterns for Relationships vs. Master Data
+
+To ensure API consistency, deletion operations adhere to one of three distinct patterns based on the type of resource being deleted.
+
+| Deletion Type | Endpoint | Method | Body Content | Purpose |
+| :--- | :--- | :--- | :--- | :--- |
+| **Master Data** | `/api/[entity]/[id]` | `DELETE` | *None*. `cascade` flag is a URL query parameter (`?cascade=true`). | Deletes a top-level entity. The ID in the URL is the source of truth. |
+| **n:m Assignment** | `/api/[parent]-[child]` | `DELETE` | `RemoveAssignmentRequest<{parentId, childId}>` | Removes a link between two entities. Requires both IDs to identify the unique relationship. |
+| **1:n Child** | `/api/[parent]-[child]` | `DELETE` | `DeleteRequest<{id}>` | Deletes a child entity that has its own unique ID. Follows the standard `DeleteRequest` pattern. |
+
 ---
 
 ## Current Implementation Status
@@ -240,7 +237,6 @@ POST /api/supplier-categories
 | Create | `POST /api/category-offerings` | `CreateChildRequest<ProductCategory, OfferingData>` | ✅ | ✅ | |
 | Update | `PUT /api/category-offerings` | `{offering_id, ...updates}` | ✅ | ✅ | |
 | Delete | `DELETE /api/category-offerings` | `DeleteRequest<WholesalerItemOffering>` | ✅ | ✅ | |
-| **~~OFFERINGS/NEW (Deprecated)~~** | ~~`POST /api/offerings/new`~~ | ~~Violates hierarchical principle~~ | ❌ | ❌ | Use category-offerings |
 | **OFFERING-ATTRIBUTES (Assignment - n:m Attributed)** | | | | | |
 | Query via JOINs | `POST /api/query` | `namedQuery: 'offering_attributes'` | ✅ | ✅ | |
 | Create Assignment | `POST /api/offering-attributes` | `AssignmentRequest<WholesalerItemOffering, Attribute>` | ✅ | ✅ | |
@@ -275,7 +271,7 @@ WHERE
 ```
 
 **The Architectural Challenge & Solution:**
-Instead of creating a specialized, one-off API endpoint, we **leverage the flexibility of the generic query system**. The client-side API module (`offering.ts`) now constructs a full `QueryPayload` that perfectly describes this complex join. This payload is then sent to the generic `/api/query` endpoint, which validates it against the `aliasedTablesConfig` and builds the secure, parameterized SQL.
+Instead of creating a specialized, one-off API endpoint, we **leverage the flexibility of the generic query system**. The client-side API module (`offering.ts`) constructs a full `QueryPayload` that perfectly describes this complex join. This payload is then sent to the generic `/api/query` endpoint, which validates it against the `aliasedTablesConfig` and builds the secure, parameterized SQL.
 
 This enhancement makes our generic query system significantly more powerful, avoids API endpoint proliferation, and keeps complex business logic encapsulated in the client-side API module responsible for the context (`offering.ts`).
 
@@ -284,11 +280,12 @@ This enhancement makes our generic query system significantly more powerful, avo
 ## Technical Architecture Pillars
 
 ### Type Safety Architecture
-The project is built on four pillars of type safety that work together to ensure correctness from the database to the UI.
+The project is built on five pillars of type safety that work together to ensure correctness from the database to the UI.
 - **Pillar I: Generic API Types:** Universal request/response envelopes in `lib/api/types/common.ts`.
 - **Pillar II: Query Grammar:** Type-safe query language in `lib/clientAndBack/queryGrammar.ts`, featuring a structured `from: { table, alias }` object.
 - **Pillar III: Query Config:** A security whitelist for all table, alias, and column access, centered around a single source of truth: the `aliasedTablesConfig` object.
 - **Pillar IV: Query Builder:** A server-side utility that converts the type-safe grammar into parameterized SQL.
+- **Pillar V: Data Validation & Contracts with Zod:** A new pillar ensuring runtime data integrity on the frontend.
 
 ### Pillar V: Data Validation & Contracts with Zod
 Zod is the single source of truth for the **shape** of data on the frontend. It allows us to define a data structure once and get both static TypeScript types and runtime validation for free. This is crucial for ensuring that data coming from the "untyped" outside world (like an API response) conforms to the application's expectations before it is used in Svelte components.
@@ -311,7 +308,7 @@ Zod is a cornerstone of the frontend architecture in two key areas:
 2.  **Validating Component Props:** Components that receive complex data objects as props, like `OfferingForm`, use Zod schemas internally to validate their inputs upon initialization. This creates robust, "self-defending" components that fail early if they are used with incorrect data.
 
 #### Current Status on the Server-Side
-Currently, server-side API endpoints (`/api/...`) do **not yet** use Zod for validating incoming request bodies. They rely on the custom-built, programmatic `validateDomainEntity` function from `domainValidator.ts`.
+Server-side API endpoints (`/api/...`) do **not yet** use Zod for validating incoming request bodies. They rely on the custom-built, programmatic `validateDomainEntity` function from `domainValidator.ts`.
 
 Migrating the server-side validation to Zod is a potential future architectural improvement. This would reduce code, eliminate the need for the `validateDomainEntity` system, and create a single, unified validation mechanism across the entire full-stack application.
 
@@ -359,7 +356,7 @@ To create reusable yet fully type-safe forms, the project uses this robust patte
 #### The "Dumb" State Manager: `FormShell.svelte`
 - A generic component that knows nothing about specific data types like `Wholesaler`.
 - It manages the core form mechanics: tracking data, "dirty" state, submission status, and orchestrating the `validate` and `submit` lifecycle via Svelte 5 callback props (`onSubmitted`, `onSubmitError`).
-- **Update:** The `FormShell` is now enhanced with an `$effect` to robustly handle asynchronous changes to its `initial` prop, preventing state inconsistencies when a component is reused across navigations.
+- The `FormShell` is enhanced with an `$effect` to robustly handle asynchronous changes to its `initial` prop, preventing state inconsistencies when a component is reused across navigations.
 
 #### The "Smart" Parent: `SupplierForm.svelte`
 - A specific component that knows everything about a `Wholesaler`.
@@ -423,148 +420,7 @@ This principle translates into the following specific behaviors:
 
 This behavior is orchestrated by the root `(browser)/+layout.ts`, which reconciles the current URL with the state persisted in the `navigationState` store on every navigation.
 
----
-
-## Architectural Insight: Handling Isomorphic Code
-
-One of the major challenges in SvelteKit is managing code that runs in both environments (isomorphic code, primarily in `src/lib`).
-
-**The Problem: Hidden Node.js Dependencies in the Browser**
-Attempting to import server-side Node.js modules (like `pino-pretty`) in an isomorphic file **inevitably breaks the browser build**. This happens at build-time, long before a runtime `if (browser)` check can prevent the import.
-
-**The Challenge: Race Conditions with Asynchronous Initialization**
-Workarounds involving dynamic, asynchronous imports introduce race conditions where log calls can be "swallowed" because the logger has not yet finished its asynchronous initialization.
-
-**The Current Solution: A Minimal, Synchronous Logger**
-The project uses a **minimal, synchronous logger implementation** in `src/lib/utils/logger.ts` that uses a simple `if (browser)` check to strictly separate the environments without any problematic server-side imports. This guarantees reliability.
-
----
-
-## Examples of Generic Type Usage
-
-### Querying Master Data
-```typescript
-// In an API client (e.g., supplier.ts)
-const query: QueryPayload<Wholesaler> = {
-  from: { table: 'dbo.wholesalers', alias: 'w' },
-  select: ['w.wholesaler_id', 'w.name'],
-  where: { key: 'w.status', whereCondOp: ComparisonOperator.EQUALS, val: 'active' }
-};
-// Sent via POST /api/suppliers
-```
-
-### Hierarchical Child Creation (1:n)
-```typescript
-// Category → Offering
-CreateChildRequest<ProductCategory, Partial<Omit<WholesalerItemOffering, 'offering_id'>>>
-// → { parentId: 5, data: { wholesaler_id: 1, category_id: 5, product_def_id: 10 } }
-
-// Offering → Link
-CreateChildRequest<WholesalerItemOffering, Omit<WholesalerOfferingLink, 'link_id'>>
-// → { parentId: 12, data: { offering_id: 12, url: "https://...", notes: "..." } }
-```
-
-### Assignment Creation (n:m)
-```typescript
-// Supplier-Category Assignment
-AssignmentRequest<Wholesaler, ProductCategory, { comment?: string; link?: string }>
-// → { parentId: 1, childId: 5, comment: "High priority" }
-
-// Offering-Attribute Assignment  
-AssignmentRequest<WholesalerItemOffering, Attribute, { value?: string }>
-// → { parentId: 12, childId: 3, value: "Red" }
-```
-
----
-
-## Implementation Guidelines
-
-### Adding New Master Data
-
-**For Independent Entities:**
-```typescript
-// Server endpoint: /api/{entity}/new
-Body: Omit<Entity, 'id_field'>
-
-// Client function:
-create{Entity}(data: Omit<Entity, 'id_field'>): Promise<Entity>
-```
-
-### Adding New Hierarchical Children
-
-**For 1:n Relationships:**
-```typescript
-// Server endpoint: /api/{parent}-{child}
-Body: CreateChildRequest<ParentEntity, Omit<ChildEntity, 'child_id'>>
-
-// Client function:
-create{Child}For{Parent}(
-  parentId: number,
-  childData: Omit<ChildEntity, 'child_id' | 'parent_fk'>
-): Promise<ChildEntity>
-```
-
-### Adding New Assignments
-
-**For n:m Relationships:**
-```typescript
-// Server endpoint: /api/{parent}-{child}
-Body: AssignmentRequest<ParentEntity, ChildEntity, MetadataType>
-
-// Client function:
-assign{Child}To{Parent}(data: {
-  parentId: number,
-  childId: number,
-  ...metadata
-}): Promise<AssignmentData>
-```
-
----
-
-## Developer Tooling: Automated Page Scaffolding
-
-To enforce the Page Delegation Pattern and accelerate development, a command-line scaffolding tool is provided. It automatically generates the required file structure for a new page based on a central configuration.
-
-### The Configuration (`tools/scaffoldConfig.ts`)
-
-This file is the single source of truth for the application's page structure. It defines root directories and a nested map of all available pages.
-
-```typescript
-// tools/scaffoldConfig.ts
-
-// Defines root paths for all generated files
-export const scaffoldingConfig = {
-  pagesRoot: 'generated/src/lib/pages',
-  routesRoot: 'generated/src/routes',
-  overwriteExisting: true,
-  // ... other options
-};
-
-// Defines the pages, grouped by their base directory
-export const pages: Record<string, Record<string, PageDefinition>> = {
-  suppliers: {
-    list: { pageName: 'SupplierListPage', paramName: '' },
-    detail: { pageName: 'SupplierDetailPage', paramName: 'supplierId' }
-  },
-  // ... other pages
-};
-```
-
-### The Templates (`tools/templates/`)
-
-The tool uses template files for each generated file type (`page.svelte`, `page.ts`, `+page.svelte`, `+page.ts`). These templates contain Svelte 5-compliant boilerplate code and placeholders (e.g., `PageName$PlaceHolder`) that are filled in by the script.
-
-### Usage
-
-To generate all pages defined in the configuration, run the following command from the project root:
-
-```
-npm run generate:pages
-```
-
----
-
-## Frontend API Client & State Management
+### Frontend API Client & State Management
 
 ### The ApiClient: An SSR-Safe Foundation
 The cornerstone of frontend data fetching is the `ApiClient` class. A new instance is created for each data-loading context, passing in the context-aware `fetch` function provided by SvelteKit's `load` event. This ensures that API calls are SSR-safe.
@@ -583,7 +439,80 @@ The application uses a two-level approach to provide clear loading feedback.
 - **Action-Specific Loading:** Each API client module (`supplier.ts`, etc.) exports its own `LoadingState` instance for granular feedback on specific actions (e.g., deleting, saving).
 - **Page-Level Loading:** Page components import relevant `LoadingState` stores and combine them using a `derived` store to create a single, top-level loading indicator for the entire view.
 
+### Data Invalidation: The "Re-fetch and Update" Pattern
+To provide a seamless user experience without disruptive page reloads, the application uses a **"Re-fetch and Update"** pattern for data invalidation after a mutation (e.g., assigning a category).
+
+-   **Anti-Pattern:** The use of `invalidateAll()` or `goto(..., { invalidateAll: true })` is avoided for simple state updates. While effective, this "sledgehammer" approach re-runs all `load` functions and can cause a noticeable "jump" or "flash" as the entire page's data is re-fetched.
+-   **Best Practice:** The recommended workflow is:
+    1.  **Mutate:** Execute the API call that changes data on the server (e.g., `supplierApi.assignCategoryToSupplier()`).
+    2.  **Re-fetch:** Upon a successful response, immediately re-fetch *only the specific data sources* that were affected by the change (e.g., call `loadCategoriesForSupplier()` and `loadAvailableCategoriesForSupplier()` again).
+    3.  **Update State:** Write the newly fetched data directly into the component's local `$state` variables. Svelte's reactivity will then update the UI seamlessly and instantly without a full page reload.
+
+This pattern provides the ideal balance between data consistency (by always getting the latest data from the server) and a smooth, modern user experience.
+
 ---
+
+## Developer Experience & Tooling
+
+### Fluent Query Builder: Type-Safe Query Construction
+To improve developer experience and reduce errors when constructing `QueryPayload` objects on the client, the project provides a typsicheren, fluenten Query Builder. This builder guides the developer through the creation of a valid query, making the code more readable and robust.
+
+**Before (Manual Object Construction):**
+```typescript
+const payload: QueryPayload<Wholesaler> = {
+  from: { table: 'dbo.wholesalers', alias: 'w' },
+  select: ['w.wholesaler_id', 'w.name'],
+  where: { key: 'w.status', whereCondOp: ComparisonOperator.EQUALS, val: 'active' }
+};
+```
+
+**After (Fluent Builder):**
+```typescript
+import { Query, ComparisonOperator } from '$lib/backendQueries/fluentQueryBuilder';
+
+const payload = Query.for<Wholesaler>()
+  .from('dbo.wholesalers', 'w')
+  .select(['w.wholesaler_id', 'w.name'])
+  .where()
+    .and('w.status', ComparisonOperator.EQUALS, 'active')
+  .build();
+```
+
+---
+
+### Advanced Assertion Utilities: Simplifying Type Safety
+A common challenge in Svelte components that handle asynchronously loaded data is proving to the TypeScript compiler that a nested property is no longer `null` or `undefined`. The project provides an advanced `assertDefined` utility to solve this elegantly.
+
+**The Problem:**
+After loading data, a simple check might not be enough to satisfy the compiler for nested properties.
+```typescript
+let resolvedData: { offering: Offering | null } | null = $state(null);
+
+// This check only confirms `resolvedData` is not null.
+if (!resolvedData) { throw new Error("Data not loaded"); }
+
+// ERROR: 'resolvedData.offering' is possibly 'null'.
+const id = resolvedData.offering.offering_id; 
+```
+
+**The Solution (`assertDefined` with Path Validation):**
+The enhanced `assertDefined` function can take an array of paths to validate. It uses an advanced `asserts obj is WithDefinedPaths<...>` signature to inform TypeScript's control flow analysis that these paths are guaranteed to exist and are not null/undefined.
+
+```typescript
+// This single assertion guarantees that `resolvedData` AND the path `["offering"]` are not null.
+assertDefined(resolvedData, "Data and offering must be loaded", ["offering"]);
+
+// NO ERROR: TypeScript now understands the access is safe.
+const id = resolvedData.offering.offering_id; 
+
+// It even works for deeply nested paths.
+assertDefined(resolvedData, "Price must exist", ["offering", "details", "price"]);
+const price = resolvedData.offering.details.price; // Type is `number`, not `number | null`
+```
+This utility simplifies code within event handlers and other component logic, eliminating the need for repetitive nested `if` checks while maintaining strict type safety.
+
+---
+
 
 ## Understanding Svelte's Reactivity in the SupplierBrowser App
 
@@ -648,3 +577,4 @@ By using this pattern, the `data` object passed back into the snippet from `Form
 *   **Audit `load` Functions:** Verify that all `load` functions correctly pass the `fetch` function from the `LoadEvent` to the `ApiClient`.
 *   **Audit Deletion Logic:** Verify that all `deleteStrategy` implementations use the "fire-and-forget" `invalidateAll()` pattern to prevent UI race conditions.
 *   **Fix scaffolding tool:** Ensure the `+page.ts` template generates extension-less imports for module delegation.
+```

@@ -2,13 +2,11 @@
 
 import { describe, it, expect } from 'vitest'
 import { Query } from './fluentQueryBuilder'
-import type { QueryPayload } from './queryGrammar'
 import type { 
   Wholesaler, 
   ProductDefinition, 
   ProductCategory,
   WholesalerItemOffering,
-  WholesalerCategory 
 } from '../domain/domainTypes'
 
 describe('FluentQueryBuilder with Real Domain Types', () => {

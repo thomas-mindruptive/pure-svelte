@@ -1,3 +1,5 @@
+// lib/utils/assertions.ts
+
 /**
  * Type-safe object validation guards with path support.
  * 

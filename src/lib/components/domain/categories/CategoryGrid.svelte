@@ -5,10 +5,10 @@
   import type {
     DeleteStrategy,
     RowActionStrategy,
-    ColumnDef,
     ColumnDefWithAccessor,
     ColumnDefDirect,
     ID,
+    ColumnDef,
   } from "$lib/components/grids/Datagrid.types";
 
   import type { WholesalerCategory_Category } from "$lib/domain/domainTypes";
@@ -27,81 +27,31 @@
     rowActionStrategy?: RowActionStrategy<WholesalerCategory_Category>;
   }>();
 
+
   // Svelte will say that "columns is updated." This is ok because this is jsut a workaorund for not being const.
-  let columns: ColumnDef<WholesalerCategory_Category>[] = [];
-  if (showOfferingCount) {
-    let colsWithAccessor: ColumnDefWithAccessor<WholesalerCategory_Category>[] =
-      [
-        {
-          key: "category_name",
-          header: "Category Name",
-          sortable: true,
-          width: "3fr",
-          accessor: null,
-        },
-        {
-          key: "comment",
-          header: "Comment",
-          sortable: false,
-          width: "2fr",
-          accessor: null,
-        },
-        {
-          key: "offering_count",
-          header: "Offerings",
-          sortable: true,
-          width: "1fr",
-          accessor: (r: WholesalerCategory_Category) =>
-            (r as any).offering_count || 0,
-        },
-        {
-          key: "link",
-          header: "Link",
-          sortable: false,
-          width: "2fr",
-          accessor: null,
-        },
+  const columns = $derived.by((): ColumnDef<WholesalerCategory_Category>[] => {
+    if (showOfferingCount) {
+      const colsWithAccessor: ColumnDefWithAccessor<WholesalerCategory_Category>[] = [
+        { key: "category_name", header: "Category Name", sortable: true, width: "3fr", accessor: null, },
+        { key: "comment", header: "Comment", sortable: false, width: "2fr", accessor: null, },
+        { key: "offering_count", header: "Offerings", sortable: true, width: "1fr", accessor: (r: any) => (r as any).offering_count || 0, },
+        { key: "link", header: "Link", sortable: false, width: "2fr", accessor: null, },
       ];
-    columns = colsWithAccessor;
-  } else {
-    let colsDirect: ColumnDefDirect<WholesalerCategory_Category>[] = [
-      {
-        key: "category_name",
-        header: "Category Name",
-        sortable: true,
-        width: "3fr",
-      },
-      { key: "comment", header: "Comment", sortable: false, width: "2fr" },
-      { key: "link", header: "Link", sortable: false, width: "2fr" },
-    ];
-    columns = colsDirect;
-  }
+      return colsWithAccessor;
+    } else {
+      const colsDirect: ColumnDefDirect<WholesalerCategory_Category>[] = [
+        { key: "category_name", header: "Category Name", sortable: true, width: "3fr" },
+        { key: "comment", header: "Comment", sortable: false, width: "2fr" },
+        { key: "link", header: "Link", sortable: false, width: "2fr" },
+      ];
+      return colsDirect;
+    }
+  });
+
 
   // Composite key for categories (wholesaler_id + category_id)
   const getId = (r: WholesalerCategory_Category): ID =>
     `${r.wholesaler_id}-${r.category_id}`;
-
-  // const deleteStrategy: DeleteStrategy<WholesalerCategory_Category> = {
-  //   execute: async (ids: ID[]) => {
-  //     await executeDelete(ids);
-  //   },
-  // };
-
-  // /**
-  //  * Configure row interaction behavior.
-  //  * Primary click typically navigates to category detail view.
-  //  * Uses optional callback pattern to avoid forcing navigation behavior.
-  //  */
-  // const rowActionStrategy: RowActionStrategy<WholesalerCategory_Category> = {
-  //   click: onRowClick,
-  // };
-
-  // Silence "declared but never read" in some TS setups (harmless)
-  void rows;
-  void loading;
-  void columns;
-  void getId;
-  void deleteStrategy;
 </script>
 
 <Datagrid

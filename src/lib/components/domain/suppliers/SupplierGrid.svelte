@@ -28,23 +28,6 @@
   ];
 
   const getId = (r: Wholesaler): ID => r.wholesaler_id;
-
-  // const deleteStrategy: DeleteStrategy<Wholesaler> = {
-  //   execute: async (ids: ID[]) => {
-  //     await executeDelete(ids);
-  //   },
-  // };
-
-  // const rowActionStrategy: RowActionStrategy<Wholesaler> = {
-  //   click: onRowClick,
-  // };
-
-  // Silence "declared but never read" in some TS setups (harmless)
-  void rows;
-  void loading;
-  void columns;
-  void getId;
-  void deleteStrategy;
 </script>
 
 <Datagrid

@@ -10,7 +10,7 @@
 	import "$lib/components/styles/assignment-section.css";
 	import "$lib/components/styles/grid-section.css";
 	import SupplierForm from "$lib/components/domain/suppliers/SupplierForm.svelte";
-	import CategoryGrid from "$lib/components/domain/categories/CategoryGrid.svelte";
+	import CategoryGrid from "$lib/components/domain/suppliers/SupplierCategoriesGrid.svelte";
 	import CategoryAssignment from "$lib/components/domain/suppliers/CategoryAssignment.svelte";
 
 	// API & Type Imports

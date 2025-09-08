@@ -1,52 +1,36 @@
 <script lang="ts">
-  // --- Component & Type Imports ---
-  // The SupplierGrid is the primary UI component for displaying the data.
-  import SupplierGrid from "$lib/components/domain/suppliers/SupplierGrid.svelte";
-  // We need the supplierLoadingState to show loading for on-page actions like 'delete'.
-  import {
-    supplierLoadingState,
-    getSupplierApi,
-  } from "$lib/api/client/supplier";
-  import type { Wholesaler } from "$lib/domain/domainTypes";
 
-  // --- SvelteKit & Utility Imports ---
-  // `goto` is used for programmatic navigation (e.g., after clicking a row).
+  import CategoryGrid from "$lib/components/domain/categories/CategoryGrid.svelte";
+
+
   import { goto } from "$app/navigation";
-  // The application's standard logger.
   import { log } from "$lib/utils/logger";
-  // UI feedback helpers for success/error messages and confirmation dialogs.
   import { addNotification } from "$lib/stores/notifications";
   import { requestConfirmation } from "$lib/stores/confirmation";
-
-  // --- API & Strategy Imports ---
-  // The ApiClient is the foundation for making SSR-safe fetch requests.
   import { ApiClient } from "$lib/api/client/ApiClient";
-  // Types for the strategy pattern used by the generic DataGrid component.
   import type {
     ID,
     DeleteStrategy,
     RowActionStrategy,
   } from "$lib/components/grids/Datagrid.types";
   import { page } from "$app/stores";
+  import type { ProductCategory } from "$lib/domain/domainTypes";
+  import { categoryLoadingState, getCategoryApi } from "$lib/api/client/category";
 
   // --- PROPS ---
-  // 1. The `data` prop receives the promise streamed from the non-blocking `load` function.
-  //    It is NOT the resolved array of suppliers, but the promise that will resolve to it.
-  let { data }: { data: { suppliers: Promise<Wholesaler[]> } } = $props<{
-    data: { suppliers: Promise<Wholesaler[]> };
+
+  let { data }: { data: { suppliers: Promise<ProductCategory[]> } } = $props<{
+    data: { suppliers: Promise<ProductCategory[]> };
   }>();
 
   // --- LOCAL COMPONENT STATE ---
-  // These top-level `let` variables are made reactive by Svelte 5.
-  // They will hold the resolved state of the promise.
-  let resolvedSuppliers = $state<Wholesaler[]>([]);
+
+  let resolvedCategories = $state<ProductCategory[]>([]);
   let isLoading = $state(true); // The component always starts in a loading state.
-  // A structured object to hold a clean, UI-friendly error if the promise rejects.
   let loadingOrValidationError = $state<{ message: string; status: number } | null>(null);
 
   // --- ASYNCHRONOUS LOGIC HANDLING ---
-  // This `$effect` is the core of the solution. It runs whenever the `data.suppliers`
-  //    promise changes (e.g., on initial load or after an `invalidateAll` call).
+
   $effect(() => {
     // For Svelte cleanup funtion!
     let aborted = false;
@@ -58,7 +42,7 @@
       // a. Reset the state each time a new promise is processed.
       isLoading = true;
       loadingOrValidationError = null;
-      resolvedSuppliers = []; // Clear old data to prevent stale UI
+      resolvedCategories = []; // Clear old data to prevent stale UI
 
       if (!data.suppliers) {
         const message = `Cannot load suppliers because data.suppliers is not defined`;
@@ -68,7 +52,7 @@
         try {
           // b. Await the promise to get the data.
           if (!aborted) {
-            resolvedSuppliers = await data.suppliers;
+            resolvedCategories = await data.suppliers;
             log.debug(`Suppliers promise resolved successfully.`);
           }
         } catch (rawError: any) {
@@ -112,69 +96,70 @@
 
   // 3. These functions handle user interactions within the grid. They remain unchanged.
   const client = new ApiClient(fetch);
-  const supplierApi = getSupplierApi(client);
+  const categoryApi = getCategoryApi(client);
 
-  function handleSupplierSelect(supplier: Wholesaler): void {
+  function handleCategorySelect(category: ProductCategory): void {
     log.info(
-      `(SupplierListPage) Navigating to detail for supplierId: ${supplier.wholesaler_id}`
+      `Navigating to detail for supplierId: ${category.category_id}`
     );
-    goto(`/suppliers/${supplier.wholesaler_id}`);
+    goto(`/categories/${category.category_id}`);
   }
 
-  async function handleSupplierDelete(ids: ID[]): Promise<void> {
+  async function handleCategoryDelete(ids: ID[]): Promise<void> {
     log.info(`(SupplierListPage) Deleting suppliers`, { ids });
     let dataChanged = false;
 
     for (const id of ids) {
       const numericId = Number(id);
-      const result = await supplierApi.deleteSupplier(numericId, false);
+      const result = await categoryApi.deleteCategory(numericId, false);
 
       if (result.success) {
         addNotification(
-          `Supplier "${result.data.deleted_resource.name}" deleted.`,
+          `Category "${result.data.deleted_resource.name}" deleted.`,
           "success"
         );
         dataChanged = true;
       } else if ("cascade_available" in result && result.cascade_available) {
         const dependencies = (result.dependencies as string[]).join(", ");
         const confirmed = await requestConfirmation(
-          `Supplier has dependencies: ${dependencies}. Delete with all related data?`,
+          `Category has dependencies: ${dependencies}. Delete with all related data?`,
           "Confirm Cascade Delete"
         );
 
         if (confirmed) {
-          const cascadeResult = await supplierApi.deleteSupplier(
+          const cascadeResult = await categoryApi.deleteCategory(
             numericId,
             true
           );
           if (cascadeResult.success) {
-            addNotification("Supplier and related data deleted.", "success");
+            addNotification("Category and related data deleted.", "success");
             dataChanged = true;
           }
         }
       } else {
-        addNotification(`Could not delete supplier (ID: ${id}).`, "error");
+        addNotification(`Could not delete category (ID: ${id}).`, "error");
       }
     }
 
+    // TODO: Stay on page, just reload categories!!! See OfferingDetailAttributes -> Delete attribute.
     if (dataChanged) {
-      goto("/suppliers", { invalidateAll: true });
+      goto("/categories", { invalidateAll: true });
     }
   }
 
-  function handleSupplierCreate() {
-    log.info(`Going to SupplierDetailPage with "new"`);
+  function handleCategoryCreate() {
+    log.info(`Going to CategloryDetailPage with "new"`);
     goto(`${$page.url.pathname}/new`);
   }
 
   // ===== GRID STRATEGIES =====
 
-  const deleteStrategy: DeleteStrategy<Wholesaler> = {
-    execute: handleSupplierDelete,
+  const deleteStrategy: DeleteStrategy<ProductCategory> = {
+    execute: handleCategoryDelete,
   };
 
-  const rowActionStrategy: RowActionStrategy<Wholesaler> = {
-    click: handleSupplierSelect,
+  const rowActionStrategy: RowActionStrategy<ProductCategory> = {
+    click: handleCategorySelect,
   };
 </script>
 
@@ -197,12 +182,12 @@
     </div>
   {:else}
     <div class="grid-section">
-      <button class="pc-grid__createbtn" onclick={handleSupplierCreate}
+      <button class="pc-grid__createbtn" onclick={handleCategoryCreate}
         >Create Supplier</button
       >
-      <SupplierGrid
-        rows={resolvedSuppliers}
-        loading={isLoading || $supplierLoadingState}
+      <CategoryGrid
+        rows={resolvedCategories}
+        loading={isLoading || $categoryLoadingState}
         {deleteStrategy}
         {rowActionStrategy}
       />

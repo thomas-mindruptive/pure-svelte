@@ -1,17 +1,31 @@
+
 <script lang="ts">
-    // CategoryAssignment.svelte (Svelte 5 + Runes) - COMPACT LAYOUT
-    //
-    // PURPOSE:
-    // A compact, single-row UI component for assigning existing categories
-    // to a supplier. Replaces the larger form-block layout.
-    //
-    // WORKFLOW:
-    // 1. Shows dropdown of available (unassigned) categories.
-    // 2. User selects a category and clicks "Assign".
-    // 3. Fires `onAssigned` event for the parent to handle the API call.
+    // ========================================================================
+    // IMPORTS
+    // ========================================================================
 
     import { log } from "$lib/utils/logger";
     import type { ProductCategory } from "$lib/domain/domainTypes";
+
+    // ========================================================================
+    // TYPE DEFINITIONS
+    // ========================================================================
+
+    /**
+     * Props interface for CategoryAssignment component
+     */
+    interface CategoryAssignmentProps {
+        supplierId: number;
+        availableCategories?: ProductCategory[];
+        loading?: boolean;
+        disabled?: boolean;
+        assignCbk?: (category: ProductCategory) => void;
+        onError?: (error: string) => void;
+    }
+
+    // ========================================================================
+    // COMPONENT PROPS
+    // ========================================================================
 
     const {
         supplierId,
@@ -20,34 +34,54 @@
         disabled = false,
         assignCbk,
         onError,
-    } = $props<{
-        supplierId: number;
-        availableCategories?: ProductCategory[];
-        loading?: boolean;
-        disabled?: boolean;
-        assignCbk?: (category: ProductCategory) => void;
-        onError?: (error: string) => void;
-    }>();
+    }: CategoryAssignmentProps = $props();
+
+    // ========================================================================
+    // STATE
+    // ========================================================================
 
     let selectedCategoryId = $state<number | null>(null);
     let assigning = $state(false);
 
+    // ========================================================================
+    // DERIVED STATE
+    // ========================================================================
+
     const selectedCategory = $derived(
         selectedCategoryId
             ? availableCategories.find(
-                  (cat: ProductCategory) =>
-                      cat.category_id === selectedCategoryId,
-              )
+                (cat: ProductCategory) => cat.category_id === selectedCategoryId,
+            )
             : null,
     );
 
     const canAssign = $derived(
         !loading &&
-            !disabled &&
-            !assigning &&
-            selectedCategoryId !== null &&
-            selectedCategory !== undefined,
+        !disabled &&
+        !assigning &&
+        selectedCategoryId !== null &&
+        selectedCategory !== undefined,
     );
+
+    // ========================================================================
+    // EVENT HANDLERS
+    // ========================================================================
+
+    function handleCategorySelect(event: Event) {
+        const target = event.target as HTMLSelectElement;
+        selectedCategoryId = target.value ? Number(target.value) : null;
+    }
+
+    function handleSubmit(event: Event) {
+        event.preventDefault();
+        if (canAssign) {
+            handleAssign();
+        }
+    }
+
+    // ========================================================================
+    // BUSINESS LOGIC
+    // ========================================================================
 
     async function handleAssign() {
         if (!selectedCategory || !supplierId) {
@@ -55,6 +89,7 @@
             return;
         }
         if (assigning) return;
+
         assigning = true;
         try {
             // The parent component is responsible for the API call.
@@ -73,39 +108,26 @@
             assigning = false;
         }
     }
-
-    function handleCategorySelect(event: Event) {
-        const target = event.target as HTMLSelectElement;
-        selectedCategoryId = target.value ? Number(target.value) : null;
-    }
-
-    function handleSubmit(event: Event) {
-        event.preventDefault();
-        if (canAssign) {
-            handleAssign();
-        }
-    }
 </script>
 
-<!-- NEW, COMPACT LAYOUT -->
+<!-- ====================================================================== -->
+<!-- TEMPLATE -->
+<!-- ====================================================================== -->
+
 <div class="category-assignment-compact">
     <strong class="assignment-title">Assign Category:</strong>
 
     <form class="assignment-controls" onsubmit={handleSubmit}>
-        <!-- 
-      An explicit label is included for accessibility but visually hidden.
-      The placeholder in the <select> serves as the visual cue.
-    -->
         <label for="category-select-{supplierId}" class="visually-hidden">
             Available Categories
         </label>
 
         <select
-            id="category-select-{supplierId}"
-            value={selectedCategoryId ?? ""}
-            onchange={handleCategorySelect}
-            disabled={disabled || assigning || availableCategories.length === 0}
-            required
+                id="category-select-{supplierId}"
+                value={selectedCategoryId ?? ""}
+                onchange={handleCategorySelect}
+                disabled={disabled || assigning || availableCategories.length === 0}
+                required
         >
             <option value="">
                 {availableCategories.length === 0
@@ -120,13 +142,13 @@
         </select>
 
         <button
-            type="submit"
-            class="primary-button"
-            disabled={!canAssign}
-            aria-busy={assigning}
-            title={canAssign
-                ? `Assign ${selectedCategory?.name || "selected category"}`
-                : "Select a category to assign"}
+                type="submit"
+                class="primary-button"
+                disabled={!canAssign}
+                aria-busy={assigning}
+                title={canAssign
+        ? `Assign ${selectedCategory?.name || "selected category"}`
+        : "Select a category to assign"}
         >
             {#if assigning}
                 <span class="pc-grid__spinner" aria-hidden="true"></span>
@@ -137,7 +159,6 @@
 </div>
 
 <style>
-    /* --- NEW, COMPACT STYLES --- */
     .category-assignment-compact {
         display: flex;
         align-items: center;
@@ -158,17 +179,15 @@
         display: flex;
         align-items: center;
         gap: 0.75rem;
-        flex-grow: 1; /* Allow the form to take up remaining space */
+        flex-grow: 1;
     }
 
-    /* Override the default 100% width from form-elements.css for inline layout */
     .assignment-controls select {
         width: auto;
         min-width: 250px;
     }
 
     .assignment-controls .primary-button {
-        /* Ensure button has a consistent width */
         min-width: 100px;
         justify-content: center;
         display: inline-flex;
@@ -176,7 +195,6 @@
         gap: 0.5rem;
     }
 
-    /* Accessibility helper to hide labels visually but keep them for screen readers */
     .visually-hidden {
         position: absolute;
         width: 1px;

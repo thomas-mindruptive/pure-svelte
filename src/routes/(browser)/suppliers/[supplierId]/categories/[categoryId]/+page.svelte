@@ -3,7 +3,7 @@
   /**
    * Route Delegator (UI)
    */
-  import CategoryDetailPage from '$lib/pages/categories/CategoryDetailPage.svelte';
+  import CategoryDetailPage from '$lib/components/domain/categories/CategoryDetailPage.svelte';
 
   let { data } = $props();
 </script>

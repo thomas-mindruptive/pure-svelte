@@ -416,14 +416,14 @@ This pattern is realized by separating Page Modules from the Routes that use the
   - `routes/`
     - `categories/`
       - `[categoryId]/`
-        - `+page.ts`: [DELEGATOR] `import { load } from '$lib/pages/categories/categoryDetailPage.ts'`
-        - `+page.svelte`: [RENDERER] `import CategoryDetailPage from '$lib/pages/categories/CategoryDetailPage.svelte'`
+        - `+page.ts`: [DELEGATOR] `import { load } from '$lib/components/domain/categories/categoryDetailPage.ts'`
+        - `+page.svelte`: [RENDERER] `import CategoryDetailPage from '$lib/components/domain/categories/CategoryDetailPage.svelte'`
     - `suppliers/`
       - `[supplierId]/`
         - `categories/`
           - `[categoryId]/`
-            - `+page.ts`: [DELEGATOR] `import { load } from '$lib/pages/categories/categoryDetailPage.ts'`
-            - `+page.svelte`: [RENDERER] `import CategoryDetailPage from '$lib/pages/categories/CategoryDetailPage.svelte'`
+            - `+page.ts`: [DELEGATOR] `import { load } from '$lib/components/domain/categories/categoryDetailPage.ts'`
+            - `+page.svelte`: [RENDERER] `import CategoryDetailPage from '$lib/components/domain/categories/CategoryDetailPage.svelte'`
 
 **Benefits:**
 - **DRY (Don't Repeat Yourself):** UI and data logic for a view like "Category Detail" exist only once.

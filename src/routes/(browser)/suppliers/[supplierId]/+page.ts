@@ -3,4 +3,4 @@
 /**
  * Route Delegator (Logic)
  */
-export { load } from '$lib/pages/suppliers/supplierDetailPage';
+export { load } from '$lib/components/domain/suppliers/supplierDetailPage';

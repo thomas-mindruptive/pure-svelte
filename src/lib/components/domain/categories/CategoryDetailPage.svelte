@@ -23,7 +23,7 @@
 		CategoryDetailPage_LoadDataSchema,
 		type CategoryDetailPage_LoadData,
 		type CategoryDetailPage_LoadDataAsync
-	} from './categoryDetailPage.types';
+	} from '$lib/components/domain/categories/categoryDetailPage.types';
 
 	// ========================================================================
 	// PROPS

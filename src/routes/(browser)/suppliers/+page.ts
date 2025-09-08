@@ -7,4 +7,4 @@
  * Its only purpose is to import and re-export the `load` function
  * from the actual page logic module.
  */
-export { load } from '$lib/pages/suppliers/supplierListPage';
+export { load } from '$lib/components/domain/suppliers/supplierListPage';

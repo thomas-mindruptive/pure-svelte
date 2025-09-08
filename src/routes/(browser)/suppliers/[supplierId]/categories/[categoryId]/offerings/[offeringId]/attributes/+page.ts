@@ -1,1 +1,1 @@
-export { load } from '$lib/pages/offerings/offerDetailAttributesPage';
+export { load } from '$lib/components/domain/offerings/offerDetailAttributesPage';

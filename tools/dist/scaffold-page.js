@@ -33,7 +33,7 @@ function generateFilesContent(baseDir, pageKey, templates) {
     const camelCaseName = toCamelCase(pageName);
     const pageDir = path.resolve(process.cwd(), scaffoldingConfig.pagesRoot, baseDir);
     const routeDir = path.resolve(process.cwd(), scaffoldingConfig.routesRoot, baseDir, paramName ? `[${paramName}]` : '');
-    const aliasPathToPageModule = `$lib/pages/${baseDir}`;
+    const aliasPathToPageModule = `$lib/components/domain/${baseDir}`;
     const paramLogSuffix = paramName ? ` with ID: \${_event.params.${paramName}}` : '.';
     const paramId = paramName ? `Number(_event.params.${paramName})` : 'null';
     let pageTsContent = templates.pageTsTpl;

@@ -37,7 +37,7 @@
 		SupplierDetailPage_LoadDataSchema,
 		type SupplierDetailPage_LoadData,
 		type SupplierDetailPage_LoadDataAsync,
-	} from "./supplierDetailPage.types";
+	} from "$lib/components/domain/suppliers/supplierDetailPage.types";
 	import { assertDefined } from "$lib/utils/validation/assertions";
 
 	// --- PROPS ---

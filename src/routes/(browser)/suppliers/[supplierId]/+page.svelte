@@ -3,7 +3,7 @@
   /**
    * Route Delegator (UI)
    */
-  import SupplierDetailPage from '$lib/pages/suppliers/SupplierDetailPage.svelte';
+  import SupplierDetailPage from '$lib/components/domain/suppliers/SupplierDetailPage.svelte';
 
   let { data } = $props();
 </script>

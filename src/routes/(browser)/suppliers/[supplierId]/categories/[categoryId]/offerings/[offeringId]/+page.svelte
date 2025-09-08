@@ -1,5 +1,5 @@
 <script lang="ts">
-    import OfferDetailLinksPage from "$lib/pages/offerings/OfferDetailLinksPage.svelte";
+    import OfferDetailLinksPage from "$lib/components/domain/offerings/OfferDetailLinksPage.svelte";
 
     let { data } = $props();
 </script>

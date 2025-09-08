@@ -27,7 +27,7 @@
 	import {
 		type OfferingDetail_LoadData,
 		OfferingDetail_LoadDataSchema,
-	} from "$lib/pages/offerings/offeringDetail.types";
+	} from "$lib/components/domain/offerings/offeringDetail.types";
 	import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
 	import { assertDefined } from "$lib/utils/validation/assertions";
 

@@ -15,7 +15,7 @@
 	import type {
 		OfferingDetailAttributes_LoadData,
 		OfferingDetailLinks_LoadData,
-	} from "$lib/pages/offerings/offeringDetail.types";
+	} from "$lib/components/domain/offerings/offeringDetail.types";
 	import { assertDefined } from "$lib/utils/validation/assertions";
 	import { goto } from "$app/navigation";
 

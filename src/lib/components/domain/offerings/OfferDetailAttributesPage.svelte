@@ -25,7 +25,7 @@
 		OfferingDetailAttributes_LoadDataSchema,
 		type OfferingDetailAttributes_LoadData,
 		type OfferingDetailAttributes_LoadDataAsync,
-	} from "./offeringDetail.types";
+	} from "$lib/components/domain/offerings/offeringDetail.types";
 	import { assertDefined } from "$lib/utils/validation/assertions";
 
 	// --- PROPS ---

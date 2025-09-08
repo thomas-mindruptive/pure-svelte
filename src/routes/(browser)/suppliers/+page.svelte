@@ -7,7 +7,7 @@
    * Its only purpose is to import and render the actual page component,
    * passing down the data loaded by its sibling `+page.ts`.
    */
-  import SupplierListPage from '$lib/pages/suppliers/SupplierListPage.svelte';
+  import SupplierListPage from '$lib/components/domain/suppliers/SupplierListPage.svelte';
 
   let { data } = $props();
 </script>

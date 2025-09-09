@@ -6,17 +6,23 @@
 
   import type { ProductCategory } from "$lib/domain/domainTypes";
 
-  const {
-    rows = null, // Can accept null from parent
-    loading = false,
-    deleteStrategy,
-    rowActionStrategy,
-  } = $props<{
-    rows?: ProductCategory[] | null;
+  // === PROPS ====================================================================================
+
+  export type CategoryGridProps = {
+    rows: ProductCategory[];
     loading?: boolean;
     deleteStrategy: DeleteStrategy<ProductCategory>;
     rowActionStrategy?: RowActionStrategy<ProductCategory>;
-  }>();
+  }
+
+  const {
+    rows = [],
+    loading = false,
+    deleteStrategy,
+    rowActionStrategy,
+  }:CategoryGridProps = $props();
+
+  // === COLUMNS ====================================================================================
 
   const columns: ColumnDefDirect<ProductCategory>[] = [
     { key: "category_id", header: "id", sortable: true, width: "3fr" },
@@ -27,6 +33,8 @@
   // Composite key for categories (wholesaler_id + category_id)
   const getId = (r: ProductCategory): ID => `${r.category_id}`;
 </script>
+
+<!--- TEMPLATE ----------------------------------------------------------------------------------->
 
 <Datagrid
   {rows}

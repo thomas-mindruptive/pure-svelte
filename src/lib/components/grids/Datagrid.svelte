@@ -29,7 +29,7 @@
     canDelete?: (row: any) => boolean;
     loading?: boolean;
     deleteStrategy: DeleteStrategy<any>;
-    rowActionStrategy?: RowActionStrategy<any>;
+    rowActionStrategy?: RowActionStrategy<any> | undefined | null;
     gridId?: string;
     entity?: string;
 

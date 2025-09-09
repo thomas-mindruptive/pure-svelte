@@ -13,28 +13,26 @@
 
   import type { WholesalerCategory_Category } from "$lib/domain/domainTypes";
 
-  const {
-    rows = null, // Can accept null from parent
-    loading = false,
-    showOfferingCount = true,
-    deleteStrategy,
-    rowActionStrategy,
-  } = $props<{
-    rows?: WholesalerCategory_Category[] | null;
+  // === PROPS ====================================================================================
+
+  export type SupplierCategoriesGridProps = {
+    rows: WholesalerCategory_Category[];
     loading?: boolean;
     showOfferingCount?: boolean;
     deleteStrategy: DeleteStrategy<WholesalerCategory_Category>;
     rowActionStrategy?: RowActionStrategy<WholesalerCategory_Category>;
-  }>();
+  };
 
+  const { rows, loading = false, showOfferingCount = true, deleteStrategy, rowActionStrategy }: SupplierCategoriesGridProps = $props();
 
-  // Svelte will say that "columns is updated." This is ok because this is jsut a workaorund for not being const.
+  // === COLUMNS ==================================================================================
+
   const columns = $derived.by((): ColumnDef<WholesalerCategory_Category>[] => {
     if (showOfferingCount) {
       const colsWithAccessor: ColumnDefWithAccessor<WholesalerCategory_Category>[] = [
-        { key: "category_name", header: "Category Name", sortable: true, width: "3fr", accessor: null, },
-        { key: "comment", header: "Comment", sortable: false, width: "2fr", accessor: null, },
-        { key: "link", header: "Link", sortable: false, width: "2fr", accessor: null, },
+        { key: "category_name", header: "Category Name", sortable: true, width: "3fr", accessor: null },
+        { key: "comment", header: "Comment", sortable: false, width: "2fr", accessor: null },
+        { key: "link", header: "Link", sortable: false, width: "2fr", accessor: null },
       ];
       return colsWithAccessor;
     } else {
@@ -47,10 +45,8 @@
     }
   });
 
-
   // Composite key for categories (wholesaler_id + category_id)
-  const getId = (r: WholesalerCategory_Category): ID =>
-    `${r.wholesaler_id}-${r.category_id}`;
+  const getId = (r: WholesalerCategory_Category): ID => `${r.wholesaler_id}-${r.category_id}`;
 </script>
 
 <Datagrid

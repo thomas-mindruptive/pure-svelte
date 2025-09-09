@@ -15,19 +15,21 @@
     ID,
   } from "../grids/Datagrid.types";
 
-  // ===== COMPONENT PROPS (REFACTORED) =====
+  // ===== COMPONENT PROPS  =====
+
+  export type LinkGridProps = {
+    rows: WholesalerOfferingLink[];
+    loading?: boolean;
+    deleteStrategy: DeleteStrategy<WholesalerOfferingLink>;
+    rowActionStrategy?: RowActionStrategy<WholesalerOfferingLink>;
+  }
 
   const {
     rows = [] as WholesalerOfferingLink[],
     loading = false,
     deleteStrategy,
     rowActionStrategy,
-  } = $props<{
-    rows?: WholesalerOfferingLink[];
-    loading?: boolean;
-    deleteStrategy: DeleteStrategy<WholesalerOfferingLink>;
-    rowActionStrategy?: RowActionStrategy<WholesalerOfferingLink>;
-  }>();
+  }:LinkGridProps = $props();
 
   // ===== COLUMN DEFINITIONS (Unchanged) =====
 

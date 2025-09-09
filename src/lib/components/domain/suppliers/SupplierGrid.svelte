@@ -1,20 +1,26 @@
 <script lang="ts">
   // Thin wrapper around Datagrid for wholesalers
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
-    import type { DeleteStrategy, RowActionStrategy, ColumnDef, ID } from "$lib/components/grids/Datagrid.types";
+  import type { DeleteStrategy, RowActionStrategy, ColumnDef, ID } from "$lib/components/grids/Datagrid.types";
   import type { Wholesaler } from "$lib/domain/domainTypes";
 
- const {
-    rows = null, // Can accept null from parent
-    loading = false,
-    deleteStrategy,
-    rowActionStrategy
-  } = $props<{
-    rows?: Wholesaler[] | null;
+  // === PROPS ====================================================================================
+
+  export type SupplierGridProps =  {
+    rows: Wholesaler[];
     loading?: boolean;
     deleteStrategy: DeleteStrategy<Wholesaler>;
     rowActionStrategy?: RowActionStrategy<Wholesaler>;
-  }>();
+  }
+
+  const {
+    rows,
+    loading = false,
+    deleteStrategy,
+    rowActionStrategy,
+  }: SupplierGridProps = $props();
+
+  // === COLUMNS ==================================================================================
 
   const columns: ColumnDef<Wholesaler>[] = [
     { key: "name", header: "Name", sortable: true },

@@ -12,30 +12,34 @@
   // - Robust exception handling with structured logging
   // - CSS-based styling via global grid.css classes
 
-  import { onMount } from "svelte";
   import type { Snippet } from "svelte";
   import { log } from "$lib/utils/logger";
   import { requestConfirmation } from "$lib/stores/confirmation";
 
+  import "$lib/components/styles/grid.css";
+  import type { ID, ColumnDef, DeleteStrategy, RowActionStrategy, DryRunResult, ConfirmResult } from "./Datagrid.types";
 
-    import "$lib/components/styles/grid.css";
-    import type { ID, ColumnDef, DeleteStrategy, RowActionStrategy, DryRunResult, ConfirmResult } from "./Datagrid.types";
+  // ===== PROP TYPES =====
 
-  // ===== TYPE DEFINITIONS =====
+  export type DataGridProps = {
+    rows: any[];
+    columns: ColumnDef<any>[];
+    getId: (row: any) => ID;
+    selection?: "none" | "single" | "multiple";
+    canDelete?: (row: any) => boolean;
+    loading?: boolean;
+    deleteStrategy: DeleteStrategy<any>;
+    rowActionStrategy?: RowActionStrategy<any>;
+    gridId?: string;
+    entity?: string;
 
-  // // Column definition - describes how to display and interact with a data column
-  // export type ColumnDef<T = any> = {
-  //   key: string;              // Property name in the data object
-  //   header: string;           // Display text in column header
-  //   accessor?: (row: T) => any; // Optional custom data extraction function
-  //   sortable?: boolean;       // Whether this column supports sorting
-  //   width?: string;           // CSS width value (e.g., "200px", "2fr")
-  //   class?: string;           // Additional CSS classes for the column
-  // };
+    toolbar?: Snippet<[ToolbarSnippetProps]>;
+    cell?: Snippet<[CellSnippetProps]>;
+    rowActions?: Snippet<[RowActionsSnippetProps]>;
+    empty?: Snippet<[]>;
+    meta?: Snippet<[MetaSnippetProps]>;
+  };
 
-  // Type-safe ColumnDef - nur gültige Properties oder mit accessor
-
-  // ===== SNIPPET PROP TYPES =====
   // These define the data passed to customizable snippets
 
   type ToolbarSnippetProps = {
@@ -90,24 +94,7 @@
     rowActions, // Custom row action buttons
     empty, // Custom empty state
     meta, // Additional metadata display
-  } = $props<{
-    rows: any[];
-    columns: ColumnDef<any>[];
-    getId: (row: any) => ID;
-    selection?: "none" | "single" | "multiple";
-    canDelete?: (row: any) => boolean;
-    loading?: boolean;
-    deleteStrategy: DeleteStrategy<any>;
-    rowActionStrategy?: RowActionStrategy<any>;
-    gridId?: string;
-    entity?: string;
-
-    toolbar?: Snippet<[ToolbarSnippetProps]>;
-    cell?: Snippet<[CellSnippetProps]>;
-    rowActions?: Snippet<[RowActionsSnippetProps]>;
-    empty?: Snippet<[]>;
-    meta?: Snippet<[MetaSnippetProps]>;
-  }>();
+  }: DataGridProps = $props();
 
   // ===== LOCAL STATE (Svelte 5 Runes) =====
 
@@ -128,9 +115,7 @@
   function newBatchId(): string {
     // Use crypto.randomUUID if available (modern browsers), otherwise fallback to Math.random
     // @ts-ignore - globalThis typing issue
-    return (
-      globalThis?.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2)
-    );
+    return globalThis?.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2);
   }
 
   /**
@@ -155,10 +140,7 @@
     try {
       return getId(row);
     } catch (error) {
-      log.error(
-        { component: "DataGrid", gridId, entity, error: String(error) },
-        "getId threw",
-      );
+      log.error({ component: "DataGrid", gridId, entity, error: String(error) }, "getId threw");
       return null;
     }
   }
@@ -200,9 +182,7 @@
         //   `safeAccessor: Cell accessor for ${colName} returned: ${val}`,
         // );
         if (undefined === val) {
-          log.info(
-            `safeAccessor: Cell accessor for ${colName} returned undefined`,
-          );
+          log.info(`safeAccessor: Cell accessor for ${colName} returned undefined`);
           return `${colInfo} (accessor) undefined`;
         }
         return val;
@@ -213,9 +193,7 @@
         //   `safeAccessor: safeAccessor: Direct access for ${colName} returned: ${val}`,
         // );
         if (undefined === val) {
-          log.info(
-            `safeAccessor: Cell accessor for ${colName} returned undefined`,
-          );
+          log.info(`safeAccessor: Cell accessor for ${colName} returned undefined`);
           return `${colInfo} (direct) undefined`;
         }
         return val;
@@ -246,10 +224,7 @@
     try {
       return !!canDelete(row);
     } catch (error) {
-      log.warn(
-        { component: "DataGrid", gridId, entity, error: String(error) },
-        "canDelete threw; treating as not deletable",
-      );
+      log.warn({ component: "DataGrid", gridId, entity, error: String(error) }, "canDelete threw; treating as not deletable");
       return false; // Fail safe - if we can't determine, assume not deletable
     }
   }
@@ -276,12 +251,6 @@
   function rowIsDeleting(row: any): boolean {
     const id = safeGetId(row);
     const result = id != null && isDeleting(id);
-    // log.info("rowIsDeleting:", {
-    //   id,
-    //   idType: typeof id,
-    //   setHas: deletingObjectIds.has(id!),
-    //   result,
-    // });
     return result;
   }
 
@@ -325,9 +294,7 @@
       currentSetTypes: Array.from(deletingObjectIds).map((id) => typeof id),
     });
 
-    ids.forEach((id: ID) =>
-      on ? deletingObjectIds.add(id) : deletingObjectIds.delete(id),
-    );
+    ids.forEach((id: ID) => (on ? deletingObjectIds.add(id) : deletingObjectIds.delete(id)));
   }
 
   // ===== SELECTION MANAGEMENT =====
@@ -352,10 +319,7 @@
       // Multiple selection: toggle this ID
       selectedIds.has(id) ? selectedIds.delete(id) : selectedIds.add(id);
     } catch (error) {
-      log.error(
-        { component: "DataGrid", gridId, entity, id, error: String(error) },
-        "toggleSelect failed",
-      );
+      log.error({ component: "DataGrid", gridId, entity, id, error: String(error) }, "toggleSelect failed");
     }
   }
 
@@ -379,10 +343,7 @@
         }
       }
     } catch (error) {
-      log.error(
-        { component: "DataGrid", gridId, entity, error: String(error) },
-        "selectAll failed",
-      );
+      log.error({ component: "DataGrid", gridId, entity, error: String(error) }, "selectAll failed");
     }
   }
 
@@ -400,10 +361,7 @@
         return id != null && set.has(id);
       });
     } catch (error) {
-      log.error(
-        { component: "DataGrid", gridId, entity, error: String(error) },
-        "currentSelectionRows failed",
-      );
+      log.error({ component: "DataGrid", gridId, entity, error: String(error) }, "currentSelectionRows failed");
       return [];
     }
   }
@@ -511,10 +469,7 @@
 
     // Ensure delete strategy is properly configured
     if (!deleteStrategy || typeof deleteStrategy.execute !== "function") {
-      log.warn(
-        { component: "DataGrid:orchestrateDelete", gridId, entity },
-        "Delete requested but deleteStrategy.execute is missing",
-      );
+      log.warn({ component: "DataGrid:orchestrateDelete", gridId, entity }, "Delete requested but deleteStrategy.execute is missing");
       return; // Fail gracefully - don't show error to user
     }
 
@@ -545,7 +500,7 @@
 
     // === PHASE 2: DRY-RUN (Optional Impact Analysis) ===
 
-    let dryRun: DryRunResult | undefined;
+    let dryRun: DryRunResult | undefined | null;
 
     if (deleteStrategy?.dryRun) {
       const t0 = nowMs();
@@ -577,9 +532,7 @@
         return; // If dry-run fails, abort delete operation
       }
     } else {
-      log.debug(
-        `DataGrid:orchestrateDelete: deleteStrategy.dryRun not defined - skipping impact analysis`,
-      );
+      log.debug(`DataGrid:orchestrateDelete: deleteStrategy.dryRun not defined - skipping impact analysis`);
     }
 
     // === PHASE 3: CONFIRMATION ===
@@ -611,9 +564,7 @@
         );
 
         if (!confirmResult.ok) {
-          log.info(
-            `DataGrid:orchestrateDelete: confirmResult.ok == false - aborting`,
-          );
+          log.info(`DataGrid:orchestrateDelete: confirmResult.ok == false - aborting`);
           return; // User cancelled or confirmation failed
         }
       } catch (error) {
@@ -629,9 +580,7 @@
         );
 
         if (!confirmed) {
-          log.debug(
-            `DataGrid:orchestrateDelete: Built-in confirm => user cancelled`,
-          );
+          log.debug(`DataGrid:orchestrateDelete: Built-in confirm => user cancelled`);
           return; // User cancelled
         }
 
@@ -699,10 +648,7 @@
       log.info("FINALLY: Clearing deleting state for IDs:", pendingIds);
       // Always remove loading indicators, even if delete failed
       markDeleting(pendingIds, false);
-      log.info(
-        "FINALLY: deletingObjectIds after clear:",
-        Array.from(deletingObjectIds),
-      );
+      log.info("FINALLY: deletingObjectIds after clear:", Array.from(deletingObjectIds));
     }
   }
 
@@ -732,39 +678,34 @@
   // ===== LIFECYCLE =====
 
   /**
-   * Component mount handler - performs initialization and validation.
    * Logs grid configuration for debugging and validates required props.
    */
-  onMount(() => {
+  $effect(() => {
+    // Diese Funktion wird einmal nach dem ersten Rendern ausgeführt,
+    // genau wie onMount.
     try {
       const multiselect = selection === "multiple";
-
-      // Log grid initialization for debugging
       log.info(
-        "Grid mounted",
+        "Grid mounted (via $effect)", // Geänderte Log-Nachricht zur Überprüfung
         {
           component: "DataGrid",
           gridId,
           entity,
           selection,
           multiselect,
-          columns: (columns as ColumnDef<any>[]).map(
-            (c: ColumnDef<any>) => c.key,
-          ),
+          columns: (columns as ColumnDef<any>[]).map((c: ColumnDef<any>) => c.key),
         },
       );
 
-      // Validate required props and warn about missing configuration
       if (!deleteStrategy || typeof deleteStrategy.execute !== "function") {
-        log.warn(
-          { component: "DataGrid", gridId, entity },
-          "deleteStrategy.execute missing; delete actions will be disabled",
-        );
+        log.warn({ component: "DataGrid", gridId, entity }, "deleteStrategy.execute missing; delete actions will be disabled");
       }
     } catch (error) {
-      // Never let mount logging throw and crash the component
       console.error("DataGrid mount log failed", error);
     }
+
+    // Ein leerer return-Wert für einen $effect bedeutet, dass er keine Cleanup-Funktion hat.
+    return () => {};
   });
 </script>
 
@@ -793,8 +734,7 @@
           <input
             type="checkbox"
             aria-label="Select all rows in the grid"
-            onchange={(e: Event) =>
-              selectAll((e.target as HTMLInputElement).checked)}
+            onchange={(e: Event) => selectAll((e.target as HTMLInputElement).checked)}
           />
           <span>Select all</span>
         </label>
@@ -803,10 +743,7 @@
       <!-- Bulk delete button - disabled when nothing selected or delete not available -->
       <button
         class="pc-grid__btn"
-        disabled={selectedIds.size === 0 ||
-          loading ||
-          !deleteStrategy ||
-          typeof deleteStrategy.execute !== "function"}
+        disabled={selectedIds.size === 0 || loading || !deleteStrategy || typeof deleteStrategy.execute !== "function"}
         onclick={() => deleteSelected()}
         aria-busy={Array.from(selectedIds).some((id: ID) => isDeleting(id))}
         title={selectedIds.size === 0
@@ -815,7 +752,10 @@
       >
         <!-- Loading spinner when any selected items are being deleted -->
         {#if Array.from(selectedIds).some((id: ID) => isDeleting(id))}
-          <span class="pc-grid__spinner" aria-hidden="true"></span>
+          <span
+            class="pc-grid__spinner"
+            aria-hidden="true"
+          ></span>
         {/if}
         Delete selected ({selectedIds.size})
       </button>
@@ -838,7 +778,10 @@
         <tr>
           <!-- Selection column header - only shown when selection is enabled -->
           {#if selection !== "none"}
-            <th class="w-8 pc-grid__th--center" aria-label="Row selection">
+            <th
+              class="w-8 pc-grid__th--center"
+              aria-label="Row selection"
+            >
               <!-- Empty header - selection checkboxes are in body rows -->
             </th>
           {/if}
@@ -849,16 +792,19 @@
               style={"width:" + (col.width ?? "auto")}
               class={col.class}
               aria-sort={col.sortable ? "none" : undefined}
-              title={col.sortable
-                ? `Click to sort by ${col.header}`
-                : undefined}
+              title={col.sortable ? `Click to sort by ${col.header}` : undefined}
             >
               {col.header}
             </th>
           {/each}
 
           <!-- Actions column header - for row-specific buttons -->
-          <th class="pc-grid__th--right" aria-label="Row actions">Actions</th>
+          <th
+            class="pc-grid__th--right"
+            aria-label="Row actions"
+          >
+            Actions
+          </th>
         </tr>
       </thead>
 
@@ -956,9 +902,7 @@
                   <!-- Default delete button -->
                   <button
                     class="pc-grid__btn pc-grid__btn--danger"
-                    disabled={!(
-                      safeGetId(row) != null && isRowDeletable(row)
-                    ) ||
+                    disabled={!(safeGetId(row) != null && isRowDeletable(row)) ||
                       !deleteStrategy ||
                       typeof deleteStrategy.execute !== "function"}
                     onclick={() => {
@@ -977,7 +921,10 @@
                       const id = safeGetId(row);
                       return id != null && isDeleting(id);
                     })()}
-                      <span class="pc-grid__spinner" aria-hidden="true"></span>
+                      <span
+                        class="pc-grid__spinner"
+                        aria-hidden="true"
+                      ></span>
                     {/if}
                     Delete
                   </button>

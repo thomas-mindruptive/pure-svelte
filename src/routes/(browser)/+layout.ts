@@ -1,16 +1,16 @@
 // src/routes/(browser)/+layout.ts
 
-import { get } from 'svelte/store';
-import { log } from '$lib/utils/logger';
-import type { LoadEvent } from '@sveltejs/kit';
-import { navigationState, type NavigationPath } from '$lib/stores/navigationState';
-import { ApiClient } from '$lib/api/client/ApiClient';
-import { getSupplierApi } from '$lib/api/client/supplier';
-import { getCategoryApi } from '$lib/api/client/category';
-import { getOfferingApi } from '$lib/api/client/offering';
-import { buildBreadcrumb, type ConservedPath } from '$lib/utils/buildBreadcrumb';
+import { get } from "svelte/store";
+import { log } from "$lib/utils/logger";
+import type { LoadEvent } from "@sveltejs/kit";
+import { navigationState, type NavigationPath } from "$lib/stores/navigationState";
+import { ApiClient } from "$lib/api/client/ApiClient";
+import { getSupplierApi } from "$lib/api/client/supplier";
+import { getCategoryApi } from "$lib/api/client/category";
+import { getOfferingApi } from "$lib/api/client/offering";
+import { buildBreadcrumb, type ConservedPath } from "$lib/utils/buildBreadcrumb";
+import type { HierarchyTree } from "$lib/components/sidebarAndNav/HierarchySidebar.svelte";
 
-// KORREKTUR: Definiere einen expliziten Typ für entityNames
 type EntityNames = {
   supplier: string | null;
   category: string | null;
@@ -18,7 +18,7 @@ type EntityNames = {
 };
 
 export async function load({ url, params, depends, fetch: loadEventFetch }: LoadEvent) {
-  log.info('(Layout Load) called with URL:', url.href, 'and params:', params);
+  log.info("(Layout Load) called with URL:", url.href, "and params:", params);
   depends(`url:${url.href}`);
 
   // --- STEP 1: DEFINE PATHS FROM SOURCES ---
@@ -26,7 +26,7 @@ export async function load({ url, params, depends, fetch: loadEventFetch }: Load
     supplierId: params.supplierId ? Number(params.supplierId) : null,
     categoryId: params.categoryId ? Number(params.categoryId) : null,
     offeringId: params.offeringId ? Number(params.offeringId) : null,
-    leaf: url.pathname.endsWith('/attributes') ? 'attributes' : (url.pathname.endsWith('/links') ? 'links' : null)
+    leaf: url.pathname.endsWith("/attributes") ? "attributes" : url.pathname.endsWith("/links") ? "links" : null,
   };
   const conservedPath = get(navigationState);
 
@@ -44,52 +44,89 @@ export async function load({ url, params, depends, fetch: loadEventFetch }: Load
       supplierId: pathFromUrl.supplierId ?? conservedPath.supplierId,
       categoryId: pathFromUrl.categoryId ?? conservedPath.categoryId,
       offeringId: pathFromUrl.offeringId ?? conservedPath.offeringId,
-      leaf: pathFromUrl.leaf ?? conservedPath.leaf
+      leaf: pathFromUrl.leaf ?? conservedPath.leaf,
     };
   }
   navigationState.set(finalUiPath);
 
   // --- STEP 3: FETCH ENTITY NAMES FOR THE UI PATH ---
   const client = new ApiClient(loadEventFetch);
-  
-  // KORREKTUR: Wende den expliziten Typ hier an
+
   const entityNames: EntityNames = { supplier: null, category: null, offering: null };
 
   const promises = [];
-  if (finalUiPath.supplierId) promises.push(getSupplierApi(client).loadSupplier(finalUiPath.supplierId).then(s => entityNames.supplier = s.name).catch(() => {}));
-  if (finalUiPath.categoryId) promises.push(getCategoryApi(client).loadCategory(finalUiPath.categoryId).then(c => entityNames.category = c.name).catch(() => {}));
-  if (finalUiPath.offeringId) promises.push(getOfferingApi(client).loadOffering(finalUiPath.offeringId).then(o => entityNames.offering = o.product_def_title).catch(() => {}));
+  if (finalUiPath.supplierId)
+    promises.push(
+      getSupplierApi(client)
+        .loadSupplier(finalUiPath.supplierId)
+        .then((s) => (entityNames.supplier = s.name))
+        .catch(() => {}),
+    );
+  if (finalUiPath.categoryId)
+    promises.push(
+      getCategoryApi(client)
+        .loadCategory(finalUiPath.categoryId)
+        .then((c) => (entityNames.category = c.name))
+        .catch(() => {}),
+    );
+  if (finalUiPath.offeringId)
+    promises.push(
+      getOfferingApi(client)
+        .loadOffering(finalUiPath.offeringId)
+        .then((o) => (entityNames.offering = o.product_def_title))
+        .catch(() => {}),
+    );
   await Promise.all(promises);
 
   // --- STEP 4: DETERMINE ACTIVE LEVEL & BUILD UI PROPS (FIXED) ---
   let activeLevel: string;
   if (pathFromUrl.offeringId) {
-    activeLevel = pathFromUrl.leaf || 'links';
+    activeLevel = pathFromUrl.leaf || "links";
   } else if (pathFromUrl.categoryId) {
-    activeLevel = 'offerings';
+    activeLevel = "offerings";
   } else if (pathFromUrl.supplierId) {
-    activeLevel = 'categories';
+    activeLevel = "categories";
   } else {
-    activeLevel = 'suppliers';
+    activeLevel = "suppliers";
   }
-  
+
   const breadcrumbItems = buildBreadcrumb({
-    url, params, entityNames,
+    url,
+    params,
+    entityNames,
     conservedPath: finalUiPath as ConservedPath,
-    activeLevel
+    activeLevel,
   });
-  
-  const supplierPath = finalUiPath.supplierId ? `/suppliers/${finalUiPath.supplierId}` : '#';
-  const categoryPath = finalUiPath.supplierId && finalUiPath.categoryId ? `/suppliers/${finalUiPath.supplierId}/categories/${finalUiPath.categoryId}` : '#';
-  const offeringPathBase = finalUiPath.supplierId && finalUiPath.categoryId && finalUiPath.offeringId ? `/suppliers/${finalUiPath.supplierId}/categories/${finalUiPath.categoryId}/offerings/${finalUiPath.offeringId}` : '#';
 
-  const sidebarItems = [
-    { key: 'suppliers', label: 'Suppliers', disabled: false, level: 0, href: '/suppliers' },
-    { key: 'categories', label: 'Categories', disabled: !finalUiPath.supplierId, level: 1, href: supplierPath },
-    { key: 'offerings', label: 'Offerings', disabled: !finalUiPath.categoryId, level: 2, href: categoryPath },
-    { key: 'attributes', label: 'Attributes', disabled: !finalUiPath.offeringId, level: 3, href: offeringPathBase === '#' ? '#' : `${offeringPathBase}/attributes` },
-    { key: 'links', label: 'Links', disabled: !finalUiPath.offeringId, level: 3, href: offeringPathBase === '#' ? '#' : `${offeringPathBase}/links` },
-  ];
+  const supplierPath = finalUiPath.supplierId ? `/suppliers/${finalUiPath.supplierId}` : "#";
+  const categoryPath =
+    finalUiPath.supplierId && finalUiPath.categoryId ? `/suppliers/${finalUiPath.supplierId}/categories/${finalUiPath.categoryId}` : "#";
+  const offeringPathBase =
+    finalUiPath.supplierId && finalUiPath.categoryId && finalUiPath.offeringId
+      ? `/suppliers/${finalUiPath.supplierId}/categories/${finalUiPath.categoryId}/offerings/${finalUiPath.offeringId}`
+      : "#";
 
-  return { breadcrumbItems, sidebarItems, activeLevel };
+  const supplierHierarchy: HierarchyTree = {root:"suppliers", items: [
+    { key: "suppliers", label: "Suppliers", disabled: false, level: 0, href: "/suppliers" },
+    { key: "categories", label: "Categories", disabled: !finalUiPath.supplierId, level: 1, href: supplierPath },
+    { key: "offerings", label: "Offerings", disabled: !finalUiPath.categoryId, level: 2, href: categoryPath },
+    {
+      key: "attributes",
+      label: "Attributes",
+      disabled: !finalUiPath.offeringId,
+      level: 3,
+      href: offeringPathBase === "#" ? "#" : `${offeringPathBase}/attributes`,
+    },
+    {
+      key: "links",
+      label: "Links",
+      disabled: !finalUiPath.offeringId,
+      level: 3,
+      href: offeringPathBase === "#" ? "#" : `${offeringPathBase}/links`,
+    },
+  ]};
+
+  const hierarchy = [supplierHierarchy];
+
+  return { breadcrumbItems, hierarchy, activeLevel };
 }

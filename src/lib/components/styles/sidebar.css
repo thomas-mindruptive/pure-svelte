@@ -7,6 +7,24 @@
   padding: 0.5rem 0.5rem;
 }
 
+.hb__tree {
+  margin-bottom: 1rem; /* Fügt Abstand zwischen den Bäumen hinzu */
+}
+
+.hb__tree:last-child {
+  margin-bottom: 0;
+}
+
+.hb__root-title {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem; /* Etwas kleiner, um es von den Items abzuheben */
+  font-weight: 700;
+  color: var(--color-muted, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0;
+}
+
 .hb__list { 
   list-style: none; 
   margin: 0; 

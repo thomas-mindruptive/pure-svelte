@@ -17,19 +17,19 @@
   import type { ProductCategory } from "$lib/domain/domainTypes";
   import { categoryLoadingState, getCategoryApi } from "$lib/api/client/category";
 
-  // --- PROPS ---
+  // === PROPS ====================================================================================
 
   let { data }: { data: { suppliers: Promise<ProductCategory[]> } } = $props<{
     data: { suppliers: Promise<ProductCategory[]> };
   }>();
 
-  // --- LOCAL COMPONENT STATE ---
+  // === STATE =====================================================================================
 
   let resolvedCategories = $state<ProductCategory[]>([]);
   let isLoading = $state(true); // The component always starts in a loading state.
   let loadingOrValidationError = $state<{ message: string; status: number } | null>(null);
 
-  // --- ASYNCHRONOUS LOGIC HANDLING ---
+  // === LOAD ======================================================================================
 
   $effect(() => {
     // For Svelte cleanup funtion!
@@ -92,7 +92,7 @@
     };
   });
 
-  // ===== EVENT HANDLERS =====
+  // === EVENT HANDLERS ===========================================================================
 
   // 3. These functions handle user interactions within the grid. They remain unchanged.
   const client = new ApiClient(fetch);
@@ -152,7 +152,7 @@
     goto(`${$page.url.pathname}/new`);
   }
 
-  // ===== GRID STRATEGIES =====
+  // === GRID STRATEGIES ==========================================================================
 
   const deleteStrategy: DeleteStrategy<ProductCategory> = {
     execute: handleCategoryDelete,
@@ -163,7 +163,7 @@
   };
 </script>
 
-<!----- TEMPLATE ----->
+<!--- TEMPLATE ----------------------------------------------------------------------------------->
 
 <div class="page-content-wrapper">
   <h1>Suppliers</h1>

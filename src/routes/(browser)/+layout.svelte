@@ -1,6 +1,6 @@
-<!-- src/routes/(browser)/+layout.svelte - REFACTORED FOR INLINE SPINNER -->
+<!-- src/routes/(browser)/+layout.svelte -->
 <script lang="ts">
-	import HierarchySidebar from '$lib/components/sidebarAndNav/HierarchySidebar.svelte';
+	import HierarchySidebar, { type HierarchyItem } from '$lib/components/sidebarAndNav/HierarchySidebar.svelte';
 	import { goto } from '$app/navigation';
 	import { log } from '$lib/utils/logger';
 	import Breadcrumb from '$lib/components/sidebarAndNav/Breadcrumb.svelte';
@@ -15,7 +15,7 @@
 	let { data, children } = $props();
 
 	const crumbItems = $derived(data.breadcrumbItems);
-	const sidebarItems = $derived(data.sidebarItems);
+	const hierarchy = $derived(data.hierarchy);
 	const activeLevel = $derived(data.activeLevel);
 
 	// ===== LOADING INDICATOR (Unverändert) =====
@@ -44,15 +44,14 @@
 		}
 	);
 
-	// ===== NAVIGATION (Unverändert) =====
-	function handleSidebarNavigation(event: CustomEvent<{ key: string }>) {
-		const selectedKey = event.detail.key;
-		const selectedItem = sidebarItems.find((item) => item.key === selectedKey);
-		log.info(`(Layout) Sidebar navigation requested for key: ${selectedKey}`);
+	// ===== NAVIGATION  =====
+	
+	function handleSidebarNavigation(selectedItem: HierarchyItem) {
+		log.info(`(Layout) Sidebar navigation requested for key: ${selectedItem.key}`);
 		if (selectedItem && !selectedItem.disabled && selectedItem.href && selectedItem.href !== '#') {
 			goto(selectedItem.href);
 		} else {
-			log.warn(`(Layout) Navigation aborted for key: ${selectedKey}`, {
+			log.warn(`Navigation aborted for key: ${selectedItem.key}`, {
 				item: selectedItem
 			});
 		}
@@ -64,20 +63,20 @@
 <div class="browser-layout">
 	<aside class="sidebar">
 		<HierarchySidebar
-			items={sidebarItems}
+			{hierarchy}
 			active={activeLevel}
 			onselect={handleSidebarNavigation}
 		/>
 	</aside>
 
 	<main class="main-content">
-		<!-- NEU: Ein <header> umschließt Breadcrumbs und Spinner -->
 		<header class="main-header">
+			<!-- Breadcrumbs -->
 			<div class="breadcrumbs-wrapper">
 				<Breadcrumb items={crumbItems} />
 			</div>
 
-			<!-- Der Lade-Spinner wird nur bei Bedarf eingeblendet -->
+			<!-- Spinner-->
 			{#if $isAnythingLoading }
 				<div class="loader-wrapper" transition:fade={{ duration: 150, delay: 200 }}>
 					<div class="spinner"></div>
@@ -85,7 +84,7 @@
 			{/if}
 		</header>
 
-		<!-- Der Seiteninhalt wird jetzt in einem eigenen scrollbaren Container gerendert -->
+		<!-- Page content -->
 		<div class="page-content-wrapper">
 			{@render children()}
 		</div>

@@ -66,6 +66,7 @@
 			{hierarchy}
 			active={activeLevel}
 			onselect={handleSidebarNavigation}
+			shouldRenderHierarchyRootTitle = {false}
 		/>
 	</aside>
 

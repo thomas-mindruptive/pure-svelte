@@ -1,5 +1,5 @@
 <!-- HierarchySidebar -->
- 
+
 <script lang="ts">
   // Simple, typed sidebar for the SupplierBrowser
   // Props-only, no slots. Emits a single "select" event.
@@ -35,6 +35,7 @@
     active?: string | null;
     ariaLabel?: string;
     onselect?: SelectCbk;
+    shouldRenderHierarchyRootTitle: boolean
   };
 
   const {
@@ -42,9 +43,10 @@
     active = null as string | null,
     ariaLabel = "Navigation",
     onselect,
-  }:HierarchySidebarProps = $props();
+    shouldRenderHierarchyRootTitle
+  }: HierarchySidebarProps = $props();
 
-  // === EVENTS HANDLERS =========================================================================
+  // === EVENTS HANDLERS ==========================================================================
 
   function handleSelect(item: HierarchyItem) {
     log.debug("Clicked item", item);
@@ -67,8 +69,10 @@
   {#each hierarchy as tree (tree.root)}
     <div class="hb__tree">
       <!-- Zeige den Titel des Baumes an, wenn er existiert -->
-      {#if tree.root}
+      {#if tree.root && shouldRenderHierarchyRootTitle}
         <h3 class="hb__root-title">{tree.root}</h3>
+      {:else}
+        <p class="hb__root-title"></p>  
       {/if}
 
       <ul class="hb__list">

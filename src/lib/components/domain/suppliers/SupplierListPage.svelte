@@ -3,10 +3,7 @@
   // The SupplierGrid is the primary UI component for displaying the data.
   import SupplierGrid from "$lib/components/domain/suppliers/SupplierGrid.svelte";
   // We need the supplierLoadingState to show loading for on-page actions like 'delete'.
-  import {
-    supplierLoadingState,
-    getSupplierApi,
-  } from "$lib/api/client/supplier";
+  import { supplierLoadingState, getSupplierApi } from "$lib/api/client/supplier";
   import type { Wholesaler } from "$lib/domain/domainTypes";
 
   // --- SvelteKit & Utility Imports ---
@@ -22,21 +19,17 @@
   // The ApiClient is the foundation for making SSR-safe fetch requests.
   import { ApiClient } from "$lib/api/client/ApiClient";
   // Types for the strategy pattern used by the generic DataGrid component.
-  import type {
-    ID,
-    DeleteStrategy,
-    RowActionStrategy,
-  } from "$lib/components/grids/Datagrid.types";
+  import type { ID, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
   import { page } from "$app/stores";
 
-  // --- PROPS ---
+  // === PROPS ====================================================================================
+
   // 1. The `data` prop receives the promise streamed from the non-blocking `load` function.
   //    It is NOT the resolved array of suppliers, but the promise that will resolve to it.
-  let { data }: { data: { suppliers: Promise<Wholesaler[]> } } = $props<{
-    data: { suppliers: Promise<Wholesaler[]> };
-  }>();
+  let { data }: { data: { suppliers: Promise<Wholesaler[]> } } = $props();
 
-  // --- LOCAL COMPONENT STATE ---
+  // === STATE ====================================================================================
+
   // These top-level `let` variables are made reactive by Svelte 5.
   // They will hold the resolved state of the promise.
   let resolvedSuppliers = $state<Wholesaler[]>([]);
@@ -47,8 +40,9 @@
     status: number;
   } | null>(null);
 
-  // --- ASYNCHRONOUS LOGIC HANDLING ---
-  // This `$effect` is the core of the solution. It runs whenever the `data.suppliers`
+  // === LOAD =====================================================================================
+
+  // This `$effect` runs whenever the `data.suppliers`
   //    promise changes (e.g., on initial load or after an `invalidateAll` call).
   $effect(() => {
     // For Svelte cleanup funtion!
@@ -79,19 +73,13 @@
 
           if (!aborted) {
             const status = rawError.status ?? 500;
-            const message =
-              rawError.body?.message ||
-              rawError.message ||
-              "An unknown error occurred while loading suppliers.";
+            const message = rawError.body?.message || rawError.message || "An unknown error occurred while loading suppliers.";
 
             // Set the clean error state for the UI to display.
             loadingOrValidationError = { message, status };
 
             // Log the full, raw error object for debugging purposes.
-            log.error(
-              "(SupplierListPage) Promise rejected while loading suppliers",
-              { rawError }
-            );
+            log.error("(SupplierListPage) Promise rejected while loading suppliers", { rawError });
           }
         } finally {
           // Always set loading to false when the process is complete (success or fail).
@@ -111,16 +99,16 @@
     };
   });
 
-  // ===== EVENT HANDLERS =====
+  // === API ======================================================================================
 
   // 3. These functions handle user interactions within the grid. They remain unchanged.
   const client = new ApiClient(fetch);
   const supplierApi = getSupplierApi(client);
 
+  // === EVENTS ===================================================================================
+
   function handleSupplierSelect(supplier: Wholesaler): void {
-    log.info(
-      `(SupplierListPage) Navigating to detail for supplierId: ${supplier.wholesaler_id}`
-    );
+    log.info(`(SupplierListPage) Navigating to detail for supplierId: ${supplier.wholesaler_id}`);
     goto(`/suppliers/${supplier.wholesaler_id}`);
   }
 
@@ -133,23 +121,17 @@
       const result = await supplierApi.deleteSupplier(numericId, false);
 
       if (result.success) {
-        addNotification(
-          `Supplier "${result.data.deleted_resource.name}" deleted.`,
-          "success"
-        );
+        addNotification(`Supplier "${result.data.deleted_resource.name}" deleted.`, "success");
         dataChanged = true;
       } else if ("cascade_available" in result && result.cascade_available) {
         const dependencies = (result.dependencies as string[]).join(", ");
         const confirmed = await requestConfirmation(
           `Supplier has dependencies: ${dependencies}. Delete with all related data?`,
-          "Confirm Cascade Delete"
+          "Confirm Cascade Delete",
         );
 
         if (confirmed) {
-          const cascadeResult = await supplierApi.deleteSupplier(
-            numericId,
-            true
-          );
+          const cascadeResult = await supplierApi.deleteSupplier(numericId, true);
           if (cascadeResult.success) {
             addNotification("Supplier and related data deleted.", "success");
             dataChanged = true;
@@ -162,7 +144,7 @@
 
     if (dataChanged) {
       // Reload and change state.
-      resolvedSuppliers = await supplierApi.loadSuppliers(); 
+      resolvedSuppliers = await supplierApi.loadSuppliers();
     }
   }
 
@@ -186,9 +168,7 @@
 
 <div class="page-content-wrapper">
   <h1>Suppliers</h1>
-  <p>
-    Select a supplier to view their details and manage their product categories.
-  </p>
+  <p>Select a supplier to view their details and manage their product categories.</p>
 
   <!-- 
     4. The template is now extremely simple and clean. It is purely presentational,
@@ -203,9 +183,12 @@
     </div>
   {:else}
     <div class="grid-section">
-      <button class="pc-grid__createbtn" onclick={handleSupplierCreate}
-        >Create Supplier</button
+      <button
+        class="pc-grid__createbtn"
+        onclick={handleSupplierCreate}
       >
+        Create Supplier
+      </button>
       <SupplierGrid
         rows={resolvedSuppliers}
         loading={isLoading || $supplierLoadingState}

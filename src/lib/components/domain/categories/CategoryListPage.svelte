@@ -1,27 +1,23 @@
 <script lang="ts">
-
   import CategoryGrid from "$lib/components/domain/categories/CategoryGrid.svelte";
-
 
   import { goto } from "$app/navigation";
   import { log } from "$lib/utils/logger";
   import { addNotification } from "$lib/stores/notifications";
   import { requestConfirmation } from "$lib/stores/confirmation";
   import { ApiClient } from "$lib/api/client/ApiClient";
-  import type {
-    ID,
-    DeleteStrategy,
-    RowActionStrategy,
-  } from "$lib/components/grids/Datagrid.types";
+  import type { ID, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
   import { page } from "$app/stores";
   import type { ProductCategory } from "$lib/domain/domainTypes";
   import { categoryLoadingState, getCategoryApi } from "$lib/api/client/category";
 
   // === PROPS ====================================================================================
 
-  let { data }: { data: { suppliers: Promise<ProductCategory[]> } } = $props<{
-    data: { suppliers: Promise<ProductCategory[]> };
-  }>();
+  export type CategoryGridProps = {
+    data: { suppliers: Promise<ProductCategory[]>}
+  };
+
+  let { data }: CategoryGridProps = $props();
 
   // === STATE =====================================================================================
 
@@ -60,19 +56,13 @@
 
           if (!aborted) {
             const status = rawError.status ?? 500;
-            const message =
-              rawError.body?.message ||
-              rawError.message ||
-              "An unknown error occurred while loading suppliers.";
+            const message = rawError.body?.message || rawError.message || "An unknown error occurred while loading suppliers.";
 
             // Set the clean error state for the UI to display.
             loadingOrValidationError = { message, status };
 
             // Log the full, raw error object for debugging purposes.
-            log.error(
-              "(SupplierListPage) Promise rejected while loading suppliers",
-              { rawError }
-            );
+            log.error("(SupplierListPage) Promise rejected while loading suppliers", { rawError });
           }
         } finally {
           // Always set loading to false when the process is complete (success or fail).
@@ -99,9 +89,7 @@
   const categoryApi = getCategoryApi(client);
 
   function handleCategorySelect(category: ProductCategory): void {
-    log.info(
-      `Navigating to detail for supplierId: ${category.category_id}`
-    );
+    log.info(`Navigating to detail for supplierId: ${category.category_id}`);
     goto(`/categories/${category.category_id}`);
   }
 
@@ -114,23 +102,17 @@
       const result = await categoryApi.deleteCategory(numericId, false);
 
       if (result.success) {
-        addNotification(
-          `Category "${result.data.deleted_resource.name}" deleted.`,
-          "success"
-        );
+        addNotification(`Category "${result.data.deleted_resource.name}" deleted.`, "success");
         dataChanged = true;
       } else if ("cascade_available" in result && result.cascade_available) {
         const dependencies = (result.dependencies as string[]).join(", ");
         const confirmed = await requestConfirmation(
           `Category has dependencies: ${dependencies}. Delete with all related data?`,
-          "Confirm Cascade Delete"
+          "Confirm Cascade Delete",
         );
 
         if (confirmed) {
-          const cascadeResult = await categoryApi.deleteCategory(
-            numericId,
-            true
-          );
+          const cascadeResult = await categoryApi.deleteCategory(numericId, true);
           if (cascadeResult.success) {
             addNotification("Category and related data deleted.", "success");
             dataChanged = true;
@@ -167,9 +149,7 @@
 
 <div class="page-content-wrapper">
   <h1>Suppliers</h1>
-  <p>
-    Select a supplier to view their details and manage their product categories.
-  </p>
+  <p>Select a supplier to view their details and manage their product categories.</p>
 
   <!-- 
     4. The template is now extremely simple and clean. It is purely presentational,
@@ -182,9 +162,12 @@
     </div>
   {:else}
     <div class="grid-section">
-      <button class="pc-grid__createbtn" onclick={handleCategoryCreate}
-        >Create Supplier</button
+      <button
+        class="pc-grid__createbtn"
+        onclick={handleCategoryCreate}
       >
+        Create Supplier
+      </button>
       <CategoryGrid
         rows={resolvedCategories}
         loading={isLoading || $categoryLoadingState}

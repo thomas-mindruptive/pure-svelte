@@ -2,12 +2,7 @@
   // Thin wrapper around Datagrid for categoriesAA
 
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
-  import type {
-    DeleteStrategy,
-    RowActionStrategy,
-    ID,
-    ColumnDefDirect,
-  } from "$lib/components/grids/Datagrid.types";
+  import type { DeleteStrategy, RowActionStrategy, ID, ColumnDefDirect } from "$lib/components/grids/Datagrid.types";
 
   import type { ProductCategory } from "$lib/domain/domainTypes";
 
@@ -23,26 +18,10 @@
     rowActionStrategy?: RowActionStrategy<ProductCategory>;
   }>();
 
-  // Svelte will say that "columns is updated." This is ok because this is jsut a workaorund for not being const.
   const columns: ColumnDefDirect<ProductCategory>[] = [
-    {
-      key: "category_id",
-      header: "id",
-      sortable: true,
-      width: "3fr"
-    },
-    {
-      key: "name",
-      header: "Name",
-      sortable: false,
-      width: "2fr"
-    },
-    {
-      key: "description",
-      header: "description",
-      sortable: true,
-      width: "1fr"
-    }
+    { key: "category_id", header: "id", sortable: true, width: "3fr" },
+    { key: "name", header: "Name", sortable: false, width: "2fr" },
+    { key: "description", header: "description", sortable: true, width: "1fr" },
   ];
 
   // Composite key for categories (wholesaler_id + category_id)

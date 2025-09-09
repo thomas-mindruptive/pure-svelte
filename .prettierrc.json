@@ -1,0 +1,16 @@
+{
+  "plugins": ["prettier-plugin-svelte"],
+  "printWidth": 140,
+  "singleQuote": false,
+  "overrides": [
+    {
+      "files": "*.svelte",
+      "options": {
+        "parser": "svelte",
+        "printWidth": 140,
+        "singleAttributePerLine": true,
+        "htmlWhitespaceSensitivity": "ignore"
+      }
+    }
+  ]
+}

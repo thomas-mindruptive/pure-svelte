@@ -113,3 +113,27 @@ export function buildHrefForNode(
   return buildUrlFromNavigationPath(pathToTarget, urlParams);
 }
 
+// === NODE UTILITIES =============================================================================
+
+/**
+ * Finds a node in the hierarchy by key and level
+ * Used to locate nodes that correspond to URL parameters
+ */
+export function findNodeInTree(tree: HierarchyTree, key: string, level: number): HierarchyTreeNode | null {
+  function searchNode(node: HierarchyTreeNode): HierarchyTreeNode | null {
+    if (node.item.key === key && (node.item.level ?? 0) === level) {
+      return node;
+    }
+    
+    if (node.items) {
+      for (const child of node.items) {
+        const found = searchNode(child);
+        if (found) return found;
+      }
+    }
+    
+    return null;
+  }
+  
+  return searchNode(tree.rootItem);
+}

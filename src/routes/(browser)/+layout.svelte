@@ -10,8 +10,9 @@
 	import { productDefinitionLoadingState } from '$lib/api/client/productDefinition.js';
 	import { supplierLoadingState } from '$lib/api/client/supplier.js';
 	import { derived } from 'svelte/store';
-	import { fade } from 'svelte/transition'; // Import für die Animation
-    import type { HierarchyItem } from '$lib/components/sidebarAndNav/HierarchySidebar.types.js';
+	import { fade } from 'svelte/transition';
+	import type { HierarchyTree, HierarchyTreeNode } from '$lib/components/sidebarAndNav/HierarchySidebar.types.js';
+    import { selectNode } from '$lib/stores/navigationState.js';
 
 	let { data, children } = $props();
 
@@ -46,21 +47,37 @@
 		}
 	);
 
-	// ===== NAVIGATION  =====
+	// ===== NAVIGATION (UPDATED FOR NEW HIERARCHY) =====
 	
-	function handleSidebarNavigation(selectedItem: HierarchyItem) {
-		log.info(`(Layout) Sidebar navigation requested for key: ${selectedItem.key}`);
-		if (selectedItem && !selectedItem.disabled && selectedItem.href && selectedItem.href !== '#') {
-			goto(selectedItem.href);
-		} else {
-			log.warn(`Navigation aborted for key: ${selectedItem.key}`, {
-				item: selectedItem
-			});
+	/**
+	 * Updated navigation handler for the new HierarchySidebar signature
+	 * Now receives (tree, node) instead of just selectedItem
+	 */
+	function handleSidebarNavigation(tree: HierarchyTree, node: HierarchyTreeNode) {
+		log.info(`(Layout) Sidebar navigation requested for tree: ${tree.name}, node: ${node.item.key}`);
+		
+		try {
+			// NEW: Update NavigationState with the selected node
+			// This handles context preservation automatically
+			selectNode(node);
+			
+			// Navigate to the URL for this node (same logic as before)
+			if (node.item && !node.item.disabled && node.item.href && node.item.href !== '#') {
+				log.debug('Navigating to:', node.item.href);
+				goto(node.item.href);
+			} else {
+				log.warn(`Navigation aborted for key: ${node.item.key}`, {
+					node: node.item,
+					tree: tree.name
+				});
+			}
+		} catch (error) {
+			log.error('Failed to handle sidebar navigation:', error);
 		}
 	}
 </script>
 
-<!----- TEMPLATE (Angepasst) ----->
+<!----- TEMPLATE (UNVERÄNDERT) ----->
 
 <div class="browser-layout">
 	<aside class="sidebar">

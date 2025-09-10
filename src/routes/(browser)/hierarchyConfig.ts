@@ -21,7 +21,6 @@ export function buildSupplierHierarchy(finalUiPath: {
   supplierId: number | null;
   categoryId: number | null;
   offeringId: number | null;
-  leaf: "attributes" | "links" | null;
 }): HierarchyTree {
   // Create the base hierarchy structure
   // Note: levels will be set by initLevels(), hrefs will be built dynamically
@@ -142,7 +141,7 @@ export function buildHierarchy(finalUiPath: {
   supplierId: number | null;
   categoryId: number | null;
   offeringId: number | null;
-  leaf: "attributes" | "links" | null;
+  leaf: string | null;
 }): Hierarchy {
   return [
     buildSupplierHierarchy(finalUiPath),

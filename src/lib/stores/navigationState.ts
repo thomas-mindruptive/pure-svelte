@@ -1,5 +1,6 @@
 import { writable } from 'svelte/store';
 import type { HierarchyTree, HierarchyTreeNode } from '$lib/components/sidebarAndNav/HierarchySidebar.types';
+import { log } from '$lib/utils/logger';
 
 // === TYPES ====================================================================================
 
@@ -175,7 +176,7 @@ export function selectNode(node: HierarchyTreeNode): void {
  */
 export function setActiveTreePath(tree: HierarchyTree, path: HierarchyTreeNode[] = []): void {
   navigationState.update(state => {
-    console.debug(`Setting active tree: ${tree.name}, path length: ${path.length}`);
+    log.debug(`Setting active tree: ${tree.name}, path length: ${path.length}`);
     
     // Store the current path for the previously active tree (if any)
     const updatedTreePaths = new Map(state.treePaths);

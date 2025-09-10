@@ -76,10 +76,8 @@
       {/if}
 
       <ul class="hb__list">
-        <!-- 2. INNERE SCHLEIFE: Iteriert über die Items des aktuellen Baumes -->
         {#each tree.items as it (it.key)}
           <li class="hb__li">
-            <!-- Der Button-Code bleibt exakt gleich wie vorher -->
             <button
               type="button"
               class="hb__item {active === it.key ? 'is-active' : ''}"

@@ -21,7 +21,7 @@ export async function load({ url, params, depends, fetch: loadEventFetch }: Load
   log.info("(Layout Load) called with URL:", url.href, "and params:", params);
   depends(`url:${url.href}`);
 
-  // --- STEP 1: DEFINE PATHS FROM SOURCES ---
+  // DEFINE PATHS FROM SOURCES
   const pathFromUrl: NavigationPath = {
     supplierId: params.supplierId ? Number(params.supplierId) : null,
     categoryId: params.categoryId ? Number(params.categoryId) : null,
@@ -30,7 +30,7 @@ export async function load({ url, params, depends, fetch: loadEventFetch }: Load
   };
   const conservedPath = get(navigationState);
 
-  // --- STEP 2: RECONCILE PATHS (FINAL, ROBUST LOGIC) ---
+  // RECONCILE PATHS
   let finalUiPath: NavigationPath;
 
   if (pathFromUrl.supplierId && pathFromUrl.supplierId !== conservedPath.supplierId) {
@@ -49,7 +49,6 @@ export async function load({ url, params, depends, fetch: loadEventFetch }: Load
   }
   navigationState.set(finalUiPath);
 
-  // --- STEP 3: FETCH ENTITY NAMES FOR THE UI PATH ---
   const client = new ApiClient(loadEventFetch);
 
   const entityNames: EntityNames = { supplier: null, category: null, offering: null };
@@ -78,7 +77,7 @@ export async function load({ url, params, depends, fetch: loadEventFetch }: Load
     );
   await Promise.all(promises);
 
-  // --- STEP 4: DETERMINE ACTIVE LEVEL & BUILD UI PROPS (FIXED) ---
+  // DETERMINE ACTIVE LEVEL & BUILD UI PROPS
   let activeLevel: string;
   if (pathFromUrl.offeringId) {
     activeLevel = pathFromUrl.leaf || "links";
@@ -106,25 +105,28 @@ export async function load({ url, params, depends, fetch: loadEventFetch }: Load
       ? `/suppliers/${finalUiPath.supplierId}/categories/${finalUiPath.categoryId}/offerings/${finalUiPath.offeringId}`
       : "#";
 
-  const supplierHierarchy: HierarchyTree = {root:"suppliers", items: [
-    { key: "suppliers", label: "Suppliers", disabled: false, level: 0, href: "/suppliers" },
-    { key: "categories", label: "Categories", disabled: !finalUiPath.supplierId, level: 1, href: supplierPath },
-    { key: "offerings", label: "Offerings", disabled: !finalUiPath.categoryId, level: 2, href: categoryPath },
-    {
-      key: "attributes",
-      label: "Attributes",
-      disabled: !finalUiPath.offeringId,
-      level: 3,
-      href: offeringPathBase === "#" ? "#" : `${offeringPathBase}/attributes`,
-    },
-    {
-      key: "links",
-      label: "Links",
-      disabled: !finalUiPath.offeringId,
-      level: 3,
-      href: offeringPathBase === "#" ? "#" : `${offeringPathBase}/links`,
-    },
-  ]};
+  const supplierHierarchy: HierarchyTree = {
+    root: "suppliers",
+    items: [
+      { key: "suppliers", label: "Suppliers", disabled: false, level: 0, href: "/suppliers" },
+      { key: "categories", label: "Categories", disabled: !finalUiPath.supplierId, level: 1, href: supplierPath },
+      { key: "offerings", label: "Offerings", disabled: !finalUiPath.categoryId, level: 2, href: categoryPath },
+      {
+        key: "attributes",
+        label: "Attributes",
+        disabled: !finalUiPath.offeringId,
+        level: 3,
+        href: offeringPathBase === "#" ? "#" : `${offeringPathBase}/attributes`,
+      },
+      {
+        key: "links",
+        label: "Links",
+        disabled: !finalUiPath.offeringId,
+        level: 3,
+        href: offeringPathBase === "#" ? "#" : `${offeringPathBase}/links`,
+      },
+    ],
+  };
 
   const hierarchy = [supplierHierarchy];
 

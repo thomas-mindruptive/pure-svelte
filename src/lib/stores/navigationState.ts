@@ -1,12 +1,11 @@
-import { writable, type Writable } from 'svelte/store';
-import { browser } from '$app/environment';
-import type { HierarchyTree, HierarchyTreeNode, Hierarchy } from '$lib/components/sidebarAndNav/HierarchySidebar.types';
+import { writable } from 'svelte/store';
+import type { HierarchyTree, HierarchyTreeNode } from '$lib/components/sidebarAndNav/HierarchySidebar.types';
 
 // === TYPES ====================================================================================
 
 /**
  * Represents the current navigation state for hierarchy trees
- * Contains object references to the active tree and path through it
+ * Lives in memory only - reset on browser reload
  */
 export interface NavigationState {
   /** Currently active tree (null if no tree selected) */
@@ -19,18 +18,11 @@ export interface NavigationState {
    */
   activePath: HierarchyTreeNode[];
   
-  /** Map storing paths for all trees to preserve context when switching */
+  /** 
+   * Map storing paths for all trees to preserve context when switching
+   * Key: tree.name, Value: array of nodes representing the path in that tree
+   */
   treePaths: Map<string, HierarchyTreeNode[]>;
-}
-
-/**
- * Serializable version of NavigationState for sessionStorage persistence
- * Uses tree names and node keys instead of object references
- */
-interface SerializableNavigationState {
-  activeTreeName: string | null;
-  activePath: string[]; // node keys in order
-  treePaths: Record<string, string[]>; // tree name -> array of node keys
 }
 
 // === INITIAL STATE ============================================================================
@@ -41,7 +33,15 @@ const initialState: NavigationState = {
   treePaths: new Map()
 };
 
-// === NODE UTILITIES ============================================================================
+// === EXPORTED STORE ===========================================================================
+
+/**
+ * Simple navigation state store for hierarchy trees
+ * No persistence - state is lost on browser reload
+ */
+export const navigationState = writable<NavigationState>(initialState);
+
+// === UTILITY FUNCTIONS ========================================================================
 
 /**
  * Compares two nodes for equality using both key and level
@@ -68,240 +68,7 @@ function getNodeLevel(node: HierarchyTreeNode): number {
   return node.item.level ?? 0;
 }
 
-// === PERSISTENCE UTILITIES ===================================================================
-
-/**
- * Serializes NavigationState to a format suitable for sessionStorage
- * Converts object references to string identifiers that can survive page reloads
- * 
- * @param state The current NavigationState to serialize
- * @returns Serializable representation using strings instead of object refs
- */
-function serializeNavigationState(state: NavigationState): SerializableNavigationState {
-  const treePathsObj: Record<string, string[]> = {};
-  
-  // Convert Map to plain object for JSON serialization
-  // Each tree path becomes an array of node keys in order
-  for (const [treeName, path] of state.treePaths.entries()) {
-    treePathsObj[treeName] = path.map(node => node.item.key);
-  }
-  
-  return {
-    activeTreeName: state.activeTree?.name ?? null,
-    activePath: state.activePath.map(node => node.item.key),
-    treePaths: treePathsObj
-  };
-}
-
-/**
- * Creates a flat lookup map for all nodes in a tree
- * Groups nodes by their keys, then by their levels to handle potential duplicates
- * 
- * @param tree The tree to create a lookup map for
- * @returns Nested map: key -> level -> node
- */
-function createNodeLookup(tree: HierarchyTree): Map<string, Map<number, HierarchyTreeNode>> {
-  const lookup = new Map<string, Map<number, HierarchyTreeNode>>();
-  
-  /**
-   * Recursively traverse tree and collect all nodes
-   * Each node is indexed by its key and level for unique identification
-   */
-  function collectNodes(node: HierarchyTreeNode): void {
-    const key = node.item.key;
-    const level = getNodeLevel(node);
-    
-    // Ensure we have a map for this key
-    if (!lookup.has(key)) {
-      lookup.set(key, new Map());
-    }
-    
-    // Store the node at its specific level
-    lookup.get(key)!.set(level, node);
-    
-    // Recursively process children
-    if (node.items) {
-      for (const child of node.items) {
-        collectNodes(child);
-      }
-    }
-  }
-  
-  collectNodes(tree.rootItem);
-  return lookup;
-}
-
-/**
- * Finds a node by key and level using the lookup map
- * 
- * @param lookup The node lookup map created by createNodeLookup()
- * @param key The node key to find
- * @param level The specific level to look at
- * @returns The node if found, null otherwise
- */
-function findNodeByKeyAndLevel(
-  lookup: Map<string, Map<number, HierarchyTreeNode>>, 
-  key: string, 
-  level: number
-): HierarchyTreeNode | null {
-  const nodesWithKey = lookup.get(key);
-  if (!nodesWithKey) {
-    return null;
-  }
-  
-  return nodesWithKey.get(level) ?? null;
-}
-
-/**
- * Deserializes NavigationState from sessionStorage format
- * Resolves string keys back to actual HierarchyTreeNode object references
- * 
- * @param serialized The serialized state from sessionStorage
- * @param hierarchy The current hierarchy to resolve nodes from
- * @returns NavigationState with proper object references
- */
-function deserializeNavigationState(
-  serialized: SerializableNavigationState, 
-  hierarchy: Hierarchy
-): NavigationState {
-  const treePaths = new Map<string, HierarchyTreeNode[]>();
-  
-  // Find the active tree by name
-  const activeTree = hierarchy.find(tree => tree.name === serialized.activeTreeName) ?? null;
-  
-  // Restore all tree paths by resolving keys to nodes
-  for (const [treeName, nodeKeys] of Object.entries(serialized.treePaths)) {
-    const tree = hierarchy.find(t => t.name === treeName);
-    if (tree && nodeKeys.length > 0) {
-      // Resolve this tree's path
-      const resolvedPath = resolveKeysToPath(tree, nodeKeys);
-      if (resolvedPath.length > 0) {
-        treePaths.set(treeName, resolvedPath);
-      }
-    }
-  }
-  
-  // Restore active path
-  const activePath = activeTree ? resolveKeysToPath(activeTree, serialized.activePath) : [];
-  
-  return {
-    activeTree,
-    activePath,
-    treePaths
-  };
-}
-
-/**
- * Resolves an array of node keys to actual HierarchyTreeNode references
- * Uses the assumption that keys represent a valid path through the hierarchy
- * 
- * @param tree The tree to resolve nodes from
- * @param nodeKeys Array of node keys in path order
- * @returns Array of resolved nodes (may be shorter if some keys couldn't be resolved)
- */
-function resolveKeysToPath(tree: HierarchyTree, nodeKeys: string[]): HierarchyTreeNode[] {
-  if (nodeKeys.length === 0) {
-    return [];
-  }
-  
-  const lookup = createNodeLookup(tree);
-  const result: HierarchyTreeNode[] = [];
-  
-  // Resolve each key to a node at the expected level
-  // Level corresponds to position in the keys array: keys[0] = level 0, keys[1] = level 1, etc.
-  for (let i = 0; i < nodeKeys.length; i++) {
-    const key = nodeKeys[i];
-    const expectedLevel = i; // ASSUMPTION: levels are 0, 1, 2, 3...
-    
-    const node = findNodeByKeyAndLevel(lookup, key, expectedLevel);
-    if (!node) {
-      // Can't resolve this key at expected level - stop here
-      // Return partial path up to this point
-      break;
-    }
-    
-    result.push(node);
-  }
-  
-  return result;
-}
-
-// === STORE CREATION ===========================================================================
-
-/**
- * Extended writable store interface with hierarchy initialization method
- */
-interface NavigationStateStore extends Writable<NavigationState> {
-  initializeFromHierarchy: (hierarchy: Hierarchy) => void;
-}
-
-/**
- * Creates a persistent navigation state store that automatically saves/restores from sessionStorage
- * The store must be initialized with a hierarchy before it can restore from storage
- * 
- * @param key The sessionStorage key to use for persistence
- * @param startValue The initial state to use before initialization
- * @returns Extended store with initialization method
- */
-function createNavigationStateStore(
-  key: string, 
-  startValue: NavigationState
-): NavigationStateStore {
-  
-  const store = writable<NavigationState>(startValue);
-  let currentHierarchy: Hierarchy = [];
-  
-  // Subscribe to state changes and automatically persist to sessionStorage
-  store.subscribe(state => {
-    if (browser && currentHierarchy.length > 0) {
-      try {
-        const serialized = serializeNavigationState(state);
-        window.sessionStorage.setItem(key, JSON.stringify(serialized));
-      } catch (error) {
-        console.warn('Failed to persist navigation state to sessionStorage:', error);
-      }
-    }
-  });
-  
-  return {
-    ...store,
-    
-    /**
-     * Initialize the store from sessionStorage using the provided hierarchy
-     * This must be called once the hierarchy is available (typically in +layout.ts)
-     * After initialization, the store will automatically persist changes
-     * 
-     * @param hierarchy The current hierarchy to use for resolving stored paths
-     */
-    initializeFromHierarchy(hierarchy: Hierarchy): void {
-      currentHierarchy = hierarchy;
-      
-      // Try to restore from sessionStorage
-      if (browser) {
-        const stored = window.sessionStorage.getItem(key);
-        if (stored) {
-          try {
-            const serialized = JSON.parse(stored) as SerializableNavigationState;
-            const deserialized = deserializeNavigationState(serialized, hierarchy);
-            store.set(deserialized);
-            return;
-          } catch (error) {
-            console.warn('Failed to restore navigation state from sessionStorage:', error);
-          }
-        }
-      }
-      
-      // Fallback to initial state if restoration fails
-      store.set(startValue);
-    }
-  };
-}
-
-// === EXPORTED STORE ===========================================================================
-
-export const navigationState = createNavigationStateStore('sb:hierarchyNavigationState', initialState);
-
-// === HELPER FUNCTIONS =========================================================================
+// === CORE NAVIGATION FUNCTIONS ================================================================
 
 /**
  * Core navigation function: selects a node with context preservation logic
@@ -335,6 +102,7 @@ export function selectNode(node: HierarchyTreeNode): void {
       if (nodesEqual(existingNodeAtLevel, node)) {
         // No change needed - user clicked the same node they're already at
         // This preserves any deeper navigation context
+        console.debug('Same node clicked, preserving deeper context');
         return state;
       }
       
@@ -344,6 +112,8 @@ export function selectNode(node: HierarchyTreeNode): void {
         const newPath = currentPath.slice(0, nodeLevel); // Keep path up to (but not including) this level
         newPath.push(node); // Add the new node at this level
         // Everything deeper is automatically removed by slice()
+        
+        console.debug(`Different node at level ${nodeLevel}, resetting deeper levels`);
         
         // Update the tree paths map to remember this change
         const updatedTreePaths = new Map(state.treePaths);
@@ -362,6 +132,8 @@ export function selectNode(node: HierarchyTreeNode): void {
       // User is navigating deeper - add this node to the end of the path
       const newPath = [...currentPath, node];
       
+      console.debug(`Extending path to level ${nodeLevel}`);
+      
       // Update the tree paths map
       const updatedTreePaths = new Map(state.treePaths);
       updatedTreePaths.set(state.activeTree.name, newPath);
@@ -377,9 +149,9 @@ export function selectNode(node: HierarchyTreeNode): void {
     else {
       console.warn(`Navigation level gap detected: current depth ${currentPath.length}, selected level ${nodeLevel}`);
       
-      // Create a path up to the selected level, filling gaps if necessary
-      const newPath = currentPath.slice(0, nodeLevel); // Truncate to before this level
-      // Fill any gaps with nulls would be dangerous, so just add the node
+      // Create a path up to the selected level
+      // Fill missing levels would be dangerous, so just truncate and add the node
+      const newPath = currentPath.slice(0, nodeLevel);
       newPath.push(node);
       
       const updatedTreePaths = new Map(state.treePaths);
@@ -403,10 +175,13 @@ export function selectNode(node: HierarchyTreeNode): void {
  */
 export function setActiveTreePath(tree: HierarchyTree, path: HierarchyTreeNode[] = []): void {
   navigationState.update(state => {
+    console.debug(`Setting active tree: ${tree.name}, path length: ${path.length}`);
+    
     // Store the current path for the previously active tree (if any)
     const updatedTreePaths = new Map(state.treePaths);
     if (state.activeTree && state.activePath.length > 0) {
       updatedTreePaths.set(state.activeTree.name, [...state.activePath]);
+      console.debug(`Stored path for previous tree: ${state.activeTree.name}`);
     }
     
     return {
@@ -426,14 +201,18 @@ export function setActiveTreePath(tree: HierarchyTree, path: HierarchyTreeNode[]
  */
 export function switchToTree(tree: HierarchyTree): void {
   navigationState.update(state => {
+    console.debug(`Switching to tree: ${tree.name}`);
+    
     // Store current path for the previously active tree
     const updatedTreePaths = new Map(state.treePaths);
     if (state.activeTree && state.activePath.length > 0) {
       updatedTreePaths.set(state.activeTree.name, [...state.activePath]);
+      console.debug(`Stored path for previous tree: ${state.activeTree.name}, depth: ${state.activePath.length}`);
     }
     
     // Restore the saved path for the new tree (or start with empty path)
     const restoredPath = state.treePaths.get(tree.name) ?? [];
+    console.debug(`Restored path for new tree: ${tree.name}, depth: ${restoredPath.length}`);
     
     return {
       ...state,
@@ -449,6 +228,7 @@ export function switchToTree(tree: HierarchyTree): void {
  * Clears all trees, paths, and stored context
  */
 export function resetNavigationState(): void {
+  console.debug('Resetting navigation state');
   navigationState.set(initialState);
 }
 
@@ -499,4 +279,23 @@ export function getNodeAtLevel(state: NavigationState, level: number): Hierarchy
  */
 export function getNavigationDepth(state: NavigationState): number {
   return state.activePath.length;
+}
+
+/**
+ * Gets all stored tree paths for debugging purposes
+ * 
+ * @param state The current navigation state
+ * @returns Object with tree names as keys and path info as values
+ */
+export function getStoredTreePaths(state: NavigationState): Record<string, { depth: number; lastNode: string | null }> {
+  const result: Record<string, { depth: number; lastNode: string | null }> = {};
+  
+  for (const [treeName, path] of state.treePaths.entries()) {
+    result[treeName] = {
+      depth: path.length,
+      lastNode: path.length > 0 ? path[path.length - 1].item.key : null
+    };
+  }
+  
+  return result;
 }

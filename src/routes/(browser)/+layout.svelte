@@ -1,6 +1,6 @@
 <!-- src/routes/(browser)/+layout.svelte -->
 <script lang="ts">
-	import HierarchySidebar, { type HierarchyItem } from '$lib/components/sidebarAndNav/HierarchySidebar.svelte';
+	import HierarchySidebar from '$lib/components/sidebarAndNav/HierarchySidebar.svelte';
 	import { goto } from '$app/navigation';
 	import { log } from '$lib/utils/logger';
 	import Breadcrumb from '$lib/components/sidebarAndNav/Breadcrumb.svelte';
@@ -11,6 +11,7 @@
 	import { supplierLoadingState } from '$lib/api/client/supplier.js';
 	import { derived } from 'svelte/store';
 	import { fade } from 'svelte/transition'; // Import für die Animation
+    import type { HierarchyItem } from '$lib/components/sidebarAndNav/HierarchySidebar.types.js';
 
 	let { data, children } = $props();
 
@@ -18,7 +19,8 @@
 	const hierarchy = $derived(data.hierarchy);
 	const activeLevel = $derived(data.activeLevel);
 
-	// ===== LOADING INDICATOR (Unverändert) =====
+	// ===== LOADING INDICATOR  =====
+
 	const isAnythingLoading = derived(
 		[
 			supplierLoadingState,

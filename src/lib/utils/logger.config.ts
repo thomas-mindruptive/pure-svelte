@@ -8,7 +8,7 @@ import { LogLevel, type LoggerConfig } from './logger.types';
  * Modify this file to change global defaults; no circular imports.
  */
 export const LOGGER_DEFAULT_CONFIG: Partial<LoggerConfig> = {
-    level: LogLevel.DETDEBUG,
+    level: LogLevel.DEBUG,
     meta: 'location',
     skipFrames: 0,
 

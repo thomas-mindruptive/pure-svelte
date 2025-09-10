@@ -9,7 +9,7 @@ import { getSupplierApi } from "$lib/api/client/supplier";
 import { getCategoryApi } from "$lib/api/client/category";
 import { getOfferingApi } from "$lib/api/client/offering";
 import { buildBreadcrumb, type ConservedPath } from "$lib/utils/buildBreadcrumb";
-import type { HierarchyTree } from "$lib/components/sidebarAndNav/HierarchySidebar.svelte";
+import type { HierarchyTree } from "$lib/components/sidebarAndNav/HierarchySidebar.types";
 
 type EntityNames = {
   supplier: string | null;
@@ -106,27 +106,62 @@ export async function load({ url, params, depends, fetch: loadEventFetch }: Load
       : "#";
 
   const supplierHierarchy: HierarchyTree = {
-    root: "suppliers",
-    items: [
-      { key: "suppliers", label: "Suppliers", disabled: false, level: 0, href: "/suppliers" },
-      { key: "categories", label: "Categories", disabled: !finalUiPath.supplierId, level: 1, href: supplierPath },
-      { key: "offerings", label: "Offerings", disabled: !finalUiPath.categoryId, level: 2, href: categoryPath },
-      {
-        key: "attributes",
-        label: "Attributes",
-        disabled: !finalUiPath.offeringId,
-        level: 3,
-        href: offeringPathBase === "#" ? "#" : `${offeringPathBase}/attributes`,
-      },
-      {
-        key: "links",
-        label: "Links",
-        disabled: !finalUiPath.offeringId,
-        level: 3,
-        href: offeringPathBase === "#" ? "#" : `${offeringPathBase}/links`,
-      },
-    ],
+    name: "suppliers",
+    rootItem: {
+      item: { key: "suppliers", label: "Suppliers", disabled: false, level: 0, href: "/suppliers" },
+      items: [
+        {
+          item: { key: "categories", label: "Categories", disabled: !finalUiPath.supplierId, level: 1, href: supplierPath },
+          items: [
+            {
+              item: { key: "offerings", label: "Offerings", disabled: !finalUiPath.categoryId, level: 2, href: categoryPath },
+              items: [
+                {
+                  item: {
+                    key: "attributes",
+                    label: "Attributes",
+                    disabled: !finalUiPath.offeringId,
+                    level: 3,
+                    href: offeringPathBase === "#" ? "#" : `${offeringPathBase}/attributes`,
+                  },
+                },
+                {
+                  item: {
+                    key: "links",
+                    label: "Links",
+                    disabled: !finalUiPath.offeringId,
+                    level: 3,
+                    href: offeringPathBase === "#" ? "#" : `${offeringPathBase}/links`,
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
   };
+
+  //   items: [
+  //     { key: "suppliers", label: "Suppliers", disabled: false, level: 0, href: "/suppliers" },
+  //     { key: "categories", label: "Categories", disabled: !finalUiPath.supplierId, level: 1, href: supplierPath },
+  //     { key: "offerings", label: "Offerings", disabled: !finalUiPath.categoryId, level: 2, href: categoryPath },
+  //     {
+  //       key: "attributes",
+  //       label: "Attributes",
+  //       disabled: !finalUiPath.offeringId,
+  //       level: 3,
+  //       href: offeringPathBase === "#" ? "#" : `${offeringPathBase}/attributes`,
+  //     },
+  //     {
+  //       key: "links",
+  //       label: "Links",
+  //       disabled: !finalUiPath.offeringId,
+  //       level: 3,
+  //       href: offeringPathBase === "#" ? "#" : `${offeringPathBase}/links`,
+  //     },
+  //   ],
+  // };
 
   const hierarchy = [supplierHierarchy];
 

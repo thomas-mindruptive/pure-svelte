@@ -193,7 +193,7 @@
         //   `safeAccessor: safeAccessor: Direct access for ${colName} returned: ${val}`,
         // );
         if (undefined === val) {
-          log.info(`safeAccessor: Cell accessor for ${colName} returned undefined`);
+          log.detdebug(`safeAccessor: Cell accessor for ${colName} returned undefined`);
           return `${colInfo} (direct) undefined`;
         }
         return val;

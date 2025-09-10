@@ -119,8 +119,7 @@ CreateChildRequest<ProductCategory, Partial<Omit<WholesalerItemOffering, 'offeri
 // Server-side logic ensures consistency:
 if (requestData.parentId !== requestData.data.category_id) {
   throw new Error("Parent ID mismatch");
-}
-```
+}```
 
 ---
 
@@ -275,6 +274,13 @@ Instead of creating a specialized, one-off API endpoint, we **leverage the flexi
 
 This enhancement makes our generic query system significantly more powerful, avoids API endpoint proliferation, and keeps complex business logic encapsulated in the client-side API module responsible for the context (`offering.ts`).
 
+### Future Architectural Enhancements
+
+#### Recursive Sidebar Component
+- **Current State:** The `HierarchySidebar` component currently renders a flat list of `HierarchyItem` objects. The hierarchical structure is simulated using a `level` property, which is used to calculate CSS padding for indentation.
+- **Potential Improvement:** A future refactoring could change the data structure from a flat list to a true tree structure, where each node object contains an optional `children` array of child nodes.
+- **Benefits:** The `HierarchySidebar` component could then be refactored to render itself recursively using `<svelte:self>`. This would make the component more robust, capable of handling infinitely deep hierarchies, and would rely on semantically correct nested `<ul>` lists for indentation instead of dynamic styling.
+
 ---
 
 ## Technical Architecture Pillars
@@ -286,6 +292,7 @@ The project is built on five pillars of type safety that work together to ensure
 - **Pillar III: Query Config:** A security whitelist for all table, alias, and column access, centered around a single source of truth: the `aliasedTablesConfig` object.
 - **Pillar IV: Query Builder:** A server-side utility that converts the type-safe grammar into parameterized SQL.
 - **Pillar V: Data Validation & Contracts with Zod:** A new pillar ensuring runtime data integrity on the frontend.
+- **Pillar VI: Enhanced Component Type Safety:** Key generic components like the `Datagrid` have been improved for stricter type safety. For example, the `ColumnDef` type now requires the `key` property to always be a valid `keyof T` of the data model, even when a custom `accessor` function is used. This prevents typos and invalid column definitions at compile time.
 
 ### Pillar V: Data Validation & Contracts with Zod
 Zod is the single source of truth for the **shape** of data on the frontend. It allows us to define a data structure once and get both static TypeScript types and runtime validation for free. This is crucial for ensuring that data coming from the "untyped" outside world (like an API response) conforms to the application's expectations before it is used in Svelte components.
@@ -339,11 +346,36 @@ The two-step confirmation process is universal, but the **scope** of the cascade
     *   **Impact:** The potential cascade is **wide and destructive**, affecting the entire data tree beneath that supplier: *all* of its category assignments, *all* of its offerings across all categories, and *all* attributes and links associated with those offerings.
     *   **User Confirmation:** The dialog reflects the massive scope: `"Delete supplier AND ALL related data (5 categories, 28 offerings)?"`
 
-### Frontend Architecture: Page Delegation Pattern
-To avoid code duplication, the frontend follows a powerful **Page Delegation Pattern**.
-- A SvelteKit **Route** (`src/routes/...`) acts as a simple "delegator".
-- It imports and renders a reusable **Page Module** (`src/lib/pages/...`).
-- This allows multiple, different URLs to render the same UI with different data contexts, ensuring that UI and data-loading logic exist only once.
+### Frontend Architecture: Domain-Driven Structure & Page Delegation
+To improve developer experience and scalability, the frontend follows a **Domain-Driven file structure** combined with a **Page Delegation Pattern**.
+
+The core principle is **Co-Location**: All files related to a specific business domain (e.g., "Suppliers") are located in a single directory.
+
+#### New Directory Structure
+All reusable page modules and components are now located under `src/lib/domain/`. The previous separation between `lib/pages` and `lib/components/domain` has been eliminated.
+
+**Before:**
+```
+src/lib/
+├── components/domain/suppliers/
+│   └── SupplierForm.svelte
+└── pages/suppliers/
+    └── SupplierDetailPage.svelte
+```
+
+**After:**
+```
+src/lib/
+└── domain/
+    └── suppliers/
+        ├── SupplierForm.svelte
+        └── SupplierDetailPage.svelte
+```
+
+#### The Delegation Pattern
+- A SvelteKit **Route** (`src/routes/...`) acts as a simple "delegator". Its only job is to load data and render the corresponding page module.
+- It imports and renders a reusable **Page Module** from `src/lib/domain/...`.
+- This allows multiple, different URLs to render the same UI with different data contexts, ensuring that UI and data-loading logic exist only once and are easy to find.
 
 ### Frontend Styling Architecture: Pattern-Based CSS
 The application avoids global, unscoped CSS. Instead, it follows a **pattern-based approach** where common UI patterns are defined in central CSS files and explicitly imported by the components or pages that use them.
@@ -463,8 +495,7 @@ const payload: QueryPayload<Wholesaler> = {
   from: { table: 'dbo.wholesalers', alias: 'w' },
   select: ['w.wholesaler_id', 'w.name'],
   where: { key: 'w.status', whereCondOp: ComparisonOperator.EQUALS, val: 'active' }
-};
-```
+};```
 
 **After (Fluent Builder):**
 ```typescript
@@ -539,42 +570,48 @@ Svelte's core feature is its powerful and efficient reactivity system. In this a
 **Problem:** Using the global `fetch` with relative URLs (e.g., `/api/suppliers`) will fail during Server-Side Rendering (SSR).
 **Best Practice:** Always use the context-aware `fetch` function provided by SvelteKit's `LoadEvent` and pass it to the `ApiClient`'s constructor, as documented in the architecture.
 
-## Svelte 5 pitfalls
-**The Core DX Problem: "Global Magic Chaos" and Type Safety in Generic Components**
+## Svelte 5 Best Practices & Pitfalls
 
-SvelteKit's `PageData` object, which merges data from all parent layouts, is a powerful feature to avoid prop drilling. However, it can introduce a pattern that feels like **"global magic chaos,"** where a component develops an implicit dependency on a parent layout, making the root cause of errors difficult to trace.
+### Correct Prop Typing with `$props()`
+Correctly typing component props is crucial for type safety. The official and recommended syntax for Svelte 5 is to use **destructuring with a type annotation**.
 
-This challenge is most apparent when using generic components with slots or snippets, such as `FormShell.svelte`. Without careful implementation, the specific type information from a "smart parent" component (like `OfferingForm`) can be lost when passed to the generic child, leading to a bypass of TypeScript's static analysis within the snippet.
+**Correct Pattern:**
+A `type` or `interface` for the props is defined, and this type is then applied to the destructured `const` or `let`.
+```typescript
+// 1. Define a type for the component's props.
+type MyComponentProps = {
+  name: string;
+  count?: number;
+};
 
-**Solution: The Controlled Bridge**
+// 2. Use the type to annotate the destructured props.
+const { name, count = 0 }: MyComponentProps = $props();
+```
+**Anti-Pattern:**
+Using a generic type argument with `$props()` (e.g., `$props<MyComponentProps>()`) is **incorrect**. The `$props()` rune is a compiler macro, not a generic function. This will result in a TypeScript compiler error (`ts(2558): Expected 0 type arguments, but got 1`).
 
-This application solves the problem by establishing a "Controlled Bridge" pattern. The "smart parent" component provides explicit type information to the generic child, ensuring end-to-end type safety.
+### Understanding `$derived` vs. `$derived.by`
+Svelte 5 offers two ways to create derived reactive values. Understanding their difference is key to avoiding bugs and "false positive" type errors from the language server.
 
-1.  **Strongly-Typed Instance:** The parent component declares an instance of the generic child with a specific type argument. This provides type safety within the `<script>` block.
-    ```typescript
-    // In OfferingForm.svelte
-    let formShell: InstanceType<typeof FormShell<WholesalerItemOffering_ProductDef_Category>>;
-    ```
+#### `$derived(...)` - The Macro
+- **What it is:** A compile-time macro. The Svelte compiler transforms this code at build time.
+- **How to access:** The variable holds the **direct value**. You access it directly: `if (myDerivedValue) { ... }`.
+- **When to use:** This should be the default choice for simple, inline derivations. It's cleaner and more concise.
+- **Pitfall:** Because it's a compiler macro, the TypeScript Language Server can sometimes get confused and incorrectly infer that the variable is a function (`() => ...`), leading to "false positive" type errors in the editor, even though the code would compile and run correctly.
 
-2.  **Explicit Prop Casting:** The parent passes its initial data to the generic component with an explicit `as` cast. This ensures the generic component is instantiated with the correct, specific type.
-    ```svelte
-    // In OfferingForm.svelte
-    <FormShell
-        initial={initialValidatedOfferingData as WholesalerItemOffering_ProductDef_Category}
-        ...
-    />
-    ```
+#### `$derived.by(...)` - The Function
+- **What it is:** An explicit, regular function that is executed at runtime. It does not get transformed.
+- **How to access:** The variable holds a **signal object**, which is a getter function. To get the current value, you **must call it**: `if (myDerivedValue()) { ... }`.
+- **When to use:** Use this more explicit form when the `$derived` macro causes incorrect type errors from the tooling, or when the derivation logic is complex and needs to be passed as a function.
 
-By using this pattern, the `data` object passed back into the snippet from `FormShell` retains its specific type (`WholesalerItemOffering_ProductDef_Category`). This guarantees that any access to its properties (e.g., `data.product_def_title`) is fully type-checked by the compiler, preventing runtime errors and maintaining architectural integrity.
+**Recommendation:** Start with the `$derived` macro for its simplicity. If you encounter inexplicable TypeScript errors related to a "function being assigned to a value", switch to `$derived.by(...)` and remember to access the value with `()`.
 
 ---
 
 ## TODOS (UPDATED)
-* **`SupplierDetailPage`:** Implement a suitable `handleSubmitted` function, analogous to the one in `OfferingDetailWrapper`. It must trigger a `goto` call to the new "edit mode" URL after a successful entity creation. This is required to enable category assignments for the new supplier.
-* Add routes for adding new objects: suppliers, offerings
+* Check if necessary: Add routes for adding new objects: suppliers, offerings
 *   **Finalize CSS Refactoring:** Ensure all pages correctly import and use the new pattern-based CSS files (`detail-page-layout.css`, etc.) and that all duplicate local styles have been removed.
 *   **Audit API Clients for SSR Safety:** Verify that all `LoadingState` method calls (`.start()`, `.finish` are wrapped in an `if (browser)` check.
 *   **Audit `load` Functions:** Verify that all `load` functions correctly pass the `fetch` function from the `LoadEvent` to the `ApiClient`.
 *   **Audit Deletion Logic:** Verify that all `deleteStrategy` implementations use the "fire-and-forget" `invalidateAll()` pattern to prevent UI race conditions.
 *   **Fix scaffolding tool:** Ensure the `+page.ts` template generates extension-less imports for module delegation.
-```

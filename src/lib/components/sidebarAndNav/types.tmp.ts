@@ -12,18 +12,18 @@ export type HierarchyTreeNode = {
 
 export type HierarchyItem = {
   // "Configure-time"
-  key: "suppliers" | "categories" | "offerings" | "attributes" | "links" | (string & {});
+  key: string;
   label: string; // already includes counts if you want (e.g. "Suppliers (5)")
   count?: number | null; // optional separate count, shows as a badge if provided
   disabled?: boolean;
-  level?: number | undefined; // 0..3 for indentation
-  urlParamName?: string | undefined; // For URL-Building "supplierId", "categoryId", etc.
-
-  // Only runtime!!!
-  href: string;
-  urlParamValue?: string | number | undefined;
+  urlParamName: "leaf" | string; // For URL-Building "supplierId", "categoryId", etc.
 };
 
+// Will be in "hierarchyConfig.ts"
+export type AppSpecificHierarchyItem = HierarchyItem & {
+  key: "suppliers" | "categories" | "offerings" | "attributes" | "links";
+  urlParamName: "supplierId" | "categoryId" | "offeringId" | "leaf";
+};
 
 export type RuntimeHierarchyTree = {
   name: string;
@@ -36,6 +36,7 @@ export type RuntimeHierarchyTreeNode = {
 };
 
 export type RuntimeHierarchyItem = HierarchyItem & {
-  urlParamValue: string | number | undefined;
+  urlParamValue: string | number | "leaf";
+  level: number | undefined; // 0..3 for indentation
   // href will be built based on urlParamName and urlParamValue
 };

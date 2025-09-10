@@ -96,11 +96,16 @@ export function buildSupplierHierarchy(finalUiPath: {
 
     // Build href for this node - it should link to this node's level
     // preserving context from higher levels
-    node.item.href = buildUrlFromNavigationPath(currentPath, {
-      supplierId: finalUiPath.supplierId,
-      categoryId: finalUiPath.categoryId,
-      offeringId: finalUiPath.offeringId,
-    });
+    // Level "0" is always without context
+    if (node.item.level === 0) {
+      node.item.href = `/${node.item.key}`; // /suppliers
+    } else {
+      node.item.href = buildUrlFromNavigationPath(currentPath, {
+        supplierId: finalUiPath.supplierId,
+        categoryId: finalUiPath.categoryId,
+        offeringId: finalUiPath.offeringId,
+      });
+    }
 
     // Recursively set hrefs for children
     if (node.items) {

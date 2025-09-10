@@ -73,10 +73,10 @@ function getNodeLevel(node: HierarchyTreeNode): number {
 
 /**
  * Core navigation function: selects a node with context preservation logic
- * This implements the same logic as the original +layout.ts but in a generic way
+ * This implements the correct back-navigation and context preservation behavior
  * 
  * CONTEXT PRESERVATION RULES:
- * 1. If clicking the same node that's already at that level → preserve deeper context (no change)
+ * 1. If clicking the same node that's already at that level → navigate TO that level (back navigation)
  * 2. If clicking a different node at an existing level → reset all deeper levels  
  * 3. If extending to a new level → add the node to the path
  * 
@@ -88,7 +88,7 @@ export function selectNode(node: HierarchyTreeNode): void {
   navigationState.update(state => {
     // Can't navigate without an active tree
     if (!state.activeTree) {
-      console.warn('No active tree - cannot select node');
+      log.error('No active tree - cannot select node');
       return state;
     }
     
@@ -99,12 +99,23 @@ export function selectNode(node: HierarchyTreeNode): void {
     if (nodeLevel < currentPath.length) {
       const existingNodeAtLevel = currentPath[nodeLevel];
       
-      // CASE 1A: Same node at same level → preserve deeper context
+      // CASE 1A: Same node at same level → navigate TO this level (back navigation)
       if (nodesEqual(existingNodeAtLevel, node)) {
-        // No change needed - user clicked the same node they're already at
-        // This preserves any deeper navigation context
-        console.debug('Same node clicked, preserving deeper context');
-        return state;
+        // User clicked a level they're already at - truncate to that level
+        // This enables back navigation: /suppliers/3/categories/5 → click "suppliers" → /suppliers/3
+        const newPath = currentPath.slice(0, nodeLevel + 1);
+        
+        log.debug(`Back navigation to level ${nodeLevel}, truncating deeper levels`);
+        
+        // Update the tree paths map to remember this change
+        const updatedTreePaths = new Map(state.treePaths);
+        updatedTreePaths.set(state.activeTree.name, newPath);
+        
+        return {
+          ...state,
+          activePath: newPath,
+          treePaths: updatedTreePaths
+        };
       }
       
       // CASE 1B: Different node at existing level → reset deeper levels
@@ -114,7 +125,7 @@ export function selectNode(node: HierarchyTreeNode): void {
         newPath.push(node); // Add the new node at this level
         // Everything deeper is automatically removed by slice()
         
-        console.debug(`Different node at level ${nodeLevel}, resetting deeper levels`);
+        log.debug(`Different node at level ${nodeLevel}, resetting deeper levels`);
         
         // Update the tree paths map to remember this change
         const updatedTreePaths = new Map(state.treePaths);
@@ -133,7 +144,7 @@ export function selectNode(node: HierarchyTreeNode): void {
       // User is navigating deeper - add this node to the end of the path
       const newPath = [...currentPath, node];
       
-      console.debug(`Extending path to level ${nodeLevel}`);
+      log.debug(`Extending path to level ${nodeLevel}`);
       
       // Update the tree paths map
       const updatedTreePaths = new Map(state.treePaths);
@@ -148,7 +159,7 @@ export function selectNode(node: HierarchyTreeNode): void {
     
     // CASE 3: Gap in levels (shouldn't happen with proper UI, but handle gracefully)
     else {
-      console.warn(`Navigation level gap detected: current depth ${currentPath.length}, selected level ${nodeLevel}`);
+      log.error(`Navigation level gap detected: current depth ${currentPath.length}, selected level ${nodeLevel}`);
       
       // Create a path up to the selected level
       // Fill missing levels would be dangerous, so just truncate and add the node
@@ -182,7 +193,7 @@ export function setActiveTreePath(tree: HierarchyTree, path: HierarchyTreeNode[]
     const updatedTreePaths = new Map(state.treePaths);
     if (state.activeTree && state.activePath.length > 0) {
       updatedTreePaths.set(state.activeTree.name, [...state.activePath]);
-      console.debug(`Stored path for previous tree: ${state.activeTree.name}`);
+      log.debug(`Stored path for previous tree: ${state.activeTree.name}`);
     }
     
     return {
@@ -202,18 +213,18 @@ export function setActiveTreePath(tree: HierarchyTree, path: HierarchyTreeNode[]
  */
 export function switchToTree(tree: HierarchyTree): void {
   navigationState.update(state => {
-    console.debug(`Switching to tree: ${tree.name}`);
+    log.debug(`Switching to tree: ${tree.name}`);
     
     // Store current path for the previously active tree
     const updatedTreePaths = new Map(state.treePaths);
     if (state.activeTree && state.activePath.length > 0) {
       updatedTreePaths.set(state.activeTree.name, [...state.activePath]);
-      console.debug(`Stored path for previous tree: ${state.activeTree.name}, depth: ${state.activePath.length}`);
+      log.debug(`Stored path for previous tree: ${state.activeTree.name}, depth: ${state.activePath.length}`);
     }
     
     // Restore the saved path for the new tree (or start with empty path)
     const restoredPath = state.treePaths.get(tree.name) ?? [];
-    console.debug(`Restored path for new tree: ${tree.name}, depth: ${restoredPath.length}`);
+    log.debug(`Restored path for new tree: ${tree.name}, depth: ${restoredPath.length}`);
     
     return {
       ...state,
@@ -229,7 +240,7 @@ export function switchToTree(tree: HierarchyTree): void {
  * Clears all trees, paths, and stored context
  */
 export function resetNavigationState(): void {
-  console.debug('Resetting navigation state');
+  log.debug('⚠️ Resetting navigation state');
   navigationState.set(initialState);
 }
 

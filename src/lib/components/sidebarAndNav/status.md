@@ -93,20 +93,12 @@ const supplierHierarchy: HierarchyTree = {
 ## **⚠️ Aktuelle Probleme (Runtime Bugs)**
 
 ### **1. ActiveLevel Logic Bug** 🔴
-```typescript
-// Bei /suppliers/3:
-// Erwartung: "categories" markiert 
-// Realität: "suppliers" markiert
+Rücknavigation level N+1 => level N: nicht korrekt
+Sollzustand: 
+* Der nav-state bleibt erhalten.
+* erst wenn ein anderes element der ebene N gewählt wird (zb. supplier) => reset nav-state 
 
-// Problem in determineActiveLevel() funktion
-function determineActiveLevel(navigationPath, tree, leaf) {
-  // BUG: Logik zeigt falschen Level
-}
-```
 
-### **2. Breadcrumbs möglicherweise broken** 🔴
-- Breadcrumbs verschwunden oder falsch angezeigt
-- Legacy buildBreadcrumb() integration issue?
 
 ### **3. URL-Parsing Edge Cases** 🟡  
 - Leaf page detection funktioniert?
@@ -116,21 +108,12 @@ function determineActiveLevel(navigationPath, tree, leaf) {
 
 ## **📋 Debugging Needed**
 
-### **1. ActiveLevel Debug**
-```typescript
-// In +layout.ts hinzufügen:
-console.log("DEBUG determineActiveLevel:", {
-  navigationPath: navigationPath.map(n => n.item.key),
-  currentDepth: navigationPath.length,
-  nextNode: findNodeAtLevel(tree, currentDepth)?.item.key,
-  result: activeLevel
-});
-```
+``
 
 ### **2. NavigationPath Validation**
 ```typescript
 // Prüfen ob buildNavigationPath() korrekte Pfade baut
-console.log("Navigation path built:", navigationPath.map(n => ({ 
+log.log("Navigation path built:", navigationPath.map(n => ({ 
   key: n.item.key, 
   level: n.item.level,
   urlParamName: n.item.urlParamName 
@@ -140,7 +123,7 @@ console.log("Navigation path built:", navigationPath.map(n => ({
 ### **3. Breadcrumb Data Check**
 ```typescript
 // In Layout.svelte:
-console.log("Breadcrumb items:", breadcrumbItems);
+log.log("Breadcrumb items:", breadcrumbItems);
 ```
 
 ---

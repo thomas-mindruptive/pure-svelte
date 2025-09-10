@@ -17,5 +17,5 @@
     disabled?: boolean;
     level?: number | undefined; // 0..3 for indentation
     href: string;
-    paramName?: string;    // For URL-Building "supplierId", "categoryId", etc.
+    urlParamName?: string | undefined;    // For URL-Building "supplierId", "categoryId", etc.
   };

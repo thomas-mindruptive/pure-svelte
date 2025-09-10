@@ -1,186 +1,82 @@
 import type { HierarchyTree, HierarchyTreeNode, Hierarchy } from "$lib/components/sidebarAndNav/HierarchySidebar.types";
+import { initLevels, buildUrlFromNavigationPath } from "$lib/components/sidebarAndNav/hierarchyUtils";
 
-// === LEVEL INITIALIZATION UTILITY =============================================================
-
-/**
- * Recursively sets the level property on all nodes in a hierarchy tree
- * This ensures that each node has the correct level for the NavigationState logic
- *
- * Level meanings:
- * - Level 0: Root node (e.g., "suppliers")
- * - Level 1: First child level (e.g., "categories")
- * - Level 2: Second child level (e.g., "offerings")
- * - Level 3+: Deeper child levels (e.g., "attributes", "links")
- *
- * @param tree The hierarchy tree to process
- * @returns The same tree with levels properly set on all nodes
- */
-export function initLevels(tree: HierarchyTree): HierarchyTree {
-  /**
-   * Recursively sets levels starting from the given node
-   *
-   * @param node The current node to set level for
-   * @param level The level to assign to this node
-   */
-  function setNodeLevels(node: HierarchyTreeNode, level: number): void {
-    // Set the level on this node's item
-    node.item.level = level;
-
-    // Recursively set levels on all children (if any)
-    if (node.items && node.items.length > 0) {
-      for (const childNode of node.items) {
-        setNodeLevels(childNode, level + 1);
-      }
-    }
-  }
-
-  // Start setting levels from the root node at level 0
-  setNodeLevels(tree.rootItem, 0);
-
-  return tree;
-}
-
-// === HIERARCHY DEFINITIONS ====================================================================
-
-/**
- * Supplier hierarchy tree definition
- * Defines the navigation structure for supplier-related pages
- *
- * Structure:
- * Suppliers (level 0)
- *   └── Categories (level 1)
- *       └── Offerings (level 2)
- *           ├── Attributes (level 3)
- *           └── Links (level 3)
- *
- * Note: The level properties will be set automatically by initLevels()
- * Note: disabled and href properties are set based on current navigation context in +layout.ts
- */
-export const supplierHierarchyTemplate: HierarchyTree = {
-  name: "suppliers",
-  rootItem: {
-    item: {
-      key: "suppliers",
-      label: "Suppliers",
-      disabled: false,
-      level: undefined, // Will be set by initLevels()
-      href: "/suppliers",
-    },
-    items: [
-      {
-        item: {
-          key: "categories",
-          label: "Categories",
-          disabled: false, // Will be updated based on context
-          level: undefined, // Will be set by initLevels()
-          href: "#", // Will be updated based on context
-        },
-        items: [
-          {
-            item: {
-              key: "offerings",
-              label: "Offerings",
-              disabled: false, // Will be updated based on context
-              level: undefined, // Will be set by initLevels()
-              href: "#", // Will be updated based on context
-            },
-            items: [
-              {
-                item: {
-                  key: "attributes",
-                  label: "Attributes",
-                  disabled: false, // Will be updated based on context
-                  level: undefined, // Will be set by initLevels()
-                  href: "#", // Will be updated based on context
-                },
-              },
-              {
-                item: {
-                  key: "links",
-                  label: "Links",
-                  disabled: false, // Will be updated based on context
-                  level: undefined, // Will be set by initLevels()
-                  href: "#", // Will be updated based on context
-                },
-              },
-            ],
-          },
-        ],
-      },
-    ],
-  },
-};
-
-// === HIERARCHY BUILDER ========================================================================
+// === SUPPLIER HIERARCHY BUILDER ===============================================================
 
 /**
  * Creates the supplier hierarchy with proper context-sensitive properties
  * This function builds the hierarchy tree with the correct disabled states and hrefs
  * based on the current navigation path
  *
+ * IMPORTANT: The 'key' properties in this hierarchy MUST match URL path segments exactly
+ * for routing to work correctly. For example:
+ * - key: "suppliers" → URL segment "/suppliers"
+ * - key: "categories" → URL segment "/categories"
+ * - key: "offerings" → URL segment "/offerings"
+ *
  * @param finalUiPath The current navigation path containing IDs for supplier, category, offering
- * @returns Complete hierarchy tree ready for use
+ * @returns Complete hierarchy tree ready for use with levels and hrefs set
  */
 export function buildSupplierHierarchy(finalUiPath: {
   supplierId: number | null;
   categoryId: number | null;
   offeringId: number | null;
+  leaf: "attributes" | "links" | null;
 }): HierarchyTree {
-  // Build the dynamic paths based on current navigation context
-  const supplierPath = finalUiPath.supplierId ? `/suppliers/${finalUiPath.supplierId}` : "#";
-  const categoryPath =
-    finalUiPath.supplierId && finalUiPath.categoryId ? `/suppliers/${finalUiPath.supplierId}/categories/${finalUiPath.categoryId}` : "#";
-  const offeringPathBase =
-    finalUiPath.supplierId && finalUiPath.categoryId && finalUiPath.offeringId
-      ? `/suppliers/${finalUiPath.supplierId}/categories/${finalUiPath.categoryId}/offerings/${finalUiPath.offeringId}`
-      : "#";
+  // Create the base hierarchy structure
+  // Note: levels will be set by initLevels(), hrefs will be built dynamically
 
-  // Create the hierarchy with context-sensitive properties
+  // prettier-ignore
   const supplierHierarchy: HierarchyTree = {
     name: "suppliers",
     rootItem: {
       item: {
-        key: "suppliers",
+        key: "suppliers",                               // ⚠️ MUST match URL segment: /suppliers
         label: "Suppliers",
         disabled: false,
-        level: undefined, // Will be set by initLevels()
-        href: "/suppliers",
+        level: undefined,                               // Will be set by initLevels()
+        href: "/suppliers",                             // Static - always goes to suppliers list
+        urlParamName: "supplierId",                     // ⚠️ Parameter name for IDs at this level - MUST match route url param name!
       },
       items: [
         {
           item: {
-            key: "categories",
+            key: "categories",                          // ⚠️ MUST match URL segment: /categories
             label: "Categories",
-            disabled: !finalUiPath.supplierId, // Disabled if no supplier selected
-            level: undefined, // Will be set by initLevels()
-            href: supplierPath,
+            disabled: !finalUiPath.supplierId,          // Disabled if no supplier selected
+            level: undefined,                           // Will be set by initLevels()
+            href: "#",                                  // Will be set dynamically below
+            urlParamName: "categoryId",                 //  ⚠️Parameter name for IDs at this level - MUST match route url param name!
           },
           items: [
             {
               item: {
-                key: "offerings",
+                key: "offerings",                        // ⚠️MUST match URL segment: /offerings
                 label: "Offerings",
-                disabled: !finalUiPath.categoryId, // Disabled if no category selected
-                level: undefined, // Will be set by initLevels()
-                href: categoryPath,
+                disabled: !finalUiPath.categoryId,       // Disabled if no category selected
+                level: undefined,                        // Will be set by initLevels()
+                href: "#",                               // Will be set dynamically below
+                urlParamName: "offeringId",              //  ⚠️Parameter name for IDs at this level - MUST match route url param name!
               },
               items: [
                 {
                   item: {
-                    key: "attributes",
+                    key: "attributes",                   // MUST match URL segment: /attributes
                     label: "Attributes",
-                    disabled: !finalUiPath.offeringId, // Disabled if no offering selected
-                    level: undefined, // Will be set by initLevels()
-                    href: offeringPathBase === "#" ? "#" : `${offeringPathBase}/attributes`,
+                    disabled: !finalUiPath.offeringId,   // Disabled if no offering selected
+                    level: undefined,                    // Will be set by initLevels()
+                    href: "#",                           // Will be set dynamically below
+                    urlParamName: undefined,             // Leaf pages don't have IDs
                   },
                 },
                 {
                   item: {
-                    key: "links",
+                    key: "links",                       // MUST match URL segment: /links
                     label: "Links",
-                    disabled: !finalUiPath.offeringId, // Disabled if no offering selected
-                    level: undefined, // Will be set by initLevels()
-                    href: offeringPathBase === "#" ? "#" : `${offeringPathBase}/links`,
+                    disabled: !finalUiPath.offeringId,  // Disabled if no offering selected
+                    level: undefined,                   // Will be set by initLevels()
+                    href: "#",                          // Will be set dynamically below
+                    urlParamName: undefined,            // Leaf pages don't have IDs
                   },
                 },
               ],
@@ -191,30 +87,62 @@ export function buildSupplierHierarchy(finalUiPath: {
     },
   };
 
-  // Initialize levels before returning
-  return initLevels(supplierHierarchy);
+  // Initialize levels first so we can use them for href building
+  const hierarchyWithLevels = initLevels(supplierHierarchy);
+
+  // Now build hrefs for each node based on current context
+  // We need to traverse the tree and set hrefs dynamically
+  function setHrefsRecursively(node: HierarchyTreeNode, pathSoFar: HierarchyTreeNode[]): void {
+    const currentPath = [...pathSoFar, node];
+
+    // Build href for this node - it should link to this node's level
+    // preserving context from higher levels
+    node.item.href = buildUrlFromNavigationPath(currentPath, {
+      supplierId: finalUiPath.supplierId,
+      categoryId: finalUiPath.categoryId,
+      offeringId: finalUiPath.offeringId,
+    });
+
+    // Recursively set hrefs for children
+    if (node.items) {
+      for (const childNode of node.items) {
+        setHrefsRecursively(childNode, currentPath);
+      }
+    }
+  }
+
+  // Set hrefs starting from root with empty path
+  setHrefsRecursively(hierarchyWithLevels.rootItem, []);
+
+  return hierarchyWithLevels;
 }
 
-// === EXPORTED HIERARCHY =======================================================================
+// === MAIN HIERARCHY BUILDER ===================================================================
 
 /**
- * Main hierarchy array containing all available trees
- * Currently only contains the supplier hierarchy, but can be extended
+ * Main function to build the complete hierarchy array
+ * Currently only contains the supplier hierarchy, but designed to be extensible
  *
  * To add more trees:
- * 1. Create a new tree definition (like supplierHierarchyTemplate)
- * 2. Create a builder function (like buildSupplierHierarchy)
- * 3. Add the built tree to this array in +layout.ts
+ * 1. Create a new builder function (like buildSupplierHierarchy)
+ * 2. Add it to the returned array
  *
- * Example future trees:
- * - Product categories hierarchy
- * - Settings/configuration hierarchy
- * - User management hierarchy
+ * @param finalUiPath The current navigation context for building context-sensitive properties
+ * @returns Complete hierarchy array with all available trees
+ *
+ * @example
+ * // Future expansion:
+ * return [
+ *   buildSupplierHierarchy(finalUiPath),
+ *   buildProductHierarchy(productPath),
+ *   buildSettingsHierarchy(settingsPath)
+ * ];
  */
 export function buildHierarchy(finalUiPath: {
   supplierId: number | null;
   categoryId: number | null;
   offeringId: number | null;
+  leaf: "attributes" | "links" | null;
 }): Hierarchy {
   return [
     buildSupplierHierarchy(finalUiPath),
@@ -222,4 +150,65 @@ export function buildHierarchy(finalUiPath: {
     // buildProductHierarchy(productPath),
     // buildSettingsHierarchy(settingsPath)
   ];
+}
+
+// === URL PARSING UTILITIES ====================================================================
+
+/**
+ * Parses a URL path and extracts parameters for the supplier hierarchy
+ * This is the reverse operation of buildUrlFromNavigationPath
+ *
+ * @param urlPath The URL path to parse (e.g., "/suppliers/123/categories/456/offerings/789/attributes")
+ * @returns Object containing the extracted parameters
+ *
+ * @example
+ * parseSupplierUrl("/suppliers/123/categories/456/offerings/789/attributes")
+ * // → { supplierId: 123, categoryId: 456, offeringId: 789, leaf: "attributes" }
+ */
+export function parseSupplierUrl(urlPath: string): {
+  supplierId: number | null;
+  categoryId: number | null;
+  offeringId: number | null;
+  leaf: "attributes" | "links" | null;
+} {
+  const segments = urlPath.split("/").filter((segment) => segment.length > 0);
+
+  const result = {
+    supplierId: null as number | null,
+    categoryId: null as number | null,
+    offeringId: null as number | null,
+    leaf: null as "attributes" | "links" | null,
+  };
+
+  // Parse segments in expected order: suppliers, {id}, categories, {id}, offerings, {id}, {leaf}
+  for (let i = 0; i < segments.length; i++) {
+    const segment = segments[i];
+
+    if (segment === "suppliers" && i + 1 < segments.length) {
+      const idStr = segments[i + 1];
+      const id = parseInt(idStr, 10);
+      if (!isNaN(id)) {
+        result.supplierId = id;
+        i++; // Skip the ID segment
+      }
+    } else if (segment === "categories" && i + 1 < segments.length) {
+      const idStr = segments[i + 1];
+      const id = parseInt(idStr, 10);
+      if (!isNaN(id)) {
+        result.categoryId = id;
+        i++; // Skip the ID segment
+      }
+    } else if (segment === "offerings" && i + 1 < segments.length) {
+      const idStr = segments[i + 1];
+      const id = parseInt(idStr, 10);
+      if (!isNaN(id)) {
+        result.offeringId = id;
+        i++; // Skip the ID segment
+      }
+    } else if (segment === "attributes" || segment === "links") {
+      result.leaf = segment;
+    }
+  }
+
+  return result;
 }

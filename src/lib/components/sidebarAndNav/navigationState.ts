@@ -125,13 +125,19 @@ export interface NavigationState {
    * - Switch back to suppliers → restore supplier NavigationContext
    */
   allTrees: Map<RuntimeHierarchyTree, NavigationPathTree>;
+
+  /**
+   * This is the sidebar item that should be marked as "current".
+   */
+  activeViewKey: string | null;
 }
 
 // === INITIAL STATE ===========================================================================================
 
 const initialState: NavigationState = {
   activeTree: null,
-  allTrees: new Map()
+  allTrees: new Map(),
+  activeViewKey: null
 };
 
 // === EXPORTED STORE ==========================================================================================
@@ -391,6 +397,18 @@ export function selectNode(
 }
 
 /**
+ * Explicitly sets the key for the upcoming active view.
+ * This is called from the UI just before navigation to signal intent.
+ * @param key The item key of the node that should become active.
+ */
+export function setActiveViewKey(key: string | null): void {
+	navigationState.update((state) => {
+		log.debug(`NavigationState: Setting activeViewKey to '${key}'`);
+		return { ...state, activeViewKey: key };
+	});
+}
+
+/**
  * Sets the active tree and optionally a specific path within it.
  * Used during initial navigation state setup and tree switching.
  * 
@@ -402,7 +420,7 @@ export function selectNode(
  */
 export function setActiveTreePath(runtimeTree: RuntimeHierarchyTree, paths: RuntimeHierarchyTreeNode[] = []): void {
   navigationState.update(state => {
-    log.debug(`NavigationState: Setting active tree: ${runtimeTree.name}, paths length: ${paths.length}`);
+    log.debug(`NavigationState: Setting active tree: ${runtimeTree.name}, paths length: ${paths.length}`, paths);
     
     // Store the current tree state before switching (if any)
     const updatedAllTrees = new Map(state.allTrees);
@@ -542,6 +560,10 @@ export function getStoredTreePaths(state: NavigationState): Record<string, { dep
   }
   
   return result;
+}
+
+export function getNavState() {
+
 }
 
 // === DEVELOPMENT VALIDATION ==================================================================================

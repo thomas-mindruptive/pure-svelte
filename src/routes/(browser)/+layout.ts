@@ -8,7 +8,6 @@ import { getCategoryApi } from '$lib/api/client/category';
 import { getOfferingApi } from '$lib/api/client/offering';
 import { buildBreadcrumb } from '$lib/components/sidebarAndNav/buildBreadcrumb';
 import type {
-	HierarchyTree,
 	RuntimeHierarchyTree,
 	RuntimeHierarchyTreeNode
 } from '$lib/components/sidebarAndNav/HierarchySidebar.types';
@@ -18,7 +17,6 @@ import {
 	buildNavigationPath,
 	convertToRuntimeTree,
 	extractLeafFromUrl,
-	findNodeAtLevel,
 	parseUrlParameters,
 	updateRuntimeHierarchyParameters
 } from '$lib/components/sidebarAndNav/hierarchyUtils';

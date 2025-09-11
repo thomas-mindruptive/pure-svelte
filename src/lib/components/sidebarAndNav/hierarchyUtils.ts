@@ -1,13 +1,14 @@
 // File: src/lib/components/sidebarAndNav/hierarchyUtils.ts
 
+import { log } from "$lib/utils/logger";
 import type {
-	Hierarchy,
-	HierarchyItem,
-	HierarchyTree,
-	RuntimeHierarchyItem,
-	RuntimeHierarchyTree,
-	RuntimeHierarchyTreeNode
-} from './HierarchySidebar.types';
+  Hierarchy,
+  HierarchyItem,
+  HierarchyTree,
+  RuntimeHierarchyItem,
+  RuntimeHierarchyTree,
+  RuntimeHierarchyTreeNode,
+} from "./HierarchySidebar.types";
 
 // === TYPE ALIASES FOR STRICT TYPING ============================================================
 
@@ -16,9 +17,9 @@ import type {
  * This avoids circular references found in type aliases and eliminates the need for `any`.
  */
 interface GenericStaticNode {
-	item: HierarchyItem<string>;
-	children?: readonly GenericStaticNode[];
-	defaultChild?: string;
+  item: HierarchyItem<string>;
+  children?: readonly GenericStaticNode[];
+  defaultChild?: string;
 }
 
 // === CORE UTILITIES ============================================================================
@@ -29,15 +30,12 @@ interface GenericStaticNode {
  * @param params The parameters object from the URL.
  * @returns The resolved value or "leaf" if the parameter is not found.
  */
-function resolveUrlParamValue(
-	urlParamName: string,
-	params: Record<string, string | number | null>
-): string | number | 'leaf' {
-	if (urlParamName === 'leaf') {
-		return 'leaf';
-	}
-	const value = params[urlParamName];
-	return value ?? 'leaf'; // Fallback to "leaf" if parameter not found
+function resolveUrlParamValue(urlParamName: string, params: Record<string, string | number | null>): string | number | "leaf" {
+  if (urlParamName === "leaf") {
+    return "leaf";
+  }
+  const value = params[urlParamName];
+  return value ?? "leaf"; // Fallback to "leaf" if parameter not found
 }
 
 // === PARAMETER UPDATE LOGIC ====================================================================
@@ -47,16 +45,13 @@ function resolveUrlParamValue(
  * @param node The runtime node to update.
  * @param params The URL parameters object.
  */
-function updateNodeParameters(
-	node: RuntimeHierarchyTreeNode,
-	params: Record<string, string | number | null>
-): void {
-	node.item.urlParamValue = resolveUrlParamValue(node.item.urlParamName, params);
-	if (node.children) {
-		for (const child of node.children) {
-			updateNodeParameters(child, params);
-		}
-	}
+function updateNodeParameters(node: RuntimeHierarchyTreeNode, params: Record<string, string | number | null>): void {
+  node.item.urlParamValue = resolveUrlParamValue(node.item.urlParamName, params);
+  if (node.children) {
+    for (const child of node.children) {
+      updateNodeParameters(child, params);
+    }
+  }
 }
 
 /**
@@ -67,13 +62,13 @@ function updateNodeParameters(
  * @returns The same, but modified, array of runtime hierarchies.
  */
 export function updateRuntimeHierarchyParameters(
-	runtimeHierarchies: RuntimeHierarchyTree[],
-	params: Record<string, string | number | null>
+  runtimeHierarchies: RuntimeHierarchyTree[],
+  params: Record<string, string | number | null>,
 ): RuntimeHierarchyTree[] {
-	for (const tree of runtimeHierarchies) {
-		updateNodeParameters(tree.rootItem, params);
-	}
-	return runtimeHierarchies;
+  for (const tree of runtimeHierarchies) {
+    updateNodeParameters(tree.rootItem, params);
+  }
+  return runtimeHierarchies;
 }
 
 // === INITIAL CREATION LOGIC ====================================================================
@@ -84,17 +79,17 @@ export function updateRuntimeHierarchyParameters(
  * @returns A new RuntimeHierarchyTreeNode.
  */
 function convertNodeToRuntime(staticNode: GenericStaticNode): RuntimeHierarchyTreeNode {
-	const runtimeItem: RuntimeHierarchyItem = {
-		...staticNode.item,
-		urlParamValue: 'leaf',
-		level: undefined
-	};
-	const runtimeChildren = staticNode.children?.map((child) => convertNodeToRuntime(child));
-	return {
-		item: runtimeItem,
-		children: runtimeChildren,
-		defaultChild: staticNode.defaultChild
-	};
+  const runtimeItem: RuntimeHierarchyItem = {
+    ...staticNode.item,
+    urlParamValue: "leaf",
+    level: undefined,
+  };
+  const runtimeChildren = staticNode.children?.map((child) => convertNodeToRuntime(child));
+  return {
+    item: runtimeItem,
+    children: runtimeChildren,
+    defaultChild: staticNode.defaultChild,
+  };
 }
 
 /**
@@ -103,12 +98,12 @@ function convertNodeToRuntime(staticNode: GenericStaticNode): RuntimeHierarchyTr
  * @returns An initial RuntimeHierarchyTree without specific parameter values.
  */
 export function convertToRuntimeTree(staticTree: HierarchyTree): RuntimeHierarchyTree {
-	const runtimeTree: RuntimeHierarchyTree = {
-		name: staticTree.name,
-		rootItem: convertNodeToRuntime(staticTree.rootItem as unknown as GenericStaticNode)
-	};
-	initLevels(runtimeTree);
-	return runtimeTree;
+  const runtimeTree: RuntimeHierarchyTree = {
+    name: staticTree.name,
+    rootItem: convertNodeToRuntime(staticTree.rootItem as unknown as GenericStaticNode),
+  };
+  initLevels(runtimeTree);
+  return runtimeTree;
 }
 
 // === COMBINED BUILD FUNCTION ===================================================================
@@ -122,11 +117,11 @@ export function convertToRuntimeTree(staticTree: HierarchyTree): RuntimeHierarch
  * @returns A new array of RuntimeHierarchyTree with urlParamValues and levels set.
  */
 export function buildRuntimeHierarchy(
-	staticHierarchies: Hierarchy,
-	params: Record<string, string | number | null>
+  staticHierarchies: Hierarchy,
+  params: Record<string, string | number | null>,
 ): RuntimeHierarchyTree[] {
-	const initialHierarchies = staticHierarchies.map((tree) => convertToRuntimeTree(tree));
-	return updateRuntimeHierarchyParameters(initialHierarchies, params);
+  const initialHierarchies = staticHierarchies.map((tree) => convertToRuntimeTree(tree));
+  return updateRuntimeHierarchyParameters(initialHierarchies, params);
 }
 
 // === HIERARCHY UTILITIES =======================================================================
@@ -138,16 +133,16 @@ export function buildRuntimeHierarchy(
  * @returns The same tree instance with levels set.
  */
 export function initLevels(tree: RuntimeHierarchyTree): RuntimeHierarchyTree {
-	function setNodeLevels(node: RuntimeHierarchyTreeNode, level: number): void {
-		node.item.level = level;
-		if (node.children && node.children.length > 0) {
-			for (const childNode of node.children) {
-				setNodeLevels(childNode, level + 1);
-			}
-		}
-	}
-	setNodeLevels(tree.rootItem, 0);
-	return tree;
+  function setNodeLevels(node: RuntimeHierarchyTreeNode, level: number): void {
+    node.item.level = level;
+    if (node.children && node.children.length > 0) {
+      for (const childNode of node.children) {
+        setNodeLevels(childNode, level + 1);
+      }
+    }
+  }
+  setNodeLevels(tree.rootItem, 0);
+  return tree;
 }
 
 /**
@@ -157,24 +152,20 @@ export function initLevels(tree: RuntimeHierarchyTree): RuntimeHierarchyTree {
  * @param level The level to search at.
  * @returns The found node or null if not found.
  */
-export function findNodeInTree(
-	tree: RuntimeHierarchyTree,
-	key: string,
-	level: number
-): RuntimeHierarchyTreeNode | null {
-	function searchNode(node: RuntimeHierarchyTreeNode): RuntimeHierarchyTreeNode | null {
-		if (node.item.key === key && (node.item.level ?? 0) === level) {
-			return node;
-		}
-		if (node.children) {
-			for (const child of node.children) {
-				const found = searchNode(child);
-				if (found) return found;
-			}
-		}
-		return null;
-	}
-	return searchNode(tree.rootItem);
+export function findNodeInTree(tree: RuntimeHierarchyTree, key: string, level: number): RuntimeHierarchyTreeNode | null {
+  function searchNode(node: RuntimeHierarchyTreeNode): RuntimeHierarchyTreeNode | null {
+    if (node.item.key === key && (node.item.level ?? 0) === level) {
+      return node;
+    }
+    if (node.children) {
+      for (const child of node.children) {
+        const found = searchNode(child);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+  return searchNode(tree.rootItem);
 }
 
 /**
@@ -183,26 +174,20 @@ export function findNodeInTree(
  * @param targetLevel The level to find a node at.
  * @returns The node at that level or null if not found.
  */
-export function findNodeAtLevel(
-	tree: RuntimeHierarchyTree,
-	targetLevel: number
-): RuntimeHierarchyTreeNode | null {
-	function searchAtLevel(
-		node: RuntimeHierarchyTreeNode,
-		currentLevel: number
-	): RuntimeHierarchyTreeNode | null {
-		if (currentLevel === targetLevel) {
-			return node;
-		}
-		if (node.children && currentLevel < targetLevel) {
-			for (const child of node.children) {
-				const found = searchAtLevel(child, currentLevel + 1);
-				if (found) return found;
-			}
-		}
-		return null;
-	}
-	return searchAtLevel(tree.rootItem, 0);
+export function findNodeAtLevel(tree: RuntimeHierarchyTree, targetLevel: number): RuntimeHierarchyTreeNode | null {
+  function searchAtLevel(node: RuntimeHierarchyTreeNode, currentLevel: number): RuntimeHierarchyTreeNode | null {
+    if (currentLevel === targetLevel) {
+      return node;
+    }
+    if (node.children && currentLevel < targetLevel) {
+      for (const child of node.children) {
+        const found = searchAtLevel(child, currentLevel + 1);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+  return searchAtLevel(tree.rootItem, 0);
 }
 
 // === URL AND PATH UTILITIES ====================================================================
@@ -216,36 +201,33 @@ export function findNodeAtLevel(
  * @returns The resolved URL string.
  * @throws {Error} If a placeholder in the pattern cannot be found in the `urlParams` object.
  */
-export function resolveHref(
-	hrefPattern: string,
-	urlParams: Record<string, string | number | null>
-): string {
-	// Regular expression to find all placeholders in the format [paramName]
-	const placeholderRegex = /\[(\w+)\]/g;
+export function resolveHref(hrefPattern: string, urlParams: Record<string, string | number | null>): string {
+  // Regular expression to find all placeholders in the format [paramName]
+  const placeholderRegex = /\[(\w+)\]/g;
 
-	// Use .replace() with a replacer function to look up each placeholder
-	const resolvedUrl = hrefPattern.replace(placeholderRegex, (match, paramName) => {
-		// `match` is the full placeholder (e.g., "[supplierId]")
-		// `paramName` is the captured group (e.g., "supplierId")
+  // Use .replace() with a replacer function to look up each placeholder
+  const resolvedUrl = hrefPattern.replace(placeholderRegex, (match, paramName) => {
+    // `match` is the full placeholder (e.g., "[supplierId]")
+    // `paramName` is the captured group (e.g., "supplierId")
 
-		if (paramName in urlParams) {
-			const value = urlParams[paramName];
-			// Ensure we have a valid, non-null value to inject into the URL
-			if (value !== null && value !== undefined) {
-				return String(value);
-			}
-		}
+    if (paramName in urlParams) {
+      const value = urlParams[paramName];
+      // Ensure we have a valid, non-null value to inject into the URL
+      if (value !== null && value !== undefined) {
+        return String(value);
+      }
+    }
 
-		// If the placeholder is not found or its value is null/undefined, throw an error.
-		// This indicates a configuration or routing logic error and should be fixed.
-		throw new Error(
-			`Failed to resolve href pattern "${hrefPattern}". Placeholder "[${paramName}]" not found in provided urlParams: ${JSON.stringify(
-				urlParams
-			)}`
-		);
-	});
+    // If the placeholder is not found or its value is null/undefined, throw an error.
+    // This indicates a configuration or routing logic error and should be fixed.
+    throw new Error(
+      `Failed to resolve href pattern "${hrefPattern}". Placeholder "[${paramName}]" not found in provided urlParams: ${JSON.stringify(
+        urlParams,
+      )}`,
+    );
+  });
 
-	return resolvedUrl;
+  return resolvedUrl;
 }
 
 /**
@@ -254,75 +236,56 @@ export function resolveHref(
  * @returns A complete URL path string, e.g., "/suppliers/3/categories/5".
  */
 export function buildUrlFromNavigationPath(navigationPath: RuntimeHierarchyTreeNode[]): string {
-	if (navigationPath.length === 0) {
-		return '/';
-	}
-	const urlSegments: string[] = [];
-	for (const node of navigationPath) {
-		const segment = node.item.key;
-		const urlParamValue = node.item.urlParamValue;
-		urlSegments.push(segment);
-		if (urlParamValue !== 'leaf') {
-			urlSegments.push(String(urlParamValue));
-		}
-	}
-	return '/' + urlSegments.join('/');
+  if (navigationPath.length === 0) {
+    return "/";
+  }
+  const urlSegments: string[] = [];
+  for (const node of navigationPath) {
+    const segment = node.item.key;
+    const urlParamValue = node.item.urlParamValue;
+    urlSegments.push(segment);
+    if (urlParamValue !== "leaf") {
+      urlSegments.push(String(urlParamValue));
+    }
+  }
+  return "/" + urlSegments.join("/");
 }
 
 /**
  * Builds a navigation path from the runtime tree based on available URL parameters.
- * This function intelligently traverses the tree, even with sibling nodes, by finding
- * the child node that matches a parameter in the URL.
- * The navigation path wil be set INTO THE NAVIGATION CONTEXT!
+ * This function intelligently traverses the tree by checking for the existence of
+ * parameters defined in `urlParamName`, making it robust for direct deep links.
  *
  * @param tree The runtime tree to build the path from.
- * @param urlParams The currently parsed URL parameters.
+ * @param urlParams A record of all currently active URL parameters.
  * @returns An array of nodes representing the resolved navigation path.
  */
-export function buildNavigationPath(
-	tree: RuntimeHierarchyTree,
-	urlParams: Record<string, any>
-): RuntimeHierarchyTreeNode[] {
-	const path: RuntimeHierarchyTreeNode[] = [];
+export function buildNavigationPath(tree: RuntimeHierarchyTree, urlParams: Record<string, any>): RuntimeHierarchyTreeNode[] {
+  log.debug(`Building navigation path`, { tree, urlParams });
 
-	// A recursive helper function to perform the intelligent search.
-	function findPath(currentNode: RuntimeHierarchyTreeNode): void {
-		// A node is part of the path if its parameter has a value.
-		if (currentNode.item.urlParamValue !== 'leaf') {
-			path.push(currentNode);
-		} else {
-			// If the root node has no value, it might still be the start of the path.
-			if (path.length === 0 && currentNode.item.level === 0) {
-				path.push(currentNode);
-			} else {
-				// Stop if we encounter a node without a value that is not the root.
-				return;
-			}
-		}
+  const path: RuntimeHierarchyTreeNode[] = [];
 
-		// If there are no children, the path ends here.
-		if (!currentNode.children || currentNode.children.length === 0) {
-			return;
-		}
+  function findPath(currentNode: RuntimeHierarchyTreeNode): void {
+    // The current node is always added to the path as we traverse down.
+    path.push(currentNode);
+    log.debug(`findPath: Pushing path`, currentNode);
 
-		// Intelligent search: Find the *correct* child to descend into.
-		// The correct child is the one whose `urlParamName` exists in the `urlParams`.
-		let nextNode: RuntimeHierarchyTreeNode | null = null;
-		for (const child of currentNode.children) {
-			if (urlParams[child.item.urlParamName] !== undefined) {
-				nextNode = child;
-				break; // Found the next segment of the path.
-			}
-		}
+    if (!currentNode.children) {
+      return; // End of the branch.
+    }
 
-		// If a valid next step was found, continue building the path from there.
-		if (nextNode) {
-			findPath(nextNode);
-		}
-	}
+    // Find the next node in the path by checking which of the children's
+    // urlParamNames exists in the urlParams object.
+    const nextNodeInPath = currentNode.children.find((child) => urlParams[child.item.urlParamName] !== undefined);
 
-	findPath(tree.rootItem);
-	return path;
+    if (nextNodeInPath) {
+      // If a child matches, continue building the path from there.
+      findPath(nextNodeInPath);
+    }
+  }
+
+  findPath(tree.rootItem);
+  return path;
 }
 
 // === DYNAMIC STATE AND VALIDATION ==============================================================
@@ -335,42 +298,39 @@ export function buildNavigationPath(
  * @param navigationPath The current navigation path with parameter values.
  * @returns The updated tree with correct disabled states.
  */
-export function updateDisabledStates(
-	tree: RuntimeHierarchyTree,
-	navigationPath: RuntimeHierarchyTreeNode[]
-): RuntimeHierarchyTree {
-	const navDepth = navigationPath.length;
-	const lastNodeInPath = navDepth > 0 ? navigationPath[navDepth - 1] : null;
-	const lastNodeHasEntity = lastNodeInPath ? lastNodeInPath.item.urlParamValue !== 'leaf' : false;
+export function updateDisabledStates(tree: RuntimeHierarchyTree, navigationPath: RuntimeHierarchyTreeNode[]): RuntimeHierarchyTree {
+  const navDepth = navigationPath.length;
+  const lastNodeInPath = navDepth > 0 ? navigationPath[navDepth - 1] : null;
+  const lastNodeHasEntity = lastNodeInPath ? lastNodeInPath.item.urlParamValue !== "leaf" : false;
 
-	function updateNode(node: RuntimeHierarchyTreeNode): void {
-		const nodeLevel = node.item.level ?? 0;
-		let isDisabled = true; // Default to disabled
+  function updateNode(node: RuntimeHierarchyTreeNode): void {
+    const nodeLevel = node.item.level ?? 0;
+    let isDisabled = true; // Default to disabled
 
-		// Rule 1: Ancestors of the current path are always enabled.
-		if (nodeLevel < navDepth) {
-			isDisabled = false;
-		}
+    // Rule 1: Ancestors of the current path are always enabled.
+    if (nodeLevel < navDepth) {
+      isDisabled = false;
+    }
 
-		// Rule 2: Direct children of a selected entity are enabled.
-		if (nodeLevel === navDepth && lastNodeHasEntity) {
-			isDisabled = false;
-		}
+    // Rule 2: Direct children of a selected entity are enabled.
+    if (nodeLevel === navDepth && lastNodeHasEntity) {
+      isDisabled = false;
+    }
 
-		// Rule 3: The absolute root node of the tree is always enabled.
-		if (nodeLevel === 0) {
-			isDisabled = false;
-		}
+    // Rule 3: The absolute root node of the tree is always enabled.
+    if (nodeLevel === 0) {
+      isDisabled = false;
+    }
 
-		node.item.disabled = isDisabled;
+    node.item.disabled = isDisabled;
 
-		if (node.children) {
-			node.children.forEach(updateNode);
-		}
-	}
+    if (node.children) {
+      node.children.forEach(updateNode);
+    }
+  }
 
-	updateNode(tree.rootItem);
-	return tree;
+  updateNode(tree.rootItem);
+  return tree;
 }
 
 /**
@@ -379,23 +339,23 @@ export function updateDisabledStates(
  * @returns A validation result with any errors found.
  */
 export function validateRuntimeTree(tree: RuntimeHierarchyTree): {
-	isValid: boolean;
-	errors: string[];
+  isValid: boolean;
+  errors: string[];
 } {
-	const errors: string[] = [];
-	function validateNode(node: RuntimeHierarchyTreeNode, path: string): void {
-		if (!node.item.key) errors.push(`${path}: Missing key`);
-		if (!node.item.label) errors.push(`${path}: Missing label`);
-		if (node.item.level === undefined) errors.push(`${path}: Missing level`);
-		if (!node.item.urlParamValue) errors.push(`${path}: Missing urlParamValue`);
-		if (node.children) {
-			node.children.forEach((child, index) => {
-				validateNode(child, `${path}.children[${index}]`);
-			});
-		}
-	}
-	validateNode(tree.rootItem, `${tree.name}.rootItem`);
-	return { isValid: errors.length === 0, errors };
+  const errors: string[] = [];
+  function validateNode(node: RuntimeHierarchyTreeNode, path: string): void {
+    if (!node.item.key) errors.push(`${path}: Missing key`);
+    if (!node.item.label) errors.push(`${path}: Missing label`);
+    if (node.item.level === undefined) errors.push(`${path}: Missing level`);
+    if (!node.item.urlParamValue) errors.push(`${path}: Missing urlParamValue`);
+    if (node.children) {
+      node.children.forEach((child, index) => {
+        validateNode(child, `${path}.children[${index}]`);
+      });
+    }
+  }
+  validateNode(tree.rootItem, `${tree.name}.rootItem`);
+  return { isValid: errors.length === 0, errors };
 }
 
 // === URL PARSING UTILITIES =====================================================================
@@ -407,22 +367,19 @@ export function validateRuntimeTree(tree: RuntimeHierarchyTree): {
  * @param params The `params` object from a SvelteKit LoadEvent.
  * @returns A record object mapping `urlParamName` to its value.
  */
-export function parseUrlParameters(
-	hierarchy: RuntimeHierarchyTree[],
-	params: Record<string, string>
-): Record<string, any> {
-	const result: Record<string, any> = {};
-	for (const tree of hierarchy) {
-		traverse(tree.rootItem, (node) => {
-			const paramName = node.item.urlParamName;
-			if (paramName && params[paramName]) {
-				const paramValue = params[paramName];
-				const numericValue = Number(paramValue);
-				result[paramName] = !isNaN(numericValue) ? numericValue : paramValue;
-			}
-		});
-	}
-	return result;
+export function parseUrlParameters(hierarchy: RuntimeHierarchyTree[], params: Record<string, string>): Record<string, any> {
+  const result: Record<string, any> = {};
+  for (const tree of hierarchy) {
+    traverse(tree.rootItem, (node) => {
+      const paramName = node.item.urlParamName;
+      if (paramName && params[paramName]) {
+        const paramValue = params[paramName];
+        const numericValue = Number(paramValue);
+        result[paramName] = !isNaN(numericValue) ? numericValue : paramValue;
+      }
+    });
+  }
+  return result;
 }
 
 /**
@@ -432,24 +389,21 @@ export function parseUrlParameters(
  * @param pathname The URL pathname string.
  * @returns The key of the found leaf node, or null.
  */
-export function extractLeafFromUrl(
-	hierarchy: RuntimeHierarchyTree[],
-	pathname: string
-): string | null {
-	const leafNodes: string[] = [];
-	for (const tree of hierarchy) {
-		traverse(tree.rootItem, (node) => {
-			if (node.item.urlParamName === 'leaf') {
-				leafNodes.push(node.item.key);
-			}
-		});
-	}
-	for (const leafKey of leafNodes) {
-		if (pathname.endsWith(`/${leafKey}`)) {
-			return leafKey;
-		}
-	}
-	return null;
+export function extractLeafFromUrl(hierarchy: RuntimeHierarchyTree[], pathname: string): string | null {
+  const leafNodes: string[] = [];
+  for (const tree of hierarchy) {
+    traverse(tree.rootItem, (node) => {
+      if (node.item.urlParamName === "leaf") {
+        leafNodes.push(node.item.key);
+      }
+    });
+  }
+  for (const leafKey of leafNodes) {
+    if (pathname.endsWith(`/${leafKey}`)) {
+      return leafKey;
+    }
+  }
+  return null;
 }
 
 /**
@@ -458,10 +412,10 @@ export function extractLeafFromUrl(
  * @param callback The function to execute for each node.
  */
 function traverse(node: RuntimeHierarchyTreeNode, callback: (node: RuntimeHierarchyTreeNode) => void) {
-	callback(node);
-	if (node.children) {
-		for (const child of node.children) {
-			traverse(child, callback);
-		}
-	}
+  callback(node);
+  if (node.children) {
+    for (const child of node.children) {
+      traverse(child, callback);
+    }
+  }
 }

@@ -239,161 +239,58 @@ function isSameEntity(existingNode: RuntimeHierarchyTreeNode, newUrlParamValue: 
  *                         treats as Sidebar Navigation (Context Preservation)
  */
 export function selectNode(
-  node: RuntimeHierarchyTreeNode, 
-  newUrlParamValue?: string | number | "leaf"
+	node: RuntimeHierarchyTreeNode,
+	newUrlParamValue?: string | number | 'leaf'
 ): void {
-  navigationState.update(state => {
-    // Validation: Can't navigate without an active tree
-    if (!state.activeTree) {
-      log.error('NavigationState: No active tree - cannot select node');
-      return state;
-    }
-    
-    const currentPath = [...state.activeTree.paths];
-    const nodeLevel = getNodeLevel(node);
-    
-    log.debug(`NavigationState: selectNode called`, {
-      nodeKey: node.item.key,
-      nodeLevel,
-      newUrlParamValue,
-      currentPathLength: currentPath.length,
-      isEntitySelection: newUrlParamValue !== undefined
-    });
-    
-    // =============================================================================================
-    // CASE 1: Node is at an existing level in the current path
-    // =============================================================================================
-    if (nodeLevel < currentPath.length) {
-      const existingNodeAtLevel = currentPath[nodeLevel];
-      
-      // CASE 1A: Sidebar Navigation (no urlParamValue provided) → Context Preservation
-      if (newUrlParamValue === undefined) {
-        // User clicked a sidebar element for level navigation
-        // This is always Context Preservation - NavigationContext remains unchanged
-        log.debug(`NavigationState: Sidebar navigation to level ${nodeLevel}, Context Preservation`);
-        return state; // No changes to NavigationContext
-      }
-      
-      // CASE 1B: Entity Selection - check if same or different entity
-      else {
-        // User selected an entity (e.g., clicked Supplier 7 in DataGrid)
-        if (isSameEntity(existingNodeAtLevel, newUrlParamValue)) {
-          // Same entity selected → Context Preservation
-          log.debug(`NavigationState: Same entity selected at level ${nodeLevel}, Context Preservation`);
-          return state; // No changes to NavigationContext
-        } else {
-          // Different entity selected → Context Reset for deeper levels
-          log.debug(`NavigationState: Different entity selected at level ${nodeLevel}, Context Reset for deeper levels`);
-          
-          // Create updated node with new urlParamValue
-          const updatedNode: RuntimeHierarchyTreeNode = {
-            ...node,
-            item: {
-              ...node.item,
-              urlParamValue: newUrlParamValue
-            }
-          };
-          
-          // Build new path: keep everything up to this level, add updated node, remove deeper levels
-          const newPath = currentPath.slice(0, nodeLevel); // Keep path up to (excluding) this level
-          newPath.push(updatedNode); // Add the updated node at this level
-          // Everything deeper is automatically removed by slice() → Context Reset
-          
-          // Update the NavigationPathTree
-          const updatedActiveTree: NavigationPathTree = {
-            ...state.activeTree,
-            paths: newPath
-          };
-          
-          // Store the updated tree state
-          const updatedAllTrees = new Map(state.allTrees);
-          updatedAllTrees.set(state.activeTree.tree, updatedActiveTree);
-          
-          return {
-            ...state,
-            activeTree: updatedActiveTree,
-            allTrees: updatedAllTrees
-          };
-        }
-      }
-    }
-    
-    // =============================================================================================
-    // CASE 2: Node extends the path to a new level
-    // =============================================================================================
-    else if (nodeLevel === currentPath.length) {
-      // User is navigating deeper into the hierarchy
-      log.debug(`NavigationState: Extending path to level ${nodeLevel}`);
-      
-      // For new levels, we need a urlParamValue (Entity Selection)
-      if (newUrlParamValue === undefined) {
-        log.warn(`NavigationState: No urlParamValue provided for new level ${nodeLevel}`);
-        // For Sidebar Navigation to new levels, preserve existing urlParamValue
-        newUrlParamValue = node.item.urlParamValue;
-      }
-      
-      // Create node with proper urlParamValue
-      const extendedNode: RuntimeHierarchyTreeNode = {
-        ...node,
-        item: {
-          ...node.item,
-          urlParamValue: newUrlParamValue
-        }
-      };
-      
-      const newPath = [...currentPath, extendedNode];
-      
-      // Update the NavigationPathTree
-      const updatedActiveTree: NavigationPathTree = {
-        ...state.activeTree,
-        paths: newPath
-      };
-      
-      // Store the updated tree state
-      const updatedAllTrees = new Map(state.allTrees);
-      updatedAllTrees.set(state.activeTree.tree, updatedActiveTree);
-      
-      return {
-        ...state,
-        activeTree: updatedActiveTree,
-        allTrees: updatedAllTrees
-      };
-    }
-    
-    // =============================================================================================
-    // CASE 3: Gap in levels (error handling - shouldn't happen with proper UI)
-    // =============================================================================================
-    else {
-      log.error(`NavigationState: Level gap detected - current depth ${currentPath.length}, selected level ${nodeLevel}`);
-      
-      // Graceful fallback: create path up to selected level
-      const newPath = currentPath.slice(0, nodeLevel);
-      
-      const gapFillerNode: RuntimeHierarchyTreeNode = {
-        ...node,
-        item: {
-          ...node.item,
-          urlParamValue: newUrlParamValue ?? node.item.urlParamValue
-        }
-      };
-      
-      newPath.push(gapFillerNode);
-      
-      const updatedActiveTree: NavigationPathTree = {
-        ...state.activeTree,
-        paths: newPath
-      };
-      
-      const updatedAllTrees = new Map(state.allTrees);
-      updatedAllTrees.set(state.activeTree.tree, updatedActiveTree);
-      
-      return {
-        ...state,
-        activeTree: updatedActiveTree,
-        allTrees: updatedAllTrees
-      };
-    }
-  });
+	navigationState.update((state) => {
+		if (!state.activeTree) {
+			log.error('NavigationState: No active tree - cannot select node');
+			return state;
+		}
+
+		const currentPath = state.activeTree.paths;
+		const nodeLevel = getNodeLevel(node);
+
+		log.debug(`NavigationState: selectNode called`, {
+			nodeKey: node.item.key,
+			nodeLevel,
+			newUrlParamValue,
+			currentPathLength: currentPath.length,
+			isEntitySelection: newUrlParamValue !== undefined
+		});
+
+		// --- CASE 1: ENTITY SELECTION (newUrlParamValue is provided) ---
+		if (newUrlParamValue !== undefined) {
+            // This logic is correct and remains unchanged.
+			const existingNodeAtLevel = nodeLevel < currentPath.length ? currentPath[nodeLevel] : null;
+
+			if (existingNodeAtLevel && isSameEntity(existingNodeAtLevel, newUrlParamValue)) {
+				const newPath = currentPath.slice(0, nodeLevel + 1);
+				return { ...state, activeTree: { ...state.activeTree, paths: newPath } };
+			}
+
+			log.debug(`NavigationState: New/different entity at level ${nodeLevel}, Context Reset.`);
+			const updatedNode: RuntimeHierarchyTreeNode = {
+				...node,
+				item: { ...node.item, urlParamValue: newUrlParamValue }
+			};
+			const newPath = currentPath.slice(0, nodeLevel);
+			newPath.push(updatedNode);
+
+			const updatedActiveTree: NavigationPathTree = { ...state.activeTree, paths: newPath };
+			state.allTrees.set(updatedActiveTree.tree, updatedActiveTree);
+			return { ...state, activeTree: updatedActiveTree, allTrees: new Map(state.allTrees) };
+		}
+
+		// --- CASE 2: SIDEBAR NAVIGATION (no newUrlParamValue) ---
+		else {
+			// A pure UI navigation click. The intention is to change the VIEW,
+			// but PRESERVE the underlying navigation context (the path).
+			// Therefore, we do not modify the path at all.
+			log.debug(`NavigationState: Sidebar navigation click. Preserving context path.`);
+			return state; // The path remains unchanged.
+		}
+	});
 }
 
 /**

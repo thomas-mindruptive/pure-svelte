@@ -1,4 +1,4 @@
-<!-- src/lib/pages/suppliers/SupplierDetailPage.svelte - REFACTORED & COMPLETE -->
+<!-- src/lib/pages/suppliers/SupplierDetailPage.svelte -->
 <script lang="ts">
   import { goto } from "$app/navigation";
   import { log } from "$lib/utils/logger";

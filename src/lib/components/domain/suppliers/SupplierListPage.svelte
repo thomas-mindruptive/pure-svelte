@@ -1,3 +1,4 @@
+<!-- SupplierListPage.svelte -->
 <script lang="ts">
   // --- Component & Type Imports ---
   // The SupplierGrid is the primary UI component for displaying the data.

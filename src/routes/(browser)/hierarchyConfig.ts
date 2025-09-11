@@ -1,4 +1,5 @@
 import { createHierarchyNode, type HierarchyTree, type Hierarchy } from "$lib/components/sidebarAndNav/HierarchySidebar.types";
+import { log } from "$lib/utils/logger";
 
 // ================================================================================================
 // SUPPLIER HIERARCHY CONFIGURATION
@@ -22,24 +23,28 @@ import { createHierarchyNode, type HierarchyTree, type Hierarchy } from "$lib/co
 export const supplierHierarchyConfig: HierarchyTree = {
   name: "suppliers",
   rootItem: createHierarchyNode({
-    item: { key: "suppliers", label: "Suppliers", disabled: false, urlParamName: "supplierId" },
+    // href is explicitly set. urlParamName is still needed for url param extraction.
+    item: { key: "suppliers", href: "/suppliers", label: "Suppliers", disabled: false, urlParamName: "supplierId" },
     defaultChild: "categories", // Type-safe: must be a child key
     children: [
       // Categories branch
       createHierarchyNode({
-        item: { key: "categories", label: "Categories", disabled: false, urlParamName: "categoryId" },
+        // href is explicitly set. urlParamName is still needed for url param extraction.
+        item: { key: "categories", href: "/suppliers/[supplierId]", label: "Categories", disabled: false, urlParamName: "categoryId" },
         defaultChild: "offerings", // Type-safe: must be a child key
         children: [
           createHierarchyNode({
-            item: {key: "offerings", label: "Offerings", disabled: false, urlParamName: "offeringId" },
+            // href is explicitly set. urlParamName is still needed for url param extraction.
+            item: {key: "offerings", href: "/suppliers/[supplierId]/categories/[categoryId]", label: "Offerings", disabled: false, urlParamName: "offeringId" },
             defaultChild: "links", // Type-safe: must be a child key
             children: [
               // Leaf nodes - no children, no defaultChild
               createHierarchyNode({
-                item: { key: "attributes", label: "Attributes", disabled: false, urlParamName: "leaf" },
+                item: { key: "attributes", href:"/suppliers/[supplierId]/categories/[categoryId]/offerings/[offeringId]/attributes", label: "Attributes", disabled: false, urlParamName: "leaf" },
               }),
               createHierarchyNode({
-                item: { key: "links", label: "Links", disabled: false, urlParamName: "leaf" },
+                // href is not set => hierarchyUtils.buildHrefForNode => "/suppliers/[supplierId]/categories/[categoryId]/offerings/[offeringId]/links"
+                item: { key: "links", href:"/suppliers/[supplierId]/categories/[categoryId]/offerings/[offeringId]/links", label: "Links", disabled: false, urlParamName: "leaf" },
               }),
             ],
           }),
@@ -156,9 +161,9 @@ export function validateHierarchyNames(): boolean {
 if (import.meta.env.DEV) {
   try {
     validateHierarchyNames();
-    console.log("✅ Hierarchy configuration validation passed");
+    log.info("✅ Hierarchy configuration validation passed");
   } catch (error) {
-    console.error("❌ Hierarchy configuration validation failed:", error);
+    log.error("❌ Hierarchy configuration validation failed:", error);
   }
 }
 

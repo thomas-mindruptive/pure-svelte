@@ -18,6 +18,7 @@ import {
 	convertToRuntimeTree,
 	extractLeafFromUrl,
 	parseUrlParameters,
+	updateDisabledStates,
 	updateRuntimeHierarchyParameters
 } from '$lib/components/sidebarAndNav/hierarchyUtils';
 
@@ -56,33 +57,35 @@ function determineActiveLevel(
 	tree: RuntimeHierarchyTree,
 	leaf: string | null
 ): string {
-	// Rule 1: A leaf page always has the highest priority and is the active level.
+	// Rule 1: A leaf page always has the highest priority.
 	if (leaf) {
 		log.debug(`(Layout) Active level is leaf: '${leaf}'`);
 		return leaf;
 	}
 
-	// Rule 2: If a user has selected an entity, determine the next logical step.
+	// Rule 2: If a navigation path exists, inspect the last node.
 	if (navigationPath.length > 0) {
 		const lastNodeInPath = navigationPath[navigationPath.length - 1];
 
-		// Use the configured `defaultChild` if it exists.
-		if (lastNodeInPath.defaultChild) {
+		// Only jump to the defaultChild if a specific entity has been selected
+		// (indicated by its urlParamValue not being 'leaf').
+		if (lastNodeInPath.item.urlParamValue !== 'leaf' && lastNodeInPath.defaultChild) {
 			log.debug(
-				`(Layout) Active level is defaultChild '${lastNodeInPath.defaultChild}' of node '${lastNodeInPath.item.key}'`
+				`(Layout) Entity selected. Active level is defaultChild '${lastNodeInPath.defaultChild}' of node '${lastNodeInPath.item.key}'`
 			);
 			return lastNodeInPath.defaultChild;
 		}
 
-		// Fallback: If no `defaultChild` is defined, the entity's own level is active.
+		// Otherwise (it's a list page like /suppliers or a node without a defaultChild),
+		// the active level is the node's own key.
 		log.debug(
-			`(Layout) Active level is last path node '${lastNodeInPath.item.key}' (no defaultChild)`
+			`(Layout) It's a list page. Active level is last path node '${lastNodeInPath.item.key}'`
 		);
 		return lastNodeInPath.item.key;
 	}
 
-	// Rule 3: If there is no navigation path, the root of the tree is active.
-	log.debug(`(Layout) Active level is tree root '${tree.rootItem.item.key}'`);
+	// Rule 3: Fallback for an empty path - the root of the tree is active.
+	log.debug(`(Layout) Path is empty. Active level is tree root '${tree.rootItem.item.key}'`);
 	return tree.rootItem.item.key;
 }
 
@@ -102,7 +105,7 @@ export async function load({ url, params, depends, fetch: loadEventFetch }: Load
 	log.debug(`(Layout) Extracted leaf page: ${leaf}`);
 
 	// --- 3. Update Hierarchy with Current Context ----------------------------------------------
-	const contextualHierarchy = updateRuntimeHierarchyParameters(initialHierarchies, urlParams);
+	let contextualHierarchy = updateRuntimeHierarchyParameters(initialHierarchies, urlParams);
 	const supplierTree = contextualHierarchy.find((tree) => tree.name === 'suppliers');
 	if (!supplierTree) {
 		throw new Error("Critical: 'suppliers' tree not found in hierarchy configuration.");
@@ -112,21 +115,22 @@ export async function load({ url, params, depends, fetch: loadEventFetch }: Load
 	const navigationPath = buildNavigationPath(supplierTree, urlParams);
 	log.debug('(Layout) Built navigation path:', navigationPath.map((n) => n.item.key));
 
+	// --- 4.5 Update Disabled States ------------------------------------------------------------
+	// After knowing the context path, update the entire tree to set which nodes
+	// are clickable (enabled) or not (disabled).
+	contextualHierarchy = contextualHierarchy.map((tree) => updateDisabledStates(tree, navigationPath));
+	log.debug('(Layout) Updated disabled states for the hierarchy.');
+
 	// --- 5. Synchronize with Central Navigation State ------------------------------------------
 	if (navigationPath.length > 0) {
-		setActiveTreePath(supplierTree, navigationPath as RuntimeHierarchyTreeNode[]);
+		setActiveTreePath(supplierTree, navigationPath);
 	} else {
-        // Ensure that if the path is empty, the state is also cleared for the active tree.
-        setActiveTreePath(supplierTree, []);
-    }
+		setActiveTreePath(supplierTree, []);
+	}
 	log.debug(`(Layout) NavigationState store updated with path of length: ${navigationPath.length}`);
 
 	// --- 6. Determine the Active UI Level ------------------------------------------------------
-	const activeLevel = determineActiveLevel(
-		navigationPath as RuntimeHierarchyTreeNode[],
-		supplierTree,
-		leaf
-	);
+	const activeLevel = determineActiveLevel(navigationPath, supplierTree, leaf);
 	log.debug(`(Layout) Determined final active UI level key: '${activeLevel}'`);
 
 	// --- 7. Fetch Dynamic Entity Names for Display ---------------------------------------------
@@ -168,7 +172,7 @@ export async function load({ url, params, depends, fetch: loadEventFetch }: Load
 
 	// --- 8. Build Breadcrumbs ------------------------------------------------------------------
 	const breadcrumbItems = buildBreadcrumb({
-		navigationPath: navigationPath as RuntimeHierarchyTreeNode[],
+		navigationPath: navigationPath,
 		entityNameMap,
 		activeLevelKey: activeLevel,
 		hierarchy: contextualHierarchy

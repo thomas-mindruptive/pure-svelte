@@ -92,7 +92,7 @@
 	 * Validates the incoming hierarchy prop and transforms errors into the format
 	 * expected by the ValidationWrapper component. Returns null if there are no errors.
 	 */
-	const validationErrors = $derived(() => {
+	const validationErrors = $derived.by(() => {
 		if (!hierarchy || hierarchy.length === 0) {
 			return null;
 		}
@@ -119,6 +119,10 @@
 					}
 				}
 			}
+		}
+
+		if (allErrors.length > 0) {
+			log.error(`Validation error: `, allErrors);
 		}
 
 		return allErrors.length > 0 ? allErrors : null;
@@ -188,7 +192,8 @@
 		color: var(--color-muted, #64748b);
 	}
 
-	.hb__expand-spacer {
+	.hb__expand-spacer::before {
+		content: "";
 		/* Creates empty space for items without children to align labels. */
 	}
 

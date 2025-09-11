@@ -208,6 +208,47 @@ export function findNodeAtLevel(
 // === URL AND PATH UTILITIES ====================================================================
 
 /**
+ * Resolves an href pattern by replacing placeholders with values from a parameters object.
+ * Placeholders are expected in the format `[paramName]`.
+ *
+ * @param hrefPattern The URL pattern containing placeholders, e.g., "/suppliers/[supplierId]/categories".
+ * @param urlParams A record object containing the parsed URL parameters, e.g., { supplierId: 3 }.
+ * @returns The resolved URL string.
+ * @throws {Error} If a placeholder in the pattern cannot be found in the `urlParams` object.
+ */
+export function resolveHref(
+	hrefPattern: string,
+	urlParams: Record<string, string | number | null>
+): string {
+	// Regular expression to find all placeholders in the format [paramName]
+	const placeholderRegex = /\[(\w+)\]/g;
+
+	// Use .replace() with a replacer function to look up each placeholder
+	const resolvedUrl = hrefPattern.replace(placeholderRegex, (match, paramName) => {
+		// `match` is the full placeholder (e.g., "[supplierId]")
+		// `paramName` is the captured group (e.g., "supplierId")
+
+		if (paramName in urlParams) {
+			const value = urlParams[paramName];
+			// Ensure we have a valid, non-null value to inject into the URL
+			if (value !== null && value !== undefined) {
+				return String(value);
+			}
+		}
+
+		// If the placeholder is not found or its value is null/undefined, throw an error.
+		// This indicates a configuration or routing logic error and should be fixed.
+		throw new Error(
+			`Failed to resolve href pattern "${hrefPattern}". Placeholder "[${paramName}]" not found in provided urlParams: ${JSON.stringify(
+				urlParams
+			)}`
+		);
+	});
+
+	return resolvedUrl;
+}
+
+/**
  * Builds a URL path string from an array of runtime nodes (a navigation path).
  * @param navigationPath An array of nodes representing the navigation path.
  * @returns A complete URL path string, e.g., "/suppliers/3/categories/5".
@@ -229,26 +270,10 @@ export function buildUrlFromNavigationPath(navigationPath: RuntimeHierarchyTreeN
 }
 
 /**
- * Builds an href for a specific node based on the current navigation context.
- * This creates a URL that navigates to the level of the target node, preserving parent context.
- * @param targetNode The node to build an href for.
- * @param currentNavigationPath The current navigation path for context.
- * @returns An href string for the target node.
- */
-export function buildHrefForNode(
-	targetNode: RuntimeHierarchyTreeNode,
-	currentNavigationPath: RuntimeHierarchyTreeNode[]
-): string {
-	const targetLevel = targetNode.item.level ?? 0;
-	const pathToTarget = currentNavigationPath.slice(0, targetLevel);
-	pathToTarget.push(targetNode);
-	return buildUrlFromNavigationPath(pathToTarget);
-}
-
-/**
  * Builds a navigation path from the runtime tree based on available URL parameters.
  * This function intelligently traverses the tree, even with sibling nodes, by finding
  * the child node that matches a parameter in the URL.
+ * The navigation path wil be set INTO THE NAVIGATION CONTEXT!
  *
  * @param tree The runtime tree to build the path from.
  * @param urlParams The currently parsed URL parameters.
@@ -303,33 +328,48 @@ export function buildNavigationPath(
 // === DYNAMIC STATE AND VALIDATION ==============================================================
 
 /**
- * Updates the `disabled` state of all nodes in a runtime tree based on navigation context.
+ * Updates the `disabled` state of all nodes in a runtime tree based on the
+ * navigation context, correctly implementing the logic from the readme.
+ *
  * @param tree The runtime tree to update.
  * @param navigationPath The current navigation path with parameter values.
- * @returns The updated tree with proper disabled states.
+ * @returns The updated tree with correct disabled states.
  */
 export function updateDisabledStates(
 	tree: RuntimeHierarchyTree,
 	navigationPath: RuntimeHierarchyTreeNode[]
 ): RuntimeHierarchyTree {
-	function updateNodeDisabledState(node: RuntimeHierarchyTreeNode, pathIndex: number): void {
+	const navDepth = navigationPath.length;
+	const lastNodeInPath = navDepth > 0 ? navigationPath[navDepth - 1] : null;
+	const lastNodeHasEntity = lastNodeInPath ? lastNodeInPath.item.urlParamValue !== 'leaf' : false;
+
+	function updateNode(node: RuntimeHierarchyTreeNode): void {
 		const nodeLevel = node.item.level ?? 0;
-		const hasParameterAtLevel =
-			pathIndex < navigationPath.length && navigationPath[pathIndex]?.item.level === nodeLevel;
-		if (hasParameterAtLevel) {
-			node.item.disabled = false;
-		} else if (nodeLevel <= navigationPath.length) {
-			node.item.disabled = false;
-		} else {
-			node.item.disabled = true;
+		let isDisabled = true; // Default to disabled
+
+		// Rule 1: Ancestors of the current path are always enabled.
+		if (nodeLevel < navDepth) {
+			isDisabled = false;
 		}
+
+		// Rule 2: Direct children of a selected entity are enabled.
+		if (nodeLevel === navDepth && lastNodeHasEntity) {
+			isDisabled = false;
+		}
+
+		// Rule 3: The absolute root node of the tree is always enabled.
+		if (nodeLevel === 0) {
+			isDisabled = false;
+		}
+
+		node.item.disabled = isDisabled;
+
 		if (node.children) {
-			for (const child of node.children) {
-				updateNodeDisabledState(child, pathIndex);
-			}
+			node.children.forEach(updateNode);
 		}
 	}
-	updateNodeDisabledState(tree.rootItem, 0);
+
+	updateNode(tree.rootItem);
 	return tree;
 }
 

@@ -11,13 +11,13 @@
 	import { supplierLoadingState } from '$lib/api/client/supplier.js';
 	import { derived } from 'svelte/store';
 	import { fade } from 'svelte/transition';
-	// Step 1: Import the correct runtime types and the URL builder utility
 	import type {
 		RuntimeHierarchyTree,
 		RuntimeHierarchyTreeNode
 	} from '$lib/components/sidebarAndNav/HierarchySidebar.types.js';
 	import { selectNode } from '$lib/components/sidebarAndNav/navigationState.js';
-	import { buildHrefForNode } from '$lib/components/sidebarAndNav/hierarchyUtils.js';
+	// Step 1: Import the new resolver function
+	import { resolveHref } from '$lib/components/sidebarAndNav/hierarchyUtils.js';
 
 	let { data, children } = $props();
 
@@ -25,8 +25,8 @@
 	const crumbItems = $derived(data.breadcrumbItems);
 	const hierarchy = $derived(data.hierarchy);
 	const activeLevel = $derived(data.activeLevel);
-	// Step 2: Access the current navigation path, needed for context-aware URL building
-	const navigationPath = $derived(data.navigationPath);
+	// Step 2: Access the urlParams provided by the load function
+	const urlParams = $derived(data.urlParams);
 
 	// === LOADING INDICATOR ===
 	const isAnythingLoading = derived(
@@ -57,9 +57,8 @@
 	// === NAVIGATION HANDLER ===
 
 	/**
-	 * Handles sidebar navigation clicks. This function is the final piece that
-	 * closes the navigation loop, using the runtime context to dynamically generate
-	 * the correct URL and trigger the navigation.
+	 * Handles sidebar navigation clicks using the new configuration-driven approach.
+	 * It resolves the href pattern from the hierarchy config with the current URL params.
 	 * @param tree The runtime tree of the selected item.
 	 * @param node The runtime node that was selected.
 	 */
@@ -67,8 +66,7 @@
 		log.info(`(Layout) Sidebar navigation requested for tree: '${tree.name}', node: '${node.item.key}'`);
 
 		try {
-			// First, update the central navigation state with the selected node.
-			// Since no new entity ID is passed, this triggers "Context Preservation".
+			// Update the central navigation state. This is for context preservation logic.
 			selectNode(node);
 
 			if (node.item.disabled) {
@@ -76,18 +74,21 @@
 				return;
 			}
 
-			// Step 3: Dynamically build the URL for the selected node,
-			// preserving the context from the current navigation path.
-			const href = buildHrefForNode(node, navigationPath);
-
-			if (href && href !== '#') {
-				log.debug(`(Layout) Dynamically built href: '${href}', navigating...`);
-				goto(href);
+			// Step 3: Resolver logic
+			if (node.item.href) {
+				// Resolve the href pattern using the current urlParams from the load function.
+				const finalHref = resolveHref(node.item.href, urlParams);
+				log.debug(`Resolved href from pattern '${node.item.href}' to '${finalHref}', navigating...`);
+				goto(finalHref);
 			} else {
-				log.warn(`(Layout) Navigation aborted for node key: '${node.item.key}' (no valid href)`);
+				// This case should ideally not happen if the config is complete.
+				// It serves as a fallback or for nodes that are intentionally not navigable.
+				log.warn(
+					`Navigation aborted for node key: '${node.item.key}' (no href pattern defined in config)`
+				);
 			}
 		} catch (error) {
-			log.error('(Layout) Failed to handle sidebar navigation:', error);
+			log.error('Failed to handle sidebar navigation:', error);
 		}
 	}
 </script>

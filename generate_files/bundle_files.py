@@ -9,9 +9,9 @@ from typing import List, Dict, Iterable
 START_DIR = Path(__file__).parent.parent.resolve()
 OUTPUT_FILE = Path(__file__).parent.resolve() / "generated" / "bundle.txt"
 
-TREE_ONLY = False
+TREE_ONLY = True
 TREE_OUTPUT_FILE = Path(__file__).parent.resolve() / "generated" / "tree.txt"
-TREE_INCLUDE_ALL_FILES = False
+TREE_INCLUDE_ALL_FILES = True
 
 EXTENSIONS = {
     ".cs",
@@ -57,9 +57,10 @@ EXCLUDE_FILES = ["package-lock.json", ".gitignore", "package.json", "package-loc
 # Positivliste: Leer = alles zulassen
 INCLUDE_PATTERNS: List[str] = [
     # z.B. "src/**", "app/*.svelte",
-    "src/lib/components/sidebarAndNav/**",
-    "src/routes/(browser)/*.*",
-]
+    # "src/lib/components/sidebarAndNav/**",
+    # "src/routes/(browser)/*.*",
+     "src/**"
+]  
 
 # =========================
 # Logging

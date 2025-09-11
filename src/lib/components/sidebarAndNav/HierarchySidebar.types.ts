@@ -7,6 +7,9 @@ export type HierarchyItem<K extends string> = {
   count?: number | null;
   disabled?: boolean;
   urlParamName: "leaf" | string;
+  // NOTE: If defined, this will used for the navigation. 
+  // If not, buildHrefForNode in hierarchyUtils.ts will be used to generate it ath render-time. 
+  href?: string | undefined;          
 };
 
 // 2. HierarchyTreeNode is also made generic over the key K and its children C.

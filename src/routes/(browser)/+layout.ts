@@ -8,7 +8,7 @@ import { getCategoryApi } from "$lib/api/client/category";
 import { getOfferingApi } from "$lib/api/client/offering";
 import { buildBreadcrumb, type ConservedPath } from "$lib/utils/buildBreadcrumb";
 import type { HierarchyTree, HierarchyTreeNode, Hierarchy } from "$lib/components/sidebarAndNav/HierarchySidebar.types";
-import { setActiveTreePath } from "$lib/stores/navigationState";
+import { setActiveTreePath } from "$lib/components/sidebarAndNav/navigationState";
 import { buildHierarchy } from "./hierarchyConfig";
 
 // === TYPES ====================================================================================

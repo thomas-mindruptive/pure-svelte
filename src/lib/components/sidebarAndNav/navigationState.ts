@@ -30,7 +30,7 @@ import { log } from '$lib/utils/logger';
  * 11. **defaultChild** - Automatically marked child-level during Entity Selection
  * 
  * =====================================================================================================
- * CORE NAVIGATION FLOW (from status.md examples):
+ * CORE NAVIGATION FLOW (from navigation.readme.md examples):
  * =====================================================================================================
  * 
  * Step 2: User selects Supplier 3 (Entity Selection)

@@ -279,9 +279,6 @@ type RuntimeHierarchyItem = HierarchyItem & {
 ## **Migration Safety**
 
 ### **Rückwärts-Kompatibilität:**
-- **Runtime Types**: RuntimeHierarchyTree bleibt API-kompatibel
-- **URL Building**: buildUrlFromNavigationPath() unchanged
-- **Navigation Logic**: Bestehende Navigation funktioniert
 - **Fallback**: System funktioniert auch ohne defaultChild (optional property)
 
 ### **Additive Changes:**
@@ -297,18 +294,65 @@ type RuntimeHierarchyItem = HierarchyItem & {
 
 ---
 
-## **Current Status: Phase 1 Complete ✅**
+## **Current Status: Phase-by-Phase Progress**
 
-**Completed:**
-- ✅ Begriffsdefinitionen geklärt
-- ✅ Navigation Flow dokumentiert  
-- ✅ Type System designed (HierarchyItem<K>, createHierarchyNode)
-- ✅ NavigationState architecture updated
-- ✅ selectNode() logic clarified
+!!! IMPORTANT: At runtime (not config time), we always(!!!) use the RuntimeTree!
+CHECK it this is true: IT MUST ALWAYS contain the complete structure of the config time tree.
+=> convertToRuntimeTree must copy all props!
 
-**Next Steps:**
-- Phase 2: Static Configuration in hierarchyConfig.ts
-- Phase 3: Transform Functions in hierarchyUtils.ts
-- Integration Testing
+### **Phase 1: Type System Update ✅ COMPLETE**
+- ✅ **HierarchySidebar.types.ts**: Generic types + createHierarchyNode helper fertig
+- ✅ **RuntimeHierarchy types**: urlParamValue + level properties implementiert
+- ✅ **Type-safe defaultChild**: Compile-time validation funktioniert
 
-**Ready für Implementation!**
+### **Phase 2: Static Configuration ✅ COMPLETE**
+- ✅ **hierarchyConfig.ts**: Static configs mit createHierarchyNode implementiert
+- ✅ **getAppHierarchies()**: Function returning HierarchyTree[] fertig
+- ✅ **Supplier hierarchy**: Mit categories/addresses siblings + defaultChild definiert
+
+### **Phase 3: NavigationState Integration ✅ COMPLETE**
+- ✅ **navigationState.ts**: Complete rewrite mit RuntimeHierarchyTree consistency
+- ✅ **selectNode() Logic**: Context Preservation vs Context Reset implementiert
+- ✅ **Entity Selection vs Sidebar Navigation**: Unterscheidung durch optional urlParamValue
+
+### **Phase 4: Transform Functions 🔶 NEEDS UPDATE**
+- ✅ **hierarchyUtils.ts**: buildRuntimeHierarchy() basic implementation fertig
+- ❌ **Missing**: updateTreeParameters() für parameter-only updates
+- ❌ **Missing**: Parameter update logic statt complete rebuilds
+
+### **Phase 5: +layout.ts Integration ❌ NOT STARTED**
+- ❌ **Missing**: RuntimeHierarchyTree caching architecture: init runtime tree once, update it with the hierarchyUtils functions.
+- ❌ **Missing**: getRuntimeHierarchies() mit cache management
+- ❌ **Missing**: Integration mit NavigationState + buildNavigationPath
+- ❌ **Missing**: determineActiveLevel() mit defaultChild resolution
+
+### **Phase 6: UI Integration ❌ NOT STARTED**
+- ❌ **Missing**: HierarchySidebar.svelte update für RuntimeHierarchyTree
+- ❌ **Missing**: Layout.svelte handleSidebarNavigation update
+- ❌ **Missing**: End-to-end navigation testing
+
+---
+
+## **Immediate Next Steps (Priority Order)**
+
+### **1. Complete Phase 4: hierarchyUtils.ts**
+```typescript
+// Add to hierarchyUtils.ts:
+export function updateTreeParameters(tree: RuntimeHierarchyTree, params): RuntimeHierarchyTree;
+export function updateNodeParameters(node: RuntimeHierarchyTreeNode, params): void;
+```
+
+### **2. Implement Phase 5: +layout.ts**
+```typescript
+// New +layout.ts architecture:
+const runtimeTreeCache = new Map<string, RuntimeHierarchyTree>();
+function getRuntimeHierarchies(): RuntimeHierarchyTree[];
+function updateHierarchyParameters(trees, urlParams): void;
+```
+
+### **3. Start Phase 6: UI Updates**
+- Update HierarchySidebar component
+- Update Layout.svelte navigation handlers
+- End-to-end testing
+
+---

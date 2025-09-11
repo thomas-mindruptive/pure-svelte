@@ -28,8 +28,8 @@ type EntityNames = {
 function traverseHierarchy(node: HierarchyTreeNode, callback: (node: HierarchyTreeNode) => void): void {
   callback(node);
 
-  if (node.items) {
-    for (const child of node.items) {
+  if (node.children) {
+    for (const child of node.children) {
       traverseHierarchy(child, callback);
     }
   }
@@ -102,10 +102,10 @@ function findNodeAtLevel(tree: HierarchyTree, targetLevel: number): HierarchyTre
       return node;
     }
 
-    if (node.items && currentLevel < targetLevel) {
+    if (node.children && currentLevel < targetLevel) {
       // Return the first child node at the target level
       // This assumes a linear hierarchy structure
-      for (const child of node.items) {
+      for (const child of node.children) {
         const found = searchAtLevel(child, currentLevel + 1);
         if (found) return found;
       }

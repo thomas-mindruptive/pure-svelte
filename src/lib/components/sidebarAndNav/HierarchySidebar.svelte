@@ -74,12 +74,12 @@
       href: node.item.href,
       treeRef: tree,
       nodeRef: node,
-      hasChildren: Boolean(node.items && node.items.length > 0)
+      hasChildren: Boolean(node.children && node.children.length > 0)
     });
 
     // Recursively flatten children if they exist
-    if (node.items) {
-      for (const childNode of node.items) {
+    if (node.children) {
+      for (const childNode of node.children) {
         result.push(...flattenTreeNode(childNode, tree));
       }
     }

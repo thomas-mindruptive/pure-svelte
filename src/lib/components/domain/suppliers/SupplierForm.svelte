@@ -51,7 +51,7 @@
 
   // === VALIDATE =================================================================================
 
-  let { initialValidateSupplierData, errors, validatedData } = $derived.by(() => {
+  let { initialValidateSupplierData, errors } = $derived.by(() => {
     // NOTE: our initial data is ONLY a wholesaler, not the complete SupplierDetail_LoadDataSchema.
     const result = WholesalerSchema.nullable().safeParse(initial);
     if (result.error) {
@@ -137,7 +137,6 @@
 
 <ValidationWrapper
   {errors}
-  data={validatedData}
 >
   <FormShell
     entity="Wholesaler"

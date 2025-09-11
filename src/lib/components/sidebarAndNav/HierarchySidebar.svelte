@@ -1,205 +1,211 @@
-<!-- HierarchySidebar - Flattened Rendering with Tree References -->
+<!-- File: src/lib/components/sidebarAndNav/HierarchySidebar.svelte -->
 
 <script lang="ts">
-  import "$lib/components/styles/sidebar.css";
-  import { log } from "$lib/utils/logger";
-  import type { HierarchyItem, Hierarchy, HierarchyTree, HierarchyTreeNode } from "./HierarchySidebar.types";
+	import '$lib/components/styles/sidebar.css';
+	import { log } from '$lib/utils/logger';
+	import type {
+		RuntimeHierarchyTree,
+		RuntimeHierarchyTreeNode,
+		RuntimeHierarchyItem
+	} from './HierarchySidebar.types';
+	// Step 1: Import validation utilities
+	import { validateRuntimeTree } from '$lib/components/sidebarAndNav/hierarchyUtils';
+	import ValidationWrapper from '$lib/components/validation/ValidationWrapper.svelte';
 
-  // === TYPES ====================================================================================
+	// === TYPES ====================================================================================
 
-  /**
-   * Callback function type for when a user selects an item in the sidebar
-   */
-  export type SelectCallback = (tree: HierarchyTree, node: HierarchyTreeNode) => void;
+	export type SelectCallback = (tree: RuntimeHierarchyTree, node: RuntimeHierarchyTreeNode) => void;
 
-  /**
-   * Flattened representation of a hierarchy item for rendering
-   * Contains all display properties plus references to the original tree structure
-   */
-  type FlattenedItem = {
-    // Display properties (copied from HierarchyItem)
-    key: HierarchyItem['key'];
-    label: HierarchyItem['label'];
-    count?: HierarchyItem['count'];
-    disabled?: HierarchyItem['disabled'];
-    level: HierarchyItem['level'];
-    href: HierarchyItem['href'];
-    
-    // References to original tree structure
-    treeRef: HierarchyTree;
-    nodeRef: HierarchyTreeNode;
-    hasChildren: boolean;
-  };
+	type FlattenedItem = {
+		key: RuntimeHierarchyItem['key'];
+		label: RuntimeHierarchyItem['label'];
+		count?: RuntimeHierarchyItem['count'];
+		disabled?: RuntimeHierarchyItem['disabled'];
+		level: RuntimeHierarchyItem['level'];
+		treeRef: RuntimeHierarchyTree;
+		nodeRef: RuntimeHierarchyTreeNode;
+		hasChildren: boolean;
+	};
 
-  /**
-   * Component props interface
-   */
-  export type HierarchySidebarProps = {
-    hierarchy?: Hierarchy;
-    active?: string | null;
-    ariaLabel?: string;
-    onselect?: SelectCallback;
-    shouldRenderHierarchyRootTitle: boolean;
-  };
+	export type HierarchySidebarProps = {
+		hierarchy?: RuntimeHierarchyTree[];
+		active?: string | null;
+		ariaLabel?: string;
+		onselect?: SelectCallback;
+		shouldRenderHierarchyRootTitle: boolean;
+	};
 
-  // === PROPS ====================================================================================
+	/** The expected structure for a single validation error for the wrapper. */
+	type ValidationError = {
+		path: string[];
+		message: string;
+	};
 
-  const {
-    hierarchy = [] as Hierarchy,
-    active = null as string | null,
-    ariaLabel = "Navigation",
-    onselect,
-    shouldRenderHierarchyRootTitle
-  }: HierarchySidebarProps = $props();
+	// === PROPS ====================================================================================
 
-  // === UTILITY FUNCTIONS =======================================================================
+	const {
+		hierarchy = [] as RuntimeHierarchyTree[],
+		active = null as string | null,
+		ariaLabel = 'Navigation',
+		onselect,
+		shouldRenderHierarchyRootTitle
+	}: HierarchySidebarProps = $props();
 
-  /**
-   * Recursively flattens a tree node and its children into a flat array
-   * Each flattened item maintains references to the original tree structure
-   */
-  function flattenTreeNode(
-    node: HierarchyTreeNode, 
-    tree: HierarchyTree
-  ): FlattenedItem[] {
-    const result: FlattenedItem[] = [];
-    
-    // Add the current node to the flattened list
-    result.push({
-      key: node.item.key,
-      label: node.item.label,
-      count: node.item.count,
-      disabled: node.item.disabled,
-      level: node.item.level,
-      href: node.item.href,
-      treeRef: tree,
-      nodeRef: node,
-      hasChildren: Boolean(node.children && node.children.length > 0)
-    });
+	// === UTILITY FUNCTIONS =======================================================================
 
-    // Recursively flatten children if they exist
-    if (node.children) {
-      for (const childNode of node.children) {
-        result.push(...flattenTreeNode(childNode, tree));
-      }
-    }
+	function flattenTreeNode(
+		node: RuntimeHierarchyTreeNode,
+		tree: RuntimeHierarchyTree
+	): FlattenedItem[] {
+		const result: FlattenedItem[] = [];
+		result.push({
+			key: node.item.key,
+			label: node.item.label,
+			count: node.item.count,
+			disabled: node.item.disabled,
+			level: node.item.level,
+			treeRef: tree,
+			nodeRef: node,
+			hasChildren: Boolean(node.children && node.children.length > 0)
+		});
+		if (node.children) {
+			for (const childNode of node.children) {
+				result.push(...flattenTreeNode(childNode, tree));
+			}
+		}
+		return result;
+	}
 
-    return result;
-  }
+	function flattenHierarchy(runtimeHierarchy: RuntimeHierarchyTree[]): FlattenedItem[] {
+		const result: FlattenedItem[] = [];
+		for (const tree of runtimeHierarchy) {
+			result.push(...flattenTreeNode(tree.rootItem, tree));
+		}
+		return result;
+	}
 
-  /**
-   * Flattens the entire hierarchy into a flat array for rendering
-   * Preserves tree structure references for navigation logic
-   */
-  function flattenHierarchy(hierarchy: Hierarchy): FlattenedItem[] {
-    const result: FlattenedItem[] = [];
-    
-    for (const tree of hierarchy) {
-      // Flatten the root item and all its descendants
-      result.push(...flattenTreeNode(tree.rootItem, tree));
-    }
-    
-    return result;
-  }
+	// === DERIVED STATE & VALIDATION ==============================================================
 
-  // === DERIVED STATE ============================================================================
+	const flattenedItems = $derived(flattenHierarchy(hierarchy));
 
-  /**
-   * Flattened items for rendering - recalculated when hierarchy changes
-   */
-  const flattenedItems = $derived(flattenHierarchy(hierarchy));
+	/**
+	 * Validates the incoming hierarchy prop and transforms errors into the format
+	 * expected by the ValidationWrapper component. Returns null if there are no errors.
+	 */
+	const validationErrors = $derived(() => {
+		if (!hierarchy || hierarchy.length === 0) {
+			return null;
+		}
 
-  // === EVENT HANDLERS ===========================================================================
+		const allErrors: ValidationError[] = [];
 
-  /**
-   * Handles item selection, passing both tree and node references to the callback
-   */
-  function handleSelect(tree: HierarchyTree, node: HierarchyTreeNode) {
-    log.debug("Sidebar item selected", { tree: tree.name, nodeKey: node.item.key });
-    
-    try {
-      onselect?.(tree, node);
-    } catch (error: unknown) {
-      log.error("Selection callback failed:", error);
-      // Don't throw - keep UI responsive
-    }
-  }
+		for (const tree of hierarchy) {
+			const result = validateRuntimeTree(tree);
+			if (!result.isValid) {
+				// Transform the string errors into the structured error object
+				for (const errorString of result.errors) {
+					const parts = errorString.split(': ');
+					if (parts.length === 2) {
+						allErrors.push({
+							path: parts[0].split('.'),
+							message: parts[1]
+						});
+					} else {
+						// Fallback for unexpected error format
+						allErrors.push({
+							path: ['Unknown'],
+							message: errorString
+						});
+					}
+				}
+			}
+		}
+
+		return allErrors.length > 0 ? allErrors : null;
+	});
+
+	// === EVENT HANDLERS ===========================================================================
+
+	function handleSelect(tree: RuntimeHierarchyTree, node: RuntimeHierarchyTreeNode) {
+		log.debug('Sidebar item selected', { tree: tree.name, nodeKey: node.item.key });
+		try {
+			onselect?.(tree, node);
+		} catch (error: unknown) {
+			log.error('Selection callback in HierarchySidebar failed:', error);
+		}
+	}
 </script>
 
 <!-- TEMPLATE ==================================================================================== -->
 
-<nav class="hb" aria-label={ariaLabel}>
-  {#each hierarchy as tree (tree.name)}
-    <div class="hb__tree">
-      <!-- Tree title (optional) -->
-      {#if shouldRenderHierarchyRootTitle && tree.name}
-        <h3 class="hb__root-title">{tree.name}</h3>
-      {/if}
+<ValidationWrapper errors={validationErrors}>
+	<nav class="hb" aria-label={ariaLabel}>
+		{#each hierarchy as tree (tree.name)}
+			<div class="hb__tree">
+				{#if shouldRenderHierarchyRootTitle && tree.name}
+					<h3 class="hb__root-title">{tree.name}</h3>
+				{/if}
 
-      <!-- Flattened tree items -->
-      <ul class="hb__list">
-        {#each flattenedItems.filter(item => item.treeRef === tree) as item (item.key)}
-          <li class="hb__li">
-            <button
-              type="button"
-              class="hb__item {active === item.key ? 'is-active' : ''}"
-              disabled={!!item.disabled}
-              aria-current={active === item.key ? "page" : undefined}
-              style="padding-left: {(item.level ?? 0) * 14}px"
-              onclick={() => !item.disabled && handleSelect(item.treeRef, item.nodeRef)}
-            >
-              <!-- Expand indicator for items with children -->
-              {#if item.hasChildren}
-                <span class="hb__expand-indicator" aria-hidden="true">▶</span>
-              {:else}
-                <span class="hb__expand-spacer" aria-hidden="true"></span>
-              {/if}
-
-              <!-- Item label -->
-              <span class="hb__label">{item.label}</span>
-
-              <!-- Optional count badge -->
-              {#if item.count != null}
-                <span class="hb__count">{item.count}</span>
-              {/if}
-            </button>
-          </li>
-        {/each}
-      </ul>
-    </div>
-  {/each}
-</nav>
+				<ul class="hb__list">
+					{#each flattenedItems.filter((item) => item.treeRef === tree) as item (item.key)}
+						<li class="hb__li">
+							<button
+								type="button"
+								class="hb__item {active === item.key ? 'is-active' : ''}"
+								disabled={!!item.disabled}
+								aria-current={active === item.key ? 'page' : undefined}
+								style="padding-left: {(item.level ?? 0) * 14}px"
+								onclick={() => !item.disabled && handleSelect(item.treeRef, item.nodeRef)}
+							>
+								{#if item.hasChildren}
+									<span class="hb__expand-indicator" aria-hidden="true">▶</span>
+								{:else}
+									<span class="hb__expand-spacer" aria-hidden="true"></span>
+								{/if}
+								<span class="hb__label">{item.label}</span>
+								{#if item.count != null}
+									<span class="hb__count">{item.count}</span>
+								{/if}
+							</button>
+						</li>
+					{/each}
+				</ul>
+			</div>
+		{/each}
+	</nav>
+</ValidationWrapper>
 
 <!-- STYLES ====================================================================================== -->
 
 <style>
-  .hb__expand-indicator,
-  .hb__expand-spacer {
-    width: 16px;
-    display: inline-block;
-    text-align: center;
-    font-size: 10px;
-    margin-right: 4px;
-    color: var(--color-muted, #64748b);
-  }
+	.hb__expand-indicator,
+	.hb__expand-spacer {
+		width: 16px;
+		display: inline-block;
+		text-align: center;
+		font-size: 10px;
+		margin-right: 4px;
+		color: var(--color-muted, #64748b);
+	}
 
-  .hb__expand-spacer {
-    /* Empty space for items without children */
-  }
+	.hb__expand-spacer {
+		/* Creates empty space for items without children to align labels. */
+	}
 
-  .hb__item {
-    display: flex;
-    align-items: center;
-    width: 100%;
-    /* Rest of existing styles remain the same */
-  }
+	.hb__item {
+		display: flex;
+		align-items: center;
+		width: 100%;
+		/* Rest of existing styles from sidebar.css remain the same */
+	}
 
-  .hb__label {
-    flex: 1;
-  }
+	.hb__label {
+		flex: 1;
+		text-align: left;
+	}
 
-  .hb__count {
-    margin-left: auto;
-    /* Existing count styles */
-  }
+	.hb__count {
+		margin-left: auto;
+		/* Existing count styles from sidebar.css */
+	}
 </style>

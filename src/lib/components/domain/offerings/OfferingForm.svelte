@@ -240,7 +240,7 @@
 	}
 </script>
 
-<ValidationWrapper {errors} data={validatedData}>
+<ValidationWrapper {errors} >
 	<FormShell
 		bind:this={formShell}
 		entity="Offering"

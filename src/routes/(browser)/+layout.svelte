@@ -1,4 +1,4 @@
-<!-- src/routes/(browser)/+layout.svelte -->
+<!-- File: src/routes/(browser)/+layout.svelte -->
 <script lang="ts">
 	import HierarchySidebar from '$lib/components/sidebarAndNav/HierarchySidebar.svelte';
 	import { goto } from '$app/navigation';
@@ -11,17 +11,24 @@
 	import { supplierLoadingState } from '$lib/api/client/supplier.js';
 	import { derived } from 'svelte/store';
 	import { fade } from 'svelte/transition';
-	import type { HierarchyTree, HierarchyTreeNode } from '$lib/components/sidebarAndNav/HierarchySidebar.types.js';
-    import { selectNode } from '$lib/stores/navigationState.js';
+	// Step 1: Import the correct runtime types and the URL builder utility
+	import type {
+		RuntimeHierarchyTree,
+		RuntimeHierarchyTreeNode
+	} from '$lib/components/sidebarAndNav/HierarchySidebar.types.js';
+	import { selectNode } from '$lib/components/sidebarAndNav/navigationState.js';
+	import { buildHrefForNode } from '$lib/components/sidebarAndNav/hierarchyUtils.js';
 
 	let { data, children } = $props();
 
+	// === DERIVED STATE FROM LOAD FUNCTION ===
 	const crumbItems = $derived(data.breadcrumbItems);
 	const hierarchy = $derived(data.hierarchy);
 	const activeLevel = $derived(data.activeLevel);
+	// Step 2: Access the current navigation path, needed for context-aware URL building
+	const navigationPath = $derived(data.navigationPath);
 
-	// ===== LOADING INDICATOR  =====
-
+	// === LOADING INDICATOR ===
 	const isAnythingLoading = derived(
 		[
 			supplierLoadingState,
@@ -47,72 +54,76 @@
 		}
 	);
 
-	// ===== NAVIGATION (UPDATED FOR NEW HIERARCHY) =====
-	
+	// === NAVIGATION HANDLER ===
+
 	/**
-	 * Updated navigation handler for the new HierarchySidebar signature
-	 * Now receives (tree, node) instead of just selectedItem
+	 * Handles sidebar navigation clicks. This function is the final piece that
+	 * closes the navigation loop, using the runtime context to dynamically generate
+	 * the correct URL and trigger the navigation.
+	 * @param tree The runtime tree of the selected item.
+	 * @param node The runtime node that was selected.
 	 */
-	function handleSidebarNavigation(tree: HierarchyTree, node: HierarchyTreeNode) {
-		log.info(`(Layout) Sidebar navigation requested for tree: ${tree.name}, node: ${node.item.key}`);
-		
+	function handleSidebarNavigation(tree: RuntimeHierarchyTree, node: RuntimeHierarchyTreeNode) {
+		log.info(`(Layout) Sidebar navigation requested for tree: '${tree.name}', node: '${node.item.key}'`);
+
 		try {
-			// NEW: Update NavigationState with the selected node
-			// This handles context preservation automatically
+			// First, update the central navigation state with the selected node.
+			// Since no new entity ID is passed, this triggers "Context Preservation".
 			selectNode(node);
-			
-			// Navigate to the URL for this node (same logic as before)
-			if (node.item && !node.item.disabled && node.item.href && node.item.href !== '#') {
-				log.debug('Navigating to:', node.item.href);
-				goto(node.item.href);
+
+			if (node.item.disabled) {
+				log.warn(`(Layout) Navigation aborted for disabled node key: '${node.item.key}'`);
+				return;
+			}
+
+			// Step 3: Dynamically build the URL for the selected node,
+			// preserving the context from the current navigation path.
+			const href = buildHrefForNode(node, navigationPath);
+
+			if (href && href !== '#') {
+				log.debug(`(Layout) Dynamically built href: '${href}', navigating...`);
+				goto(href);
 			} else {
-				log.warn(`Navigation aborted for key: ${node.item.key}`, {
-					node: node.item,
-					tree: tree.name
-				});
+				log.warn(`(Layout) Navigation aborted for node key: '${node.item.key}' (no valid href)`);
 			}
 		} catch (error) {
-			log.error('Failed to handle sidebar navigation:', error);
+			log.error('(Layout) Failed to handle sidebar navigation:', error);
 		}
 	}
 </script>
 
-<!----- TEMPLATE (UNVERÄNDERT) ----->
-
+<!-- TEMPLATE (unchanged) -->
 <div class="browser-layout">
 	<aside class="sidebar">
 		<HierarchySidebar
 			{hierarchy}
 			active={activeLevel}
 			onselect={handleSidebarNavigation}
-			shouldRenderHierarchyRootTitle = {false}
+			shouldRenderHierarchyRootTitle={false}
 		/>
 	</aside>
 
 	<main class="main-content">
 		<header class="main-header">
-			<!-- Breadcrumbs -->
 			<div class="breadcrumbs-wrapper">
 				<Breadcrumb items={crumbItems} />
 			</div>
 
-			<!-- Spinner-->
-			{#if $isAnythingLoading }
+			{#if $isAnythingLoading}
 				<div class="loader-wrapper" transition:fade={{ duration: 150, delay: 200 }}>
 					<div class="spinner"></div>
 				</div>
 			{/if}
 		</header>
 
-		<!-- Page content -->
 		<div class="page-content-wrapper">
 			{@render children()}
 		</div>
 	</main>
 </div>
 
+<!-- STYLES (unchanged) -->
 <style>
-	/* --- LAYOUT-BASIS (Angepasst) --- */
 	.browser-layout {
 		display: grid;
 		grid-template-columns: 280px 1fr;
@@ -125,70 +136,48 @@
 		border-right: 1px solid var(--pc-grid-border, #e2e8f0);
 		overflow-y: auto;
 	}
-
-	/* --- SCROLLABLE MAIN --- */
-
 	.main-content {
 		display: grid;
-		grid-template-rows: auto 1fr; /* Header: Höhe nach Bedarf, Inhalt: füllt den Rest */
-		overflow: hidden; /* Verhindert doppelte Scrollbalken */
+		grid-template-rows: auto 1fr;
+		overflow: hidden;
 		background: #f8fafc;
 	}
-
-	/* --- HEADER --- */
-
 	.main-header {
 		display: flex;
-		justify-content: flex-start; /* Breadcrumbs links, Spinner rechts */
-		align-items: center; /* Vertikal zentrieren */
-    gap: 2rem;
-		padding: 0 1.5rem; /* Gleicher Abstand wie der Seiteninhalt */
+		justify-content: flex-start;
+		align-items: center;
+		gap: 2rem;
+		padding: 0 1.5rem;
 		border-bottom: 1px solid var(--pc-grid-border, #e2e8f0);
 		background-color: white;
-
-		/* WICHTIG: Feste Mindesthöhe, um "Springen" zu verhindern, wenn der Spinner erscheint */
 		min-height: 54px;
 	}
-
 	.breadcrumbs-wrapper {
-		/* Dieser Wrapper sorgt dafür, dass die Breadcrumbs nicht unnötig schrumpfen */
 		flex-grow: 0;
-    min-width: 0;
-    flex-shrink: 1;
+		min-width: 0;
+		flex-shrink: 1;
 	}
-
-  /* ----- LOADING WRAPPER -----*/
-
 	.loader-wrapper {
-		/* Dieser Wrapper sorgt für eine korrekte Platzierung im Flex-Layout */
-		flex-shrink: 0; /* Verhindert, dass der Spinner gequetscht wird */
-    background-color:var(--color-primary);
-    border-radius: 50%;
-    padding: 5px;
+		flex-shrink: 0;
+		background-color: var(--color-primary);
+		border-radius: 50%;
+		padding: 5px;
 	}
-
 	.spinner {
-		width: 1.5rem; 
+		width: 1.5rem;
 		height: 1.5rem;
 		border-radius: 50%;
 		border: 4px solid var(--color-background);
 		border-right-color: transparent;
 		animation: spin 0.8s linear infinite;
 	}
-
 	@keyframes spin {
 		to {
 			transform: rotate(360deg);
 		}
 	}
-
-	/* --- INHALTSBEREICH (NEU) --- */
-	/* Dieser Container umschließt jetzt den <slot> und ist scrollbar */
 	.page-content-wrapper {
 		overflow-y: auto;
-		padding: 1.5rem; /* Stellt sicher, dass der Inhalt Abstand zum Rand hat */
+		padding: 1.5rem;
 	}
-
-	/* --- ALTE STYLES (ENTFERNT) --- */
-	/* Die Klasse .global-loading-indicator wird nicht mehr benötigt und wurde entfernt. */
 </style>

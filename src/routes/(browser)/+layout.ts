@@ -1,331 +1,189 @@
-// src/routes/(browser)/+layout.ts
+// File: src/routes/(browser)/+layout.ts
 
-import { log } from "$lib/utils/logger";
-import type { LoadEvent } from "@sveltejs/kit";
-import { ApiClient } from "$lib/api/client/ApiClient";
-import { getSupplierApi } from "$lib/api/client/supplier";
-import { getCategoryApi } from "$lib/api/client/category";
-import { getOfferingApi } from "$lib/api/client/offering";
-import { buildBreadcrumb, type ConservedPath } from "$lib/utils/buildBreadcrumb";
-import type { HierarchyTree, HierarchyTreeNode, Hierarchy } from "$lib/components/sidebarAndNav/HierarchySidebar.types";
-import { setActiveTreePath } from "$lib/components/sidebarAndNav/navigationState";
-import { buildHierarchy } from "./hierarchyConfig";
+import { log } from '$lib/utils/logger';
+import type { LoadEvent } from '@sveltejs/kit';
+import { ApiClient } from '$lib/api/client/ApiClient';
+import { getSupplierApi } from '$lib/api/client/supplier';
+import { getCategoryApi } from '$lib/api/client/category';
+import { getOfferingApi } from '$lib/api/client/offering';
+import { buildBreadcrumb } from '$lib/components/sidebarAndNav/buildBreadcrumb';
+import type {
+	HierarchyTree,
+	RuntimeHierarchyTree,
+	RuntimeHierarchyTreeNode
+} from '$lib/components/sidebarAndNav/HierarchySidebar.types';
+import { setActiveTreePath } from '$lib/components/sidebarAndNav/navigationState';
+import { getAppHierarchies } from './hierarchyConfig';
+import {
+	buildNavigationPath,
+	convertToRuntimeTree,
+	extractLeafFromUrl,
+	findNodeAtLevel,
+	parseUrlParameters,
+	updateRuntimeHierarchyParameters
+} from '$lib/components/sidebarAndNav/hierarchyUtils';
 
-// === TYPES ====================================================================================
+// === CACHING ARCHITECTURE ======================================================================
 
-type EntityNames = {
-  supplier: string | null;
-  category: string | null;
-  offering: string | null | undefined;
-};
+const runtimeHierarchyCache = new Map<string, RuntimeHierarchyTree>();
 
-// === HIERARCHY TRAVERSAL UTILITIES ============================================================
-
-/**
- * Traverses a hierarchy tree and calls a function for each node
- * Used for extracting information from the hierarchy structure
- */
-function traverseHierarchy(node: HierarchyTreeNode, callback: (node: HierarchyTreeNode) => void): void {
-  callback(node);
-
-  if (node.children) {
-    for (const child of node.children) {
-      traverseHierarchy(child, callback);
-    }
-  }
+function initializeAndCacheHierarchies(): RuntimeHierarchyTree[] {
+	if (runtimeHierarchyCache.size > 0) {
+		return Array.from(runtimeHierarchyCache.values());
+	}
+	log.debug('(Layout) Initializing and caching runtime hierarchies for the first time...');
+	const staticHierarchies = getAppHierarchies();
+	const initialRuntimeHierarchies: RuntimeHierarchyTree[] = [];
+	for (const staticTree of staticHierarchies) {
+		const runtimeTree = convertToRuntimeTree(staticTree);
+		initialRuntimeHierarchies.push(runtimeTree);
+		runtimeHierarchyCache.set(runtimeTree.name, runtimeTree);
+	}
+	return initialRuntimeHierarchies;
 }
 
-/**
- * Finds all leaf nodes in the hierarchy (nodes without urlParamName)
- * These represent pages like /attributes, /links that don't have IDs
- */
-function findLeafNodes(hierarchy: Hierarchy): string[] {
-  const leafNodes: string[] = [];
-
-  for (const tree of hierarchy) {
-    traverseHierarchy(tree.rootItem, (node) => {
-      // Leaf nodes are those without urlParamName (no ID expected)
-      if (!node.item.urlParamName) {
-        leafNodes.push(node.item.key);
-      }
-    });
-  }
-
-  return leafNodes;
-}
+// === HIERARCHY UTILITIES =======================================================================
 
 /**
- * Extracts leaf page information from URL pathname using hierarchy structure
- * No hardcoded strings - determines leaf pages from hierarchy
+ * Determines the key of the active level for sidebar highlighting, correctly
+ * implementing the `defaultChild` strategy from the navigation readme.
+ *
+ * @param navigationPath The current path of resolved entities.
+ * @param tree The hierarchy tree being navigated.
+ * @param leaf The key of a leaf page if one is active, otherwise null.
+ * @returns The string key of the active level.
  */
-function extractLeafFromUrl(hierarchy: Hierarchy, pathname: string): string | null {
-  const leafNodes = findLeafNodes(hierarchy);
+function determineActiveLevel(
+	navigationPath: RuntimeHierarchyTreeNode[],
+	tree: RuntimeHierarchyTree,
+	leaf: string | null
+): string {
+	// Rule 1: A leaf page always has the highest priority and is the active level.
+	if (leaf) {
+		log.debug(`(Layout) Active level is leaf: '${leaf}'`);
+		return leaf;
+	}
 
-  // Check which leaf node matches the URL ending
-  for (const leafKey of leafNodes) {
-    if (pathname.endsWith(`/${leafKey}`)) {
-      return leafKey;
-    }
-  }
+	// Rule 2: If a user has selected an entity, determine the next logical step.
+	if (navigationPath.length > 0) {
+		const lastNodeInPath = navigationPath[navigationPath.length - 1];
 
-  return null;
+		// Use the configured `defaultChild` if it exists.
+		if (lastNodeInPath.defaultChild) {
+			log.debug(
+				`(Layout) Active level is defaultChild '${lastNodeInPath.defaultChild}' of node '${lastNodeInPath.item.key}'`
+			);
+			return lastNodeInPath.defaultChild;
+		}
+
+		// Fallback: If no `defaultChild` is defined, the entity's own level is active.
+		log.debug(
+			`(Layout) Active level is last path node '${lastNodeInPath.item.key}' (no defaultChild)`
+		);
+		return lastNodeInPath.item.key;
+	}
+
+	// Rule 3: If there is no navigation path, the root of the tree is active.
+	log.debug(`(Layout) Active level is tree root '${tree.rootItem.item.key}'`);
+	return tree.rootItem.item.key;
 }
 
-/**
- * Generically parses URL parameters based on hierarchy structure
- * Uses the urlParamName properties from hierarchy nodes to extract values
- */
-function parseUrlParameters(hierarchy: Hierarchy, params: Record<string, string>): Record<string, any> {
-  const result: Record<string, any> = {};
-
-  for (const tree of hierarchy) {
-    traverseHierarchy(tree.rootItem, (node) => {
-      if (node.item.urlParamName && params[node.item.urlParamName]) {
-        const paramValue = params[node.item.urlParamName];
-        // Try to parse as number, fall back to string
-        const numericValue = Number(paramValue);
-        result[node.item.urlParamName] = !isNaN(numericValue) && isFinite(numericValue) ? numericValue : paramValue;
-      }
-    });
-  }
-
-  return result;
-}
-
-/**
- * Finds a node at a specific level in the hierarchy
- * Levels are 0-indexed: 0 = root, 1 = first child level, etc.
- */
-function findNodeAtLevel(tree: HierarchyTree, targetLevel: number): HierarchyTreeNode | null {
-  function searchAtLevel(node: HierarchyTreeNode, currentLevel: number): HierarchyTreeNode | null {
-    if (currentLevel === targetLevel) {
-      return node;
-    }
-
-    if (node.children && currentLevel < targetLevel) {
-      // Return the first child node at the target level
-      // This assumes a linear hierarchy structure
-      for (const child of node.children) {
-        const found = searchAtLevel(child, currentLevel + 1);
-        if (found) return found;
-      }
-    }
-
-    return null;
-  }
-
-  return searchAtLevel(tree.rootItem, 0);
-}
-
-/**
- * Builds a navigation path based on available URL parameters
- * Traverses the hierarchy and includes nodes where parameters are available
- */
-function buildNavigationPath(tree: HierarchyTree, urlParams: Record<string, any>): HierarchyTreeNode[] {
-  const path: HierarchyTreeNode[] = [];
-
-  // Start from root and traverse down while we have parameters
-  let currentLevel = 0;
-
-  while (true) {
-    const nodeAtLevel = findNodeAtLevel(tree, currentLevel);
-    if (!nodeAtLevel) break;
-
-    const paramName = nodeAtLevel.item.urlParamName;
-
-    // If this node expects a parameter and we have it, include it in path
-    if (paramName && urlParams[paramName] !== undefined) {
-      path.push(nodeAtLevel);
-      currentLevel++;
-    }
-    // If this node doesn't expect a parameter (like root "suppliers"), include it if it's level 0
-    else if (!paramName && currentLevel === 0) {
-      path.push(nodeAtLevel);
-      currentLevel++;
-    }
-    // If we can't continue the path, stop
-    else {
-      break;
-    }
-  }
-
-  return path;
-}
-
-/**
- * Determines the active level for sidebar highlighting
- * Shows the next navigable level or current leaf page
- */
-function determineActiveLevel(navigationPath: HierarchyTreeNode[], tree: HierarchyTree, leaf: string | null): string {
-  log.debug("determineActiveLevel:", {
-    navigationPath: navigationPath.map((n) => n.item.key),
-    currentDepth: navigationPath.length,
-    leaf,
-  });
-
-  // If we're on a leaf page, that's the active level
-  if (leaf) return leaf;
-
-  // Otherwise, find the next level that should be active
-  const currentDepth = navigationPath.length;
-  const nextNode = findNodeAtLevel(tree, currentDepth);
-
-   log.debug("nextNode:", nextNode?.item.key);
-
-  // Return the next node's key, or fallback to the root
-  return nextNode?.item.key || tree.rootItem.item.key;
-}
-
-// === LEGACY SUPPORT ===========================================================================
-
-/**
- * Creates a legacy-compatible finalUiPath object for buildBreadcrumb
- * This bridges the gap between hierarchy-based parsing and existing breadcrumb logic
- */
-function createLegacyFinalUiPath(urlParams: Record<string, any>, leaf: string | null): ConservedPath {
-  return {
-    supplierId: urlParams.supplierId || null,
-    categoryId: urlParams.categoryId || null,
-    offeringId: urlParams.offeringId || null,
-    leaf: leaf as any,
-  };
-}
-
-// === MAIN LOAD FUNCTION =======================================================================
+// === MAIN LOAD FUNCTION ========================================================================
 
 export async function load({ url, params, depends, fetch: loadEventFetch }: LoadEvent) {
-  log.info("(Layout Load) called with URL:", url.href, "and params:", params);
-  depends(`url:${url.href}`);
+	log.info(`(Layout) Load function triggered for URL: ${url.pathname}`);
+	depends(`url:${url.href}`);
 
-  // === 1. BUILD INITIAL HIERARCHY ==============================================================
+	// --- 1. Get or Initialize Hierarchy from Cache ---------------------------------------------
+	const initialHierarchies = initializeAndCacheHierarchies();
 
-  // Build hierarchy with empty context first to get structure
-  const initialHierarchy = buildHierarchy({
-    supplierId: null,
-    categoryId: null,
-    offeringId: null,
-    leaf: null,
-  });
+	// --- 2. Parse URL for Parameters and Leaf --------------------------------------------------
+	const urlParams = parseUrlParameters(initialHierarchies, params);
+	const leaf = extractLeafFromUrl(initialHierarchies, url.pathname);
+	log.debug('(Layout) Parsed URL parameters:', urlParams);
+	log.debug(`(Layout) Extracted leaf page: ${leaf}`);
 
-  // === 2. PARSE URL PARAMETERS =================================================================
+	// --- 3. Update Hierarchy with Current Context ----------------------------------------------
+	const contextualHierarchy = updateRuntimeHierarchyParameters(initialHierarchies, urlParams);
+	const supplierTree = contextualHierarchy.find((tree) => tree.name === 'suppliers');
+	if (!supplierTree) {
+		throw new Error("Critical: 'suppliers' tree not found in hierarchy configuration.");
+	}
 
-  // Extract parameters generically from hierarchy structure
-  const urlParams = parseUrlParameters(initialHierarchy, params);
-  log.debug("Parsed URL parameters:", urlParams);
+	// --- 4. Build the Navigation Context Path --------------------------------------------------
+	const navigationPath = buildNavigationPath(supplierTree, urlParams);
+	log.debug('(Layout) Built navigation path:', navigationPath.map((n) => n.item.key));
 
-  // Extract leaf page information
-  const leaf = extractLeafFromUrl(initialHierarchy, url.pathname);
-  log.debug("Extracted leaf:", leaf);
+	// --- 5. Synchronize with Central Navigation State ------------------------------------------
+	if (navigationPath.length > 0) {
+		setActiveTreePath(supplierTree, navigationPath as RuntimeHierarchyTreeNode[]);
+	} else {
+        // Ensure that if the path is empty, the state is also cleared for the active tree.
+        setActiveTreePath(supplierTree, []);
+    }
+	log.debug(`(Layout) NavigationState store updated with path of length: ${navigationPath.length}`);
 
-  // === 3. BUILD CONTEXTUAL HIERARCHY ===========================================================
+	// --- 6. Determine the Active UI Level ------------------------------------------------------
+	const activeLevel = determineActiveLevel(
+		navigationPath as RuntimeHierarchyTreeNode[],
+		supplierTree,
+		leaf
+	);
+	log.debug(`(Layout) Determined final active UI level key: '${activeLevel}'`);
 
-  // Rebuild hierarchy with actual context for proper disabled states and hrefs
-  const contextualHierarchy = buildHierarchy({
-    supplierId: urlParams.supplierId || null,
-    categoryId: urlParams.categoryId || null,
-    offeringId: urlParams.offeringId || null,
-    leaf: leaf,
-  });
+	// --- 7. Fetch Dynamic Entity Names for Display ---------------------------------------------
+	const client = new ApiClient(loadEventFetch);
+	const entityNameMap = new Map<string, string>();
+	const promises = [];
+	if (urlParams.supplierId) {
+		promises.push(
+			getSupplierApi(client)
+				.loadSupplier(urlParams.supplierId)
+				.then((s) => {
+					if (s.name) entityNameMap.set('supplierId', s.name);
+				})
+				.catch(() => {})
+		);
+	}
+	if (urlParams.categoryId) {
+		promises.push(
+			getCategoryApi(client)
+				.loadCategory(urlParams.categoryId)
+				.then((c) => {
+					if (c.name) entityNameMap.set('categoryId', c.name);
+				})
+				.catch(() => {})
+		);
+	}
+	if (urlParams.offeringId) {
+		promises.push(
+			getOfferingApi(client)
+				.loadOffering(urlParams.offeringId)
+				.then((o) => {
+					if (o.product_def_title) entityNameMap.set('offeringId', o.product_def_title);
+				})
+				.catch(() => {})
+		);
+	}
+	await Promise.all(promises);
+	log.debug('(Layout) Fetched entity names:', Object.fromEntries(entityNameMap));
 
-  // Find the supplier tree (assuming single tree for now)
-  const supplierTree = contextualHierarchy.find((tree) => tree.name === "suppliers");
-  if (!supplierTree) {
-    throw new Error("Supplier tree not found in hierarchy");
-  }
+	// --- 8. Build Breadcrumbs ------------------------------------------------------------------
+	const breadcrumbItems = buildBreadcrumb({
+		navigationPath: navigationPath as RuntimeHierarchyTreeNode[],
+		entityNameMap,
+		activeLevelKey: activeLevel,
+		hierarchy: contextualHierarchy
+	});
 
-  // === 4. BUILD NAVIGATION PATH ================================================================
-
-  // Build the navigation path that corresponds to the current URL
-  const navigationPath = buildNavigationPath(supplierTree, urlParams);
-  log.debug(
-    "Built navigation path:",
-    navigationPath.map((n) => n.item.key),
-  );
-
-  // === 5. UPDATE NAVIGATION STATE ==============================================================
-
-  // Update NavigationState to reflect the current URL
-  if (navigationPath.length > 0) {
-    setActiveTreePath(supplierTree, navigationPath);
-    log.debug("NavigationState updated with path length:", navigationPath.length);
-  }
-
-  // === 6. DETERMINE ACTIVE LEVEL ===============================================================
-
-  // Determine which level should be highlighted in the sidebar
-  const activeLevel = determineActiveLevel(navigationPath, supplierTree, leaf);
-  log.debug("Determined active level:", activeLevel);
-
-  // === 7. LOAD ENTITY NAMES ====================================================================
-
-  const client = new ApiClient(loadEventFetch);
-  const entityNames: EntityNames = { supplier: null, category: null, offering: null };
-
-  // Load entity names in parallel (same as original +layout.ts)
-  const promises = [];
-
-  if (urlParams.supplierId) {
-    promises.push(
-      getSupplierApi(client)
-        .loadSupplier(urlParams.supplierId)
-        .then((s) => (entityNames.supplier = s.name))
-        .catch(() => {}),
-    );
-  }
-
-  if (urlParams.categoryId) {
-    promises.push(
-      getCategoryApi(client)
-        .loadCategory(urlParams.categoryId)
-        .then((c) => (entityNames.category = c.name))
-        .catch(() => {}),
-    );
-  }
-
-  if (urlParams.offeringId) {
-    promises.push(
-      getOfferingApi(client)
-        .loadOffering(urlParams.offeringId)
-        .then((o) => (entityNames.offering = o.product_def_title))
-        .catch(() => {}),
-    );
-  }
-
-  await Promise.all(promises);
-
-  // === 8. BUILD BREADCRUMBS ====================================================================
-
-  // Create legacy-compatible finalUiPath for existing buildBreadcrumb function
-  const legacyFinalUiPath = createLegacyFinalUiPath(urlParams, leaf);
-
-  // Build breadcrumbs using the existing buildBreadcrumb function
-  const breadcrumbItems = buildBreadcrumb({
-    url,
-    params,
-    entityNames,
-    conservedPath: legacyFinalUiPath,
-    activeLevel,
-  });
-
-  // === 9. RETURN LAYOUT DATA ===================================================================
-
-  return {
-    // Core data for the layout
-    hierarchy: contextualHierarchy,
-    breadcrumbItems,
-    activeLevel,
-
-    // Entity names for display
-    entityNames,
-
-    // Current navigation state (for debugging/inspection)
-    finalUiPath: legacyFinalUiPath,
-
-    // Navigation path for components that need it
-    navigationPath,
-
-    // Debug information
-    urlParams,
-    leaf,
-  };
+	// --- 9. Return Final Data Payload ----------------------------------------------------------
+	return {
+		hierarchy: contextualHierarchy,
+		breadcrumbItems,
+		activeLevel,
+		entityNameMap,
+		navigationPath,
+		urlParams,
+		leaf
+	};
 }

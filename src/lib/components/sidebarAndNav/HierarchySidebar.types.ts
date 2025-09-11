@@ -32,7 +32,7 @@ export type HierarchyTree = {
 // The `<const ...>` annotations are crucial here.
 export const createHierarchyNode = <const K extends string, const C extends readonly HierarchyTreeNode<any, any>[] | undefined>(node: {
   item: HierarchyItem<K>;
-  defaultChild?: C extends readonly any[] ? C[number]["item"]["key"] : never;
+  defaultChild?: C extends readonly any[] ? C[number]["item"]["key"] : never ;
   children?: C;
 }): HierarchyTreeNode<K, C> => node;
 
@@ -45,7 +45,8 @@ export type RuntimeHierarchyTree = {
 
 export type RuntimeHierarchyTreeNode = {
   item: RuntimeHierarchyItem;
-  children?: RuntimeHierarchyTreeNode[];
+  children?: RuntimeHierarchyTreeNode[] | undefined;
+  defaultChild?: string | undefined;
 };
 
 export type RuntimeHierarchyItem = HierarchyItem<string> & {

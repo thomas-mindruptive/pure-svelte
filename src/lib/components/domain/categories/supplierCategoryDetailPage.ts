@@ -5,7 +5,7 @@ import { error, type LoadEvent } from '@sveltejs/kit';
 import { getCategoryApi } from '$lib/api/client/category';
 import { getSupplierApi } from '$lib/api/client/supplier';
 import { ApiClient } from '$lib/api/client/ApiClient';
-import type { SupplierCategoryDetailPage_LoadDataAsync } from './categoryDetailPage.types';
+import type { SupplierCategoryDetailPage_LoadDataAsync } from './supplierCategoryDetailPage.types';
 
 /**
  * Loads all data for the Category Detail Page using the non-blocking "app shell" pattern.

@@ -23,7 +23,7 @@
 		SupplierCategoryDetailPage_LoadDataSchema,
 		type SupplierCategoryDetailPage_LoadData,
 		type SupplierCategoryDetailPage_LoadDataAsync
-	} from '$lib/components/domain/categories/categoryDetailPage.types';
+	} from '$lib/components/domain/categories/supplierCategoryDetailPage.types';
 
 	// ========================================================================
 	// PROPS

@@ -18,7 +18,7 @@ import type { PromisifyComplex } from '$lib/utils/typeUtils';
  * This schema is used to validate the data after all promises from the `load` function
  * have been resolved in the component.
  */
-export const CategoryDetailPage_LoadDataSchema = z.object({
+export const SupplierCategoryDetailPage_LoadDataSchema = z.object({
 	/**
 	 * Contains all details for the page header, loaded in a single API call.
 	 * This includes category name, description, and assignment-specific data like comments.
@@ -38,10 +38,10 @@ export const CategoryDetailPage_LoadDataSchema = z.object({
  * The type representing the final, resolved data structure for the page,
  * inferred directly from the Zod schema for consistency.
  */
-export type CategoryDetailPage_LoadData = z.infer<typeof CategoryDetailPage_LoadDataSchema>;
+export type SupplierCategoryDetailPage_LoadData = z.infer<typeof SupplierCategoryDetailPage_LoadDataSchema>;
 
 /**
  * The asynchronous version of the load data, where complex object properties are Promises.
  * This is the exact type that the `load` function will return.
  */
-export type CategoryDetailPage_LoadDataAsync = PromisifyComplex<CategoryDetailPage_LoadData>;
+export type SupplierCategoryDetailPage_LoadDataAsync = PromisifyComplex<SupplierCategoryDetailPage_LoadData>;

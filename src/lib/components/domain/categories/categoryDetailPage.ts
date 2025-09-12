@@ -5,7 +5,7 @@ import { error, type LoadEvent } from '@sveltejs/kit';
 import { getCategoryApi } from '$lib/api/client/category';
 import { getSupplierApi } from '$lib/api/client/supplier';
 import { ApiClient } from '$lib/api/client/ApiClient';
-import type { CategoryDetailPage_LoadDataAsync } from './categoryDetailPage.types';
+import type { SupplierCategoryDetailPage_LoadDataAsync } from './categoryDetailPage.types';
 
 /**
  * Loads all data for the Category Detail Page using the non-blocking "app shell" pattern.
@@ -14,7 +14,7 @@ import type { CategoryDetailPage_LoadDataAsync } from './categoryDetailPage.type
  * @returns An object where each property is a promise for the required data,
  *          matching the `CategoryDetailPage_LoadDataAsync` type for compile-time safety.
  */
-export function load({ params, fetch: loadEventFetch }: LoadEvent): CategoryDetailPage_LoadDataAsync {
+export function load({ params, fetch: loadEventFetch }: LoadEvent): SupplierCategoryDetailPage_LoadDataAsync {
   const supplierId = Number(params.supplierId);
   const categoryId = Number(params.categoryId);
 

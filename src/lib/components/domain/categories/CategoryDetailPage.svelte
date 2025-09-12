@@ -20,9 +20,9 @@
 	import { ApiClient } from '$lib/api/client/ApiClient';
 	import type { ID, DeleteStrategy, RowActionStrategy } from '$lib/components/grids/Datagrid.types';
 	import {
-		CategoryDetailPage_LoadDataSchema,
-		type CategoryDetailPage_LoadData,
-		type CategoryDetailPage_LoadDataAsync
+		SupplierCategoryDetailPage_LoadDataSchema,
+		type SupplierCategoryDetailPage_LoadData,
+		type SupplierCategoryDetailPage_LoadDataAsync
 	} from '$lib/components/domain/categories/categoryDetailPage.types';
 
 	// ========================================================================
@@ -31,7 +31,7 @@
 
 	// This interface now correctly matches the type returned by our new `load` function.
 	interface CategoryDetailPageProps {
-		data: CategoryDetailPage_LoadDataAsync;
+		data: SupplierCategoryDetailPage_LoadDataAsync;
 	}
 
 	const { data }: CategoryDetailPageProps = $props();
@@ -40,7 +40,7 @@
 	// STATE & DATA PROCESSING
 	// ========================================================================
 
-	let resolvedData = $state<CategoryDetailPage_LoadData | null>(null);
+	let resolvedData = $state<SupplierCategoryDetailPage_LoadData | null>(null);
 	let isLoading = $state(true);
 	let loadingError = $state<{ message: string; status?: number } | null>(null);
 
@@ -62,7 +62,7 @@
 
 				// Assemble the data object for Zod validation.
 				const dataToValidate = { assignmentDetails, offerings };
-				const validationResult = CategoryDetailPage_LoadDataSchema.safeParse(dataToValidate);
+				const validationResult = SupplierCategoryDetailPage_LoadDataSchema.safeParse(dataToValidate);
 
 				if (!validationResult.success) {
 					log.error('Zod validation failed', validationResult.error.issues);

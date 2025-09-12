@@ -23,7 +23,7 @@
 		SupplierCategoryDetailPage_LoadDataSchema,
 		type SupplierCategoryDetailPage_LoadData,
 		type SupplierCategoryDetailPage_LoadDataAsync
-	} from '$lib/components/domain/categories/supplierCategoryDetailPage.types';
+	} from './supplierCategoryDetailPage.types';
 
 	// ========================================================================
 	// PROPS
@@ -164,7 +164,6 @@
 {:else}
 	<div class="detail-page-layout">
 		<div class="detail-header-section">
-            <!-- CORRECTED: Now using assignmentDetails for header info -->
 			<h1>Offerings in "{resolvedData.assignmentDetails.category_name}"</h1>
 			<p>{resolvedData.assignmentDetails.category_description || 'No description available for this category.'}</p>
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-    import CategoryDetailPage from "$lib/components/domain/categories/SupplierCategoryDetailPage.svelte";
+    import CategoryDetailPage from "$lib/components/domain/suppliers/categories/SupplierCategoryDetailPage.svelte";
 
     let { data } = $props();
 </script>

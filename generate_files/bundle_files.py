@@ -62,7 +62,7 @@ INCLUDE_PATTERNS: List[str] = [
     # "src/lib/components/sidebarAndNav/**",
     # "src/lib/components/domain/**",
     # "src/routes/(browser)/*.*",
-    "/**"
+    "**"
 ]  
 
 # =========================

@@ -1,46 +1,55 @@
 <!-- src/lib/components/Breadcrumb.svelte - ENHANCED STYLING -->
 
-<script module lang="ts">
-  /**
-   * Defines the structure of a single breadcrumb item.
-   * This type is exported so other components can use it for type safety.
-   */
-  export type Crumb = {
-    label: string;
-    href?: string;
-    active?: boolean;
-  };
-</script>
-
 <script lang="ts">
-  /**
-   * Breadcrumb Component
-   * @props
-   * - items: Crumb[] - An array of crumb objects to display.
-   */
-  let { items = [] as Crumb[] } = $props();
+  import { log } from "$lib/utils/logger";
+  import type { Crumb } from "./breadcrumb.types";
+  import type { RuntimeHierarchyTreeNode } from "./HierarchySidebar.types";
+
+  export type BreadcrumbProps = {
+    items?: Crumb[];
+    onselect: (node: RuntimeHierarchyTreeNode) => void;
+  };
+
+  const { items = [] as Crumb[], onselect }: BreadcrumbProps = $props();
+
+  $effect(() => {
+     log.debug(`+++ Breadcrumb Props - Items`, items);
+  })
+
+
+  function handleClick(event: MouseEvent, crumb: Crumb) {
+    // Only proceed if the crumb is interactive and a handler is provided.
+    if (!crumb.active && onselect) {
+      // Prevent the browser from following the link's href directly.
+      event.preventDefault(); 
+      log.debug(`Breadcrumb link clicked. Preventing default and signaling selection of node: '${crumb.node.item.key}'`, crumb);
+      // Trigger our custom navigation logic.
+      onselect(crumb.node);
+    }
+  }
 </script>
 
 <nav aria-label="Breadcrumb" class="breadcrumb-nav">
   <ol class="breadcrumb-list">
     {#each items as item, i}
       <li class="breadcrumb-item">
-        {#if item.href && !item.active}
-          <!-- Render as a link if it has an href and is not the active page -->
-          <a href={item.href} class="breadcrumb-link">
+        {#if !item.active}
+          <!-- RENDER AS A LINK (<a> tag) as per the visual requirements. -->
+          <!-- The onclick handler intercepts the click for client-side navigation. -->
+          <a 
+            href={item.href} 
+            class="breadcrumb-link" 
+            onclick={(event) => handleClick(event, item)}
+          >
             {item.label}
           </a>
         {:else}
-          <!-- Render as plain text for the active page or items without a link -->
-          <span
-            class="breadcrumb-label"
-            aria-current={item.active ? 'page' : undefined}
-          >
+          <!-- RENDER AS PLAIN TEXT for the active page. -->
+          <span class="breadcrumb-label" aria-current="page">
             {item.label}
           </span>
         {/if}
 
-        <!-- Add a separator after each item except the last one -->
         {#if i < items.length - 1}
           <span class="breadcrumb-separator" aria-hidden="true">/</span>
         {/if}
@@ -101,7 +110,7 @@
     text-decoration: underline;
     text-decoration-color: var(--color-primary, #4f46e5);
     text-decoration-thickness: 2px;
-    
+
     /* Add some space between the text and the line for a cleaner look */
     text-underline-offset: 4px;
   }

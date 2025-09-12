@@ -14,7 +14,7 @@
 
 	// === TYPES ====================================================================================
 
-	export type SelectCallback = (tree: RuntimeHierarchyTree, node: RuntimeHierarchyTreeNode) => void;
+	export type SelectCallback = (node: RuntimeHierarchyTreeNode) => void;
 
 	type FlattenedItem = {      
 		key: RuntimeHierarchyItem['key'];
@@ -130,10 +130,10 @@
 
 	// === EVENT HANDLERS ===========================================================================
 
-	function handleSelect(tree: RuntimeHierarchyTree, node: RuntimeHierarchyTreeNode) {
-		log.debug('Sidebar item selected', { tree: tree.name, nodeKey: node.item.key });
+	function handleSelect(node: RuntimeHierarchyTreeNode) {
+		log.debug('Sidebar item selected', { nodeKey: node.item.key });
 		try {
-			onselect?.(tree, node);
+			onselect?.(node);
 		} catch (error: unknown) {
 			log.error('Selection callback in HierarchySidebar failed:', error);
 		}
@@ -159,7 +159,7 @@
 								disabled={!!item.disabled}
 								aria-current={active === item.nodeRef ? 'page' : undefined}
 								style="padding-left: {(item.level ?? 0) * 14}px"
-								onclick={() => !item.disabled && handleSelect(item.treeRef, item.nodeRef)}
+								onclick={() => !item.disabled && handleSelect(item.nodeRef)}
 							>
 								<!-- {#if item.hasChildren}
 									<span class="hb__expand-indicator" aria-hidden="true">▶</span>

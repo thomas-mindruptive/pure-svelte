@@ -171,7 +171,7 @@ export async function load({ url, params, depends, fetch: loadEventFetch }: Load
 
   const currentNavState = get(ns.navigationState);
   // const activeTree = currentState.activeTree;
-  log.debug("### Current navstate: ", currentNavState);
+  log.debug("Current navstate: ", currentNavState);
 
   // --- 1. Get or Initialize Hierarchy from Cache ---------------------------------------------
   const initialHierarchies = initializeAndCacheHierarchies();
@@ -306,8 +306,7 @@ export async function load({ url, params, depends, fetch: loadEventFetch }: Load
   const breadcrumbItems = buildBreadcrumb({
     navigationPath: navigationPath,
     entityNameMap,
-    activeLevelKey: activeNode?.item.key,
-    hierarchy: contextualRuntimeTreeHierarchy,
+    activeNode
   });
 
   // --- 9. Return Final Data Payload ----------------------------------------------------------

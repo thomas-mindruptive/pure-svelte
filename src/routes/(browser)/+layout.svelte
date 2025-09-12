@@ -11,13 +11,13 @@
   import { supplierLoadingState } from "$lib/api/client/supplier.js";
   import { derived } from "svelte/store";
   import { fade } from "svelte/transition";
-  import type { RuntimeHierarchyTree, RuntimeHierarchyTreeNode } from "$lib/components/sidebarAndNav/HierarchySidebar.types.js";
+  import type { RuntimeHierarchyTreeNode } from "$lib/components/sidebarAndNav/HierarchySidebar.types.js";
   import { selectNode, setActiveViewNode } from "$lib/components/sidebarAndNav/navigationState.js";
   import { resolveHref } from "$lib/components/sidebarAndNav/hierarchyUtils.js";
 
   import "$lib/components/styles/loadingIndicator.css";
 
-  let { data, children } = $props();
+  const { data, children } = $props();
 
   // === DERIVED STATE FROM LOAD FUNCTION ===
   const crumbItems = $derived(data.breadcrumbItems);
@@ -39,11 +39,10 @@
   /**
    * Handles sidebar navigation clicks using the new configuration-driven approach.
    * It resolves the href pattern from the hierarchy config with the current URL params.
-   * @param tree The runtime tree of the selected item.
    * @param node The runtime node that was selected.
    */
-  function handleSidebarNavigation(tree: RuntimeHierarchyTree, node: RuntimeHierarchyTreeNode) {
-    log.info(`Sidebar navigation requested for tree: '${tree.name}', node: '${node.item.key}'`);
+  function handleSidebarNavigation(node: RuntimeHierarchyTreeNode) {
+    log.info(`Sidebar navigation requested node: '${node.item.key}'`);
 
     try {
       // Update the central navigation state. This is for context preservation logic.
@@ -88,7 +87,10 @@
   <main class="main-content">
     <header class="main-header">
       <div class="breadcrumbs-wrapper">
-        <Breadcrumb items={crumbItems} />
+        <Breadcrumb
+          items={crumbItems}
+          onselect={handleSidebarNavigation}
+        />
       </div>
 
       {#if $isAnythingLoading}

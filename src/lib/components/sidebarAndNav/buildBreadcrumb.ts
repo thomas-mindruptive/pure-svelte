@@ -1,11 +1,11 @@
 // File: src/lib/components/sidebarAndNav/buildBreadcrumb.ts
 
 import type {
-	RuntimeHierarchyTree,
 	RuntimeHierarchyTreeNode
 } from './HierarchySidebar.types';
-import type { Crumb } from './Breadcrumb.svelte';
 import { buildUrlFromNavigationPath } from './hierarchyUtils';
+import { log } from '$lib/utils/logger';
+import type { Crumb } from './breadcrumb.types';
 
 // === TYPES ===
 
@@ -15,113 +15,77 @@ export type BuildBreadcrumbParams = {
 	navigationPath: RuntimeHierarchyTreeNode[];
 	/** A map from `urlParamName` (e.g., "supplierId") to the loaded entity name. */
 	entityNameMap: Map<string, string>;
-	/** The key of the level that is currently active in the UI. */
-	activeLevelKey: string;
-	/** The full hierarchy, needed to find labels for levels not in the navigationPath. */
-	hierarchy: RuntimeHierarchyTree[];
+	/** The node that is currently active in the UI. */
+	activeNode: RuntimeHierarchyTreeNode | null;
 };
 
 // === HELPER FUNCTIONS ===
 
 /**
- * Gets the display label for a given node in a fully dynamic way.
- * It prefers a specific entity name from the map, otherwise falls back to the generic label.
+ * Builds a fully explicit breadcrumb trail that shows both hierarchy levels and selected entities.
  *
- * @param node The node from the navigation path.
- * @param entityNameMap The map containing specific entity names.
- * @returns The appropriate display label as a string.
- */
-function getCrumbLabel(
-	node: RuntimeHierarchyTreeNode,
-	entityNameMap: Map<string, string>
-): string {
-	const paramName = node.item.urlParamName;
-
-	// Dynamically check if a specific name exists for this node's parameter.
-	const specificName = entityNameMap.get(paramName);
-	if (specificName) {
-		return specificName;
-	}
-
-	// Fallback to the generic label (e.g., "Suppliers", "Categories").
-	return node.item.label;
-}
-
-/**
- * Recursively searches through all provided hierarchy trees to find a node by its key.
- */
-function findNodeByKeyInHierarchies(
-	hierarchies: RuntimeHierarchyTree[],
-	key: string
-): RuntimeHierarchyTreeNode | null {
-	for (const tree of hierarchies) {
-		const found = findNodeInTree(tree.rootItem, key);
-		if (found) return found;
-	}
-	return null;
-
-	function findNodeInTree(
-		node: RuntimeHierarchyTreeNode,
-		keyToFind: string
-	): RuntimeHierarchyTreeNode | null {
-		if (node.item.key === keyToFind) return node;
-		if (node.children) {
-			for (const child of node.children) {
-				const result = findNodeInTree(child, keyToFind);
-				if (result) return result;
-			}
-		}
-		return null;
-	}
-}
-
-// === MAIN BREADCRUMB BUILDER ===
-
-/**
- * Builds a fully dynamic breadcrumb trail based on the definitive navigation state.
- * This implementation is completely agnostic of the domain (no "suppliers", etc.).
+ * @description
+ * This function translates the application's navigation state into a user-friendly breadcrumb path.
+ * The generated structure follows the explicit `Level / Entity / Level / Entity...` pattern.
+ * It correctly identifies and marks the active crumb based on the provided `activeNode`.
+ *
+ * @param {BuildBreadcrumbParams} params - The necessary data to build the crumbs.
+ * @returns {Crumb[]} An array of `Crumb` objects ready to be rendered by the `Breadcrumb.svelte` component.
  */
 export function buildBreadcrumb({
 	navigationPath,
 	entityNameMap,
-	activeLevelKey,
-	hierarchy
+	activeNode
 }: BuildBreadcrumbParams): Crumb[] {
+	log.debug("Building breadcrumbs with path:", navigationPath.map(n => n.item.key), "and active node:", activeNode?.item.key);
 	const crumbs: Crumb[] = [];
 
-	// --- Stage 1: Build the clickable "Context Path" ---
+	// Stage 1: Build the explicit "Level / Entity" path
 	for (let i = 0; i < navigationPath.length; i++) {
 		const node = navigationPath[i];
-		const pathForHref = navigationPath.slice(0, i + 1);
+		const paramName = node.item.urlParamName;
+		const entityName = entityNameMap.get(paramName);
+		const hrefForLevel = buildUrlFromNavigationPath(navigationPath.slice(0, i + 1));
+		
 		crumbs.push({
-			label: getCrumbLabel(node, entityNameMap),
-			href: buildUrlFromNavigationPath(pathForHref)
+			label: node.item.label,
+			href: hrefForLevel,
+			node: node,
 		});
-	}
 
-	// --- Stage 2: Determine and adjust the "Active Page" ---
-	const lastCrumb = crumbs.length > 0 ? crumbs[crumbs.length - 1] : null;
-	const lastNodeInPath =
-		navigationPath.length > 0 ? navigationPath[navigationPath.length - 1] : null;
-
-	if (lastNodeInPath && lastNodeInPath.item.key === activeLevelKey) {
-		// The active page is a list that is part of the context path.
-		// Mark the last crumb as active.
-		if (lastCrumb) {
-			lastCrumb.active = true;
-			delete lastCrumb.href;
-		}
-	} else {
-		// The active page is a child of the context path.
-		// Find its node to get the generic label and add it as the final crumb.
-		const activeNode = findNodeByKeyInHierarchies(hierarchy, activeLevelKey);
-		if (activeNode) {
+		if (entityName) {
 			crumbs.push({
-				label: activeNode.item.label, // Active lists always use the generic label
-				active: true
+				label: entityName,
+				href: hrefForLevel,
+				node: node,
 			});
 		}
 	}
 
+	// Stage 2: If the active node is a child of the path, append it
+	if (activeNode && !navigationPath.includes(activeNode)) {
+		crumbs.push({
+			label: activeNode.item.label,
+			node: activeNode,
+		});
+	}
+
+	// Stage 3: CORRECTED LOGIC - Find and mark the active crumb using the activeNode.
+	if (activeNode) {
+		// Iterate backwards to find the last crumb that matches the active node.
+		// This correctly handles cases where both a level ("Suppliers") and an entity ("Großhändler C")
+		// share the same source node. The entity crumb will be found and marked first.
+		for (let i = crumbs.length - 1; i >= 0; i--) {
+			const crumb = crumbs[i];
+			if (crumb.node === activeNode) {
+				crumb.active = true;
+				delete crumb.href;
+				log.debug(`Marked crumb '${crumb.label}' as active because its node matches the activeNode.`);
+				break; // Stop after finding the first match from the end.
+			}
+		}
+	}
+
+	log.debug("Final crumbs built:", crumbs);
 	return crumbs;
 }

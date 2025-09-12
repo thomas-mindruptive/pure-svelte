@@ -155,18 +155,18 @@ export function initLevels(tree: RuntimeHierarchyTree): RuntimeHierarchyTree {
  * @returns The found node or null.
  */
 export function findNodeByKeyRecursive(node: RuntimeHierarchyTreeNode, key: string): RuntimeHierarchyTreeNode | null {
-    if (node.item.key === key) {
-        return node;
+  if (node.item.key === key) {
+    return node;
+  }
+  if (node.children) {
+    for (const child of node.children) {
+      const found = findNodeByKeyRecursive(child, key);
+      if (found) {
+        return found; // Wichtig: Sobald gefunden, sofort zurückgeben und die Suche abbrechen.
+      }
     }
-    if (node.children) {
-        for (const child of node.children) {
-            const found = findNodeByKeyRecursive(child, key);
-            if (found) {
-                return found; // Wichtig: Sobald gefunden, sofort zurückgeben und die Suche abbrechen.
-            }
-        }
-    }
-    return null;
+  }
+  return null;
 }
 
 /**
@@ -178,13 +178,13 @@ export function findNodeByKeyRecursive(node: RuntimeHierarchyTreeNode, key: stri
  * @returns The found RuntimeHierarchyTreeNode or null if not found.
  */
 export function findNodeByKeyInHierarchies(hierarchies: RuntimeHierarchyTree[], key: string): RuntimeHierarchyTreeNode | null {
-    for (const tree of hierarchies) {
-        const found = findNodeByKeyRecursive(tree.rootItem, key);
-        if (found) {
-            return found; // Den ersten Treffer sofort zurückgeben.
-        }
+  for (const tree of hierarchies) {
+    const found = findNodeByKeyRecursive(tree.rootItem, key);
+    if (found) {
+      return found; // Den ersten Treffer sofort zurückgeben.
     }
-    return null;
+  }
+  return null;
 }
 
 /**
@@ -294,71 +294,76 @@ export function buildUrlFromNavigationPath(navigationPath: RuntimeHierarchyTreeN
 }
 
 /**
- * Builds the authoritative `Navigation Context Path` based on the hierarchy structure and the given URL parameters.
+ * Builds the authoritative `Navigation Context Path` from a hierarchy tree and a set of URL parameters.
  *
  * @description
- * This function is a cornerstone of the navigation system. Its primary responsibility is to translate the
- * often stateless world of a URL (e.g., `/suppliers/3/categories/5`) into a structured,
- * stateful internal application concept: the **Navigation Context**.
+ * This function is a cornerstone of the navigation system. It translates the stateless URL parameters
+ * (e.g., `{ supplierId: 3, categoryId: 5 }`) into a stateful, ordered path of nodes representing the user's
+ * drill-down journey (e.g., `[suppliersNode, categoriesNode]`).
  *
- * This context is the foundation for three critical application features:
- * 1.  **Context Preservation**: It ensures the application "knows" the specific chain of entities
- *     the user has navigated through, even when the URL is simplified during sidebar navigation.
- * 2.  **Deep Linking**: It allows a direct visit to a deep URL to correctly restore the exact
- *     UI state (active sidebar items, breadcrumbs) as if the user had navigated there manually.
- * 3.  **UI State**: The path returned by this function is the direct data source for calculating
- *     which sidebar items are clickable (`updateDisabledStates`) and for constructing the
- *     breadcrumb trail (`buildBreadcrumb`).
+ * The logic is iterative:
+ * 1. It starts at the root of the tree. The root is always included in the path.
+ * 2. It checks if the `urlParamName` for the current node (e.g., 'supplierId') exists in the `urlParams`.
+ * 3. If it exists, an entity for that level has been selected, so the function descends to the next logical child node.
+ * 4. If it does not exist, the path cannot go any deeper, and the traversal stops.
  *
- * The resulting path becomes the single source of truth for the user's current location within the hierarchy.
+ * This resulting path is the single source of truth for the user's location and is used to drive the state of
+ * the breadcrumbs, the enabled/disabled state of the sidebar, and the context for subsequent navigations.
  *
  * @example
- * // GIVEN:
- * const urlParams = { supplierId: 3, categoryId: 5 };
+ * // GIVEN: urlParams = { supplierId: 3 }
+ * // RESULT: path = [suppliersNode, categoriesNode]
+ * // The path includes 'categories' because a supplier ID was provided, unlocking that level.
  *
- * // INVOCATION:
- * const contextPath = buildNavigationContextPath(supplierTree, urlParams);
+ * @example
+ * // GIVEN: urlParams = { supplierId: 3, categoryId: 5 }
+ * // RESULT: path = [suppliersNode, categoriesNode, offeringsNode]
  *
- * // RESULT (conceptual):
- * // Returns an array containing the nodes for 'suppliers' and 'categories'.
- * // The 'suppliersNode' in the path would have `urlParamValue` set to 3.
- * // The 'categoriesNode' in the path would have `urlParamValue` set to 5.
- * // return [suppliersNode, categoriesNode];
- *
- * @param tree - The complete runtime hierarchy, containing all possible
- *   branches and configuration data. It acts as the "map" on which navigation occurs.
- * @param urlParams - An object containing the merged parameters from both the
- *   URL and the `navigationState` store (e.g., `{ supplierId: 3, categoryId: 5 }`).
- *   These act as the "coordinates" on the map.
- * @returns An array of `RuntimeHierarchyTreeNode` objects representing the
- *   exact, ordered path from the root to the deepest point defined by the `urlParams`.
- *   Returns a path containing only the root node if no relevant parameters are found.
+ * @param {RuntimeHierarchyTree} tree - The complete runtime hierarchy tree to traverse.
+ * @param {Record<string, any>} urlParams - The merged URL parameters, which act as the "coordinates" to define the path's depth.
+ * @returns {RuntimeHierarchyTreeNode[]} An array of nodes representing the exact path from the root to the deepest point defined by the `urlParams`.
  */
-export function buildNavContextPathFromUrl(tree: RuntimeHierarchyTree, urlParams: Record<string, unknown>): RuntimeHierarchyTreeNode[] {
-  log.debug(`Building navigation context path from URL`, { tree, urlParams });
-
+export function buildNavContextPathFromUrl(tree: RuntimeHierarchyTree, urlParams: Record<string, any>): RuntimeHierarchyTreeNode[] {
+  log.debug(`Building path for tree '${tree.name}' with params:`, urlParams);
   const path: RuntimeHierarchyTreeNode[] = [];
+  let currentNode: RuntimeHierarchyTreeNode | null | undefined = tree.rootItem;
 
-  function findPath(currentNode: RuntimeHierarchyTreeNode): void {
-    // The current node is always added to the path as we traverse down.
+  while (currentNode) {
+    // 1. Add the current node to our path.
     path.push(currentNode);
-    log.debug(`findPath: Pushing path`, currentNode);
 
-    if (!currentNode.children) {
-      return; // End of the branch.
-    }
+    // 2. Check if the parameter for the *current* node exists.
+    // This tells us if we have selected an entity at this level.
+    const paramName = currentNode.item.urlParamName;
+    const hasEntityForCurrentLevel = urlParams[paramName] !== undefined && paramName !== "leaf";
 
-    // Find the next node in the path by checking which of the children's
-    // urlParamNames exists in the urlParams object.
-    const nextNodeInPath = currentNode.children.find((child) => urlParams[child.item.urlParamName] !== undefined);
-
-    if (nextNodeInPath) {
-      // If a child matches, continue building the path from there.
-      findPath(nextNodeInPath);
+    if (hasEntityForCurrentLevel) {
+      // 3. If an entity is selected, we are allowed to proceed to the next level.
+      // We find the next logical child to descend into (e.g., 'categories' or 'offerings').
+      // This logic assumes a primary, linear path and ignores secondary branches like 'addresses'.
+      const nextNode: RuntimeHierarchyTreeNode | undefined = currentNode.children?.find(
+        (child) => child.children || child.item.urlParamName !== "leaf",
+      );
+      if (nextNode) {
+        log.debug(`Found next node`, nextNode);
+        currentNode = nextNode;
+      } else {
+        // Reached the end of a branch with a selected entity. Stop.
+        log.debug(`Reached the end of a branch, nextNode == null`);
+        currentNode = null;
+      }
+    } else {
+      // 4. If no entity is selected at the current level, the path ends here.
+      // We cannot go any deeper.
+      log.debug(`No entity is selected at the current level, the path ends here`);
+      currentNode = null;
     }
   }
 
-  findPath(tree.rootItem);
+  log.debug(
+    `[buildNavContextPathFromUrl] Final path built:`,
+    path.map((p) => p.item.key),
+  );
   return path;
 }
 
@@ -479,7 +484,6 @@ export function extractLeafFromUrl(hierarchy: RuntimeHierarchyTree[], pathname: 
   }
   return null;
 }
-
 
 /**
  * A generic traversal utility to apply a callback to every node in a tree.

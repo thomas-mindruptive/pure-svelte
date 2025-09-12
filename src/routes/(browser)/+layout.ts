@@ -12,7 +12,7 @@ import { setActiveTreePath, setActiveViewKey } from "$lib/components/sidebarAndN
 import * as ns from "$lib/components/sidebarAndNav/navigationState";
 import { getAppHierarchies } from "./hierarchyConfig";
 import {
-  buildNavigationContextPath,
+  buildNavContextPathFromUrl,
   convertToRuntimeTree,
   extractLeafFromUrl,
   parseUrlParameters,
@@ -188,7 +188,7 @@ export async function load({ url, params, depends, fetch: loadEventFetch }: Load
   }
 
   // --- 4. Build the Navigation Context Path --------------------------------------------------
-  const navigationPath = buildNavigationContextPath(supplierTree, urlParams);
+  const navigationPath = buildNavContextPathFromUrl(supplierTree, urlParams);
   log.debug(
     "Built navigation path:",
     navigationPath.map((n) => n.item.key),

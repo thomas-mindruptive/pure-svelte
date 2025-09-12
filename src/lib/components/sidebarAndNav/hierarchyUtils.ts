@@ -260,7 +260,7 @@ export function buildUrlFromNavigationPath(navigationPath: RuntimeHierarchyTreeN
  * @param urlParams A record of all currently active URL parameters.
  * @returns An array of nodes representing the resolved navigation path.
  */
-export function buildNavigationContextPath(tree: RuntimeHierarchyTree, urlParams: Record<string, unknown>): RuntimeHierarchyTreeNode[] {
+export function buildNavContextPathFromUrl(tree: RuntimeHierarchyTree, urlParams: Record<string, unknown>): RuntimeHierarchyTreeNode[] {
   log.debug(`Building navigation path`, { tree, urlParams });
 
   const path: RuntimeHierarchyTreeNode[] = [];

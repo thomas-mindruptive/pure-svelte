@@ -23,27 +23,23 @@ import { log } from "$lib/utils/logger";
 export const supplierHierarchyConfig: HierarchyTree = {
   name: "suppliers",
   rootItem: createHierarchyNode({
-    // href is explicitly set. urlParamName is still needed for url param extraction.
+    // urlParamName is needed for url param extraction.
     item: { key: "suppliers", href: "/suppliers", label: "Suppliers", disabled: false, urlParamName: "supplierId" },
     defaultChild: "categories", // Type-safe: must be a child key
     children: [
       // Categories branch
       createHierarchyNode({
-        // href is explicitly set. urlParamName is still needed for url param extraction.
         item: { key: "categories", href: "/suppliers/[supplierId]", label: "Categories", disabled: false, urlParamName: "categoryId" },
         defaultChild: "offerings", // Type-safe: must be a child key
         children: [
           createHierarchyNode({
-            // href is explicitly set. urlParamName is still needed for url param extraction.
             item: {key: "offerings", href: "/suppliers/[supplierId]/categories/[categoryId]", label: "Offerings", disabled: false, urlParamName: "offeringId" },
             defaultChild: "links", // Type-safe: must be a child key
             children: [
-              // Leaf nodes - no children, no defaultChild
               createHierarchyNode({
                 item: { key: "attributes", href:"/suppliers/[supplierId]/categories/[categoryId]/offerings/[offeringId]/attributes", label: "Attributes", disabled: false, urlParamName: "leaf" },
               }),
               createHierarchyNode({
-                // href is not set => hierarchyUtils.buildHrefForNode => "/suppliers/[supplierId]/categories/[categoryId]/offerings/[offeringId]/links"
                 item: { key: "links", href:"/suppliers/[supplierId]/categories/[categoryId]/offerings/[offeringId]/links", label: "Links", disabled: false, urlParamName: "leaf" },
               }),
             ],
@@ -58,6 +54,38 @@ export const supplierHierarchyConfig: HierarchyTree = {
     ],
   }),
 };
+
+// prettier-ignore
+export const productCategoriesHierarchyConfig: HierarchyTree = {
+  name: "categories",
+  rootItem: createHierarchyNode({
+    // urlParamName is needed for url param extraction.
+    item: { key: "categories", href: "/categories", label: "Product Categories", disabled: false, urlParamName: "categoryId" },
+    defaultChild: "productDefinitions", // Type-safe: must be a child key
+    children: [
+      // Categories branch
+      createHierarchyNode({
+        item: { key: "productDefinitions", href: "/categories/[categoryId]", label: "Product Definitions***************", disabled: false, urlParamName: "productDefId" },
+        defaultChild: "offerings", // Type-safe: must be a child key
+        children: [
+          createHierarchyNode({
+            item: {key: "offerings", href: "/categories/[categoryId]/productDefinitions/[productDefId]", label: "Offerings", disabled: false, urlParamName: "offeringId" },
+            defaultChild: "links", // Type-safe: must be a child key
+            children: [
+              createHierarchyNode({
+                item: { key: "attributes", href:"/categories/[categoryId]/productDefinitions/[productDefId]/offerings/[offeringId]/attributes", label: "Attributes", disabled: false, urlParamName: "leaf" },
+              }),
+              createHierarchyNode({
+                item: { key: "links", href:"/categories/[categoryId]/productDefinitions/[productDefId]/offerings/[offeringId]/links", label: "Links", disabled: false, urlParamName: "leaf" },
+              }),
+            ],
+          }),
+        ],
+      }),
+    ],
+  }),
+};
+
 
 // ================================================================================================
 // FUTURE HIERARCHIES
@@ -116,6 +144,7 @@ export const productHierarchyConfig: HierarchyTree = {
 export function getAppHierarchies(): Hierarchy {
   return [
     supplierHierarchyConfig,
+    productCategoriesHierarchyConfig
     // Add more hierarchies here as they're implemented:
     // productHierarchyConfig,
     // settingsHierarchyConfig,

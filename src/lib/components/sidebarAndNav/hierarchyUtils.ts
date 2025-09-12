@@ -252,16 +252,48 @@ export function buildUrlFromNavigationPath(navigationPath: RuntimeHierarchyTreeN
 }
 
 /**
- * Builds a navigation path from the runtime tree based on available URL parameters.
- * This function intelligently traverses the tree by checking for the existence of
- * parameters defined in `urlParamName`, making it robust for direct deep links.
+ * Builds the authoritative `Navigation Context Path` based on the hierarchy structure and the given URL parameters.
  *
- * @param tree The runtime tree to build the path from.
- * @param urlParams A record of all currently active URL parameters.
- * @returns An array of nodes representing the resolved navigation path.
+ * @description
+ * This function is a cornerstone of the navigation system. Its primary responsibility is to translate the
+ * often stateless world of a URL (e.g., `/suppliers/3/categories/5`) into a structured,
+ * stateful internal application concept: the **Navigation Context**.
+ *
+ * This context is the foundation for three critical application features:
+ * 1.  **Context Preservation**: It ensures the application "knows" the specific chain of entities
+ *     the user has navigated through, even when the URL is simplified during sidebar navigation.
+ * 2.  **Deep Linking**: It allows a direct visit to a deep URL to correctly restore the exact
+ *     UI state (active sidebar items, breadcrumbs) as if the user had navigated there manually.
+ * 3.  **UI State**: The path returned by this function is the direct data source for calculating
+ *     which sidebar items are clickable (`updateDisabledStates`) and for constructing the
+ *     breadcrumb trail (`buildBreadcrumb`).
+ *
+ * The resulting path becomes the single source of truth for the user's current location within the hierarchy.
+ *
+ * @example
+ * // GIVEN:
+ * const urlParams = { supplierId: 3, categoryId: 5 };
+ *
+ * // INVOCATION:
+ * const contextPath = buildNavigationContextPath(supplierTree, urlParams);
+ *
+ * // RESULT (conceptual):
+ * // Returns an array containing the nodes for 'suppliers' and 'categories'.
+ * // The 'suppliersNode' in the path would have `urlParamValue` set to 3.
+ * // The 'categoriesNode' in the path would have `urlParamValue` set to 5.
+ * // return [suppliersNode, categoriesNode];
+ *
+ * @param tree - The complete runtime hierarchy, containing all possible
+ *   branches and configuration data. It acts as the "map" on which navigation occurs.
+ * @param urlParams - An object containing the merged parameters from both the
+ *   URL and the `navigationState` store (e.g., `{ supplierId: 3, categoryId: 5 }`).
+ *   These act as the "coordinates" on the map.
+ * @returns An array of `RuntimeHierarchyTreeNode` objects representing the
+ *   exact, ordered path from the root to the deepest point defined by the `urlParams`.
+ *   Returns a path containing only the root node if no relevant parameters are found.
  */
 export function buildNavContextPathFromUrl(tree: RuntimeHierarchyTree, urlParams: Record<string, unknown>): RuntimeHierarchyTreeNode[] {
-  log.debug(`Building navigation path`, { tree, urlParams });
+  log.debug(`Building navigation context path from URL`, { tree, urlParams });
 
   const path: RuntimeHierarchyTreeNode[] = [];
 

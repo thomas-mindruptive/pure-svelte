@@ -1,7 +1,7 @@
 // File: src/routes/(browser)/+layout.ts
 
 import { log } from "$lib/utils/logger";
-import type { LoadEvent } from "@sveltejs/kit";
+import { error, type LoadEvent } from "@sveltejs/kit";
 import { ApiClient } from "$lib/api/client/ApiClient";
 import { getSupplierApi } from "$lib/api/client/supplier";
 import { getCategoryApi } from "$lib/api/client/category";
@@ -10,7 +10,7 @@ import { buildBreadcrumb } from "$lib/components/sidebarAndNav/buildBreadcrumb";
 import type { RuntimeHierarchyTree, RuntimeHierarchyTreeNode } from "$lib/components/sidebarAndNav/HierarchySidebar.types";
 import { setActiveTreePath, setActiveViewKey } from "$lib/components/sidebarAndNav/navigationState";
 import * as ns from "$lib/components/sidebarAndNav/navigationState";
-import { getAppHierarchies } from "./hierarchyConfig";
+import { getAppHierarchies } from "./navHierarchyConfig";
 import {
   buildNavContextPathFromUrl,
   convertToRuntimeTree,
@@ -29,7 +29,7 @@ function initializeAndCacheHierarchies(): RuntimeHierarchyTree[] {
   if (runtimeHierarchyCache.size > 0) {
     return Array.from(runtimeHierarchyCache.values());
   }
-  log.debug("(Layout) Initializing and caching runtime hierarchies for the first time...");
+  log.debug("Initializing and caching runtime hierarchies for the first time...");
   const staticHierarchies = getAppHierarchies();
   const initialRuntimeHierarchies: RuntimeHierarchyTree[] = [];
   for (const staticTree of staticHierarchies) {
@@ -52,42 +52,42 @@ function initializeAndCacheHierarchies(): RuntimeHierarchyTree[] {
  * @returns The string key of the active level.
  */
 function determineActiveLevel(
-	navigationPath: RuntimeHierarchyTreeNode[],
-	tree: RuntimeHierarchyTree,
-	leaf: string | null,
-    currentState: ns.NavigationState
+  navigationPath: RuntimeHierarchyTreeNode[],
+  tree: RuntimeHierarchyTree,
+  leaf: string | null,
+  currentState: ns.NavigationState,
 ): string {
-	// Rule 1: An explicitly set view key from a sidebar click has the highest priority.
-	const explicitViewKey = currentState.activeViewKey;
-	if (explicitViewKey) {
-		log.debug(`(Layout) Active level determined by EXPLICIT VIEW KEY: '${explicitViewKey}'`);
-		// Consume the key so it's only used once.
-		setActiveViewKey(null);
-		return explicitViewKey;
-	}
+  // Rule 1: An explicitly set view key from a sidebar click has the highest priority.
+  const explicitViewKey = currentState.activeViewKey;
+  if (explicitViewKey) {
+    log.debug(`(Layout) Active level determined by EXPLICIT VIEW KEY: '${explicitViewKey}'`);
+    // Consume the key so it's only used once.
+    setActiveViewKey(null);
+    return explicitViewKey;
+  }
 
-	// Rule 2: A leaf page is the next priority.
-	if (leaf) {
-		log.debug(`(Layout) Active level determined by LEAF: '${leaf}'`);
-		return leaf;
-	}
+  // Rule 2: A leaf page is the next priority.
+  if (leaf) {
+    log.debug(`(Layout) Active level determined by LEAF: '${leaf}'`);
+    return leaf;
+  }
 
-	// Rule 3: If an entity is selected, apply the defaultChild logic.
-	if (navigationPath.length > 0) {
-		const lastNodeInPath = navigationPath[navigationPath.length - 1];
-		if (lastNodeInPath.item.urlParamValue !== 'leaf' && lastNodeInPath.defaultChild) {
-			log.debug(`(Layout) Active level determined by DEFAULT CHILD: '${lastNodeInPath.defaultChild}'`);
-			return lastNodeInPath.defaultChild;
-		}
-		if (lastNodeInPath) {
-			log.debug(`(Layout) Active level determined by LAST PATH NODE: '${lastNodeInPath.item.key}'`);
-			return lastNodeInPath.item.key;
-		}
-	}
+  // Rule 3: If an entity is selected, apply the defaultChild logic.
+  if (navigationPath.length > 0) {
+    const lastNodeInPath = navigationPath[navigationPath.length - 1];
+    if (lastNodeInPath.item.urlParamValue !== "leaf" && lastNodeInPath.defaultChild) {
+      log.debug(`(Layout) Active level determined by DEFAULT CHILD: '${lastNodeInPath.defaultChild}'`);
+      return lastNodeInPath.defaultChild;
+    }
+    if (lastNodeInPath) {
+      log.debug(`(Layout) Active level determined by LAST PATH NODE: '${lastNodeInPath.item.key}'`);
+      return lastNodeInPath.item.key;
+    }
+  }
 
-	// Fallback: The root of the tree is active.
-	log.debug(`(Layout) Active level determined by FALLBACK: '${tree.rootItem.item.key}'`);
-	return tree.rootItem.item.key;
+  // Fallback: The root of the tree is active.
+  log.debug(`(Layout) Active level determined by FALLBACK: '${tree.rootItem.item.key}'`);
+  return tree.rootItem.item.key;
 }
 
 // === MAIN LOAD FUNCTION ========================================================================
@@ -181,10 +181,14 @@ export async function load({ url, params, depends, fetch: loadEventFetch }: Load
   log.debug(`Extracted leaf page: ${leaf}`);
 
   // --- 3. Update Hierarchy with Current Context ----------------------------------------------
-  let contextualHierarchy = updateRuntimeHierarchyParameters(initialHierarchies, urlParams);
-  const supplierTree = contextualHierarchy.find((tree) => tree.name === "suppliers");
+  let contextualRuntimeTreeHierarchy = updateRuntimeHierarchyParameters(initialHierarchies, urlParams);
+  const supplierTree = contextualRuntimeTreeHierarchy.find((tree) => tree.name === "suppliers");
   if (!supplierTree) {
-    throw new Error("Critical: 'suppliers' tree not found in hierarchy configuration.");
+    throw error(500, "Critical: 'suppliers' tree not found in hierarchy configuration.");
+  }
+  const categoryTree = contextualRuntimeTreeHierarchy.find((tree) => tree.name === "categories");
+  if (!categoryTree) {
+    throw error(500, "Critical: 'categoryTree' tree not found in hierarchy configuration.");
   }
 
   // --- 4. Build the Navigation Context Path --------------------------------------------------
@@ -197,7 +201,7 @@ export async function load({ url, params, depends, fetch: loadEventFetch }: Load
   // --- 4.5 Update Disabled States ------------------------------------------------------------
   // After knowing the context path, update the entire tree to set which nodes
   // are clickable (enabled) or not (disabled).
-  contextualHierarchy = contextualHierarchy.map((tree) => updateDisabledStates(tree, navigationPath));
+  contextualRuntimeTreeHierarchy = contextualRuntimeTreeHierarchy.map((tree) => updateDisabledStates(tree, navigationPath));
   log.debug("(Layout) Updated disabled states for the hierarchy.");
 
   // --- 5. Synchronize with Central Navigation State ------------------------------------------
@@ -206,11 +210,10 @@ export async function load({ url, params, depends, fetch: loadEventFetch }: Load
   } else {
     setActiveTreePath(supplierTree, []);
   }
-  log.debug(`(Layout) NavigationState store updated with path of length: ${navigationPath.length}`);
+  log.debug(`NavigationState store updated with path of length: ${navigationPath.length}`);
 
   // --- 6. Determine the Active UI Level ------------------------------------------------------
   const activeLevel = determineActiveLevel(navigationPath, supplierTree, leaf, currentNavState);
-
   log.debug(`(Layout) Determined final active UI level key: '${activeLevel}'`);
 
   // --- 7. Fetch Dynamic Entity Names for Display ---------------------------------------------
@@ -255,12 +258,12 @@ export async function load({ url, params, depends, fetch: loadEventFetch }: Load
     navigationPath: navigationPath,
     entityNameMap,
     activeLevelKey: activeLevel,
-    hierarchy: contextualHierarchy,
+    hierarchy: contextualRuntimeTreeHierarchy,
   });
 
   // --- 9. Return Final Data Payload ----------------------------------------------------------
   return {
-    hierarchy: contextualHierarchy,
+    hierarchy: contextualRuntimeTreeHierarchy,
     breadcrumbItems,
     activeLevel,
     entityNameMap,

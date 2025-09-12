@@ -110,7 +110,7 @@
 <style>
   .browser-layout {
     display: grid;
-    grid-template-columns: 280px 1fr;
+    grid-template-columns: 320px 1fr;
     height: 100vh;
     width: 100vw;
     overflow: hidden;
@@ -119,6 +119,7 @@
     background: var(--pc-grid-header-bg, #f8fafc);
     border-right: 1px solid var(--pc-grid-border, #e2e8f0);
     overflow-y: auto;
+    white-space: nowrap;
   }
   .main-content {
     display: grid;

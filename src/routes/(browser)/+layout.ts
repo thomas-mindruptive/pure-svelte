@@ -201,18 +201,47 @@ export async function load({ url, params, depends, fetch: loadEventFetch }: Load
   log.debug(`Extracted leaf page: ${leaf}`);
 
   // --- 3. Update Hierarchy with Current Context ----------------------------------------------
+
+  // --- 3.a. Find tree based on URL
+
   let contextualRuntimeTreeHierarchy = updateRuntimeHierarchyParameters(initialHierarchies, urlParams);
-  const supplierTree = contextualRuntimeTreeHierarchy.find((tree) => tree.name === "suppliers");
-  if (!supplierTree) {
-    throw error(500, "Critical: 'suppliers' tree not found in hierarchy configuration.");
+
+  // 1. Get the first segment of the URL path (e.g., 'suppliers' or 'categories').
+  const firstPathSegment = url.pathname.split("/")[1] || "";
+
+  let activeTree: RuntimeHierarchyTree | undefined;
+
+  // 2. Handle the explicit root path "/" as a special case.
+  if (firstPathSegment === "") {
+    log.debug("Root path ('/') detected. Applying default fallback tree.");
+    // Fallback to the 'suppliers' tree or the first available one.
+    activeTree = contextualRuntimeTreeHierarchy.find((tree) => tree.name === "suppliers") || contextualRuntimeTreeHierarchy[0];
   }
-  const categoryTree = contextualRuntimeTreeHierarchy.find((tree) => tree.name === "categories");
-  if (!categoryTree) {
-    throw error(500, "Critical: 'categoryTree' tree not found in hierarchy configuration.");
+  // 3. For all other non-root paths, try to find a matching tree.
+  else {
+    log.debug(`Non-root path detected. Searching for tree with root key: '${firstPathSegment}'`);
+    activeTree = contextualRuntimeTreeHierarchy.find((tree) => tree.rootItem.item.key === firstPathSegment);
   }
 
+  // 4. Final safety check.
+  // This will now correctly throw an error for invalid paths like "/supplirrs"
+  // but will succeed for "/" because of the explicit fallback logic above.
+  if (!activeTree) {
+    throw error(404, `Page not found: No hierarchy tree configured for the path segment '${firstPathSegment}'.`);
+  }
+
+  // OLD:
+  // const supplierTree = contextualRuntimeTreeHierarchy.find((tree) => tree.name === "suppliers");
+  // if (!supplierTree) {
+  //   throw error(500, "Critical: 'suppliers' tree not found in hierarchy configuration.");
+  // }
+  // const categoryTree = contextualRuntimeTreeHierarchy.find((tree) => tree.name === "categories");
+  // if (!categoryTree) {
+  //   throw error(500, "Critical: 'categoryTree' tree not found in hierarchy configuration.");
+  // }
+
   // --- 4. Build the Navigation Context Path --------------------------------------------------
-  const navigationPath = buildNavContextPathFromUrl(supplierTree, urlParams);
+  const navigationPath = buildNavContextPathFromUrl(activeTree, urlParams);
   log.debug(
     "Built navigation path:",
     navigationPath.map((n) => n.item.key),
@@ -226,14 +255,14 @@ export async function load({ url, params, depends, fetch: loadEventFetch }: Load
 
   // --- 5. Synchronize with Central Navigation State ------------------------------------------
   if (navigationPath.length > 0) {
-    setActiveTreePath(supplierTree, navigationPath);
+    setActiveTreePath(activeTree, navigationPath);
   } else {
-    setActiveTreePath(supplierTree, []);
+    setActiveTreePath(activeTree, []);
   }
   log.debug(`NavigationState store updated with path of length: ${navigationPath.length}`);
 
   // --- 6. Determine the Active UI Level ------------------------------------------------------
-  const activeNode = determineActiveNode(navigationPath, supplierTree, leaf, currentNavState, contextualRuntimeTreeHierarchy);
+  const activeNode = determineActiveNode(navigationPath, activeTree, leaf, currentNavState, contextualRuntimeTreeHierarchy);
   log.debug(`Determined final active UI Node: '${activeNode?.item.key}'`);
 
   // --- 7. Fetch Dynamic Entity Names for Display ---------------------------------------------

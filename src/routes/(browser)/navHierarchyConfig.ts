@@ -65,7 +65,7 @@ export const productCategoriesHierarchyConfig: HierarchyTree = {
     children: [
       // Categories branch
       createHierarchyNode({
-        item: { key: "productDefinitions", href: "/categories/[categoryId]", label: "Product Definitions***************", disabled: false, urlParamName: "productDefId" },
+        item: { key: "productDefinitions", href: "/categories/[categoryId]", label: "Product Definitions", disabled: false, urlParamName: "productDefId" },
         defaultChild: "offerings", // Type-safe: must be a child key
         children: [
           createHierarchyNode({

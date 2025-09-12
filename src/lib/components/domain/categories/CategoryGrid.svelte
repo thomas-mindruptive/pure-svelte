@@ -13,20 +13,15 @@
     loading?: boolean;
     deleteStrategy: DeleteStrategy<ProductCategory>;
     rowActionStrategy?: RowActionStrategy<ProductCategory>;
-  }
+  };
 
-  const {
-    rows = [],
-    loading = false,
-    deleteStrategy,
-    rowActionStrategy,
-  }:CategoryGridProps = $props();
+  const { rows = [], loading = false, deleteStrategy, rowActionStrategy }: CategoryGridProps = $props();
 
   // === COLUMNS ====================================================================================
 
   const columns: ColumnDefDirect<ProductCategory>[] = [
-    { key: "category_id", header: "id", sortable: true, width: "3fr" },
     { key: "name", header: "Name", sortable: false, width: "2fr" },
+    { key: "category_id", header: "id", sortable: true, width: "3fr" },
     { key: "description", header: "description", sortable: true, width: "1fr" },
   ];
 

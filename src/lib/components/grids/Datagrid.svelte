@@ -19,7 +19,7 @@
   import "$lib/components/styles/grid.css";
   import type { ID, ColumnDef, DeleteStrategy, RowActionStrategy, DryRunResult, ConfirmResult } from "./Datagrid.types";
 
-   import "$lib/components/styles/loadingIndicator.css";
+  import "$lib/components/styles/loadingIndicator.css";
 
   // ===== PROP TYPES =====
 
@@ -723,14 +723,6 @@
     Uses flexbox layout for responsive arrangement
   -->
   <div class="pc-grid__toolbar">
-    {#if loading}
-      <div
-        class="loader-wrapper"
-        transition:fade={{ duration: 150, delay: 200 }}
-      >
-        <div class="spinner"></div>
-      </div>
-    {/if}
     {#if toolbar}
       <!-- Custom toolbar provided via snippet -->
       {@render toolbar({ selectedIds, deletingObjectIds, deleteSelected })}
@@ -768,6 +760,16 @@
         {/if}
         Delete selected ({selectedIds.size})
       </button>
+
+      <!-- General loading spinner for entire data grid -->
+      {#if loading}
+        <div
+          class="loader-wrapper"
+          transition:fade={{ duration: 150, delay: 200 }}
+        >
+          <div class="spinner"></div>
+        </div>
+      {/if}
     {/if}
   </div>
 

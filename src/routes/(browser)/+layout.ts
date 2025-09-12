@@ -8,13 +8,14 @@ import { getCategoryApi } from "$lib/api/client/category";
 import { getOfferingApi } from "$lib/api/client/offering";
 import { buildBreadcrumb } from "$lib/components/sidebarAndNav/buildBreadcrumb";
 import type { RuntimeHierarchyTree, RuntimeHierarchyTreeNode } from "$lib/components/sidebarAndNav/HierarchySidebar.types";
-import { setActiveTreePath, setActiveViewKey } from "$lib/components/sidebarAndNav/navigationState";
+import { setActiveTreePath } from "$lib/components/sidebarAndNav/navigationState";
 import * as ns from "$lib/components/sidebarAndNav/navigationState";
 import { getAppHierarchies } from "./navHierarchyConfig";
 import {
   buildNavContextPathFromUrl,
   convertToRuntimeTree,
   extractLeafFromUrl,
+  findNodeByKeyInHierarchies,
   parseUrlParameters,
   updateDisabledStates,
   updateRuntimeHierarchyParameters,
@@ -43,51 +44,70 @@ function initializeAndCacheHierarchies(): RuntimeHierarchyTree[] {
 // === HIERARCHY UTILITIES =======================================================================
 
 /**
- * Determines the key of the active level for sidebar highlighting, correctly
- * implementing the `defaultChild` strategy from the navigation readme.
+ * Determines the specific `RuntimeHierarchyTreeNode` that should be highlighted as 'active' in the UI (e.g., in the sidebar).
  *
- * @param navigationPath The current path of resolved entities.
- * @param tree The hierarchy tree being navigated.
- * @param leaf The key of a leaf page if one is active, otherwise null.
- * @returns The string key of the active level.
+ * @description
+ * This function is the central logic for translating the application's navigation state into a specific, active UI element.
+ * It's necessary because the active view isn't always the last element in the navigation path (e.g., after an entity selection, a `defaultChild` should be active).
+ *
+ * The function resolves the active node based on a strict priority order:
+ * 1. **Explicit User Intent:** Checks if a node was explicitly set via a sidebar click (`activeViewNode` in the state). This always wins.
+ * 2. **Leaf Page:** If the current URL points to a leaf page (e.g., 'attributes'), that page's node is active.
+ * 3. **Default Child:** After selecting an entity, its configured `defaultChild` becomes active to guide the user to the next logical step.
+ * 4. **Last Path Node:** If none of the above apply, the deepest node in the current navigation context is active.
+ * 5. **Fallback:** As a last resort, the root of the currently navigated tree is returned.
+ *
+ * @param navigationPath - The current contextual path of resolved entities (e.g., [suppliersNode, categoriesNode]).
+ * @param tree - The primary `RuntimeHierarchyTree` currently being navigated.
+ * @param leaf - The key of a leaf page if one is active, otherwise `null`.
+ * @param currentState - The full, current `NavigationState` from the Svelte store, needed to check for explicit view selections.
+ * @param allHierarchies - An array of all available runtime hierarchies, required to find nodes by key across different trees (e.g., finding a `defaultChild`).
+ * @returns The `RuntimeHierarchyTreeNode` to be highlighted, or `null` if no node could be determined as active.
  */
-function determineActiveLevel(
+function determineActiveNode(
   navigationPath: RuntimeHierarchyTreeNode[],
   tree: RuntimeHierarchyTree,
   leaf: string | null,
   currentState: ns.NavigationState,
-): string {
-  // Rule 1: An explicitly set view key from a sidebar click has the highest priority.
-  const explicitViewKey = currentState.activeViewKey;
-  if (explicitViewKey) {
-    log.debug(`(Layout) Active level determined by EXPLICIT VIEW KEY: '${explicitViewKey}'`);
-    // Consume the key so it's only used once.
-    setActiveViewKey(null);
-    return explicitViewKey;
+  allHierarchies: RuntimeHierarchyTree[],
+): RuntimeHierarchyTreeNode {
+  // Rule 1: An explicitly set view node has the highest priority.
+  const explicitViewNode = currentState.activeViewNode;
+  if (explicitViewNode) {
+    log.debug(`Active node determined by EXPLICIT VIEW NODE: '${explicitViewNode.item.key}'`);
+    // Consume the node so it's only used once.
+    ns.setActiveViewNode(null);
+    return explicitViewNode;
   }
 
   // Rule 2: A leaf page is the next priority.
   if (leaf) {
-    log.debug(`(Layout) Active level determined by LEAF: '${leaf}'`);
-    return leaf;
+    // This call now uses the clean, imported utility function.
+    const leafNode = findNodeByKeyInHierarchies(allHierarchies, leaf);
+    log.debug(`Active node determined by LEAF: '${leafNode?.item.key}'`);
+    if (!leafNode) throw error(500, `+layout.ts::determineActiveNode: Cannot find leaf node in all hierarchie trees: ${leaf}`);
+    return leafNode;
   }
 
-  // Rule 3: If an entity is selected, apply the defaultChild logic.
+  // Rule 3: Apply the defaultChild logic if an entity is selected.
   if (navigationPath.length > 0) {
     const lastNodeInPath = navigationPath[navigationPath.length - 1];
     if (lastNodeInPath.item.urlParamValue !== "leaf" && lastNodeInPath.defaultChild) {
-      log.debug(`(Layout) Active level determined by DEFAULT CHILD: '${lastNodeInPath.defaultChild}'`);
-      return lastNodeInPath.defaultChild;
+      const childNodeKey = lastNodeInPath.defaultChild;
+      // This call also uses the clean, imported utility function.
+      const childNode = findNodeByKeyInHierarchies(allHierarchies, childNodeKey);
+      log.debug(`Active node determined by DEFAULT CHILD: '${childNode?.item.key}'`);
+      if (!childNode) throw error(500, `+layout.ts::determineActiveNode: Cannot find childNode in all hierarchie trees: ${childNodeKey}`);
+      return childNode;
     }
-    if (lastNodeInPath) {
-      log.debug(`(Layout) Active level determined by LAST PATH NODE: '${lastNodeInPath.item.key}'`);
-      return lastNodeInPath.item.key;
-    }
+    // Rule 4: Otherwise, the last node in the path itself is active.
+    log.debug(`Active node determined by LAST PATH NODE: '${lastNodeInPath.item.key}'`);
+    return lastNodeInPath;
   }
 
-  // Fallback: The root of the tree is active.
-  log.debug(`(Layout) Active level determined by FALLBACK: '${tree.rootItem.item.key}'`);
-  return tree.rootItem.item.key;
+  // Fallback: The root node of the tree is active.
+  log.debug(`Active node determined by FALLBACK: '${tree.rootItem.item.key}'`);
+  return tree.rootItem;
 }
 
 // === MAIN LOAD FUNCTION ========================================================================
@@ -146,7 +166,7 @@ function determineActiveLevel(
  *     payload for the `+layout.svelte` component to render.
  */
 export async function load({ url, params, depends, fetch: loadEventFetch }: LoadEvent) {
-  log.info(`(Layout) Load function triggered for URL: ${url.pathname}`);
+  log.info(`Load function triggered for URL: ${url.pathname}`);
   depends(`url:${url.href}`);
 
   const currentNavState = get(ns.navigationState);
@@ -202,7 +222,7 @@ export async function load({ url, params, depends, fetch: loadEventFetch }: Load
   // After knowing the context path, update the entire tree to set which nodes
   // are clickable (enabled) or not (disabled).
   contextualRuntimeTreeHierarchy = contextualRuntimeTreeHierarchy.map((tree) => updateDisabledStates(tree, navigationPath));
-  log.debug("(Layout) Updated disabled states for the hierarchy.");
+  log.debug("Updated disabled states for the hierarchy.");
 
   // --- 5. Synchronize with Central Navigation State ------------------------------------------
   if (navigationPath.length > 0) {
@@ -213,8 +233,8 @@ export async function load({ url, params, depends, fetch: loadEventFetch }: Load
   log.debug(`NavigationState store updated with path of length: ${navigationPath.length}`);
 
   // --- 6. Determine the Active UI Level ------------------------------------------------------
-  const activeLevel = determineActiveLevel(navigationPath, supplierTree, leaf, currentNavState);
-  log.debug(`(Layout) Determined final active UI level key: '${activeLevel}'`);
+  const activeNode = determineActiveNode(navigationPath, supplierTree, leaf, currentNavState, contextualRuntimeTreeHierarchy);
+  log.debug(`Determined final active UI Node: '${activeNode?.item.key}'`);
 
   // --- 7. Fetch Dynamic Entity Names for Display ---------------------------------------------
   const client = new ApiClient(loadEventFetch);
@@ -251,13 +271,13 @@ export async function load({ url, params, depends, fetch: loadEventFetch }: Load
     );
   }
   await Promise.all(promises);
-  log.debug("(Layout) Fetched entity names:", Object.fromEntries(entityNameMap));
+  log.debug("Fetched entity names:", Object.fromEntries(entityNameMap));
 
   // --- 8. Build Breadcrumbs ------------------------------------------------------------------
   const breadcrumbItems = buildBreadcrumb({
     navigationPath: navigationPath,
     entityNameMap,
-    activeLevelKey: activeLevel,
+    activeLevelKey: activeNode?.item.key,
     hierarchy: contextualRuntimeTreeHierarchy,
   });
 
@@ -265,7 +285,7 @@ export async function load({ url, params, depends, fetch: loadEventFetch }: Load
   return {
     hierarchy: contextualRuntimeTreeHierarchy,
     breadcrumbItems,
-    activeLevel,
+    activeNode,
     entityNameMap,
     navigationPath,
     urlParams,

@@ -145,6 +145,48 @@ export function initLevels(tree: RuntimeHierarchyTree): RuntimeHierarchyTree {
   return tree;
 }
 
+// === QUERY TREE UTILITIES =======================================================================
+
+/**
+ * Internal, recursive helper function to find a node by key only
+ * within a single tree. Stops as soon as the first match is found.
+ * @param node The starting node.
+ * @param key The key to search for.
+ * @returns The found node or null.
+ */
+export function findNodeByKeyRecursive(node: RuntimeHierarchyTreeNode, key: string): RuntimeHierarchyTreeNode | null {
+    if (node.item.key === key) {
+        return node;
+    }
+    if (node.children) {
+        for (const child of node.children) {
+            const found = findNodeByKeyRecursive(child, key);
+            if (found) {
+                return found; // Wichtig: Sobald gefunden, sofort zurückgeben und die Suche abbrechen.
+            }
+        }
+    }
+    return null;
+}
+
+/**
+ * Finds the first node in an array of hierarchy trees that matches a given key.
+ * This is now the central function for searching by key.
+ *
+ * @param hierarchies The array of runtime trees to search within.
+ * @param key The key of the node to find.
+ * @returns The found RuntimeHierarchyTreeNode or null if not found.
+ */
+export function findNodeByKeyInHierarchies(hierarchies: RuntimeHierarchyTree[], key: string): RuntimeHierarchyTreeNode | null {
+    for (const tree of hierarchies) {
+        const found = findNodeByKeyRecursive(tree.rootItem, key);
+        if (found) {
+            return found; // Den ersten Treffer sofort zurückgeben.
+        }
+    }
+    return null;
+}
+
 /**
  * Finds a node in a runtime hierarchy tree by its key and level.
  * @param tree The runtime tree to search in.
@@ -152,7 +194,7 @@ export function initLevels(tree: RuntimeHierarchyTree): RuntimeHierarchyTree {
  * @param level The level to search at.
  * @returns The found node or null if not found.
  */
-export function findNodeInTree(tree: RuntimeHierarchyTree, key: string, level: number): RuntimeHierarchyTreeNode | null {
+export function findNodeInTreeByKEy(tree: RuntimeHierarchyTree, key: string, level: number): RuntimeHierarchyTreeNode | null {
   function searchNode(node: RuntimeHierarchyTreeNode): RuntimeHierarchyTreeNode | null {
     if (node.item.key === key && (node.item.level ?? 0) === level) {
       return node;
@@ -174,7 +216,7 @@ export function findNodeInTree(tree: RuntimeHierarchyTree, key: string, level: n
  * @param targetLevel The level to find a node at.
  * @returns The node at that level or null if not found.
  */
-export function findNodeAtLevel(tree: RuntimeHierarchyTree, targetLevel: number): RuntimeHierarchyTreeNode | null {
+export function findFirstNodeAtLevel(tree: RuntimeHierarchyTree, targetLevel: number): RuntimeHierarchyTreeNode | null {
   function searchAtLevel(node: RuntimeHierarchyTreeNode, currentLevel: number): RuntimeHierarchyTreeNode | null {
     if (currentLevel === targetLevel) {
       return node;
@@ -437,6 +479,7 @@ export function extractLeafFromUrl(hierarchy: RuntimeHierarchyTree[], pathname: 
   }
   return null;
 }
+
 
 /**
  * A generic traversal utility to apply a callback to every node in a tree.

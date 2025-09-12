@@ -16,7 +16,7 @@
 
 	export type SelectCallback = (tree: RuntimeHierarchyTree, node: RuntimeHierarchyTreeNode) => void;
 
-	type FlattenedItem = {
+	type FlattenedItem = {      
 		key: RuntimeHierarchyItem['key'];
 		label: RuntimeHierarchyItem['label'];
 		count?: RuntimeHierarchyItem['count'];
@@ -29,7 +29,7 @@
 
 	export type HierarchySidebarProps = {
 		hierarchy?: RuntimeHierarchyTree[];
-		active?: string | null;
+		active?: RuntimeHierarchyTreeNode | null;
 		ariaLabel?: string;
 		onselect?: SelectCallback;
 		shouldRenderHierarchyRootTitle: boolean;
@@ -45,7 +45,7 @@
 
 	const {
 		hierarchy = [] as RuntimeHierarchyTree[],
-		active = null as string | null,
+		active = null,
 		ariaLabel = 'Navigation',
 		onselect,
 		shouldRenderHierarchyRootTitle
@@ -155,17 +155,17 @@
 						<li class="hb__li">
 							<button
 								type="button"
-								class="hb__item {active === item.key ? 'is-active' : ''}"
+								class="hb__item {active === item.nodeRef ? 'is-active' : ''}"
 								disabled={!!item.disabled}
-								aria-current={active === item.key ? 'page' : undefined}
+								aria-current={active === item.nodeRef ? 'page' : undefined}
 								style="padding-left: {(item.level ?? 0) * 14}px"
 								onclick={() => !item.disabled && handleSelect(item.treeRef, item.nodeRef)}
 							>
-								{#if item.hasChildren}
+								<!-- {#if item.hasChildren}
 									<span class="hb__expand-indicator" aria-hidden="true">▶</span>
 								{:else}
 									<span class="hb__expand-spacer" aria-hidden="true"></span>
-								{/if}
+								{/if} -->
 								<span class="hb__label">{item.label}</span>
 								{#if item.count != null}
 									<span class="hb__count">{item.count}</span>
@@ -182,6 +182,7 @@
 <!-- STYLES ====================================================================================== -->
 
 <style>
+	/* svelte-ignore css_unused_selector */
 	.hb__expand-indicator,
 	.hb__expand-spacer {
 		width: 16px;
@@ -192,6 +193,7 @@
 		color: var(--color-muted, #64748b);
 	}
 
+		/* svelte-ignore css_unused_selector */
 	.hb__expand-spacer::before {
 		content: "";
 		/* Creates empty space for items without children to align labels. */

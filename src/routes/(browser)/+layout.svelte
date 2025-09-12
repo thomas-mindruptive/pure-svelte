@@ -12,17 +12,18 @@
   import { derived } from "svelte/store";
   import { fade } from "svelte/transition";
   import type { RuntimeHierarchyTree, RuntimeHierarchyTreeNode } from "$lib/components/sidebarAndNav/HierarchySidebar.types.js";
-  import { selectNode, setActiveViewKey } from "$lib/components/sidebarAndNav/navigationState.js";
-  // Step 1: Import the new resolver function
+  import { selectNode, setActiveViewNode } from "$lib/components/sidebarAndNav/navigationState.js";
   import { resolveHref } from "$lib/components/sidebarAndNav/hierarchyUtils.js";
+
+  import "$lib/components/styles/loadingIndicator.css";
 
   let { data, children } = $props();
 
   // === DERIVED STATE FROM LOAD FUNCTION ===
   const crumbItems = $derived(data.breadcrumbItems);
   const hierarchy = $derived(data.hierarchy);
-  const activeLevel = $derived(data.activeLevel);
-  // Step 2: Access the urlParams provided by the load function
+  const activeNode = $derived(data.activeNode);
+  // Access the urlParams provided by the load function
   const urlParams = $derived(data.urlParams);
 
   // === LOADING INDICATOR ===
@@ -42,21 +43,21 @@
    * @param node The runtime node that was selected.
    */
   function handleSidebarNavigation(tree: RuntimeHierarchyTree, node: RuntimeHierarchyTreeNode) {
-    log.info(`(Layout) Sidebar navigation requested for tree: '${tree.name}', node: '${node.item.key}'`);
+    log.info(`Sidebar navigation requested for tree: '${tree.name}', node: '${node.item.key}'`);
 
     try {
       // Update the central navigation state. This is for context preservation logic.
       selectNode(node);
 
       if (node.item.disabled) {
-        log.warn(`(Layout) Navigation aborted for disabled node key: '${node.item.key}'`);
+        log.warn(`Navigation aborted for disabled node key: '${node.item.key}'`);
         return;
       }
 
       // Step 3: Resolver logic
       if (node.item.href) {
-        // 1. Explicitly signal the intended view to the state store.
-        setActiveViewKey(node.item.key);
+        // Set the full node as the intended next view.
+        setActiveViewNode(node);
 
         // 2. Resolve the href pattern using the current urlParams from the load function.
         const finalHref = resolveHref(node.item.href, urlParams);
@@ -78,7 +79,7 @@
   <aside class="sidebar">
     <HierarchySidebar
       {hierarchy}
-      active={activeLevel}
+      active={activeNode}
       onselect={handleSidebarNavigation}
       shouldRenderHierarchyRootTitle={false}
     />
@@ -142,25 +143,7 @@
     min-width: 0;
     flex-shrink: 1;
   }
-  .loader-wrapper {
-    flex-shrink: 0;
-    background-color: var(--color-primary);
-    border-radius: 50%;
-    padding: 5px;
-  }
-  .spinner {
-    width: 1.5rem;
-    height: 1.5rem;
-    border-radius: 50%;
-    border: 4px solid var(--color-background);
-    border-right-color: transparent;
-    animation: spin 0.8s linear infinite;
-  }
-  @keyframes spin {
-    to {
-      transform: rotate(360deg);
-    }
-  }
+
   .page-content-wrapper {
     overflow-y: auto;
     padding: 1.5rem;

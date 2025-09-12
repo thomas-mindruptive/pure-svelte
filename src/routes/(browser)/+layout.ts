@@ -12,7 +12,7 @@ import { setActiveTreePath, setActiveViewKey } from "$lib/components/sidebarAndN
 import * as ns from "$lib/components/sidebarAndNav/navigationState";
 import { getAppHierarchies } from "./hierarchyConfig";
 import {
-  buildNavigationPath,
+  buildNavigationContextPath,
   convertToRuntimeTree,
   extractLeafFromUrl,
   parseUrlParameters,
@@ -92,6 +92,59 @@ function determineActiveLevel(
 
 // === MAIN LOAD FUNCTION ========================================================================
 
+/**
+ * The central orchestrator for the application's hierarchical navigation system.
+ * This `load` function acts as the "brain" on every client-side navigation,
+ * reconciling the application's "memory" (the preserved Navigation Context)
+ * with the user's current "intent" (the URL).
+ *
+ * It follows the architecture described in `README-navigation-system.md` to enable
+ * "Context Preservation," where the user's deep drill-down path is remembered
+ * even when navigating to higher-level pages via the sidebar.
+ *
+ * @param {LoadEvent} event - The SvelteKit load event, containing the URL, params, and fetch function.
+ * @returns {Promise<object>} A promise that resolves to an object containing all the necessary data
+ * for the layout and page components, including the fully contextualized hierarchy,
+ * breadcrumbs, and the active level for UI highlighting.
+ *
+ *
+ * ### Core Logic Flow:
+ *
+ * 1.  **Get Preserved Context**: It retrieves the current navigation path (the chain of selected
+ *     entities like "Supplier #3" -> "Category #5") from the `navigationState` Svelte store.
+ *     This represents the application's "memory".
+ *
+ * 2.  **Get URL Intent**: It parses the parameters from the current URL (e.g., `/suppliers/7`).
+ *     This represents the user's immediate navigational intent.
+ *
+ * 3.  **Reconcile State**: It merges the two sets of parameters. The URL's intent (`pathParams`)
+ *     always overrides the stored context (`preservedParams`). This is the key to how a
+ *     "Context Reset" works: clicking a new supplier in the list updates the URL, which
+ *     overwrites the old context. If the URL is simple (e.g., `/suppliers`), the preserved
+ *     context is used, achieving "Context Preservation".
+ *
+ * 4.  **Build Context Path**: Using the final, merged parameters, it constructs the definitive
+ *     `navigationPath` for this view using the `buildNavigationPath` utility. This path is the
+ *     single source of truth for the current context.
+ *
+ * 5.  **Update Hierarchy State**: It updates the entire runtime hierarchy:
+ *     - `urlParamValue` is injected into each node based on the merged params.
+ *     - `disabled` states are recalculated using `updateDisabledStates` based on the newly built
+ *       `navigationPath`, enabling/disabling sidebar items.
+ *
+ * 6.  **Synchronize Store**: The newly calculated `navigationPath` is synchronized back into the
+ *     `navigationState` store, making it the new "preserved context" for the *next* navigation.
+ *
+ * 7.  **Determine Active View**: It calculates which sidebar item should be highlighted (`activeLevel`)
+ *     based on a priority system: an explicit sidebar click intent (`activeViewKey`), a leaf page,
+ *     the `defaultChild` of the last selected entity, or the last entity itself.
+ *
+ * 8.  **Fetch Display Names**: It asynchronously fetches user-friendly names for entities in the path
+ *     (e.g., fetching "Supplier C" for `supplierId: 3`) to be used in UI elements like breadcrumbs.
+ *
+ * 9.  **Build UI Data**: Finally, it builds the `breadcrumbItems` and returns the complete data
+ *     payload for the `+layout.svelte` component to render.
+ */
 export async function load({ url, params, depends, fetch: loadEventFetch }: LoadEvent) {
   log.info(`(Layout) Load function triggered for URL: ${url.pathname}`);
   depends(`url:${url.href}`);
@@ -135,9 +188,9 @@ export async function load({ url, params, depends, fetch: loadEventFetch }: Load
   }
 
   // --- 4. Build the Navigation Context Path --------------------------------------------------
-  const navigationPath = buildNavigationPath(supplierTree, urlParams);
+  const navigationPath = buildNavigationContextPath(supplierTree, urlParams);
   log.debug(
-    "(Layout) Built navigation path:",
+    "Built navigation path:",
     navigationPath.map((n) => n.item.key),
   );
 

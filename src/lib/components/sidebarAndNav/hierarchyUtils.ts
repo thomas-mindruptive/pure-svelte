@@ -260,7 +260,7 @@ export function buildUrlFromNavigationPath(navigationPath: RuntimeHierarchyTreeN
  * @param urlParams A record of all currently active URL parameters.
  * @returns An array of nodes representing the resolved navigation path.
  */
-export function buildNavigationPath(tree: RuntimeHierarchyTree, urlParams: Record<string, any>): RuntimeHierarchyTreeNode[] {
+export function buildNavigationContextPath(tree: RuntimeHierarchyTree, urlParams: Record<string, unknown>): RuntimeHierarchyTreeNode[] {
   log.debug(`Building navigation path`, { tree, urlParams });
 
   const path: RuntimeHierarchyTreeNode[] = [];
@@ -368,7 +368,7 @@ export function validateRuntimeTree(tree: RuntimeHierarchyTree): {
  * @returns A record object mapping `urlParamName` to its value.
  */
 export function parseUrlParameters(hierarchy: RuntimeHierarchyTree[], params: Record<string, string>): Record<string, any> {
-  const result: Record<string, any> = {};
+  const result: Record<string, unknown> = {};
   for (const tree of hierarchy) {
     traverse(tree.rootItem, (node) => {
       const paramName = node.item.urlParamName;

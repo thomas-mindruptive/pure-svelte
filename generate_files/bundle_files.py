@@ -9,9 +9,9 @@ from typing import List, Dict, Iterable
 START_DIR = Path(__file__).parent.parent.resolve()
 OUTPUT_FILE = Path(__file__).parent.resolve() / "generated" / "bundle.txt"
 
-TREE_ONLY = True
+TREE_ONLY = False
 TREE_OUTPUT_FILE = Path(__file__).parent.resolve() / "generated" / "tree.txt"
-TREE_INCLUDE_ALL_FILES = True
+TREE_INCLUDE_ALL_FILES_EXCEPT_EXCLUDES = True
 
 EXTENSIONS = {
     ".cs",
@@ -57,9 +57,10 @@ EXCLUDE_FILES = ["package-lock.json", ".gitignore", "package.json", "package-loc
 # Positivliste: Leer = alles zulassen
 INCLUDE_PATTERNS: List[str] = [
     # z.B. "src/**", "app/*.svelte",
-    # "src/lib/components/sidebarAndNav/**",
-    # "src/routes/(browser)/*.*",
-     "src/**"
+    "src/lib/components/sidebarAndNav/**",
+    "src/lib/components/domain/**",
+    "src/routes/(browser)/*.*",
+    # "src/**"
 ]  
 
 # =========================
@@ -298,7 +299,7 @@ def main():
 
     if TREE_ONLY:
         write_tree(
-            START_DIR, TREE_OUTPUT_FILE, include_all_files=TREE_INCLUDE_ALL_FILES
+            START_DIR, TREE_OUTPUT_FILE, include_all_files=TREE_INCLUDE_ALL_FILES_EXCEPT_EXCLUDES
         )
         print("--- Fertig (Tree-Modus) ---")
     else:

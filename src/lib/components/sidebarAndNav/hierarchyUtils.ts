@@ -241,6 +241,205 @@ export function findFirstNodeAtLevel(tree: RuntimeHierarchyTree, targetLevel: nu
 // === URL AND PATH UTILITIES ====================================================================
 
 /**
+ * Parses the pathname from a URL object into a "primitive path".
+ *
+ * @description
+ * This is a foundational utility in the navigation architecture. It translates the
+ * unambiguous URL pathname string (e.g., "/suppliers/3/categories") into a structured
+ * array of its constituent parts, differentiating between static path segments (strings)
+ * and dynamic entity IDs (numbers). This primitive path becomes the basis for all
+ * subsequent context-building operations.
+ *
+ * The algorithm works as follows:
+ * 1. Splits the pathname by the "/" delimiter.
+ * 2. Filters out any empty segments resulting from leading/trailing slashes.
+ * 3. Maps over the segments, attempting to convert each one to a number.
+ * 4. If a segment is a valid number, it's included as a `number`.
+ * 5. Otherwise, it's included as a `string`.
+ *
+ * @param url The URL object from the SvelteKit load event.
+ * @returns An array of strings and numbers representing the navigation path.
+ */
+export function getPrimitivePathFromUrl(url: URL): (string | number)[] {
+  log.debug(`(getPrimitivePathFromUrl) Parsing pathname: '${url.pathname}'`);
+
+  const segments = url.pathname.split("/").filter(Boolean);
+
+  const primitivePath = segments.map((segment) => {
+    // Attempt to convert the segment to a number.
+    const numericValue = Number(segment);
+
+    // If the conversion results in a valid number (not NaN), use the numeric value.
+    // This correctly identifies entity IDs in the path.
+    if (!isNaN(numericValue)) {
+      return numericValue;
+    }
+
+    // Otherwise, treat it as a static string key (e.g., "suppliers", "categories").
+    return segment;
+  });
+
+  log.debug(`(getPrimitivePathFromUrl) Generated primitive path:`, primitivePath);
+  return primitivePath;
+}
+
+/**
+ * Reconciles a new path from a URL with a previously stored path to enable
+ * "Context Preservation", "Context Reset", and "Context Deepening".
+ *
+ * @description
+ * This is the heart of the navigation state logic. It makes the final decision on
+ * what the application's navigation context should be for the current page load.
+ *
+ * The algorithm works as follows:
+ * 1. It first checks for a divergence point by comparing segments of both paths.
+ *    If a divergence is found, the context has changed fundamentally, and the new
+ *    URL path is adopted immediately (Context Reset).
+ * 2. If no divergence is found, it means one path is a prefix of the other.
+ *    The function then compares their lengths to distinguish between two cases:
+ *    a) The URL path is shorter: The user has navigated "up" the hierarchy.
+ *       The longer, preserved path is kept. (Context Preservation)
+ *    b) The URL path is longer or the same length: The user has navigated "deeper"
+ *       down the same branch or refreshed the page. The new, deeper path is
+ *       adopted. (Context Deepening)
+ *
+ * @param urlPrimitivePath The new path derived from the current URL.
+ * @param preservedPrimitivePath The path currently stored in the navigation state for this context.
+ * @returns The definitive primitive path that should be used for this navigation.
+ */
+export function reconcilePaths(
+  urlPrimitivePath: (string | number)[],
+  preservedPrimitivePath: (string | number)[] | undefined,
+): (string | number)[] {
+  log.debug(`(reconcilePaths) Reconciling paths...`, {
+    urlPath: urlPrimitivePath,
+    preservedPath: preservedPrimitivePath,
+  });
+
+  // If no preserved path exists, the new URL path is adopted by default.
+  if (!preservedPrimitivePath || preservedPrimitivePath.length === 0) {
+    log.info(`(reconcilePaths) No preserved path. Adopting URL path.`);
+    return urlPrimitivePath;
+  }
+
+  // --- Step 1: Check for Divergence (Context Reset) ---
+  // We only need to check up to the length of the shorter of the two paths.
+  const minLength = Math.min(urlPrimitivePath.length, preservedPrimitivePath.length);
+  for (let i = 0; i < minLength; i++) {
+    if (urlPrimitivePath[i] !== preservedPrimitivePath[i]) {
+      // A segment differs. This is a clear Context Reset.
+      // The user has switched to a different entity on a shared parent path.
+      // e.g., preserved was ['suppliers', 3, 'categories']
+      //       new is      ['suppliers', 7]
+      log.info(`(reconcilePaths) Paths diverged at index ${i}. Adopting URL path (Context Reset).`);
+      return urlPrimitivePath;
+    }
+  }
+
+  // --- Step 2: No Divergence Found. Check Lengths for Preservation vs. Deepening ---
+  // If the loop completes, it means one path is a clean prefix of the other.
+
+  if (urlPrimitivePath.length < preservedPrimitivePath.length) {
+    // The new URL path is a shorter prefix of the preserved path.
+    // This is the classic Context Preservation case.
+    // e.g., preserved was ['suppliers', 3, 'categories', 5]
+    //       new is      ['suppliers', 3]
+    log.info(`(reconcilePaths) URL path is a prefix. Preserving deeper context.`);
+    return preservedPrimitivePath;
+  } else {
+    // The URL path is either identical to or longer than the preserved path.
+    // This is a refresh or a navigation deeper into the same context branch.
+    // e.g., preserved was ['suppliers', 3]
+    //       new is      ['suppliers', 3, 'categories', 5]
+    log.info(`(reconcilePaths) No divergence. Adopting URL path (No Change or Context Deepening).`);
+    return urlPrimitivePath;
+  }
+}
+
+/**
+ * Translates a primitive path into a validated path of rich RuntimeHierarchyTreeNode objects.
+ *
+ * @description
+ * This is the single authoritative function for translating a URL path into a rich
+ * contextual object path. It serves as both a translator and a validator. It traverses
+ * the hierarchy tree, guided by the segments of the primitive path, ensuring the
+ * requested path is structurally valid according to the hierarchy configuration.
+ *
+ * The algorithm works as follows:
+ * 1. Validates that the root of the path matches the root of the tree.
+ * 2. Iterates through the path segments from the second segment onwards.
+ * 3. For each segment, it finds the corresponding child in the current node's children.
+ * 4. If the segment is a string, it must match a child's `item.key`.
+ * 5. If the segment is a number, it must correspond to a child with `item.type === 'object'`.
+ * 6. If at any point a segment cannot be matched, the function throws an error,
+ *    indicating an invalid/malformed URL.
+ *
+ * @param tree The RuntimeHierarchyTree to traverse.
+ * @param primitivePath The ordered array of path segments (strings and numbers).
+ * @returns An array of `RuntimeHierarchyTreeNode` objects representing the valid path.
+ * @throws {Error} If the path is empty, does not match the tree's root, or is structurally invalid.
+ */
+export function findNodesForPath(tree: RuntimeHierarchyTree, primitivePath: (string | number)[]): RuntimeHierarchyTreeNode[] {
+  log.debug(`(findNodesForPath) Finding nodes for primitive path:`, {
+    treeName: tree.name,
+    path: primitivePath,
+  });
+
+  // --- Step 1: Validate Root ---
+  if (primitivePath.length === 0) {
+    const errorMessage = `(findNodesForPath) Validation failed: Primitive path is empty.`;
+    log.error(errorMessage);
+    throw new Error(errorMessage);
+  }
+
+  const rootNode = tree.rootItem;
+  if (rootNode.item.key !== primitivePath[0]) {
+    const errorMessage = `(findNodesForPath) Validation failed: Path root '${primitivePath[0]}' does not match tree root '${rootNode.item.key}'.`;
+    log.error(errorMessage);
+    throw new Error(errorMessage);
+  }
+
+  // --- Step 2: Traverse the Path ---
+  const nodesOnPath: RuntimeHierarchyTreeNode[] = [rootNode];
+  let currentNode = rootNode;
+
+  // Loop through the rest of the path segments to find the full node path.
+  for (let i = 1; i < primitivePath.length; i++) {
+    const segment = primitivePath[i];
+    let nextNode: RuntimeHierarchyTreeNode | undefined = undefined;
+
+    const children = currentNode.children ?? [];
+
+    if (typeof segment === "string") {
+      nextNode = children.find((child) => child.item.key === segment);
+    } else if (typeof segment === "number") {
+      nextNode = children.find((child) => child.item.type === "object");
+    }
+
+    // This check is the definitive guard.
+    // It handles all cases where a match was not found.
+    if (!nextNode) {
+      const pathSoFar = primitivePath.slice(0, i).join("/");
+      const segmentType = typeof segment === "number" ? "numeric ID" : "path segment";
+      const expectedType = typeof segment === "number" ? 'a child of type "object"' : `a child with key "${segment}"`;
+
+      const errorMessage = `(findNodesForPath) Validation failed: Invalid ${segmentType} '${segment}'. Node '${currentNode.item.key}' has no ${expectedType} (path so far: /${pathSoFar}).`;
+
+      log.error(errorMessage);
+      throw new Error(errorMessage);
+    }
+
+    // From this point onwards, TypeScript knows that `nextNode` is of type `RuntimeHierarchyTreeNode`.
+    nodesOnPath.push(nextNode);
+    currentNode = nextNode;
+  }
+
+  log.debug(`(findNodesForPath) Successfully found ${nodesOnPath.length} nodes for path.`);
+  return nodesOnPath;
+}
+
+
+/**
  * Resolves an href pattern by replacing placeholders with values from a parameters object.
  * Placeholders are expected in the format `[paramName]`.
  *
@@ -283,21 +482,21 @@ export function resolveHref(hrefPattern: string, urlParams: Record<string, strin
  * @param navigationPath An array of nodes representing the navigation path.
  * @returns A complete URL path string, e.g., "/suppliers/3/categories/5".
  */
-export function buildUrlFromNavigationPath(navigationPath: RuntimeHierarchyTreeNode[]): string {
-  if (navigationPath.length === 0) {
-    return "/";
-  }
-  const urlSegments: string[] = [];
-  for (const node of navigationPath) {
-    const segment = node.item.key;
-    const urlParamValue = node.item.urlParamValue;
-    urlSegments.push(segment);
-    if (urlParamValue !== "leaf") {
-      urlSegments.push(String(urlParamValue));
-    }
-  }
-  return "/" + urlSegments.join("/");
-}
+// export function buildUrlFromNavigationPath(navigationPath: RuntimeHierarchyTreeNode[]): string {
+//   if (navigationPath.length === 0) {
+//     return "/";
+//   }
+//   const urlSegments: string[] = [];
+//   for (const node of navigationPath) {
+//     const segment = node.item.key;
+//     const urlParamValue = node.item.urlParamValue;
+//     urlSegments.push(segment);
+//     if (urlParamValue !== "leaf") {
+//       urlSegments.push(String(urlParamValue));
+//     }
+//   }
+//   return "/" + urlSegments.join("/");
+// }
 
 /**
  * Builds the authoritative `Navigation Context Path` from a hierarchy tree and a set of URL parameters.
@@ -324,62 +523,64 @@ export function buildUrlFromNavigationPath(navigationPath: RuntimeHierarchyTreeN
  * @param {Record<string, any>} urlParams - The merged URL parameters, which act as the "coordinates" to define the path's depth.
  * @returns {RuntimeHierarchyTreeNode[]} An array of nodes representing the exact path from the root to the deepest point defined by the `urlParams`.
  */
-export function buildNavContextPathFromUrl(tree: RuntimeHierarchyTree, urlParams: Record<string, any>): RuntimeHierarchyTreeNode[] {
-	log.debug(`(buildNavContextPathFromUrl) Building path for tree '${tree.name}' with params:`, urlParams);
-	const path: RuntimeHierarchyTreeNode[] = [];
-	let currentListRoot: RuntimeHierarchyTreeNode | undefined = tree.rootItem;
+// export function buildNavContextPathFromUrl(tree: RuntimeHierarchyTree, urlParams: Record<string, any>): RuntimeHierarchyTreeNode[] {
+//   log.debug(`(buildNavContextPathFromUrl) Building path for tree '${tree.name}' with params:`, urlParams);
+//   const path: RuntimeHierarchyTreeNode[] = [];
+//   let currentListRoot: RuntimeHierarchyTreeNode | undefined = tree.rootItem;
 
-	// The loop iterates as long as we can find a "List" node to process.
-	while (currentListRoot) {
-		// 1. Add the current "List" node (e.g., `suppliers`, `categories`) to the path.
-		path.push(currentListRoot);
-		log.debug(`(buildNavContextPathFromUrl) Added List node to path: '${currentListRoot.item.key}'`);
+//   // The loop iterates as long as we can find a "List" node to process.
+//   while (currentListRoot) {
+//     // 1. Add the current "List" node (e.g., `suppliers`, `categories`) to the path.
+//     path.push(currentListRoot);
+//     log.debug(`(buildNavContextPathFromUrl) Added List node to path: '${currentListRoot.item.key}'`);
 
-		// 2. Find this List's corresponding "Object" node, which defines the parameter for this level.
-		// We assume the first hidden child is the main object representation for this list.
-		const objectNode: RuntimeHierarchyTreeNode | undefined = currentListRoot.children?.find((child) => child.item.display === false);
+//     // 2. Find this List's corresponding "Object" node, which defines the parameter for this level.
+//     // We assume the first hidden child is the main object representation for this list.
+//     const objectNode: RuntimeHierarchyTreeNode | undefined = currentListRoot.children?.find((child) => child.item.display === false);
 
-		if (!objectNode) {
-			// This branch has no further drill-down capability (e.g., a leaf or misconfiguration).
-			log.debug(`(buildNavContextPathFromUrl) No child Object node found for '${currentListRoot.item.key}'. Stopping traversal.`);
-			break;
-		}
+//     if (!objectNode) {
+//       // This branch has no further drill-down capability (e.g., a leaf or misconfiguration).
+//       log.debug(`(buildNavContextPathFromUrl) No child Object node found for '${currentListRoot.item.key}'. Stopping traversal.`);
+//       break;
+//     }
 
-		// 3. Check if the URL provides a parameter value for this Object node.
-		const paramName = objectNode.item.urlParamName;
-		if (!paramName) {
-			log.warn(`(buildNavContextPathFromUrl) Configuration issue: Object node '${objectNode.item.key}' is missing 'urlParamName'. Stopping traversal.`);
-			break;
-		}
+//     // 3. Check if the URL provides a parameter value for this Object node.
+//     const paramName = objectNode.item.urlParamName;
+//     if (!paramName) {
+//       log.warn(
+//         `(buildNavContextPathFromUrl) Configuration issue: Object node '${objectNode.item.key}' is missing 'urlParamName'. Stopping traversal.`,
+//       );
+//       break;
+//     }
 
-		const paramValue = urlParams[paramName];
-		if (paramValue === undefined || paramValue === null) {
-			// The URL does not specify an entity for this level. The path ends here.
-			log.debug(`(buildNavContextPathFromUrl) No param value for '${paramName}' in urlParams. Path construction complete.`);
-			break;
-		}
+//     const paramValue = urlParams[paramName];
+//     if (paramValue === undefined || paramValue === null) {
+//       // The URL does not specify an entity for this level. The path ends here.
+//       log.debug(`(buildNavContextPathFromUrl) No param value for '${paramName}' in urlParams. Path construction complete.`);
+//       break;
+//     }
 
-		// 4. An entity is selected. Create a dynamic version of the "Object" node
-		//    with the `urlParamValue` injected and add it to the path.
-		const dynamicObjectNode: RuntimeHierarchyTreeNode = {
-			...objectNode,
-			item: { ...objectNode.item, urlParamValue: paramValue }
-		};
-		path.push(dynamicObjectNode);
-		log.debug(`(buildNavContextPathFromUrl) Added Object node to path: '${dynamicObjectNode.item.key}' with value: ${paramValue}`);
+//     // 4. An entity is selected. Create a dynamic version of the "Object" node
+//     //    with the `urlParamValue` injected and add it to the path.
+//     const dynamicObjectNode: RuntimeHierarchyTreeNode = {
+//       ...objectNode,
+//       item: { ...objectNode.item, urlParamValue: paramValue },
+//     };
+//     path.push(dynamicObjectNode);
+//     log.debug(`(buildNavContextPathFromUrl) Added Object node to path: '${dynamicObjectNode.item.key}' with value: ${paramValue}`);
 
-		// 5. Find the next "List" node for the next iteration.
-		// It must be a child of the Object node we just processed. We assume the main
-		// drill-down path continues through the first child that is itself a "List" (i.e., has children).
-		currentListRoot = objectNode.children?.find((child) => child.children && child.children.length > 0);
-	}
+//     // 5. Find the next "List" node for the next iteration.
+//     // It must be a child of the Object node we just processed. We assume the main
+//     // drill-down path continues through the first child that is itself a "List" (i.e., has children).
+//     currentListRoot = objectNode.children?.find((child) => child.children && child.children.length > 0);
+//   }
 
-	log.debug(
-		`[buildNavContextPathFromUrl] Final path built:`,
-		path.map((p) => `${p.item.key}(${p.item.urlParamValue || ""})`)
-	);
-	return path;
-}
+//   log.debug(
+//     `[buildNavContextPathFromUrl] Final path built:`,
+//     path.map((p) => `${p.item.key}(${p.item.urlParamValue || ""})`),
+//   );
+//   return path;
+// }
 
 // === DYNAMIC STATE AND VALIDATION ==============================================================
 
@@ -403,41 +604,41 @@ export function buildNavContextPathFromUrl(tree: RuntimeHierarchyTree, urlParams
  * @returns The updated tree with correct disabled states.
  */
 export function updateDisabledStates(tree: RuntimeHierarchyTree, navigationPath: RuntimeHierarchyTreeNode[]): RuntimeHierarchyTree {
-	log.debug(`Updating disabled states with path of length ${navigationPath.length}`);
+  log.debug(`Updating disabled states with path of length ${navigationPath.length}`);
 
-	const lastNodeInPath = navigationPath.length > 0 ? navigationPath[navigationPath.length - 1] : null;
+  const lastNodeInPath = navigationPath.length > 0 ? navigationPath[navigationPath.length - 1] : null;
 
-	// A recursive helper function to process each node.
-	function updateNode(node: RuntimeHierarchyTreeNode): void {
-		let isDisabled = true; // Rule 0: Default to disabled.
+  // A recursive helper function to process each node.
+  function updateNode(node: RuntimeHierarchyTreeNode): void {
+    let isDisabled = true; // Rule 0: Default to disabled.
 
-		// Rule 1: The root node is always enabled.
-		if (node.item.level === 0) {
-			isDisabled = false;
-		}
-		// Rule 2: Any node within the active navigation path is enabled.
-		// A simple array lookup is perfectly efficient for a short path.
-		else if (navigationPath.includes(node)) {
-			isDisabled = false;
-		}
-		// Rule 3: Any direct child of the last node in the path is enabled.
-		else if (lastNodeInPath && lastNodeInPath.children?.includes(node)) {
-			isDisabled = false;
-		}
+    // Rule 1: The root node is always enabled.
+    if (node.item.level === 0) {
+      isDisabled = false;
+    }
+    // Rule 2: Any node within the active navigation path is enabled.
+    // A simple array lookup is perfectly efficient for a short path.
+    else if (navigationPath.includes(node)) {
+      isDisabled = false;
+    }
+    // Rule 3: Any direct child of the last node in the path is enabled.
+    else if (lastNodeInPath && lastNodeInPath.children?.includes(node)) {
+      isDisabled = false;
+    }
 
-		node.item.disabled = isDisabled;
+    node.item.disabled = isDisabled;
 
-		// Recurse through all children.
-		if (node.children) {
-			node.children.forEach(updateNode);
-		}
-	}
+    // Recurse through all children.
+    if (node.children) {
+      node.children.forEach(updateNode);
+    }
+  }
 
-	// Start the process from the root of the tree.
-	updateNode(tree.rootItem);
+  // Start the process from the root of the tree.
+  updateNode(tree.rootItem);
 
-	log.debug(`Finished updating states.`);
-	return tree;
+  log.debug(`Finished updating states.`);
+  return tree;
 }
 
 /**
@@ -481,29 +682,29 @@ export function validateRuntimeTree(tree: RuntimeHierarchyTree): {
  * @param {Record<string, string>} params - The `params` object from a SvelteKit LoadEvent.
  * @returns {Record<string, any>} A record object mapping `urlParamName` to its value (e.g., { supplierId: 3, categoryId: 5 }).
  */
-export function parseUrlParameters(hierarchies: RuntimeHierarchyTree[], params: Record<string, string>): Record<string, any> {
-	log.debug(`(parseUrlParameters) Parsing SvelteKit params:`, params);
-	const result: Record<string, unknown> = {};
+// export function parseUrlParameters(hierarchies: RuntimeHierarchyTree[], params: Record<string, string>): Record<string, any> {
+//   log.debug(`(parseUrlParameters) Parsing SvelteKit params:`, params);
+//   const result: Record<string, unknown> = {};
 
-	for (const tree of hierarchies) {
-		// Use the generic traverse utility to visit every node in the tree.
-		traverse(tree.rootItem, (node) => {
-			const paramName = node.item.urlParamName;
+//   for (const tree of hierarchies) {
+//     // Use the generic traverse utility to visit every node in the tree.
+//     traverse(tree.rootItem, (node) => {
+//       const paramName = node.item.urlParamName;
 
-			// Act only if the node is configured to have a URL parameter AND a value for it exists in the URL.
-			if (paramName && params[paramName] !== undefined) {
-				const paramValue = params[paramName];
-				const numericValue = Number(paramValue);
+//       // Act only if the node is configured to have a URL parameter AND a value for it exists in the URL.
+//       if (paramName && params[paramName] !== undefined) {
+//         const paramValue = params[paramName];
+//         const numericValue = Number(paramValue);
 
-				// Store the value, converting it to a number if it's a valid one.
-				result[paramName] = !isNaN(numericValue) ? numericValue : paramValue;
-			}
-		});
-	}
+//         // Store the value, converting it to a number if it's a valid one.
+//         result[paramName] = !isNaN(numericValue) ? numericValue : paramValue;
+//       }
+//     });
+//   }
 
-	log.debug(`(parseUrlParameters) Parsed result:`, result);
-	return result;
-}
+//   log.debug(`(parseUrlParameters) Parsed result:`, result);
+//   return result;
+// }
 
 /**
  * Extracts a leaf page segment from a URL pathname using the hierarchy structure.
@@ -512,29 +713,29 @@ export function parseUrlParameters(hierarchies: RuntimeHierarchyTree[], params: 
  * @param pathname The URL pathname string.
  * @returns The key of the found leaf node, or null.
  */
-export function extractLeafFromUrl(hierarchy: RuntimeHierarchyTree[], pathname: string): string | null {
-  const leafNodes: string[] = [];
-  for (const tree of hierarchy) {
-    traverse(tree.rootItem, (node) => {
-      if (node.item.urlParamName === "leaf") {
-        leafNodes.push(node.item.key);
-      }
-    });
-  }
-  for (const leafKey of leafNodes) {
-    if (pathname.endsWith(`/${leafKey}`)) {
-      return leafKey;
-    }
-  }
-  return null;
-}
+// export function extractLeafFromUrl(hierarchy: RuntimeHierarchyTree[], pathname: string): string | null {
+//   const leafNodes: string[] = [];
+//   for (const tree of hierarchy) {
+//     traverse(tree.rootItem, (node) => {
+//       if (node.item.urlParamName === "leaf") {
+//         leafNodes.push(node.item.key);
+//       }
+//     });
+//   }
+//   for (const leafKey of leafNodes) {
+//     if (pathname.endsWith(`/${leafKey}`)) {
+//       return leafKey;
+//     }
+//   }
+//   return null;
+// }
 
 /**
  * A generic traversal utility to apply a callback to every node in a tree.
  * @param node The starting node.
  * @param callback The function to execute for each node.
  */
-function traverse(node: RuntimeHierarchyTreeNode, callback: (node: RuntimeHierarchyTreeNode) => void) {
+export function traverse(node: RuntimeHierarchyTreeNode, callback: (node: RuntimeHierarchyTreeNode) => void) {
   callback(node);
   if (node.children) {
     for (const child of node.children) {

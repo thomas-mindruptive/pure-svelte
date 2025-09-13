@@ -241,3 +241,68 @@ export const supplierHierarchyConfig: HierarchyTree = {
 *   **Logic moves from Code to Data:** The hierarchy configuration becomes the single source of truth.
 *   **Drastically Simplified Code:** The complex, manual logic in `buildBreadcrumb.ts` will become obsolete. The breadcrumbs can follow the hierarchy exactly.
 *   **Enhanced Maintainability:** Future changes to the navigation flow will only require modifying the configuration data. This makes the system far more robust and easier to extend.
+
+
+# Current learnings!!!
+
+## hierarcyUtils
+
+### reconcilePaths - done
+1. Purpose of the function:
+To be the single, authoritative function that compares the user's immediate intent (urlPrimitivePath) with the application's memory (preservedPrimitivePath). It must correctly distinguish between three distinct scenarios: Context Preservation, Context Reset, and Context Deepening.
+2. Function Signature (Inputs and Outputs):
+Input 1: urlPrimitivePath: (string | number)[]
+Input 2: preservedPrimitivePath: (string | number)[] | undefined
+Output: (string | number)[] (The definitive primitive path)
+3. The Definitive Conceptual Logic:
+Handle Initial State: If there's no preservedPrimitivePath, the urlPrimitivePath is adopted by default.
+Divergence Check: The function will iterate through both paths up to the length of the shorter path, comparing each segment.
+If any segment differs (urlPath[i] !== preservedPath[i]), the paths have diverged. This is a Context Reset. The function must immediately return the new urlPrimitivePath.
+Prefix Check (No Divergence Found): If the loop finishes without finding any differences, it means one path is a prefix of the other. Now we check the lengths to determine the outcome.
+Case A: Context Preservation. If the urlPrimitivePath is shorter than the preservedPrimitivePath (urlPath.length < preservedPath.length), it means the user has navigated "up" the hierarchy. The function must return the longer preservedPrimitivePath.
+Case B: Context Deepening / No Change. In all other cases (urlPath.length >= preservedPath.length), it means the user is either at the same location or navigating further down the same path. This is a Context Deepening. The new, longer (or same-length) urlPrimitivePath becomes the new source of truth. The function must return the urlPrimitivePath.
+Example to be remembered for the README (Context Deepening):
+urlPrimitivePath: ['suppliers', 1, 'categories', 2, 'offerings', 5]
+preservedPrimitivePath: ['suppliers', 1, 'categories', 2]
+Check: The paths do not diverge. The urlPrimitivePath is longer.
+Result: The function returns the urlPrimitivePath, correctly deepening the context.
+
+# getPrimitivePathFromUrl - done
+done
+
+# findNodesForPath - done
+Conceptual Logic:
+Initialization:
+Validate that primitivePath is not empty and its first segment matches the rootItem.key. If not, throw an error.
+nodesOnPath = [tree.rootItem]
+currentNode = tree.rootItem
+Loop through the rest of the path segments (from index 1 to the end):
+segment = primitivePath[i]
+nextNode = undefined (The node we hope to find in this iteration)
+Find the nextNode based on the type of segment:
+Case A: The segment is a string (e.g., "categories")
+Search through currentNode.children.
+The nextNode is the first child where child.item.key === segment.
+If no such child is found after checking all children, the path is invalid. Throw an error (e.g., Path validation failed: segment '${segment}' not found).
+Case B: The segment is a number (e.g., 3)
+Search through currentNode.children.
+The nextNode is the first child where child.item.type === 'object'.
+If no child of type object is found, it means the hierarchy at this point does not accept an ID. The path is invalid. Throw an error (e.g., Path validation failed: numeric ID '${segment}' is not allowed here).
+If a nextNode was successfully found:
+Add the nextNode to the nodesOnPath array.
+Update the pointer for the next iteration: currentNode = nextNode.
+After the loop finishes, return nodesOnPath. If the loop completes without throwing an error, the URL path has been fully validated against the hierarchy structure.
+How This Solves All Problems:
+Your Edge Case (/suppliers/1):
+currentNode is suppliers. Next segment is 1 (number).
+The algorithm looks for a child of suppliers with type: "object".
+It finds the supplier node. This becomes the nextNode. The path is valid. Correct.
+Your Other Edge Case (/suppliers/addresses/1):
+currentNode is addresses. Next segment is 1 (number).
+The algorithm looks for a child of addresses with type: "object".
+The addresses node has no children. No object child is found.
+The algorithm throws an error. The URL is correctly identified as invalid. Correct.
+Agnosticism: The algorithm doesn't enforce a strict list -> object pattern. If an object node had another object node as a child, the logic would still work correctly as long as the URL provided another numeric ID.
+
+# updateDisabledStates - done
+

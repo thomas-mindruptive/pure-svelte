@@ -9,6 +9,7 @@ import type {
   RuntimeHierarchyTree,
   RuntimeHierarchyTreeNode,
 } from "./HierarchySidebar.types";
+import { NavigationError } from "./navigationError";
 
 // === TYPE ALIASES FOR STRICT TYPING ============================================================
 
@@ -379,63 +380,65 @@ export function reconcilePaths(
  * @returns An array of `RuntimeHierarchyTreeNode` objects representing the valid path.
  * @throws {Error} If the path is empty, does not match the tree's root, or is structurally invalid.
  */
-export function findNodesForPath(tree: RuntimeHierarchyTree, primitivePath: (string | number)[]): RuntimeHierarchyTreeNode[] {
-  log.debug(`(findNodesForPath) Finding nodes for primitive path:`, {
-    treeName: tree.name,
-    path: primitivePath,
-  });
+export function findNodesForPath(
+	tree: RuntimeHierarchyTree,
+	primitivePath: (string | number)[]
+): RuntimeHierarchyTreeNode[] {
+	log.debug(`Finding nodes for primitive path:`, {
+		treeName: tree.name,
+		path: primitivePath
+	});
 
-  // --- Step 1: Validate Root ---
-  if (primitivePath.length === 0) {
-    const errorMessage = `(findNodesForPath) Validation failed: Primitive path is empty.`;
-    log.error(errorMessage);
-    throw new Error(errorMessage);
-  }
+	// --- Step 1: Validate Root ---
+	if (primitivePath.length === 0) {
+		const message = `Validation failed: Primitive path is empty.`;
+		log.error(message);
+		throw new NavigationError(message, 'ERR_PATH_EMPTY');
+	}
 
-  const rootNode = tree.rootItem;
-  if (rootNode.item.key !== primitivePath[0]) {
-    const errorMessage = `(findNodesForPath) Validation failed: Path root '${primitivePath[0]}' does not match tree root '${rootNode.item.key}'.`;
-    log.error(errorMessage);
-    throw new Error(errorMessage);
-  }
+	const rootNode = tree.rootItem;
+	if (rootNode.item.key !== primitivePath[0]) {
+		const message = `Validation failed: Path root '${primitivePath[0]}' does not match tree root '${rootNode.item.key}'.`;
+		log.error(message);
+		throw new NavigationError(message, 'ERR_ROOT_MISMATCH');
+	}
 
-  // --- Step 2: Traverse the Path ---
-  const nodesOnPath: RuntimeHierarchyTreeNode[] = [rootNode];
-  let currentNode = rootNode;
+	// --- Step 2: Traverse the Path ---
+	const nodesOnPath: RuntimeHierarchyTreeNode[] = [rootNode];
+	let currentNode = rootNode;
 
-  // Loop through the rest of the path segments to find the full node path.
-  for (let i = 1; i < primitivePath.length; i++) {
-    const segment = primitivePath[i];
-    let nextNode: RuntimeHierarchyTreeNode | undefined = undefined;
+	for (let i = 1; i < primitivePath.length; i++) {
+		const segment = primitivePath[i];
+		let nextNode: RuntimeHierarchyTreeNode | undefined = undefined;
+		const children = currentNode.children ?? [];
 
-    const children = currentNode.children ?? [];
+		if (typeof segment === 'string') {
+			nextNode = children.find((child) => child.item.key === segment);
+		} else if (typeof segment === 'number') {
+			nextNode = children.find((child) => child.item.type === 'object');
+		}
 
-    if (typeof segment === "string") {
-      nextNode = children.find((child) => child.item.key === segment);
-    } else if (typeof segment === "number") {
-      nextNode = children.find((child) => child.item.type === "object");
-    }
+		// Definitive guard to handle all failure cases and satisfy TypeScript.
+		if (!nextNode) {
+			const pathSoFar = `/${primitivePath.slice(0, i).join('/')}`;
+			if (typeof segment === 'string') {
+				const message = `Validation failed: Path segment '${segment}' not found as a child of '${currentNode.item.key}' (path so far: ${pathSoFar}).`;
+				log.error(message);
+				throw new NavigationError(message, 'ERR_INVALID_STRING_SEGMENT');
+			} else { // segment must be a number here
+				const message = `Validation failed: Numeric ID '${segment}' is not allowed here. Node '${currentNode.item.key}' has no child of type 'object' (path so far: ${pathSoFar}).`;
+				log.error(message);
+				throw new NavigationError(message, 'ERR_ID_NOT_ALLOWED');
+			}
+		}
 
-    // This check is the definitive guard.
-    // It handles all cases where a match was not found.
-    if (!nextNode) {
-      const pathSoFar = primitivePath.slice(0, i).join("/");
-      const segmentType = typeof segment === "number" ? "numeric ID" : "path segment";
-      const expectedType = typeof segment === "number" ? 'a child of type "object"' : `a child with key "${segment}"`;
+		// After the guard, TypeScript knows `nextNode` is `RuntimeHierarchyTreeNode`.
+		nodesOnPath.push(nextNode);
+		currentNode = nextNode;
+	}
 
-      const errorMessage = `(findNodesForPath) Validation failed: Invalid ${segmentType} '${segment}'. Node '${currentNode.item.key}' has no ${expectedType} (path so far: /${pathSoFar}).`;
-
-      log.error(errorMessage);
-      throw new Error(errorMessage);
-    }
-
-    // From this point onwards, TypeScript knows that `nextNode` is of type `RuntimeHierarchyTreeNode`.
-    nodesOnPath.push(nextNode);
-    currentNode = nextNode;
-  }
-
-  log.debug(`(findNodesForPath) Successfully found ${nodesOnPath.length} nodes for path.`);
-  return nodesOnPath;
+	log.debug(`Successfully found ${nodesOnPath.length} nodes for path.`);
+	return nodesOnPath;
 }
 
 

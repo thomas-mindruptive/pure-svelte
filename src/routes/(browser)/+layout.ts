@@ -1,34 +1,31 @@
 // File: src/routes/(browser)/+layout.ts
 
-import { log } from '$lib/utils/logger';
-import { error, type LoadEvent } from '@sveltejs/kit';
-import { get } from 'svelte/store';
-import { ApiClient } from '$lib/api/client/ApiClient';
-import { getSupplierApi } from '$lib/api/client/supplier';
-import { getCategoryApi } from '$lib/api/client/category';
-import { getOfferingApi } from '$lib/api/client/offering';
-import { buildBreadcrumb } from '$lib/components/sidebarAndNav/buildBreadcrumb';
-import type {
-	RuntimeHierarchyTree,
-	RuntimeHierarchyTreeNode
-} from '$lib/components/sidebarAndNav/HierarchySidebar.types';
-import type { NavigationState } from '$lib/components/sidebarAndNav/navigationState';
+import { log } from "$lib/utils/logger";
+import { error, type LoadEvent } from "@sveltejs/kit";
+import { get } from "svelte/store";
+import { ApiClient } from "$lib/api/client/ApiClient";
+import { getSupplierApi } from "$lib/api/client/supplier";
+import { getCategoryApi } from "$lib/api/client/category";
+import { getOfferingApi } from "$lib/api/client/offering";
+import { buildBreadcrumb } from "$lib/components/sidebarAndNav/buildBreadcrumb";
+import type { RuntimeHierarchyTree, RuntimeHierarchyTreeNode } from "$lib/components/sidebarAndNav/HierarchySidebar.types";
+import type { NavigationState } from "$lib/components/sidebarAndNav/navigationState";
 import {
-	navigationState,
-	setActiveViewNode,
-	getCurrentPathForContext,
-	setCurrentPathForContext,
-	setActiveViewKeyForContext
-} from '$lib/components/sidebarAndNav/navigationState';
-import { getAppHierarchies } from './navHierarchyConfig';
+  navigationState,
+  setActiveViewNode,
+  getCurrentPathForContext,
+  setCurrentPathForContext,
+  setActiveViewKeyForContext,
+} from "$lib/components/sidebarAndNav/navigationState";
+import { getAppHierarchies } from "./navHierarchyConfig";
 import {
-	convertToRuntimeTree,
-	findNodeByKeyInHierarchies,
-	updateDisabledStates,
-	getPrimitivePathFromUrl,
-	reconcilePaths,
-	findNodesForPath
-} from '$lib/components/sidebarAndNav/hierarchyUtils';
+  convertToRuntimeTree,
+  findNodeByKeyInHierarchies,
+  updateDisabledStates,
+  getPrimitivePathFromUrl,
+  reconcilePaths,
+  findNodesForPath,
+} from "$lib/components/sidebarAndNav/hierarchyUtils";
 
 // ================================================================================================
 // CACHING & INITIALIZATION
@@ -37,18 +34,18 @@ import {
 const runtimeHierarchyCache = new Map<string, RuntimeHierarchyTree>();
 
 function initializeAndCacheHierarchies(): RuntimeHierarchyTree[] {
-	if (runtimeHierarchyCache.size > 0) {
-		return Array.from(runtimeHierarchyCache.values());
-	}
-	log.debug('Initializing and caching runtime hierarchies for the first time...');
-	const staticHierarchies = getAppHierarchies();
-	const initialRuntimeHierarchies: RuntimeHierarchyTree[] = [];
-	for (const staticTree of staticHierarchies) {
-		const runtimeTree = convertToRuntimeTree(staticTree);
-		initialRuntimeHierarchies.push(runtimeTree);
-		runtimeHierarchyCache.set(runtimeTree.name, runtimeTree);
-	}
-	return initialRuntimeHierarchies;
+  if (runtimeHierarchyCache.size > 0) {
+    return Array.from(runtimeHierarchyCache.values());
+  }
+  log.debug("Initializing and caching runtime hierarchies for the first time...");
+  const staticHierarchies = getAppHierarchies();
+  const initialRuntimeHierarchies: RuntimeHierarchyTree[] = [];
+  for (const staticTree of staticHierarchies) {
+    const runtimeTree = convertToRuntimeTree(staticTree);
+    initialRuntimeHierarchies.push(runtimeTree);
+    runtimeHierarchyCache.set(runtimeTree.name, runtimeTree);
+  }
+  return initialRuntimeHierarchies;
 }
 
 // ================================================================================================
@@ -63,28 +60,25 @@ function initializeAndCacheHierarchies(): RuntimeHierarchyTree[] {
  * @param url The current URL object from the SvelteKit load event.
  * @returns The matching RuntimeHierarchyTree for the current context.
  */
-function findTreeForUrl(
-	allHierarchies: RuntimeHierarchyTree[],
-	url: URL
-): RuntimeHierarchyTree {
-	const firstPathSegment = url.pathname.split('/')[1] || '';
+function findTreeForUrl(allHierarchies: RuntimeHierarchyTree[], url: URL): RuntimeHierarchyTree {
+  const firstPathSegment = url.pathname.split("/")[1] || "";
 
-	let activeTree: RuntimeHierarchyTree | undefined;
+  let activeTree: RuntimeHierarchyTree | undefined;
 
-	if (firstPathSegment === '') {
-		// The root path '/' defaults to the 'suppliers' tree or the first available one as a fallback.
-		activeTree = allHierarchies.find((tree) => tree.name === 'suppliers') || allHierarchies[0];
-	} else {
-		// Find the tree whose root item's key matches the first URL segment.
-		activeTree = allHierarchies.find((tree) => tree.rootItem.item.key === firstPathSegment);
-	}
+  if (firstPathSegment === "") {
+    // The root path '/' defaults to the 'suppliers' tree or the first available one as a fallback.
+    activeTree = allHierarchies.find((tree) => tree.name === "suppliers") || allHierarchies[0];
+  } else {
+    // Find the tree whose root item's key matches the first URL segment.
+    activeTree = allHierarchies.find((tree) => tree.rootItem.item.key === firstPathSegment);
+  }
 
-	if (!activeTree) {
-		// This is a critical error indicating a URL for which no navigation is configured.
-		throw error(404, `Page not found: No hierarchy tree configured for path segment '${firstPathSegment}'.`);
-	}
-	log.debug(`Active tree for URL '${url.pathname}' is '${activeTree.name}'.`);
-	return activeTree;
+  if (!activeTree) {
+    // This is a critical error indicating a URL for which no navigation is configured.
+    throw error(404, `Page not found: No hierarchy tree configured for path segment '${firstPathSegment}'.`);
+  }
+  log.debug(`Active tree for URL '${url.pathname}' is '${activeTree.name}'.`);
+  return activeTree;
 }
 
 /**
@@ -109,58 +103,63 @@ function findTreeForUrl(
  * @returns The `RuntimeHierarchyTreeNode` to be highlighted.
  */
 function determineActiveNode(
-	nodesOnPath: RuntimeHierarchyTreeNode[],
-	url: URL,
-	contextKey: string,
-	navState: NavigationState,
-	allHierarchies: RuntimeHierarchyTree[]
+  nodesOnPath: RuntimeHierarchyTreeNode[],
+  url: URL,
+  contextKey: string,
+  navState: NavigationState,
+  allHierarchies: RuntimeHierarchyTree[],
+  // NEW PARAMETER to make the logic smarter
+  definitivePrimitivePath: (string | number)[],
 ): RuntimeHierarchyTreeNode {
-	log.debug(`Determining active node for context '${contextKey}'...`);
+  log.debug(`Determining active node for context '${contextKey}'...`);
 
-	// --- Priority 1: Explicit User Intent ---
-	const currentContext = navState.contexts.get(contextKey);
-	const explicitViewNode = currentContext?.activeViewNode;
-	if (explicitViewNode) {
-		log.info(`Active node determined by EXPLICIT USER INTENT: '${explicitViewNode.item.key}'`);
-		return explicitViewNode;
-	}
+  // --- Priority 1: Explicit User Intent ---
+  const currentContext = navState.contexts.get(contextKey);
+  const explicitViewNode = currentContext?.activeViewNode;
+  if (explicitViewNode) {
+    log.info(`Active node determined by EXPLICIT USER INTENT: '${explicitViewNode.item.key}'`);
+    return explicitViewNode;
+  }
 
-	const lastNodeInPath = nodesOnPath.length > 0 ? nodesOnPath[nodesOnPath.length - 1] : null;
+  const lastNodeInPath = nodesOnPath.length > 0 ? nodesOnPath[nodesOnPath.length - 1] : null;
 
-	if (!lastNodeInPath) {
-		const fallbackRoot = allHierarchies[0]?.rootItem;
-		if (!fallbackRoot) throw error(500, 'No hierarchies configured.');
-		return fallbackRoot;
-	}
+  if (!lastNodeInPath) {
+    const fallbackRoot = allHierarchies[0]?.rootItem;
+    if (!fallbackRoot) throw error(500, "No hierarchies configured.");
+    return fallbackRoot;
+  }
 
-	// --- Priority 2: Direct Leaf Match ---
-	const pathSegments = url.pathname.split('/').filter(Boolean);
-	const lastUrlSegment = pathSegments.length > 0 ? pathSegments[pathSegments.length - 1] : null;
-	if (lastUrlSegment && lastNodeInPath.children) {
-		const matchingChild = lastNodeInPath.children.find(
-			(child) => child.item.key === lastUrlSegment
-		);
-		if (matchingChild) {
-			log.info(`Active node determined by DIRECT LEAF MATCH: '${matchingChild.item.key}'`);
-			return matchingChild;
-		}
-	}
+  // --- Priority 2: Direct Leaf Match ---
+  const pathSegments = url.pathname.split("/").filter(Boolean);
+  const lastUrlSegment = pathSegments.length > 0 ? pathSegments[pathSegments.length - 1] : null;
+  if (lastUrlSegment && lastNodeInPath.children) {
+    const matchingChild = lastNodeInPath.children.find((child) => child.item.key === lastUrlSegment);
+    if (matchingChild) {
+      log.info(`Active node determined by DIRECT LEAF MATCH: '${matchingChild.item.key}'`);
+      return matchingChild;
+    }
+  }
 
-	// --- Priority 3: Default Child ---
-	if (lastNodeInPath.defaultChild) {
-		const childNodeKey = lastNodeInPath.defaultChild;
-		const childNode = findNodeByKeyInHierarchies(allHierarchies, childNodeKey);
-		if (childNode) {
-			log.info(`Active node determined by DEFAULT CHILD: '${childNode.item.key}'`);
-			return childNode;
-		} else {
-			log.warn(`Configuration error: defaultChild '${childNodeKey}' not found.`);
-		}
-	}
+  // --- Priority 3: Default Child (NOW WITH A GUARD) ---
+  // The defaultChild rule should ONLY apply when the user has landed on an entity page,
+  // not when navigating back up the chain. We detect this by comparing path lengths.
+  const urlPathLength = pathSegments.length;
+  const contextPathLength = definitivePrimitivePath.length;
 
-	// --- Priority 4: Fallback ---
-	log.info(`Active node determined by FALLBACK (last node in path): '${lastNodeInPath.item.key}'`);
-	return lastNodeInPath;
+  if (urlPathLength === contextPathLength && lastNodeInPath.defaultChild) {
+    const childNodeKey = lastNodeInPath.defaultChild;
+    const childNode = findNodeByKeyInHierarchies(allHierarchies, childNodeKey);
+    if (childNode) {
+      log.info(`Active node determined by GUARDED DEFAULT CHILD: '${childNode.item.key}'`);
+      return childNode;
+    } else {
+      log.warn(`Configuration error: defaultChild '${childNodeKey}' not found.`);
+    }
+  }
+
+  // --- Priority 4: Fallback ---
+  log.info(`Active node determined by FALLBACK (last node in path): '${lastNodeInPath.item.key}'`);
+  return lastNodeInPath;
 }
 
 // ================================================================================================
@@ -168,118 +167,138 @@ function determineActiveNode(
 // ================================================================================================
 
 export async function load({ url, params, depends, fetch: loadEventFetch }: LoadEvent) {
-	log.info(`Load function triggered for URL: ${url.pathname}`);
-	depends(`url:${url.href}`);
+  log.info(`Load function triggered for URL: ${url.pathname}`);
+  depends(`url:${url.href}`);
 
-	// --- Setup ---
-	const currentNavState = get(navigationState);
-	const allHierarchies = initializeAndCacheHierarchies();
-	let nodesOnPath: RuntimeHierarchyTreeNode[];
+  // --- Setup ---
+  const currentNavState = get(navigationState);
+  const allHierarchies = initializeAndCacheHierarchies();
+  let nodesOnPath: RuntimeHierarchyTreeNode[];
 
-	// --- Phase 1: Reconciliation ---
-	const activeTree = findTreeForUrl(allHierarchies, url);
-	const currentContextKey = activeTree.name;
-	const urlPrimitivePath = getPrimitivePathFromUrl(url);
-	const preservedPrimitivePath = getCurrentPathForContext(currentNavState, currentContextKey);
-	const definitivePrimitivePath = reconcilePaths(urlPrimitivePath, preservedPrimitivePath);
+  // --- Phase 1: Reconciliation ---
+  const activeTree = findTreeForUrl(allHierarchies, url);
+  const currentContextKey = activeTree.name;
+  const urlPrimitivePath = getPrimitivePathFromUrl(url);
+  const preservedPrimitivePath = getCurrentPathForContext(currentNavState, currentContextKey);
+  const definitivePrimitivePath = reconcilePaths(urlPrimitivePath, preservedPrimitivePath);
 
-	// --- Phase 2: State Update & Data Preparation ---
-	setCurrentPathForContext(currentContextKey, definitivePrimitivePath);
-	try {
-		// Translate the definitive primitive path into rich node objects. This also validates the path.
-		nodesOnPath = findNodesForPath(activeTree, definitivePrimitivePath);
-	} catch (e: unknown) {
-		const message = e instanceof Error ? e.message : 'An unknown error occurred';
-		log.error(`Path validation failed, rendering 404. Reason: ${message}`);
-		throw error(404, 'Page not found');
-	}
+  log.debug(`After setup`, {
+    currentNavState,
+    allHierarchies,
+    activeTree,
+    currentContextKey,
+    urlPrimitivePath,
+    preservedPrimitivePath,
+    definitivePrimitivePath,
+  });
 
-	// Inject the actual runtime IDs from SvelteKit's params into our rich nodes.
-	// The `findNodesForPath` validates the *structure*, and this step injects the *data*.
-	const indexedParams = params as Record<string, string>;
-	nodesOnPath.forEach((node) => {
-		if (node.item.urlParamName && indexedParams[node.item.urlParamName]) {
-			const paramValue = indexedParams[node.item.urlParamName];
-			const numericValue = Number(paramValue);
-			node.item.urlParamValue = isNaN(numericValue) ? paramValue : numericValue;
-		}
-	});
+  // --- Phase 2: State Update & Data Preparation ---
+  setCurrentPathForContext(currentContextKey, definitivePrimitivePath);
+  try {
+    nodesOnPath = findNodesForPath(activeTree, definitivePrimitivePath);
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "An unknown error occurred";
+    log.error(`Path validation failed, rendering 404. Reason: ${message}`);
+    throw error(404, "Page not found");
+  }
 
-	// --- Phase 3: UI State Update ---
-	updateDisabledStates(activeTree, nodesOnPath);
+  // Set URL param values into tree.
+  const indexedParams = params as Record<string, string>;
+  nodesOnPath.forEach((node) => {
+    if (node.item.urlParamName && indexedParams[node.item.urlParamName]) {
+      const paramValue = indexedParams[node.item.urlParamName];
+      const numericValue = Number(paramValue);
+      node.item.urlParamValue = isNaN(numericValue) ? paramValue : numericValue;
+      log.debug(`Setting URL param value ${paramValue} into tree node item ${node.item.key}`);
+    }
+  });
 
-	const activeNode = determineActiveNode(
-		nodesOnPath,
-		url,
-		currentContextKey,
-		currentNavState,
-		allHierarchies
-	);
+  // --- Phase 3: UI State Update ---
+  updateDisabledStates(activeTree, nodesOnPath);
 
-	// Update the active view key in the state for the UI to consume.
-	setActiveViewKeyForContext(currentContextKey, activeNode.item.key);
+  const activeNode = determineActiveNode(nodesOnPath, url, currentContextKey, currentNavState, allHierarchies, definitivePrimitivePath);
 
-	// Consume the user's explicit navigation intent so it's only used once.
-	if (currentNavState.contexts.get(currentContextKey)?.activeViewNode) {
-		setActiveViewNode(null);
-	}
+  log.debug(`Setting activeViewKey`, { currentContextKey, activeNode_item_key: activeNode.item.key });
+  setActiveViewKeyForContext(currentContextKey, activeNode.item.key);
 
-	// Fetch dynamic entity names for breadcrumbs.
-	const client = new ApiClient(loadEventFetch);
-	const entityNameMap = new Map<string, string>();
-	const promises = [];
-	for (const node of nodesOnPath) {
-		if (node.item.type === 'object' && node.item.urlParamName) {
-			const paramName = node.item.urlParamName;
-			const entityId = node.item.urlParamValue;
+  if (currentNavState.contexts.get(currentContextKey)?.activeViewNode) {
+    log.debug(`Setting activeViewNode to null because current context has activeViewNode`);
+    setActiveViewNode(null);
+  }
 
-			if (entityId && typeof entityId === 'number') {
-				if (paramName === 'supplierId') {
-					promises.push(
-						getSupplierApi(client)
-							.loadSupplier(entityId)
-							.then((s) => {
-								if (s.name) entityNameMap.set('supplierId', s.name);
-							})
-							.catch(() => {})
-					);
-				} else if (paramName === 'categoryId') {
-					promises.push(
-						getCategoryApi(client)
-							.loadCategory(entityId)
-							.then((c) => {
-								if (c.name) entityNameMap.set('categoryId', c.name);
-							})
-							.catch(() => {})
-					);
-				} else if (paramName === 'offeringId') {
-					promises.push(
-						getOfferingApi(client)
-							.loadOffering(entityId)
-							.then((o) => {
-								if (o.product_def_title) entityNameMap.set('offeringId', o.product_def_title);
-							})
-							.catch(() => {})
-					);
-				}
-			}
-		}
-	}
-	await Promise.all(promises);
-	log.debug('Fetched entity names:', Object.fromEntries(entityNameMap));
+  // --- Phase 4: Data Fetching and Final Data Assembly ---
+  // This must happen AFTER the core logic is complete.
+  const client = new ApiClient(loadEventFetch);
+  const entityNameMap = new Map<string, string>();
+  const promises = [];
+  for (const node of nodesOnPath) {
+    if (node.item.type === "object" && node.item.urlParamName) {
+      const paramName = node.item.urlParamName;
+      const entityId = node.item.urlParamValue;
 
-	// Build breadcrumbs using the rich node path.
-	const breadcrumbItems = buildBreadcrumb({
-		navigationPath: nodesOnPath,
-		entityNameMap,
-		activeNode
-	});
+      if (entityId && typeof entityId === "number") {
+        if (paramName === "supplierId") {
+          promises.push(
+            getSupplierApi(client)
+              .loadSupplier(entityId)
+              .then((s) => {
+                if (s.name) entityNameMap.set("supplierId", s.name);
+              })
+              .catch(() => {}),
+          );
+        } else if (paramName === "categoryId") {
+          promises.push(
+            getCategoryApi(client)
+              .loadCategory(entityId)
+              .then((c) => {
+                if (c.name) entityNameMap.set("categoryId", c.name);
+              })
+              .catch(() => {}),
+          );
+        } else if (paramName === "offeringId") {
+          promises.push(
+            getOfferingApi(client)
+              .loadOffering(entityId)
+              .then((o) => {
+                if (o.product_def_title) entityNameMap.set("offeringId", o.product_def_title);
+              })
+              .catch(() => {}),
+          );
+        }
+      }
+    }
+  }
+  // Await all name-fetching promises to complete.
+  await Promise.all(promises);
+  log.debug("Fetched entity names:", Object.fromEntries(entityNameMap));
 
-	// --- Return Final Data ---
-	return {
-		hierarchy: allHierarchies,
-		breadcrumbItems,
-		activeNode,
-		urlParams: params // Pass SvelteKit's raw params for resolveHref
-	};
+  const breadcrumbPath = [...nodesOnPath];
+  log.debug(`Construcuted breadcrumbPath from [...nodesOnPath]`, breadcrumbPath);
+
+  // This is the active node for the OVERALL UI (e.g., the sidebar highlight).
+  const overallActiveNode = activeNode;
+
+  // This is the active node specifically FOR THE BREADCRUMB.
+  // The breadcrumb's active item should be the last item of its OWN path.
+  const breadcrumbActiveNode = breadcrumbPath[breadcrumbPath.length - 1];
+
+  log.debug("Finalizing breadcrumb data", {
+    breadcrumbPathKeys: breadcrumbPath.map((n) => n.item.key),
+    overallActiveNodeKey: overallActiveNode.item.key,
+    breadcrumbActiveNodeKey: breadcrumbActiveNode.item.key,
+  });
+
+  const breadcrumbItems = buildBreadcrumb({
+    navigationPath: breadcrumbPath,
+    entityNameMap,
+    activeNode: breadcrumbActiveNode, // <-- Pass the BREADCRUMB's active node
+  });
+
+  // --- Return Final Data ---
+  return {
+    hierarchy: allHierarchies,
+    breadcrumbItems,
+    activeNode,
+    urlParams: params,
+  };
 }

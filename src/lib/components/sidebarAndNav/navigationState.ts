@@ -1,504 +1,169 @@
-import { writable } from "svelte/store";
-import type { RuntimeHierarchyTree, RuntimeHierarchyTreeNode } from "$lib/components/sidebarAndNav/HierarchySidebar.types";
-import { log } from "$lib/utils/logger";
+// File: src/lib/components/sidebarAndNav/navigationState.ts
 
-// === NAVIGATION STATE ARCHITECTURE & FLOW DOCUMENTATION ========================================================
+import { writable } from 'svelte/store';
+import { log } from '$lib/utils/logger';
+import type { RuntimeHierarchyTreeNode } from './HierarchySidebar.types';
 
-/**
- * COMPREHENSIVE NAVIGATION SYSTEM DOCUMENTATION
- *
- * This NavigationState implements the complete hierarchy navigation system as documented in status.md.
- * The system separates URL/Route from NavigationContext to enable Context Preservation during navigation.
- *
- * =====================================================================================================
- * TERM DEFINITIONS (from status.md):
- * =====================================================================================================
- *
- * 1. **URL/Route** - Browser address bar, determines which Page Component is loaded
- * 2. **NavigationContext** - Stored parameter IDs in `activeTree.paths[].urlParamValue`
- * 3. **Navigation** - URL change that triggers +layout.ts load()
- * 4. **Level/Tier** - Hierarchy level in sidebar (0=suppliers, 1=categories, etc.)
- * 5. **Context Preservation** - NavigationContext remains unchanged despite URL change
- * 6. **Context Reset** - NavigationContext overwritten when different entity selected on same level
- * 7. **Sidebar markiert** - UI highlight showing current position
- * 8. **Enabled tree** - Clickable sidebar elements based on NavigationContext
- * 9. **Entity Selection** - User selects specific entity in DataGrid/Liste (e.g. Supplier 3)
- * 10. **Sidebar Navigation** - User clicks level element in sidebar (e.g. "categories")
- * 11. **defaultChild** - Automatically marked child-level during Entity Selection
- *
- * =====================================================================================================
- * CORE NAVIGATION FLOW (from navigation.readme.md examples):
- * =====================================================================================================
- *
- * Step 2: User selects Supplier 3 (Entity Selection)
- * - URL: `/suppliers/3` (SupplierDetailPage with Categories DataGrid)
- * - NavigationContext: `[{node: suppliersNode, urlParamValue: 3}]`
- * - Sidebar marked: "categories" (automatically via defaultChild)
- * - Enabled tree: suppliers > categories, addresses
- *
- * Step 4: User clicks "categories" in Sidebar (Back-Navigation)
- * - URL: `/suppliers/3/categories` (Categories List)
- * - NavigationContext: **UNCHANGED** (Context Preservation)
- * - Sidebar marked: "categories"
- * - Enabled tree: suppliers > categories > offerings > attributes, links + addresses
- *
- * Step 6: User selects Supplier 7 (Entity Selection, Context Reset)
- * - URL: `/suppliers/7`
- * - NavigationContext: `[{node: suppliersNode, urlParamValue: 7}]` (Context Reset)
- * - Sidebar marked: "categories" (automatically via defaultChild)
- * - Enabled tree: suppliers > categories, addresses
- *
- * =====================================================================================================
- * SELECTNODE() LOGIC RULES (Critical Implementation):
- * =====================================================================================================
- *
- * The selectNode() function must distinguish between two fundamentally different user actions:
- *
- * A) **Entity Selection** (DataGrid clicks):
- *    - Changes urlParamValue for a level
- *    - Triggers Context Reset for deeper levels if entity changed
- *    - Triggers Context Preservation if same entity
- *    - Automatic sidebar marking via defaultChild
- *
- * B) **Sidebar Navigation** (Sidebar clicks):
- *    - No entity change, only level navigation
- *    - Always Context Preservation
- *    - URL changes but NavigationContext preserved
- *
- * Context Preservation Rules:
- * 1. Same entity at same level → Context Preservation (no NavigationContext change)
- * 2. Different entity at same level → Context Reset for deeper levels only
- * 3. Navigation to new level → Extend NavigationContext
- *
- * =====================================================================================================
- * ARCHITECTURE NOTES:
- * =====================================================================================================
- *
- * This system uses RuntimeHierarchyTreeNode which contains:
- * - Static structure (key, label, level, urlParamName)
- * - Runtime values (urlParamValue, disabled state)
- *
- * The NavigationPathTree combines:
- * - tree: RuntimeHierarchyTree (complete structure)
- * - paths: RuntimeHierarchyTreeNode[] (current navigation path with urlParamValues)
- *
- * Multiple trees are supported via Map<RuntimeHierarchyTree, NavigationPathTree> for tree switching
- * with independent NavigationContexts per tree.
- */
-
-// === TYPES =======================================================================================================
+// ================================================================================================
+// NEW, PRIMITIVE-BASED STATE SHAPE
+// ================================================================================================
 
 /**
- * Navigation state for a specific tree, containing both the tree structure
- * and the current navigation path with parameter values.
- *
- * This represents the complete NavigationContext for one hierarchy tree.
+ * Represents the full navigation state for a single, independent hierarchy context
+ * (e.g., for the "suppliers" tree). It contains only serializable, primitive data.
  */
-export type NavigationPathTree = {
-  /** The complete runtime tree structure with urlParamValues and levels set */
-  tree: RuntimeHierarchyTree;
-  /** Current navigation path representing the NavigationContext with parameter IDs */
-  paths: RuntimeHierarchyTreeNode[];
+export type NavigationContext = {
+	/**
+	 * The definitive, ordered path of navigation, composed of static string keys
+	 * and dynamic numeric IDs. e.g., ['suppliers', 3, 'categories', 5]
+	 */
+	path: (string | number)[];
+
+	/**
+	 * The `key` of the node that the UI should highlight as the "active" view.
+	 * This can differ from the last element of the path due to `defaultChild` logic
+	 * or explicit user clicks.
+	 */
+	activeViewKey: string | null;
+
+	/**
+	 * A temporary holder for a full node object, used to signal an explicit
+	 * UI navigation intent from a component to the `load` function.
+	 * It is not part of the persistent, primitive state.
+	 */
+	activeViewNode: RuntimeHierarchyTreeNode | null;
 };
 
 /**
- * Complete navigation state for the application.
- * Supports multiple trees with independent NavigationContexts and tree switching.
- *
- * Memory-only design: no persistence, state reset on browser reload.
- * Uses RuntimeHierarchyTree consistently for all tree references.
+ * Defines the entire navigation state for the application. It manages multiple
+ * independent contexts and tracks which one is currently active.
  */
 export interface NavigationState {
-  /** Currently active tree with its NavigationContext (null if no tree selected) */
-  activeTree: NavigationPathTree | null;
+	/**
+	 * The key of the currently active context (e.g., "suppliers"). This corresponds
+	 * to the `name` property of a `HierarchyTree`.
+	 */
+	activeContextKey: string | null;
 
-  /**
-   * Map storing NavigationPathTrees for all trees to preserve context when switching.
-   * Key: RuntimeHierarchyTree object reference (consistent with NavigationPathTree.tree)
-   * Value: NavigationPathTree containing runtime tree + navigation paths
-   *
-   * This enables tree switching without losing NavigationContext:
-   * - Switch from suppliers to products → save supplier NavigationContext
-   * - Switch back to suppliers → restore supplier NavigationContext
-   */
-  allTrees: Map<RuntimeHierarchyTree, NavigationPathTree>;
-
-  /**
-   * This is the sidebar item that should be marked as "current".
-   */
-  activeViewNode: RuntimeHierarchyTreeNode | null;
+	/**
+	 * A map storing the independent `NavigationContext` for each hierarchy tree,
+	 * keyed by the tree's unique name. This enables context preservation when
+	 * switching between different navigation hierarchies.
+	 */
+	contexts: Map<string, NavigationContext>;
 }
 
-// === INITIAL STATE ===========================================================================================
+// ================================================================================================
+// INITIAL STATE
+// ================================================================================================
 
 const initialState: NavigationState = {
-  activeTree: null,
-  allTrees: new Map(),
-  activeViewNode: null,
+	activeContextKey: null,
+	contexts: new Map()
 };
 
-// === EXPORTED STORE ==========================================================================================
+// ================================================================================================
+// EXPORTED STORE
+// ================================================================================================
 
-/**
- * Navigation state store for hierarchy trees with runtime parameter support.
- * Handles Context Preservation, Context Reset, and multi-tree navigation.
- *
- * Memory-only design provides simplicity and performance benefits:
- * - No serialization complexity
- * - No sync issues between storage and memory
- * - Fast state access and updates
- * - Acceptable trade-off: state lost on browser reload
- */
 export const navigationState = writable<NavigationState>(initialState);
 
-// === UTILITY FUNCTIONS =======================================================================================
+// ================================================================================================
+// CORE MUTATOR AND QUERY FUNCTIONS
+// ================================================================================================
 
 /**
- * Compares two runtime nodes for equality using both key and level.
- * This ensures uniqueness even if keys are duplicated at different levels.
- *
- * Used in selectNode() logic to determine if the same node was clicked.
- *
- * @param node1 First node to compare
- * @param node2 Second node to compare
- * @returns true if both key and level match (same logical node)
+ * Gets or creates a mutable navigation context for a given key.
+ * This is a low-level helper to avoid boilerplate in mutator functions.
+ * @param state The current navigation state.
+ * @param contextKey The key for the context (e.g., "suppliers").
+ * @returns A mutable NavigationContext object.
  */
-function nodesEqual(node1: RuntimeHierarchyTreeNode, node2: RuntimeHierarchyTreeNode): boolean {
-  return node1.item.key === node2.item.key && (node1.item.level ?? 0) === (node2.item.level ?? 0);
+function getOrCreateContext(
+	state: NavigationState,
+	contextKey: string
+): NavigationContext {
+	if (!state.contexts.has(contextKey)) {
+		state.contexts.set(contextKey, {
+			path: [],
+			activeViewKey: null,
+			activeViewNode: null
+		});
+	}
+	// The "!" non-null assertion is safe here because we just created it if it didn't exist.
+	return state.contexts.get(contextKey)!;
 }
 
 /**
- * Gets the hierarchy level of a runtime node.
- * Levels should be set correctly via initLevels() function in hierarchyUtils.
- *
- * Level semantics:
- * - Level 0: Root node (e.g., "suppliers")
- * - Level 1: First child level (e.g., "categories")
- * - Level 2: Second child level (e.g., "offerings")
- * - Level 3+: Deeper child levels (e.g., "attributes", "links")
- *
- * @param node The runtime node to get the level for
- * @returns The hierarchy level (defaults to 0 if not set)
+ * Sets the definitive, reconciled primitive path for a specific context.
+ * This is the primary mutator called by the `load` function.
+ * @param contextKey The key of the context to update.
+ * @param path The new primitive path for the context.
  */
-function getNodeLevel(node: RuntimeHierarchyTreeNode): number {
-  return node.item.level ?? 0;
-}
-
-/**
- * Compares urlParamValues to determine if the same entity is selected.
- * This is critical for Entity Selection vs Context Preservation logic.
- *
- * @param existingNode Node currently in NavigationContext
- * @param newUrlParamValue New entity value being selected
- * @returns true if same entity (Context Preservation), false if different (Context Reset)
- */
-function isSameEntity(existingNode: RuntimeHierarchyTreeNode, newUrlParamValue: string | number | "leaf"): boolean {
-  return existingNode.item.urlParamValue === newUrlParamValue;
-}
-
-// === CORE NAVIGATION FUNCTIONS ===============================================================================
-
-/**
- * **CRITICAL FUNCTION**: Core navigation logic implementing Context Preservation vs Context Reset.
- *
- * This function handles both Entity Selection and Sidebar Navigation based on the flow documented
- * in status.md. The logic distinguishes between these two fundamentally different user actions.
- *
- * =====================================================================================================
- * USAGE PATTERNS:
- * =====================================================================================================
- *
- * A) **Entity Selection** (e.g., user clicks Supplier 3 in DataGrid):
- *    ```typescript
- *    selectNode(suppliersNode, 3); // Entity Selection with new urlParamValue
- *    ```
- *
- * B) **Sidebar Navigation** (e.g., user clicks "categories" in sidebar):
- *    ```typescript
- *    selectNode(categoriesNode); // Sidebar Navigation, no urlParamValue change
- *    ```
- *
- * =====================================================================================================
- * CONTEXT PRESERVATION vs CONTEXT RESET LOGIC:
- * =====================================================================================================
- *
- * Case 1: Node at existing level in current path
- *   1A: Same entity (urlParamValue unchanged) → Context Preservation
- *   1B: Different entity (urlParamValue changed) → Context Reset for deeper levels
- *
- * Case 2: Node extends path to new level → Add to NavigationContext
- *
- * Case 3: Level gap (error handling) → Graceful fallback
- *
- * @param node The RuntimeHierarchyTreeNode that was selected/clicked
- * @param newUrlParamValue Optional new entity value for Entity Selection. If not provided,
- *                         treats as Sidebar Navigation (Context Preservation)
- */
-export function selectNode(node: RuntimeHierarchyTreeNode, newUrlParamValue?: string | number | "leaf"): void {
-  navigationState.update((state) => {
-    if (!state.activeTree) {
-      log.error("NavigationState: No active tree - cannot select node");
-      return state;
-    }
-
-    const currentPath = state.activeTree.paths;
-    const nodeLevel = getNodeLevel(node);
-
-    log.debug(`NavigationState: selectNode called`, {
-      nodeKey: node.item.key,
-      nodeLevel,
-      newUrlParamValue,
-      currentPathLength: currentPath.length,
-      isEntitySelection: newUrlParamValue !== undefined,
-    });
-
-    // --- CASE 1: ENTITY SELECTION (newUrlParamValue is provided) ---
-    if (newUrlParamValue !== undefined) {
-      // This logic is correct and remains unchanged.
-      const existingNodeAtLevel = nodeLevel < currentPath.length ? currentPath[nodeLevel] : null;
-
-      if (existingNodeAtLevel && isSameEntity(existingNodeAtLevel, newUrlParamValue)) {
-        const newPath = currentPath.slice(0, nodeLevel + 1);
-        return { ...state, activeTree: { ...state.activeTree, paths: newPath } };
-      }
-
-      log.debug(`NavigationState: New/different entity at level ${nodeLevel}, Context Reset.`);
-      const updatedNode: RuntimeHierarchyTreeNode = {
-        ...node,
-        item: { ...node.item, urlParamValue: newUrlParamValue },
-      };
-      const newPath = currentPath.slice(0, nodeLevel);
-      newPath.push(updatedNode);
-
-      const updatedActiveTree: NavigationPathTree = { ...state.activeTree, paths: newPath };
-      state.allTrees.set(updatedActiveTree.tree, updatedActiveTree);
-      return { ...state, activeTree: updatedActiveTree, allTrees: new Map(state.allTrees) };
-    }
-
-    // --- CASE 2: SIDEBAR NAVIGATION (no newUrlParamValue) ---
-    else {
-      // A pure UI navigation click. The intention is to change the VIEW,
-      // but PRESERVE the underlying navigation context (the path).
-      // Therefore, we do not modify the path at all.
-      log.debug(`NavigationState: Sidebar navigation click. Preserving context path.`);
-      return state; // The path remains unchanged.
-    }
-  });
-}
-
-/**
- * Explicitly sets the node for the upcoming active view.
- * This is called from the UI just before navigation to signal intent.
- * @param key The item key of the node that should become active.
- */
-export function setActiveViewNode(node: RuntimeHierarchyTreeNode | null): void {
+export function setCurrentPathForContext(contextKey: string, path: (string | number)[]) {
 	navigationState.update((state) => {
-		log.debug(`NavigationState: Setting activeViewNode to '${node?.item.key}'`);
-		// ALT: return { ...state, activeViewKey: key };
-		return { ...state, activeViewNode: node };
+		log.debug(`Setting current path for context '${contextKey}':`, path);
+		const context = getOrCreateContext(state, contextKey);
+		context.path = path;
+		state.activeContextKey = contextKey;
+		return state;
 	});
 }
 
 /**
- * Sets the active tree and optionally a specific path within it.
- * Used during initial navigation state setup and tree switching.
- *
- * This function is called from +layout.ts after URL parsing to establish
- * the NavigationContext based on the current route.
- *
- * @param runtimeTree The RuntimeHierarchyTree to make active
- * @param paths Optional paths to set within the tree (defaults to empty)
+ * Sets the key of the UI element that should be actively highlighted.
+ * This is called by the `load` function after `determineActiveNode`.
+ * @param contextKey The key of the context to update.
+ * @param key The item key of the node to set as active.
  */
-export function setActiveTreePath(runtimeTree: RuntimeHierarchyTree, paths: RuntimeHierarchyTreeNode[] = []): void {
-  navigationState.update((state) => {
-    log.debug(`NavigationState: Setting active tree: ${runtimeTree.name}, paths length: ${paths.length}`, paths);
-
-    // Store the current tree state before switching (if any)
-    const updatedAllTrees = new Map(state.allTrees);
-    if (state.activeTree) {
-      updatedAllTrees.set(state.activeTree.tree, state.activeTree);
-      log.debug(`NavigationState: Stored state for previous tree: ${state.activeTree.tree.name}`);
-    }
-
-    // Create NavigationPathTree for the new active tree
-    const newActiveTree: NavigationPathTree = {
-      tree: runtimeTree,
-      paths: [...paths],
-    };
-
-    return {
-      ...state,
-      activeTree: newActiveTree,
-      allTrees: updatedAllTrees,
-    };
-  });
+export function setActiveViewKeyForContext(contextKey: string, key: string | null) {
+	navigationState.update((state) => {
+		log.debug(`Setting active view key for context '${contextKey}': '${key}'`);
+		const context = getOrCreateContext(state, contextKey);
+		context.activeViewKey = key;
+		return state;
+	});
 }
 
 /**
- * Switches to a different tree, restoring its previously saved NavigationContext if available.
- * This enables seamless multi-tree navigation without losing context.
- *
- * Example: User switches from supplier hierarchy to product hierarchy, then back to suppliers.
- * The supplier NavigationContext (e.g., Supplier 3, Category 5) is preserved and restored.
- *
- * @param runtimeTree The RuntimeHierarchyTree to switch to (used as Map key for lookup)
+ * Explicitly sets the node for the upcoming active view.
+ * This is called from the UI just before navigation to signal intent. This is a
+ * temporary, transitional state that is consumed by the `load` function.
+ * @param node The full node object that the user clicked.
  */
-export function switchToTree(runtimeTree: RuntimeHierarchyTree): void {
-  navigationState.update((state) => {
-    log.debug(`NavigationState: Switching to tree: ${runtimeTree.name}`);
-
-    // Store current tree state before switching
-    const updatedAllTrees = new Map(state.allTrees);
-    if (state.activeTree) {
-      updatedAllTrees.set(state.activeTree.tree, state.activeTree);
-      log.debug(`NavigationState: Stored state for previous tree: ${state.activeTree.tree.name}, paths: ${state.activeTree.paths.length}`);
-    }
-
-    // Restore the saved NavigationPathTree for the target tree (or null if none exists)
-    const restoredTree = state.allTrees.get(runtimeTree) || null;
-    log.debug(`NavigationState: Restored state for new tree: ${runtimeTree.name}, paths: ${restoredTree?.paths.length ?? 0}`);
-
-    return {
-      ...state,
-      activeTree: restoredTree,
-      allTrees: updatedAllTrees,
-    };
-  });
+export function setActiveViewNode(
+	node: RuntimeHierarchyTreeNode | null
+) {
+	navigationState.update((state) => {
+		// This intent is stored on the currently active context.
+		const contextKey = state.activeContextKey;
+		if (contextKey) {
+			log.debug(`Setting active view INTENT for context '${contextKey}': '${node?.item.key}'`);
+			const context = getOrCreateContext(state, contextKey);
+			context.activeViewNode = node;
+		}
+		return state;
+	});
 }
 
 /**
- * Resets the navigation state completely.
- * Clears all trees, paths, and stored NavigationContexts.
- *
- * Used for complete state reset (e.g., user logout, major navigation changes).
+ * Retrieves the current preserved path for a given context.
+ * Used by the `load` function during reconciliation.
+ * @param state The current navigation state.
+ * @param contextKey The context to query.
+ * @returns The preserved primitive path, or an empty array if none exists.
+ */
+export function getCurrentPathForContext(
+	state: NavigationState,
+	contextKey: string
+): (string | number)[] {
+	return state.contexts.get(contextKey)?.path ?? [];
+}
+
+/**
+ * Resets the entire navigation state to its initial condition.
  */
 export function resetNavigationState(): void {
-  log.debug("NavigationState: ⚠️ Resetting navigation state completely");
-  navigationState.set(initialState);
-}
-
-// === QUERY FUNCTIONS =========================================================================================
-
-/**
- * Gets the currently active node (the deepest node in the active path).
- * Returns null if no NavigationContext is currently active.
- *
- * This represents the "current position" in the hierarchy navigation.
- *
- * @param state The current navigation state
- * @returns The active node or null if no active path
- */
-export function getCurrentActiveNode(state: NavigationState): RuntimeHierarchyTreeNode | null {
-  return state.activeTree && state.activeTree.paths.length > 0 ? state.activeTree.paths[state.activeTree.paths.length - 1] : null;
-}
-
-/**
- * Checks if a specific node is anywhere in the current active path.
- * Useful for determining active states in UI components (e.g., sidebar highlighting).
- *
- * @param state The current navigation state
- * @param node The node to check for
- * @returns true if the node is in the active NavigationContext
- */
-export function isNodeInActivePath(state: NavigationState, node: RuntimeHierarchyTreeNode): boolean {
-  return state.activeTree ? state.activeTree.paths.some((pathNode) => nodesEqual(pathNode, node)) : false;
-}
-
-/**
- * Gets the node at a specific level in the active path.
- * Returns null if the NavigationContext doesn't reach that deep.
- *
- * Used for level-specific UI logic and navigation path analysis.
- *
- * @param state The current navigation state
- * @param level The level to get the node for (0 = root, 1 = first child level, etc.)
- * @returns The node at that level or null if path doesn't reach that deep
- */
-export function getNodeAtLevel(state: NavigationState, level: number): RuntimeHierarchyTreeNode | null {
-  return state.activeTree && level < state.activeTree.paths.length ? state.activeTree.paths[level] : null;
-}
-
-/**
- * Gets the current navigation depth (number of levels deep in the active path).
- * Represents how "deep" the user has navigated into the hierarchy.
- *
- * @param state The current navigation state
- * @returns The depth (0 = no active path, 1 = root only, etc.)
- */
-export function getNavigationDepth(state: NavigationState): number {
-  return state.activeTree ? state.activeTree.paths.length : 0;
-}
-
-/**
- * Gets all stored tree NavigationContexts for debugging and inspection.
- * Useful for development debugging and understanding tree switching behavior.
- *
- * @param state The current navigation state
- * @returns Object with tree names as keys and NavigationContext info as values
- */
-export function getStoredTreePaths(state: NavigationState): Record<string, { depth: number; lastNode: string | null }> {
-  const result: Record<string, { depth: number; lastNode: string | null }> = {};
-
-  for (const [runtimeTree, pathTree] of state.allTrees.entries()) {
-    result[runtimeTree.name] = {
-      depth: pathTree.paths.length,
-      lastNode: pathTree.paths.length > 0 ? pathTree.paths[pathTree.paths.length - 1].item.key : null,
-    };
-  }
-
-  return result;
-}
-
-export function getNavState() {}
-
-// === DEVELOPMENT VALIDATION ==================================================================================
-
-/**
- * Validates NavigationState consistency for development debugging.
- * Checks for common issues like missing trees, invalid paths, or inconsistent state.
- *
- * @param state The navigation state to validate
- * @returns Validation result with any issues found
- */
-export function validateNavigationState(state: NavigationState): {
-  isValid: boolean;
-  warnings: string[];
-  errors: string[];
-} {
-  const warnings: string[] = [];
-  const errors: string[] = [];
-
-  // Check active tree consistency
-  if (state.activeTree) {
-    if (!state.activeTree.tree) {
-      errors.push("Active tree missing tree structure");
-    }
-
-    if (!Array.isArray(state.activeTree.paths)) {
-      errors.push("Active tree paths is not an array");
-    }
-
-    // Validate path levels are sequential
-    state.activeTree.paths.forEach((node, index) => {
-      const expectedLevel = index;
-      const actualLevel = node.item.level ?? 0;
-
-      if (actualLevel !== expectedLevel) {
-        warnings.push(`Path level mismatch at index ${index}: expected ${expectedLevel}, got ${actualLevel}`);
-      }
-    });
-  }
-
-  // Check for orphaned trees in allTrees
-  for (const [runtimeTree, pathTree] of state.allTrees.entries()) {
-    if (!pathTree.tree || !pathTree.paths) {
-      errors.push(`Invalid NavigationPathTree for tree: ${runtimeTree.name}`);
-    }
-  }
-
-  return {
-    isValid: errors.length === 0,
-    warnings,
-    errors,
-  };
+	log.debug("⚠️ Resetting navigation state completely");
+	navigationState.set(initialState);
 }

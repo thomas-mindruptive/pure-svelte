@@ -1,322 +1,285 @@
 // File: src/routes/(browser)/+layout.ts
 
-import { log } from "$lib/utils/logger";
-import { error, type LoadEvent } from "@sveltejs/kit";
-import { ApiClient } from "$lib/api/client/ApiClient";
-import { getSupplierApi } from "$lib/api/client/supplier";
-import { getCategoryApi } from "$lib/api/client/category";
-import { getOfferingApi } from "$lib/api/client/offering";
-import { buildBreadcrumb } from "$lib/components/sidebarAndNav/buildBreadcrumb";
-import type { RuntimeHierarchyTree, RuntimeHierarchyTreeNode } from "$lib/components/sidebarAndNav/HierarchySidebar.types";
-import { setActiveTreePath } from "$lib/components/sidebarAndNav/navigationState";
-import * as ns from "$lib/components/sidebarAndNav/navigationState";
-import { getAppHierarchies } from "./navHierarchyConfig";
+import { log } from '$lib/utils/logger';
+import { error, type LoadEvent } from '@sveltejs/kit';
+import { get } from 'svelte/store';
+import { ApiClient } from '$lib/api/client/ApiClient';
+import { getSupplierApi } from '$lib/api/client/supplier';
+import { getCategoryApi } from '$lib/api/client/category';
+import { getOfferingApi } from '$lib/api/client/offering';
+import { buildBreadcrumb } from '$lib/components/sidebarAndNav/buildBreadcrumb';
+import type {
+	RuntimeHierarchyTree,
+	RuntimeHierarchyTreeNode
+} from '$lib/components/sidebarAndNav/HierarchySidebar.types';
+import type { NavigationState } from '$lib/components/sidebarAndNav/navigationState';
 import {
-  buildNavContextPathFromUrl,
-  convertToRuntimeTree,
-  extractLeafFromUrl,
-  findNodeByKeyInHierarchies,
-  parseUrlParameters,
-  updateDisabledStates,
-  updateRuntimeHierarchyParameters,
-} from "$lib/components/sidebarAndNav/hierarchyUtils";
-import { get } from "svelte/store";
+	navigationState,
+	setActiveViewNode,
+	getCurrentPathForContext,
+	setCurrentPathForContext,
+	setActiveViewKeyForContext
+} from '$lib/components/sidebarAndNav/navigationState';
+import { getAppHierarchies } from './navHierarchyConfig';
+import {
+	convertToRuntimeTree,
+	findNodeByKeyInHierarchies,
+	updateDisabledStates,
+	getPrimitivePathFromUrl,
+	reconcilePaths,
+	findNodesForPath
+} from '$lib/components/sidebarAndNav/hierarchyUtils';
 
-// === CACHING ARCHITECTURE ======================================================================
+// ================================================================================================
+// CACHING & INITIALIZATION
+// ================================================================================================
 
 const runtimeHierarchyCache = new Map<string, RuntimeHierarchyTree>();
 
 function initializeAndCacheHierarchies(): RuntimeHierarchyTree[] {
-  if (runtimeHierarchyCache.size > 0) {
-    return Array.from(runtimeHierarchyCache.values());
-  }
-  log.debug("Initializing and caching runtime hierarchies for the first time...");
-  const staticHierarchies = getAppHierarchies();
-  const initialRuntimeHierarchies: RuntimeHierarchyTree[] = [];
-  for (const staticTree of staticHierarchies) {
-    const runtimeTree = convertToRuntimeTree(staticTree);
-    initialRuntimeHierarchies.push(runtimeTree);
-    runtimeHierarchyCache.set(runtimeTree.name, runtimeTree);
-  }
-  return initialRuntimeHierarchies;
+	if (runtimeHierarchyCache.size > 0) {
+		return Array.from(runtimeHierarchyCache.values());
+	}
+	log.debug('Initializing and caching runtime hierarchies for the first time...');
+	const staticHierarchies = getAppHierarchies();
+	const initialRuntimeHierarchies: RuntimeHierarchyTree[] = [];
+	for (const staticTree of staticHierarchies) {
+		const runtimeTree = convertToRuntimeTree(staticTree);
+		initialRuntimeHierarchies.push(runtimeTree);
+		runtimeHierarchyCache.set(runtimeTree.name, runtimeTree);
+	}
+	return initialRuntimeHierarchies;
 }
 
-// === HIERARCHY UTILITIES =======================================================================
+// ================================================================================================
+// HELPER FUNCTIONS for the load function
+// ================================================================================================
 
 /**
- * Determines the specific `RuntimeHierarchyTreeNode` that should be highlighted as 'active' in the UI (e.g., in the sidebar).
+ * Finds the appropriate hierarchy tree that corresponds to the current URL's context.
+ * The context is determined by the first segment of the URL path.
+ *
+ * @param allHierarchies All available runtime hierarchies.
+ * @param url The current URL object from the SvelteKit load event.
+ * @returns The matching RuntimeHierarchyTree for the current context.
+ */
+function findTreeForUrl(
+	allHierarchies: RuntimeHierarchyTree[],
+	url: URL
+): RuntimeHierarchyTree {
+	const firstPathSegment = url.pathname.split('/')[1] || '';
+
+	let activeTree: RuntimeHierarchyTree | undefined;
+
+	if (firstPathSegment === '') {
+		// The root path '/' defaults to the 'suppliers' tree or the first available one as a fallback.
+		activeTree = allHierarchies.find((tree) => tree.name === 'suppliers') || allHierarchies[0];
+	} else {
+		// Find the tree whose root item's key matches the first URL segment.
+		activeTree = allHierarchies.find((tree) => tree.rootItem.item.key === firstPathSegment);
+	}
+
+	if (!activeTree) {
+		// This is a critical error indicating a URL for which no navigation is configured.
+		throw error(404, `Page not found: No hierarchy tree configured for path segment '${firstPathSegment}'.`);
+	}
+	log.debug(`Active tree for URL '${url.pathname}' is '${activeTree.name}'.`);
+	return activeTree;
+}
+
+/**
+ * Determines the specific `RuntimeHierarchyTreeNode` that should be highlighted as 'active' in the UI.
  *
  * @description
- * This function is the central logic for translating the application's navigation state into a specific, active UI element.
- * It's necessary because the active view isn't always the last element in the navigation path (e.g., after an entity selection, a `defaultChild` should be active).
+ * This function is the central logic for translating the application's navigation
+ * state into a specific, active UI element. It resolves the active node based on a
+ * strict priority order to create an intuitive user experience.
  *
- * The function resolves the active node based on a strict priority order:
- * 1. **Explicit User Intent:** Checks if a node was explicitly set via a sidebar click (`activeViewNode` in the state). This always wins.
- * 2. **Leaf Page:** If the current URL points to a leaf page (e.g., 'attributes'), that page's node is active.
- * 3. **Default Child:** After selecting an entity, its configured `defaultChild` becomes active to guide the user to the next logical step.
- * 4. **Last Path Node:** If none of the above apply, the deepest node in the current navigation context is active.
- * 5. **Fallback:** As a last resort, the root of the currently navigated tree is returned.
+ * The priority is as follows:
+ * 1. **Explicit User Intent:** An explicit selection from the UI (e.g., a sidebar click).
+ * 2. **Direct Leaf Match:** A static path segment at the end of the URL (e.g., "/attributes").
+ * 3. **Default Child:** The configured `defaultChild` of the last entity in the context path.
+ * 4. **Fallback:** The deepest node in the current navigation context path.
  *
- * @param navigationPath - The current contextual path of resolved entities (e.g., [suppliersNode, categoriesNode]).
- * @param tree - The primary `RuntimeHierarchyTree` currently being navigated.
- * @param leaf - The key of a leaf page if one is active, otherwise `null`.
- * @param currentState - The full, current `NavigationState` from the Svelte store, needed to check for explicit view selections.
- * @param allHierarchies - An array of all available runtime hierarchies, required to find nodes by key across different trees (e.g., finding a `defaultChild`).
- * @returns The `RuntimeHierarchyTreeNode` to be highlighted, or `null` if no node could be determined as active.
+ * @param nodesOnPath The rich node path representing the current navigation context.
+ * @param url The current URL object from the SvelteKit load event.
+ * @param contextKey The key of the currently active navigation context (e.g., "suppliers").
+ * @param navState The full, current `NavigationState` from the Svelte store.
+ * @param allHierarchies All available runtime hierarchies, for finding nodes by key.
+ * @returns The `RuntimeHierarchyTreeNode` to be highlighted.
  */
 function determineActiveNode(
-  navigationPath: RuntimeHierarchyTreeNode[],
-  tree: RuntimeHierarchyTree,
-  leaf: string | null,
-  currentState: ns.NavigationState,
-  allHierarchies: RuntimeHierarchyTree[],
+	nodesOnPath: RuntimeHierarchyTreeNode[],
+	url: URL,
+	contextKey: string,
+	navState: NavigationState,
+	allHierarchies: RuntimeHierarchyTree[]
 ): RuntimeHierarchyTreeNode {
-  // Rule 1: An explicitly set view node has the highest priority.
-  const explicitViewNode = currentState.activeViewNode;
-  if (explicitViewNode) {
-    log.debug(`Active node determined by EXPLICIT VIEW NODE: '${explicitViewNode.item.key}'`);
-    // Consume the node so it's only used once.
-    ns.setActiveViewNode(null);
-    return explicitViewNode;
-  }
+	log.debug(`Determining active node for context '${contextKey}'...`);
 
-  // Rule 2: A leaf page is the next priority.
-  if (leaf) {
-    // This call now uses the clean, imported utility function.
-    const leafNode = findNodeByKeyInHierarchies(allHierarchies, leaf);
-    log.debug(`Active node determined by LEAF: '${leafNode?.item.key}'`);
-    if (!leafNode) throw error(500, `+layout.ts::determineActiveNode: Cannot find leaf node in all hierarchie trees: ${leaf}`);
-    return leafNode;
-  }
+	// --- Priority 1: Explicit User Intent ---
+	const currentContext = navState.contexts.get(contextKey);
+	const explicitViewNode = currentContext?.activeViewNode;
+	if (explicitViewNode) {
+		log.info(`Active node determined by EXPLICIT USER INTENT: '${explicitViewNode.item.key}'`);
+		return explicitViewNode;
+	}
 
-  // Rule 3: Apply the defaultChild logic if an entity is selected.
-  if (navigationPath.length > 0) {
-    const lastNodeInPath = navigationPath[navigationPath.length - 1];
-    if (lastNodeInPath.item.urlParamValue !== "leaf" && lastNodeInPath.defaultChild) {
-      const childNodeKey = lastNodeInPath.defaultChild;
-      // This call also uses the clean, imported utility function.
-      const childNode = findNodeByKeyInHierarchies(allHierarchies, childNodeKey);
-      log.debug(`Active node determined by DEFAULT CHILD: '${childNode?.item.key}'`);
-      if (!childNode) throw error(500, `+layout.ts::determineActiveNode: Cannot find childNode in all hierarchie trees: ${childNodeKey}`);
-      return childNode;
-    }
-    // Rule 4: Otherwise, the last node in the path itself is active.
-    log.debug(`Active node determined by LAST PATH NODE: '${lastNodeInPath.item.key}'`);
-    return lastNodeInPath;
-  }
+	const lastNodeInPath = nodesOnPath.length > 0 ? nodesOnPath[nodesOnPath.length - 1] : null;
 
-  // Fallback: The root node of the tree is active.
-  log.debug(`Active node determined by FALLBACK: '${tree.rootItem.item.key}'`);
-  return tree.rootItem;
+	if (!lastNodeInPath) {
+		const fallbackRoot = allHierarchies[0]?.rootItem;
+		if (!fallbackRoot) throw error(500, 'No hierarchies configured.');
+		return fallbackRoot;
+	}
+
+	// --- Priority 2: Direct Leaf Match ---
+	const pathSegments = url.pathname.split('/').filter(Boolean);
+	const lastUrlSegment = pathSegments.length > 0 ? pathSegments[pathSegments.length - 1] : null;
+	if (lastUrlSegment && lastNodeInPath.children) {
+		const matchingChild = lastNodeInPath.children.find(
+			(child) => child.item.key === lastUrlSegment
+		);
+		if (matchingChild) {
+			log.info(`Active node determined by DIRECT LEAF MATCH: '${matchingChild.item.key}'`);
+			return matchingChild;
+		}
+	}
+
+	// --- Priority 3: Default Child ---
+	if (lastNodeInPath.defaultChild) {
+		const childNodeKey = lastNodeInPath.defaultChild;
+		const childNode = findNodeByKeyInHierarchies(allHierarchies, childNodeKey);
+		if (childNode) {
+			log.info(`Active node determined by DEFAULT CHILD: '${childNode.item.key}'`);
+			return childNode;
+		} else {
+			log.warn(`Configuration error: defaultChild '${childNodeKey}' not found.`);
+		}
+	}
+
+	// --- Priority 4: Fallback ---
+	log.info(`Active node determined by FALLBACK (last node in path): '${lastNodeInPath.item.key}'`);
+	return lastNodeInPath;
 }
 
-// === MAIN LOAD FUNCTION ========================================================================
+// ================================================================================================
+// FINAL `load` FUNCTION
+// ================================================================================================
 
-/**
- * The central orchestrator for the application's hierarchical navigation system.
- * This `load` function acts as the "brain" on every client-side navigation,
- * reconciling the application's "memory" (the preserved Navigation Context)
- * with the user's current "intent" (the URL).
- *
- * It follows the architecture described in `README-navigation-system.md` to enable
- * "Context Preservation," where the user's deep drill-down path is remembered
- * even when navigating to higher-level pages via the sidebar.
- *
- * @param {LoadEvent} event - The SvelteKit load event, containing the URL, params, and fetch function.
- * @returns {Promise<object>} A promise that resolves to an object containing all the necessary data
- * for the layout and page components, including the fully contextualized hierarchy,
- * breadcrumbs, and the active level for UI highlighting.
- *
- *
- * ### Core Logic Flow:
- *
- * 1.  **Get Preserved Context**: It retrieves the current navigation path (the chain of selected
- *     entities like "Supplier #3" -> "Category #5") from the `navigationState` Svelte store.
- *     This represents the application's "memory".
- *
- * 2.  **Get URL Intent**: It parses the parameters from the current URL (e.g., `/suppliers/7`).
- *     This represents the user's immediate navigational intent.
- *
- * 3.  **Reconcile State**: It merges the two sets of parameters. The URL's intent (`pathParams`)
- *     always overrides the stored context (`preservedParams`). This is the key to how a
- *     "Context Reset" works: clicking a new supplier in the list updates the URL, which
- *     overwrites the old context. If the URL is simple (e.g., `/suppliers`), the preserved
- *     context is used, achieving "Context Preservation".
- *
- * 4.  **Build Context Path**: Using the final, merged parameters, it constructs the definitive
- *     `navigationPath` for this view using the `buildNavigationPath` utility. This path is the
- *     single source of truth for the current context.
- *
- * 5.  **Update Hierarchy State**: It updates the entire runtime hierarchy:
- *     - `urlParamValue` is injected into each node based on the merged params.
- *     - `disabled` states are recalculated using `updateDisabledStates` based on the newly built
- *       `navigationPath`, enabling/disabling sidebar items.
- *
- * 6.  **Synchronize Store**: The newly calculated `navigationPath` is synchronized back into the
- *     `navigationState` store, making it the new "preserved context" for the *next* navigation.
- *
- * 7.  **Determine Active View**: It calculates which sidebar item should be highlighted (`activeLevel`)
- *     based on a priority system: an explicit sidebar click intent (`activeViewKey`), a leaf page,
- *     the `defaultChild` of the last selected entity, or the last entity itself.
- *
- * 8.  **Fetch Display Names**: It asynchronously fetches user-friendly names for entities in the path
- *     (e.g., fetching "Supplier C" for `supplierId: 3`) to be used in UI elements like breadcrumbs.
- *
- * 9.  **Build UI Data**: Finally, it builds the `breadcrumbItems` and returns the complete data
- *     payload for the `+layout.svelte` component to render.
- */
 export async function load({ url, params, depends, fetch: loadEventFetch }: LoadEvent) {
-  log.info(`Load function triggered for URL: ${url.pathname}`);
-  depends(`url:${url.href}`);
+	log.info(`Load function triggered for URL: ${url.pathname}`);
+	depends(`url:${url.href}`);
 
-  const currentNavState = get(ns.navigationState);
-  // const activeTree = currentState.activeTree;
-  log.debug("Current navstate: ", currentNavState);
+	// --- Setup ---
+	const currentNavState = get(navigationState);
+	const allHierarchies = initializeAndCacheHierarchies();
+	let nodesOnPath: RuntimeHierarchyTreeNode[];
 
-  // --- 1. Get or Initialize Hierarchy from Cache ---------------------------------------------
-  const initialHierarchies = initializeAndCacheHierarchies();
+	// --- Phase 1: Reconciliation ---
+	const activeTree = findTreeForUrl(allHierarchies, url);
+	const currentContextKey = activeTree.name;
+	const urlPrimitivePath = getPrimitivePathFromUrl(url);
+	const preservedPrimitivePath = getCurrentPathForContext(currentNavState, currentContextKey);
+	const definitivePrimitivePath = reconcilePaths(urlPrimitivePath, preservedPrimitivePath);
 
-  // --- 2. Reconciliate currentNavState and URL params.  --------------------------------------
+	// --- Phase 2: State Update & Data Preparation ---
+	setCurrentPathForContext(currentContextKey, definitivePrimitivePath);
+	try {
+		// Translate the definitive primitive path into rich node objects. This also validates the path.
+		nodesOnPath = findNodesForPath(activeTree, definitivePrimitivePath);
+	} catch (e: unknown) {
+		const message = e instanceof Error ? e.message : 'An unknown error occurred';
+		log.error(`Path validation failed, rendering 404. Reason: ${message}`);
+		throw error(404, 'Page not found');
+	}
 
-  // --- 2.1 Get preserved context from store
-  const preservedParams: Record<string, string | number> = {};
-  if (currentNavState.activeTree) {
-    currentNavState.activeTree.paths.forEach((node) => {
-      if (node.item.urlParamValue !== "leaf") {
-        preservedParams[node.item.urlParamName] = node.item.urlParamValue;
-      }
-    });
-  }
+	// Inject the actual runtime IDs from SvelteKit's params into our rich nodes.
+	// The `findNodesForPath` validates the *structure*, and this step injects the *data*.
+	const indexedParams = params as Record<string, string>;
+	nodesOnPath.forEach((node) => {
+		if (node.item.urlParamName && indexedParams[node.item.urlParamName]) {
+			const paramValue = indexedParams[node.item.urlParamName];
+			const numericValue = Number(paramValue);
+			node.item.urlParamValue = isNaN(numericValue) ? paramValue : numericValue;
+		}
+	});
 
-  // --- Step 2.2: Get the primary parameters from the URL path. These have priority
-  const pathParams = parseUrlParameters(initialHierarchies, params);
+	// --- Phase 3: UI State Update ---
+	updateDisabledStates(activeTree, nodesOnPath);
 
-  // --- Step 2.3: Merge them. Path parameters from the URL override the preserved context.
-  const urlParams = { ...preservedParams, ...pathParams };
-  log.debug("Preserved context from store:", preservedParams);
-  log.debug("Params from URL path:", pathParams);
-  log.debug("FINAL merged params for this load:", urlParams);
+	const activeNode = determineActiveNode(
+		nodesOnPath,
+		url,
+		currentContextKey,
+		currentNavState,
+		allHierarchies
+	);
 
-  const leaf = extractLeafFromUrl(initialHierarchies, url.pathname);
-  log.debug(`Extracted leaf page: ${leaf}`);
+	// Update the active view key in the state for the UI to consume.
+	setActiveViewKeyForContext(currentContextKey, activeNode.item.key);
 
-  // --- 3. Update Hierarchy with Current Context ----------------------------------------------
+	// Consume the user's explicit navigation intent so it's only used once.
+	if (currentNavState.contexts.get(currentContextKey)?.activeViewNode) {
+		setActiveViewNode(null);
+	}
 
-  // --- 3.a. Find tree based on URL
+	// Fetch dynamic entity names for breadcrumbs.
+	const client = new ApiClient(loadEventFetch);
+	const entityNameMap = new Map<string, string>();
+	const promises = [];
+	for (const node of nodesOnPath) {
+		if (node.item.type === 'object' && node.item.urlParamName) {
+			const paramName = node.item.urlParamName;
+			const entityId = node.item.urlParamValue;
 
-  let contextualRuntimeTreeHierarchy = updateRuntimeHierarchyParameters(initialHierarchies, urlParams);
+			if (entityId && typeof entityId === 'number') {
+				if (paramName === 'supplierId') {
+					promises.push(
+						getSupplierApi(client)
+							.loadSupplier(entityId)
+							.then((s) => {
+								if (s.name) entityNameMap.set('supplierId', s.name);
+							})
+							.catch(() => {})
+					);
+				} else if (paramName === 'categoryId') {
+					promises.push(
+						getCategoryApi(client)
+							.loadCategory(entityId)
+							.then((c) => {
+								if (c.name) entityNameMap.set('categoryId', c.name);
+							})
+							.catch(() => {})
+					);
+				} else if (paramName === 'offeringId') {
+					promises.push(
+						getOfferingApi(client)
+							.loadOffering(entityId)
+							.then((o) => {
+								if (o.product_def_title) entityNameMap.set('offeringId', o.product_def_title);
+							})
+							.catch(() => {})
+					);
+				}
+			}
+		}
+	}
+	await Promise.all(promises);
+	log.debug('Fetched entity names:', Object.fromEntries(entityNameMap));
 
-  // 1. Get the first segment of the URL path (e.g., 'suppliers' or 'categories').
-  const firstPathSegment = url.pathname.split("/")[1] || "";
+	// Build breadcrumbs using the rich node path.
+	const breadcrumbItems = buildBreadcrumb({
+		navigationPath: nodesOnPath,
+		entityNameMap,
+		activeNode
+	});
 
-  let activeTree: RuntimeHierarchyTree | undefined;
-
-  // 2. Handle the explicit root path "/" as a special case.
-  if (firstPathSegment === "") {
-    log.debug("Root path ('/') detected. Applying default fallback tree.");
-    // Fallback to the 'suppliers' tree or the first available one.
-    activeTree = contextualRuntimeTreeHierarchy.find((tree) => tree.name === "suppliers") || contextualRuntimeTreeHierarchy[0];
-  }
-  // 3. For all other non-root paths, try to find a matching tree.
-  else {
-    log.debug(`Non-root path detected. Searching for tree with root key: '${firstPathSegment}'`);
-    activeTree = contextualRuntimeTreeHierarchy.find((tree) => tree.rootItem.item.key === firstPathSegment);
-  }
-
-  // 4. Final safety check.
-  // This will now correctly throw an error for invalid paths like "/supplirrs"
-  // but will succeed for "/" because of the explicit fallback logic above.
-  if (!activeTree) {
-    throw error(404, `Page not found: No hierarchy tree configured for the path segment '${firstPathSegment}'.`);
-  }
-
-  // OLD:
-  // const supplierTree = contextualRuntimeTreeHierarchy.find((tree) => tree.name === "suppliers");
-  // if (!supplierTree) {
-  //   throw error(500, "Critical: 'suppliers' tree not found in hierarchy configuration.");
-  // }
-  // const categoryTree = contextualRuntimeTreeHierarchy.find((tree) => tree.name === "categories");
-  // if (!categoryTree) {
-  //   throw error(500, "Critical: 'categoryTree' tree not found in hierarchy configuration.");
-  // }
-
-  // --- 4. Build the Navigation Context Path --------------------------------------------------
-  const navigationPath = buildNavContextPathFromUrl(activeTree, urlParams);
-  log.debug(
-    "Built navigation path:",
-    navigationPath.map((n) => n.item.key),
-  );
-
-  // --- 4.5 Update Disabled States ------------------------------------------------------------
-  // After knowing the context path, update the entire tree to set which nodes
-  // are clickable (enabled) or not (disabled).
-  contextualRuntimeTreeHierarchy = contextualRuntimeTreeHierarchy.map((tree) => updateDisabledStates(tree, navigationPath));
-  log.debug("Updated disabled states for the hierarchy.");
-
-  // --- 5. Synchronize with Central Navigation State ------------------------------------------
-  if (navigationPath.length > 0) {
-    setActiveTreePath(activeTree, navigationPath);
-  } else {
-    setActiveTreePath(activeTree, []);
-  }
-  log.debug(`NavigationState store updated with path of length: ${navigationPath.length}`);
-
-  // --- 6. Determine the Active UI Level ------------------------------------------------------
-  const activeNode = determineActiveNode(navigationPath, activeTree, leaf, currentNavState, contextualRuntimeTreeHierarchy);
-  log.debug(`Determined final active UI Node: '${activeNode?.item.key}'`);
-
-  // --- 7. Fetch Dynamic Entity Names for Display ---------------------------------------------
-  const client = new ApiClient(loadEventFetch);
-  const entityNameMap = new Map<string, string>();
-  const promises = [];
-  if (urlParams.supplierId) {
-    promises.push(
-      getSupplierApi(client)
-        .loadSupplier(urlParams.supplierId)
-        .then((s) => {
-          if (s.name) entityNameMap.set("supplierId", s.name);
-        })
-        .catch(() => {}),
-    );
-  }
-  if (urlParams.categoryId) {
-    promises.push(
-      getCategoryApi(client)
-        .loadCategory(urlParams.categoryId)
-        .then((c) => {
-          if (c.name) entityNameMap.set("categoryId", c.name);
-        })
-        .catch(() => {}),
-    );
-  }
-  if (urlParams.offeringId) {
-    promises.push(
-      getOfferingApi(client)
-        .loadOffering(urlParams.offeringId)
-        .then((o) => {
-          if (o.product_def_title) entityNameMap.set("offeringId", o.product_def_title);
-        })
-        .catch(() => {}),
-    );
-  }
-  await Promise.all(promises);
-  log.debug("Fetched entity names:", Object.fromEntries(entityNameMap));
-
-  // --- 8. Build Breadcrumbs ------------------------------------------------------------------
-  const breadcrumbItems = buildBreadcrumb({
-    navigationPath: navigationPath,
-    entityNameMap,
-    activeNode
-  });
-
-  // --- 9. Return Final Data Payload ----------------------------------------------------------
-  return {
-    hierarchy: contextualRuntimeTreeHierarchy,
-    breadcrumbItems,
-    activeNode,
-    entityNameMap,
-    navigationPath,
-    urlParams,
-    leaf,
-  };
+	// --- Return Final Data ---
+	return {
+		hierarchy: allHierarchies,
+		breadcrumbItems,
+		activeNode,
+		urlParams: params // Pass SvelteKit's raw params for resolveHref
+	};
 }

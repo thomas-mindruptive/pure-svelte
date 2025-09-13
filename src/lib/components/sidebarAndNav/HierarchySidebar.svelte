@@ -188,23 +188,6 @@ function flattenTreeNode(
 <!-- STYLES ====================================================================================== -->
 
 <style>
-	/* svelte-ignore css_unused_selector */
-	.hb__expand-indicator,
-	.hb__expand-spacer {
-		width: 16px;
-		display: inline-block;
-		text-align: center;
-		font-size: 10px;
-		margin-right: 4px;
-		color: var(--color-muted, #64748b);
-	}
-
-		/* svelte-ignore css_unused_selector */
-	.hb__expand-spacer::before {
-		content: "";
-		/* Creates empty space for items without children to align labels. */
-	}
-
 	.hb__item {
 		display: flex;
 		align-items: center;

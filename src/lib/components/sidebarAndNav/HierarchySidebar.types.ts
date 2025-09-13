@@ -3,13 +3,14 @@
 // 1. HierarchyItem is made generic to capture the literal type of the key (K).
 export type HierarchyItem<K extends string> = {
   key: K;
+  type: "object" | "list";                 // object: is concpetually a "detail page/view", list: is conceptually a "1:n" or "n:m" list.          
   label: string;
   count?: number | null;
   disabled?: boolean;
-  urlParamName: "leaf" | string;
-  // NOTE: If defined, this will used for the navigation. 
-  // If not, buildHrefForNode in hierarchyUtils.ts will be used to generate it ath render-time. 
-  href?: string | undefined;          
+  urlParamName?: string;
+  href?: string | undefined;               // Navigation 
+  display?: boolean | undefined;           // Show it in UI or not
+  isMarkedActive?: boolean | undefined;    // If marked as active element in the UI          
 };
 
 // 2. HierarchyTreeNode is also made generic over the key K and its children C.
@@ -66,24 +67,4 @@ export type AppSpecificHierarchyItem<T extends string> = HierarchyItem<T> & {
   urlParamName: "supplierId" | "categoryId" | "offeringId" | "leaf";
 };
 
-// --- VALID EXAMPLE CHANGE "defaultChild" to check if tsc shows an error ---
-export const validTree = {
-  rootItem: createHierarchyNode({
-    item: { key: "root", label: "Root", urlParamName: "rootId" },
-    defaultChild: "categories", // Correct, because "categories" is a key in `children`
-    children: [
-      createHierarchyNode({
-        item: { key: "categories", label: "Categories", urlParamName: "categoryId" },
-        defaultChild: "products", // Correct
-        children: [
-          createHierarchyNode({
-            item: { key: "products", label: "Products", urlParamName: "productId" },
-          }),
-        ],
-      }),
-      createHierarchyNode({
-        item: { key: "addresses", label: "Addresses", urlParamName: "addressId" },
-      }),
-    ],
-  }),
-};
+

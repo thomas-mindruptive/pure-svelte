@@ -2,83 +2,100 @@ import { createHierarchyNode, type HierarchyTree, type Hierarchy } from "$lib/co
 import { log } from "$lib/utils/logger";
 
 // ================================================================================================
-// SUPPLIER HIERARCHY CONFIGURATION
+// SUPPLIER HIERARCHY CONFIGURATION (NEW DATA-DRIVEN STRUCTURE)
 // ================================================================================================
 
 /**
- * Static supplier hierarchy configuration
- * Uses createHierarchyNode for type-safe defaultChild validation
- *
- * Structure:
- * suppliers (defaultChild: categories)
- * ├── categories (defaultChild: offerings)
- * │   └── offerings (defaultChild: links)
- * │       ├── attributes (leaf)
- * │       └── links (leaf)
- * └── addresses (leaf)
- *
- * NOTE: "item.disabled will be set dynamically at runtime based on context"
+ * Defines the navigation hierarchy for Suppliers using an explicit List/Object pattern.
+ * - "List" nodes are visible and represent collections. They do not have a urlParamName.
+ * - "Object" nodes are hidden (`display: false`) and represent a single selected entity.
+ *   They hold the urlParamName for context building.
  */
 // prettier-ignore
 export const supplierHierarchyConfig: HierarchyTree = {
   name: "suppliers",
   rootItem: createHierarchyNode({
-    // urlParamName is needed for url param extraction.
-    item: { key: "suppliers", href: "/suppliers", label: "Suppliers", disabled: false, urlParamName: "supplierId" },
-    defaultChild: "categories", // Type-safe: must be a child key
+    // LEVEL 0 (List) - Visible root. No urlParamName.
+    item: { key: "suppliers", type: "list", href: "/suppliers", label: "Suppliers" },
     children: [
-      // Categories branch
       createHierarchyNode({
-        item: { key: "categories", href: "/suppliers/[supplierId]", label: "Categories", disabled: false, urlParamName: "categoryId" },
-        defaultChild: "offerings", // Type-safe: must be a child key
+        // LEVEL 1 (Object) - Hidden, represents the selected supplier. Has urlParamName.
+        item: { key: "supplier", type: "object", href: "/suppliers/[supplierId]", label: "Supplier", display: false, urlParamName: "supplierId" },
+        defaultChild: "categories",
         children: [
           createHierarchyNode({
-            item: {key: "offerings", href: "/suppliers/[supplierId]/categories/[categoryId]", label: "Offerings", disabled: false, urlParamName: "offeringId" },
-            defaultChild: "links", // Type-safe: must be a child key
+            // LEVEL 2 (List) - In our case, the categories list is already displayed on the SupplierDetailPage
+            // =>  href: "/suppliers/[supplierId]"
+            item: { key: "categories", type: "list", href: "/suppliers/[supplierId]", label: "Categories", urlParamName: "supplierId" },
             children: [
               createHierarchyNode({
-                item: { key: "attributes", href:"/suppliers/[supplierId]/categories/[categoryId]/offerings/[offeringId]/attributes", label: "Attributes", disabled: false, urlParamName: "leaf" },
-              }),
-              createHierarchyNode({
-                item: { key: "links", href:"/suppliers/[supplierId]/categories/[categoryId]/offerings/[offeringId]/links", label: "Links", disabled: false, urlParamName: "leaf" },
-              }),
-            ],
+                // LEVEL 3 (Object) - Hidden, represents the selected category. Has urlParamName.
+                item: { key: "category", type: "object", href: "/suppliers/[supplierId]/categories/[categoryId]", label: "Category", display: false, urlParamName: "categoryId" },
+                defaultChild: "offerings",
+                children: [
+                  createHierarchyNode({
+                    // LEVEL 4 (List) - Visible offerings list. 
+                    // In our case, the offerings list is already displayed on the CategoryDetailPage.
+                    // => gref points there
+                    item: { key: "offerings", type: "list", href: "/suppliers/[supplierId]/categories/[categoryId]", label: "Offerings", urlParamName: "offeringId" },
+                    children: [
+                      createHierarchyNode({
+                        // LEVEL 5 (Object) - Hidden, represents the selected offering. Has urlParamName.
+                        item: { key: "offering", type: "object", href: "/suppliers/[supplierId]/categories/[categoryId]/offerings/[offeringId]", label: "Offering", display: false, urlParamName: "offeringId" },
+                        defaultChild: "attributes",
+                        children: [
+                           createHierarchyNode({
+                            // LEVEL 6 (Leaf)
+                            item: { key: "attributes", type: "list", href:"/suppliers/[supplierId]/categories/[categoryId]/offerings/[offeringId]/attributes", label: "Attributes" },
+                          }),
+                          createHierarchyNode({
+                            // LEVEL 6 (Leaf)
+                            item: { key: "links", type: "list", href:"/suppliers/[supplierId]/categories/[categoryId]/offerings/[offeringId]/links", label: "Links" },
+                          }),
+                        ]
+                      })
+                    ]
+                  })
+                ]
+              })
+            ]
           }),
-        ],
-      }),
-      // Only for demo purposes: Addresses branch (sibling to categories)
-      createHierarchyNode({
-        item: {
-          key: "addresses", label: "Addresses", disabled: false, urlParamName: "addressId"},
-      }),
-    ],
+           // Sibling branch for addresses, just for demo purposes.
+           createHierarchyNode({
+            item: {
+              key: "addresses",  type: "list", href:"/suppliers/[supplierId]/addresses", label: "Addresses", urlParamName: "addressId"}, // This is a leaf-like node, so urlParamName is okay here.
+          }),
+        ]
+      })
+    ]
   }),
 };
 
+
+// ================================================================================================
+// PRODUCT CATEGORIES HIERARCHY CONFIGURATION (NEW DATA-DRIVEN STRUCTURE)
+// ================================================================================================
+
+/**
+ * Defines the navigation hierarchy for global Product Categories using the same List/Object pattern.
+ */
 // prettier-ignore
 export const productCategoriesHierarchyConfig: HierarchyTree = {
   name: "categories",
   rootItem: createHierarchyNode({
-    // urlParamName is needed for url param extraction.
-    item: { key: "categories", href: "/categories", label: "Product Categories", disabled: false, urlParamName: "categoryId" },
-    defaultChild: "productDefinitions", // Type-safe: must be a child key
+    // LEVEL 0 (List) - Visible root. No urlParamName.
+    item: { key: "categories", type: "list", href: "/categories", label: "Product Categories" },
     children: [
-      // Categories branch
       createHierarchyNode({
-        item: { key: "productDefinitions", href: "/categories/[categoryId]", label: "Product Definitions", disabled: false, urlParamName: "productDefId" },
-        defaultChild: "offerings", // Type-safe: must be a child key
+        // LEVEL 1 (Object) - Hidden, represents the selected category. Has urlParamName.
+        item: { key: "category", type: "object", href: "/categories/[categoryId]", label: "Category", display: false, urlParamName: "categoryId" },
+        defaultChild: "productDefinitions",
         children: [
           createHierarchyNode({
-            item: {key: "offerings", href: "/categories/[categoryId]/productDefinitions/[productDefId]", label: "Offerings", disabled: false, urlParamName: "offeringId" },
-            defaultChild: "links", // Type-safe: must be a child key
-            children: [
-              createHierarchyNode({
-                item: { key: "attributes", href:"/categories/[categoryId]/productDefinitions/[productDefId]/offerings/[offeringId]/attributes", label: "Attributes", disabled: false, urlParamName: "leaf" },
-              }),
-              createHierarchyNode({
-                item: { key: "links", href:"/categories/[categoryId]/productDefinitions/[productDefId]/offerings/[offeringId]/links", label: "Links", disabled: false, urlParamName: "leaf" },
-              }),
-            ],
+            // LEVEL 2 (List) - Visible product definitions list.
+            // The CategoryDetailPage contains a list of productDefinitions => href = "/categories/[categoryId]/"
+            item: { key: "productDefinitions", type: "list", href: "/categories/[categoryId]/", label: "Product Definitions", urlParamName: "categoryId" },
+            // Could be expanded with a hidden "productDefinition" Object-node if drill-down is needed.
           }),
         ],
       }),
@@ -88,88 +105,35 @@ export const productCategoriesHierarchyConfig: HierarchyTree = {
 
 
 // ================================================================================================
-// FUTURE HIERARCHIES
+// MAIN EXPORT FUNCTIONS (Unchanged)
 // ================================================================================================
 
 /**
- * Example: Product hierarchy configuration (for future expansion)
- * Commented out as it's not implemented yet
- */
-/*
-export const productHierarchyConfig: HierarchyTree = {
-  name: "products",
-  rootItem: createHierarchyNode({
-    item: {
-      key: "products",
-      label: "Products",
-      disabled: false,
-      urlParamName: "productId",
-    },
-    defaultChild: "variants",
-    children: [
-      createHierarchyNode({
-        item: {
-          key: "variants",
-          label: "Variants",
-          disabled: false,
-          urlParamName: "variantId",
-        },
-        defaultChild: "specifications",
-        children: [
-          createHierarchyNode({
-            item: {
-              key: "specifications",
-              label: "Specifications",
-              disabled: false,
-              urlParamName: "leaf",
-            },
-          }),
-        ],
-      }),
-    ],
-  }),
-};
-*/
-
-// ================================================================================================
-// MAIN EXPORT FUNCTIONS
-// ================================================================================================
-
-/**
- * Returns all available static hierarchy configurations for the application
- * This is the main entry point for getting hierarchy definitions
- *
- * @returns Array of static HierarchyTree configurations
+ * Returns all available static hierarchy configurations for the application.
+ * This is the main entry point for getting hierarchy definitions.
  */
 export function getAppHierarchies(): Hierarchy {
   return [
     supplierHierarchyConfig,
-    productCategoriesHierarchyConfig
-    // Add more hierarchies here as they're implemented:
-    // productHierarchyConfig,
-    // settingsHierarchyConfig,
+    productCategoriesHierarchyConfig,
   ];
 }
 
 /**
- * Gets a specific hierarchy by name
- * Useful for targeted hierarchy access
- *
- * @param name The name of the hierarchy to retrieve
- * @returns The hierarchy tree or undefined if not found
+ * Gets a specific hierarchy by name.
+ * Useful for targeted hierarchy access.
  */
 export function getHierarchyByName(name: string): HierarchyTree | undefined {
   const hierarchies = getAppHierarchies();
   return hierarchies.find((tree) => tree.name === name);
 }
 
-/**
- * Validates that all hierarchies have unique names
- * Called during development to ensure no naming conflicts
- *
- * @returns true if all names are unique, throws error otherwise
- */
-export function validateHierarchyNames(): boolean {
+
+// ================================================================================================
+// DEVELOPMENT VALIDATION (Unchanged)
+// ================================================================================================
+
+function validateHierarchyNames(): boolean {
   const hierarchies = getAppHierarchies();
   const names = hierarchies.map((tree) => tree.name);
   const uniqueNames = new Set(names);
@@ -178,15 +142,9 @@ export function validateHierarchyNames(): boolean {
     const duplicates = names.filter((name, index) => names.indexOf(name) !== index);
     throw new Error(`Duplicate hierarchy names found: ${duplicates.join(", ")}`);
   }
-
   return true;
 }
 
-// ================================================================================================
-// DEVELOPMENT VALIDATION
-// ================================================================================================
-
-// Validate hierarchy names during development
 if (import.meta.env.DEV) {
   try {
     validateHierarchyNames();
@@ -195,34 +153,3 @@ if (import.meta.env.DEV) {
     log.error("❌ Hierarchy configuration validation failed:", error);
   }
 }
-
-// ================================================================================================
-// TYPE VALIDATION EXAMPLES
-// ================================================================================================
-
-/*
-// These examples demonstrate the type safety of defaultChild
-// Uncomment to test TypeScript validation
-
-// ✅ VALID: defaultChild references existing child
-const validExample = createHierarchyNode({
-  item: { key: "test", label: "Test", urlParamName: "testId" },
-  defaultChild: "validChild", // This will be valid if "validChild" is in children
-  children: [
-    createHierarchyNode({
-      item: { key: "validChild", label: "Valid Child", urlParamName: "leaf" }
-    })
-  ]
-});
-
-// ❌ INVALID: defaultChild references non-existent child
-const invalidExample = createHierarchyNode({
-  item: { key: "test", label: "Test", urlParamName: "testId" },
-  defaultChild: "nonExistentChild", // TypeScript error: not in children
-  children: [
-    createHierarchyNode({
-      item: { key: "validChild", label: "Valid Child", urlParamName: "leaf" }
-    })
-  ]
-});
-*/

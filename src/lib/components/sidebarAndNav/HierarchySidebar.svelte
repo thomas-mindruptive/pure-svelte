@@ -53,21 +53,27 @@
 
 	// === UTILITY FUNCTIONS =======================================================================
 
-	function flattenTreeNode(
+function flattenTreeNode(
 		node: RuntimeHierarchyTreeNode,
 		tree: RuntimeHierarchyTree
 	): FlattenedItem[] {
 		const result: FlattenedItem[] = [];
-		result.push({
-			key: node.item.key,
-			label: node.item.label,
-			count: node.item.count,
-			disabled: node.item.disabled,
-			level: node.item.level,
-			treeRef: tree,
-			nodeRef: node,
-			hasChildren: Boolean(node.children && node.children.length > 0)
-		});
+
+		// ONLY add display == true nodes!
+		if (node.item.display !== false) {
+			result.push({
+				key: node.item.key,
+				label: node.item.label,
+				count: node.item.count,
+				disabled: node.item.disabled,
+				level: node.item.level,
+				treeRef: tree,
+				nodeRef: node,
+				hasChildren: Boolean(node.children && node.children.length > 0)
+			});
+		}
+
+		// Always iterate children.
 		if (node.children) {
 			for (const childNode of node.children) {
 				result.push(...flattenTreeNode(childNode, tree));

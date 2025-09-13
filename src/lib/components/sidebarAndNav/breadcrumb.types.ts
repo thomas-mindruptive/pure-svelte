@@ -6,7 +6,7 @@ import type { RuntimeHierarchyTreeNode } from "./HierarchySidebar.types";
    */
   export type Crumb = {
     label: string;
-    href?: string;
+    href?: string | undefined;
     active?: boolean;
     node: RuntimeHierarchyTreeNode;
   };

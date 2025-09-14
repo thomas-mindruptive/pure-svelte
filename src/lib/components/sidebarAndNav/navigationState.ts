@@ -1,102 +1,107 @@
-// File: src/lib/components/sidebarAndNav/navigationState.svelte.ts
+// File: src/lib/components/sidebarAndNav/navigationState.ts
 
+import { get, writable } from "svelte/store";
 import { log } from "$lib/utils/logger";
 
+// ================================================================================================
+// TYPES
+// ================================================================================================
+
 /**
- * An app can have several navigation contextes or "trees".
- * The context reflexts the currently active or valid "depth" of the navigation.
- * E.g. suppliers -> supplier1 -> categories -> category1
+ * Represents the navigation state for a single hierarchy context.
+ * It only contains the "memory" of the user's path.
  */
 export type NavigationContext = {
-  contextKey: string;
+  /**
+   * The definitive, ordered path of navigation, e.g., ['suppliers', 3, 'categories', 5]
+   */
   path: (string | number)[];
 };
 
 /**
- * The state is defined by all available contexts.
+ * Defines the entire navigation state for the application.
  */
 export interface NavigationState {
+  /**
+   * The key of the currently active context (e.g., "suppliers").
+   */
   activeContextKey: string | null;
+
+  /**
+   * A map storing the independent `NavigationContext` for each hierarchy tree.
+   */
   contexts: Map<string, NavigationContext>;
 }
 
 // ================================================================================================
-// SVELTE 5 RUNES-BASED STORE
+// INITIAL STATE
 // ================================================================================================
 
-function createNavigationStore() {
-  // Use $state rune for reactive state
-  const state = $state<NavigationState>({
-    activeContextKey: null,
-    contexts: new Map(),
-  });
+const initialState: NavigationState = {
+  activeContextKey: null,
+  contexts: new Map(),
+};
 
-  // Derived state using $derived rune
-  const activeContext = $derived(() => {
-    if (!state.activeContextKey) return null;
-    return state.contexts.get(state.activeContextKey) ?? null;
-  });
+// ================================================================================================
+// WRITABLE STORE
+// ================================================================================================
 
-  const currentPath = $derived(() => activeContext()?.path ?? []);
+/**
+ * The central writable store for the entire navigation state.
+ */
+export const navigationState = writable<NavigationState>(initialState);
 
-  // Helper function
-  function getOrCreateContext(contextKey: string): NavigationContext {
-    if (!state.contexts.has(contextKey)) {
-      state.contexts.set(contextKey, {
-        contextKey,
-        path: [],
-      });
-    }
-    return state.contexts.get(contextKey)!;
+// ================================================================================================
+// HELPER FUNCTIONS (STORE API)
+// ================================================================================================
+
+/**
+ * Internal helper to get or create a navigation context for a given key.
+ * @param state The current navigation state object.
+ * @param contextKey The key for the context (e.g., "suppliers").
+ * @returns The mutable NavigationContext object.
+ */
+function getOrCreateContext(state: NavigationState, contextKey: string): NavigationContext {
+  if (!state.contexts.has(contextKey)) {
+    state.contexts.set(contextKey, {
+      path: [],
+    });
   }
-
-  return {
-    // Read-only reactive state
-    get activeContextKey() {
-      return state.activeContextKey;
-    },
-    
-    get contexts() {
-      return state.contexts;
-    },
-    
-    get activeContext() {
-      return activeContext();
-    },
-
-    get currentPath() {
-      return currentPath();
-    },
-
-    // Actions
-    setCurrentPathForContext(contextKey: string, path: (string | number)[]) {
-      log.debug(`Setting current path for context '${contextKey}':`, path);
-      const context = getOrCreateContext(contextKey);
-      context.path = path;
-      state.activeContextKey = contextKey;
-    },
-
-    getCurrentPathForContext(contextKey: string): (string | number)[] {
-      return state.contexts.get(contextKey)?.path ?? [];
-    },
-
-    reset() {
-      log.debug("⚠️ Resetting navigation state completely");
-      state.activeContextKey = null;
-      state.contexts.clear();
-    },
-  };
+  // The "!" non-null assertion is safe here because we just created it if it didn't exist.
+  return state.contexts.get(contextKey)!;
 }
 
-// ================================================================================================
-// EXPORTED STORE INSTANCE
-// ================================================================================================
+/**
+ * Sets the definitive, reconciled primitive path for a specific context.
+ * This is the primary mutator called by the `load` function.
+ * @param contextKey The key of the context to update.
+ * @param path The new primitive path for the context.
+ */
+export function setCurrentPathForContext(contextKey: string, path: (string | number)[]) {
+  navigationState.update((state) => {
+    log.debug(`Setting current path for context '${contextKey}':`, path);
+    const context = getOrCreateContext(state, contextKey);
+    context.path = path;
+    state.activeContextKey = contextKey;
+    return state;
+  });
+}
 
-export const navigationStore = createNavigationStore();
+/**
+ * Retrieves the current preserved path for a given context from the store.
+ * Used by the `load` function during reconciliation.
+ * @param contextKey The context to query.
+ * @returns The preserved primitive path, or an empty array if none exists.
+ */
+export function getCurrentPathForContext(contextKey: string): (string | number)[] {
+  // Uses `get()` to read the current value of the store once.
+  return get(navigationState).contexts.get(contextKey)?.path ?? [];
+}
 
-// For backward compatibility, you can also export individual functions
-export const {
-  setCurrentPathForContext,
-  getCurrentPathForContext,
-  reset: resetNavigationState,
-} = navigationStore;
+/**
+ * Resets the entire navigation state to its initial condition.
+ */
+export function resetNavigationState(): void {
+  log.debug("⚠️ Resetting navigation state completely");
+  navigationState.set(initialState);
+}

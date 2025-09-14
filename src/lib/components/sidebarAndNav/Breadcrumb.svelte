@@ -40,6 +40,7 @@
             href={item.href} 
             class="breadcrumb-link" 
             onclick={(event) => handleClick(event, item)}
+            data-sveltekit-preload-data="off"
           >
             {item.label}
           </a>

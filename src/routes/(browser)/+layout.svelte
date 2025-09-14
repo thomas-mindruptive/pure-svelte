@@ -12,9 +12,7 @@
   import { derived } from "svelte/store";
   import { fade } from "svelte/transition";
   import type { RuntimeHierarchyTreeNode } from "$lib/components/sidebarAndNav/HierarchySidebar.types.js";
-  // CHANGED: setActiveViewNode is no longer needed.
   import { resolveHref } from "$lib/components/sidebarAndNav/hierarchyUtils.js";
-
   import "$lib/components/styles/loadingIndicator.css";
 
   const { data, children } = $props();
@@ -34,6 +32,10 @@
       return $supplierLoading || $categoryLoading || $offeringLoading || $attributeLoading || $productDefLoading;
     },
   );
+
+  	$effect(() => {
+		log.debug("Layout props:", {crumbItems, activeNode, urlParams, hierarchy});
+	});
 
   // === NAVIGATION HANDLER ===
 

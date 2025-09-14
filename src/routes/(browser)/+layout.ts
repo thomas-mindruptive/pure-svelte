@@ -79,10 +79,7 @@ function findTreeForUrl(allHierarchies: RuntimeHierarchyTree[], url: URL): Runti
  * @param activeTree The currently active runtime hierarchy tree to evaluate against.
  * @returns The single `RuntimeHierarchyTreeNode` that should be highlighted in the UI.
  */
-function determineActiveNode(
-  url: URL,
-  activeTree: RuntimeHierarchyTree,
-): RuntimeHierarchyTreeNode {
+function determineActiveNode(url: URL, activeTree: RuntimeHierarchyTree): RuntimeHierarchyTreeNode {
   log.debug(`<determineActiveNode> Determining active node for tree='${activeTree.name}' ...`);
 
   const isSelectableNode = (node: RuntimeHierarchyTreeNode): boolean => {
@@ -194,18 +191,26 @@ export async function load({ url, params, depends, fetch: loadEventFetch }: Load
       if (entityId && typeof entityId === "number") {
         let apiPromise;
         if (paramName === "supplierId") {
-          apiPromise = getSupplierApi(client).loadSupplier(entityId).then(s => s?.name);
+          apiPromise = getSupplierApi(client)
+            .loadSupplier(entityId)
+            .then((s) => s?.name);
         } else if (paramName === "categoryId") {
-          apiPromise = getCategoryApi(client).loadCategory(entityId).then(c => c?.name);
+          apiPromise = getCategoryApi(client)
+            .loadCategory(entityId)
+            .then((c) => c?.name);
         } else if (paramName === "offeringId") {
-          apiPromise = getOfferingApi(client).loadOffering(entityId).then(o => o?.product_def_title);
+          apiPromise = getOfferingApi(client)
+            .loadOffering(entityId)
+            .then((o) => o?.product_def_title);
         }
 
         if (apiPromise) {
           promises.push(
-            apiPromise.then(name => {
-              if (name) entityNameMap.set(paramName, name);
-            }).catch(err => log.warn(`API call failed for ${paramName}=${entityId}`, err))
+            apiPromise
+              .then((name) => {
+                if (name) entityNameMap.set(paramName, name);
+              })
+              .catch((err) => log.warn(`API call failed for ${paramName}=${entityId}`, err)),
           );
         }
       }
@@ -220,11 +225,21 @@ export async function load({ url, params, depends, fetch: loadEventFetch }: Load
     activeNode: activeNode,
   });
 
-  // --- Return Final Data ---
-  return {
+  const returnData = {
     hierarchy: allHierarchies,
     breadcrumbItems,
     activeNode,
-    urlParams: params,
+    // CORRECTED: Merge the context path parameters with the current URL parameters,
+    // ensuring the URL parameters (the source of truth for the current view) take precedence.
+    urlParams: {
+      ...Object.fromEntries(
+        nodesOnPath
+          .filter((n) => n.item.urlParamName && n.item.urlParamValue && n.item.urlParamValue !== "leaf")
+          .map((n) => [n.item.urlParamName!, n.item.urlParamValue!]),
+      ),
+      ...params,
+    },
   };
+  log.debug(`load complete, returning the data`, returnData);
+  return returnData;
 }

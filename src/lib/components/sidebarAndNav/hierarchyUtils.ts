@@ -555,7 +555,12 @@ export function resolveHref(hrefPattern: string, urlParams: Record<string, strin
 export function updateDisabledStates(tree: RuntimeHierarchyTree, navigationPath: RuntimeHierarchyTreeNode[]): RuntimeHierarchyTree {
   log.debug(`Updating disabled states with path of length ${navigationPath.length}`);
 
+  // The last node in the path enables its direct children (for drill-down).
   const lastNodeInPath = navigationPath.length > 0 ? navigationPath[navigationPath.length - 1] : null;
+
+  // The parent of the last node enables all of its children
+  // (which includes the last node itself and all its siblings).
+  const parentOfLastNode = navigationPath.length > 1 ? navigationPath[navigationPath.length - 2] : null;
 
   // A recursive helper function to process each node.
   function updateNode(node: RuntimeHierarchyTreeNode): void {
@@ -572,6 +577,11 @@ export function updateDisabledStates(tree: RuntimeHierarchyTree, navigationPath:
     }
     // Rule 3: Any direct child of the last node in the path is enabled.
     else if (lastNodeInPath && lastNodeInPath.children?.includes(node)) {
+      isDisabled = false;
+    }
+
+    // Rule 4: (Enable Siblings): Any direct child of the PARENT of the last node is also enabled.
+    else if (parentOfLastNode && parentOfLastNode.children?.includes(node)) {
       isDisabled = false;
     }
 

@@ -42,7 +42,7 @@ export const supplierHierarchyConfig: HierarchyTree = {
                       createHierarchyNode({
                         // LEVEL 5 (Object) - Hidden, represents the selected offering. Has urlParamName.
                         item: { key: "offering", type: "object", href: "/suppliers/[supplierId]/categories/[categoryId]/offerings/[offeringId]", label: "Offering", display: false, urlParamName: "offeringId" },
-                        defaultChild: "attributes",
+                        defaultChild: "links",
                         children: [
                            createHierarchyNode({
                             // LEVEL 6 (Leaf)

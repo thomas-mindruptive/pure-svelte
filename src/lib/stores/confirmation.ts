@@ -28,7 +28,7 @@ export function reset() {
  * @param message Die Frage, die dem Benutzer angezeigt wird.
  * @param title (Optional) Ein Titel für den Dialog.
  */
-export function requestConfirmation(message: string, title = 'Bitte bestätigen'): Promise<boolean> {
+export function requestConfirmation(message: string, title = 'Confirm'): Promise<boolean> {
   return new Promise<boolean>((resolve) => {
     confirmationStore.set({
       isOpen: true,

@@ -110,6 +110,19 @@ export function convertToRuntimeTree(staticTree: HierarchyTree): RuntimeHierarch
     rootItem: convertNodeToRuntime(staticTree.rootItem as unknown as GenericStaticNode),
   };
   initLevels(runtimeTree);
+
+  // STEP 2: Call validation right after creation, but only in development.
+  if (import.meta.env.DEV) {
+    const result = validateRuntimeTree(runtimeTree);
+    if (!result.isValid) {
+      log.error(`❌ Validation failed for hierarchy tree '${runtimeTree.name}':`, result.errors);
+      // Optional: Throw an error to halt execution immediately in dev.
+      // throw new Error(`Hierarchy validation failed for '${runtimeTree.name}'. See console for details.`);
+    } else {
+      log.info(`✅ Hierarchy validation passed for '${runtimeTree.name}'`);
+    }
+  }
+
   return runtimeTree;
 }
 
@@ -480,111 +493,6 @@ export function resolveHref(hrefPattern: string, urlParams: Record<string, strin
   return resolvedUrl;
 }
 
-/**
- * Builds a URL path string from an array of runtime nodes (a navigation path).
- * @param navigationPath An array of nodes representing the navigation path.
- * @returns A complete URL path string, e.g., "/suppliers/3/categories/5".
- */
-// export function buildUrlFromNavigationPath(navigationPath: RuntimeHierarchyTreeNode[]): string {
-//   if (navigationPath.length === 0) {
-//     return "/";
-//   }
-//   const urlSegments: string[] = [];
-//   for (const node of navigationPath) {
-//     const segment = node.item.key;
-//     const urlParamValue = node.item.urlParamValue;
-//     urlSegments.push(segment);
-//     if (urlParamValue !== "leaf") {
-//       urlSegments.push(String(urlParamValue));
-//     }
-//   }
-//   return "/" + urlSegments.join("/");
-// }
-
-/**
- * Builds the authoritative `Navigation Context Path` from a hierarchy tree and a set of URL parameters.
- *
- * @description
- * This is a cornerstone of the navigation system. It translates the stateless URL parameters
- * (e.g., `{ supplierId: 3, categoryId: 5 }`) into a stateful, ordered path of nodes representing
- * the user's complete drill-down journey.
- *
- * The logic is specifically designed to traverse the new, explicit "List -> Object -> List" hierarchy structure:
- * 1. It starts at a "List" node (e.g., `suppliers`). This node is added to the path.
- * 2. It then looks for that List's corresponding "Object" child node (e.g., `supplier`).
- * 3. It checks if the `urlParams` contain a value for the Object node's `urlParamName` (e.g., `supplierId`).
- * 4. If a value exists, an entity has been selected. A dynamic version of the "Object" node,
- *    injected with the `urlParamValue` from the URL, is added to the path.
- * 5. The function then descends into the children of that "Object" node to find the *next* "List" node
- *    (e.g., `categories`) and repeats the process.
- * 6. If at any point a URL parameter is missing, the traversal stops, and the path is returned.
- *
- * The resulting path is the single source of truth for the user's location, containing both
- * visible List nodes and hidden Object nodes, which is essential for building breadcrumbs and managing UI state.
- *
- * @param {RuntimeHierarchyTree} tree - The complete runtime hierarchy tree to traverse.
- * @param {Record<string, any>} urlParams - The merged URL parameters, which act as the "coordinates" to define the path's depth.
- * @returns {RuntimeHierarchyTreeNode[]} An array of nodes representing the exact path from the root to the deepest point defined by the `urlParams`.
- */
-// export function buildNavContextPathFromUrl(tree: RuntimeHierarchyTree, urlParams: Record<string, any>): RuntimeHierarchyTreeNode[] {
-//   log.debug(`(buildNavContextPathFromUrl) Building path for tree '${tree.name}' with params:`, urlParams);
-//   const path: RuntimeHierarchyTreeNode[] = [];
-//   let currentListRoot: RuntimeHierarchyTreeNode | undefined = tree.rootItem;
-
-//   // The loop iterates as long as we can find a "List" node to process.
-//   while (currentListRoot) {
-//     // 1. Add the current "List" node (e.g., `suppliers`, `categories`) to the path.
-//     path.push(currentListRoot);
-//     log.debug(`(buildNavContextPathFromUrl) Added List node to path: '${currentListRoot.item.key}'`);
-
-//     // 2. Find this List's corresponding "Object" node, which defines the parameter for this level.
-//     // We assume the first hidden child is the main object representation for this list.
-//     const objectNode: RuntimeHierarchyTreeNode | undefined = currentListRoot.children?.find((child) => child.item.display === false);
-
-//     if (!objectNode) {
-//       // This branch has no further drill-down capability (e.g., a leaf or misconfiguration).
-//       log.debug(`(buildNavContextPathFromUrl) No child Object node found for '${currentListRoot.item.key}'. Stopping traversal.`);
-//       break;
-//     }
-
-//     // 3. Check if the URL provides a parameter value for this Object node.
-//     const paramName = objectNode.item.urlParamName;
-//     if (!paramName) {
-//       log.warn(
-//         `(buildNavContextPathFromUrl) Configuration issue: Object node '${objectNode.item.key}' is missing 'urlParamName'. Stopping traversal.`,
-//       );
-//       break;
-//     }
-
-//     const paramValue = urlParams[paramName];
-//     if (paramValue === undefined || paramValue === null) {
-//       // The URL does not specify an entity for this level. The path ends here.
-//       log.debug(`(buildNavContextPathFromUrl) No param value for '${paramName}' in urlParams. Path construction complete.`);
-//       break;
-//     }
-
-//     // 4. An entity is selected. Create a dynamic version of the "Object" node
-//     //    with the `urlParamValue` injected and add it to the path.
-//     const dynamicObjectNode: RuntimeHierarchyTreeNode = {
-//       ...objectNode,
-//       item: { ...objectNode.item, urlParamValue: paramValue },
-//     };
-//     path.push(dynamicObjectNode);
-//     log.debug(`(buildNavContextPathFromUrl) Added Object node to path: '${dynamicObjectNode.item.key}' with value: ${paramValue}`);
-
-//     // 5. Find the next "List" node for the next iteration.
-//     // It must be a child of the Object node we just processed. We assume the main
-//     // drill-down path continues through the first child that is itself a "List" (i.e., has children).
-//     currentListRoot = objectNode.children?.find((child) => child.children && child.children.length > 0);
-//   }
-
-//   log.debug(
-//     `[buildNavContextPathFromUrl] Final path built:`,
-//     path.map((p) => `${p.item.key}(${p.item.urlParamValue || ""})`),
-//   );
-//   return path;
-// }
-
 // === DYNAMIC STATE AND VALIDATION ==============================================================
 
 /**
@@ -645,7 +553,7 @@ export function updateDisabledStates(tree: RuntimeHierarchyTree, navigationPath:
 }
 
 /**
- * Validates that a runtime tree has a proper structure and values for debugging.
+ * Validates that a runtime tree has a proper structure, values, and no duplicate keys.
  * @param tree The runtime tree to validate.
  * @returns A validation result with any errors found.
  */
@@ -654,95 +562,33 @@ export function validateRuntimeTree(tree: RuntimeHierarchyTree): {
   errors: string[];
 } {
   const errors: string[] = [];
+  // STEP 1: Add a Set to track keys encountered during traversal.
+  const seenKeys = new Set<string>();
+
   function validateNode(node: RuntimeHierarchyTreeNode, path: string): void {
+    // Basic property checks
     if (!node.item.key) errors.push(`${path}: Missing key`);
     if (!node.item.label) errors.push(`${path}: Missing label`);
     if (node.item.level === undefined) errors.push(`${path}: Missing level`);
-    if (!node.item.urlParamValue) errors.push(`${path}: Missing urlParamValue`);
+    // Note: urlParamValue is initialized later, so we don't check it here.
+
+    // NEW CHECK: Enforce unique keys within the tree.
+    if (node.item.key) {
+      if (seenKeys.has(node.item.key)) {
+        errors.push(`${path}: Duplicate key '${node.item.key}' found in tree '${tree.name}'. Keys must be unique.`);
+      } else {
+        seenKeys.add(node.item.key);
+      }
+    }
+
+    // Recurse through children
     if (node.children) {
       node.children.forEach((child, index) => {
         validateNode(child, `${path}.children[${index}]`);
       });
     }
   }
+
   validateNode(tree.rootItem, `${tree.name}.rootItem`);
   return { isValid: errors.length === 0, errors };
-}
-
-// === URL PARSING UTILITIES =====================================================================
-
-/**
- * Generically parses URL parameters based on the hierarchy structure.
- *
- * @description
- * This function traverses all provided hierarchy trees to find every node that has a
- * `urlParamName` defined (which, in the data-driven model, are the hidden "Object" nodes).
- * For each one found, it extracts the corresponding value from the `params` object provided
- * by SvelteKit's `load` event. It also intelligently converts numeric string values to numbers.
- * The result is a clean key-value map of the active parameters for the current URL.
- *
- * @param {RuntimeHierarchyTree[]} hierarchies - The array of all runtime hierarchies to scan.
- * @param {Record<string, string>} params - The `params` object from a SvelteKit LoadEvent.
- * @returns {Record<string, any>} A record object mapping `urlParamName` to its value (e.g., { supplierId: 3, categoryId: 5 }).
- */
-// export function parseUrlParameters(hierarchies: RuntimeHierarchyTree[], params: Record<string, string>): Record<string, any> {
-//   log.debug(`(parseUrlParameters) Parsing SvelteKit params:`, params);
-//   const result: Record<string, unknown> = {};
-
-//   for (const tree of hierarchies) {
-//     // Use the generic traverse utility to visit every node in the tree.
-//     traverse(tree.rootItem, (node) => {
-//       const paramName = node.item.urlParamName;
-
-//       // Act only if the node is configured to have a URL parameter AND a value for it exists in the URL.
-//       if (paramName && params[paramName] !== undefined) {
-//         const paramValue = params[paramName];
-//         const numericValue = Number(paramValue);
-
-//         // Store the value, converting it to a number if it's a valid one.
-//         result[paramName] = !isNaN(numericValue) ? numericValue : paramValue;
-//       }
-//     });
-//   }
-
-//   log.debug(`(parseUrlParameters) Parsed result:`, result);
-//   return result;
-// }
-
-/**
- * Extracts a leaf page segment from a URL pathname using the hierarchy structure.
- * This avoids hardcoding leaf page names like "attributes" or "links".
- * @param hierarchy The array of all runtime hierarchies.
- * @param pathname The URL pathname string.
- * @returns The key of the found leaf node, or null.
- */
-// export function extractLeafFromUrl(hierarchy: RuntimeHierarchyTree[], pathname: string): string | null {
-//   const leafNodes: string[] = [];
-//   for (const tree of hierarchy) {
-//     traverse(tree.rootItem, (node) => {
-//       if (node.item.urlParamName === "leaf") {
-//         leafNodes.push(node.item.key);
-//       }
-//     });
-//   }
-//   for (const leafKey of leafNodes) {
-//     if (pathname.endsWith(`/${leafKey}`)) {
-//       return leafKey;
-//     }
-//   }
-//   return null;
-// }
-
-/**
- * A generic traversal utility to apply a callback to every node in a tree.
- * @param node The starting node.
- * @param callback The function to execute for each node.
- */
-export function traverse(node: RuntimeHierarchyTreeNode, callback: (node: RuntimeHierarchyTreeNode) => void) {
-  callback(node);
-  if (node.children) {
-    for (const child of node.children) {
-      traverse(child, callback);
-    }
-  }
 }

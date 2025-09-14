@@ -1,158 +1,153 @@
 <!-- File: src/routes/(browser)/+layout.svelte -->
 <script lang="ts">
-	import HierarchySidebar from '$lib/components/sidebarAndNav/HierarchySidebar.svelte';
-	import { goto } from '$app/navigation';
-	import { log } from '$lib/utils/logger';
-	import Breadcrumb from '$lib/components/sidebarAndNav/Breadcrumb.svelte';
-	import { attributeLoadingState } from '$lib/api/client/attribute.js';
-	import { categoryLoadingState } from '$lib/api/client/category.js';
-	import { offeringLoadingState } from '$lib/api/client/offering.js';
-	import { productDefinitionLoadingState } from '$lib/api/client/productDefinition.js';
-	import { supplierLoadingState } from '$lib/api/client/supplier.js';
-	import { derived } from 'svelte/store';
-	import { fade } from 'svelte/transition';
-	import type { RuntimeHierarchyTreeNode } from '$lib/components/sidebarAndNav/HierarchySidebar.types.js';
-	import { setActiveViewNode } from '$lib/components/sidebarAndNav/navigationState.js';
-	import { resolveHref } from '$lib/components/sidebarAndNav/hierarchyUtils.js';
+  import HierarchySidebar from "$lib/components/sidebarAndNav/HierarchySidebar.svelte";
+  import { goto } from "$app/navigation";
+  import { log } from "$lib/utils/logger";
+  import Breadcrumb from "$lib/components/sidebarAndNav/Breadcrumb.svelte";
+  import { attributeLoadingState } from "$lib/api/client/attribute.js";
+  import { categoryLoadingState } from "$lib/api/client/category.js";
+  import { offeringLoadingState } from "$lib/api/client/offering.js";
+  import { productDefinitionLoadingState } from "$lib/api/client/productDefinition.js";
+  import { supplierLoadingState } from "$lib/api/client/supplier.js";
+  import { derived } from "svelte/store";
+  import { fade } from "svelte/transition";
+  import type { RuntimeHierarchyTreeNode } from "$lib/components/sidebarAndNav/HierarchySidebar.types.js";
+  // CHANGED: setActiveViewNode is no longer needed.
+  import { resolveHref } from "$lib/components/sidebarAndNav/hierarchyUtils.js";
 
-	import '$lib/components/styles/loadingIndicator.css';
+  import "$lib/components/styles/loadingIndicator.css";
 
-	const { data, children } = $props();
+  const { data, children } = $props();
 
-	// === DERIVED STATE FROM LOAD FUNCTION ===
-	const crumbItems = $derived(data.breadcrumbItems);
-	const hierarchy = $derived(data.hierarchy);
-	const activeNode = $derived(data.activeNode);
-	// The `urlParams` prop is provided by our new `load` function and is essential for `resolveHref`.
-	const urlParams = $derived(data.urlParams);
+  // === DERIVED STATE FROM LOAD FUNCTION ===
+  const crumbItems = $derived(data.breadcrumbItems);
+  // NOTE: data.hierarchy now contains ALL hierarchies. We need to pass only the active one
+  // or let the sidebar component handle it. For now, we assume it expects all.
+  const hierarchy = $derived(data.hierarchy);
+  const activeNode = $derived(data.activeNode);
+  const urlParams = $derived(data.urlParams);
 
-	// === LOADING INDICATOR ===
-	const isAnythingLoading = derived(
-		[
-			supplierLoadingState,
-			categoryLoadingState,
-			offeringLoadingState,
-			attributeLoadingState,
-			productDefinitionLoadingState
-		],
-		([$supplierLoading, $categoryLoading, $offeringLoading, $attributeLoading, $productDefLoading]) => {
-			return $supplierLoading || $categoryLoading || $offeringLoading || $attributeLoading || $productDefLoading;
-		}
-	);
+  // === LOADING INDICATOR ===
+  const isAnythingLoading = derived(
+    [supplierLoadingState, categoryLoadingState, offeringLoadingState, attributeLoadingState, productDefinitionLoadingState],
+    ([$supplierLoading, $categoryLoading, $offeringLoading, $attributeLoading, $productDefLoading]) => {
+      return $supplierLoading || $categoryLoading || $offeringLoading || $attributeLoading || $productDefLoading;
+    },
+  );
 
-	// === NAVIGATION HANDLER ===
+  // === NAVIGATION HANDLER ===
 
-	/**
-	 * Handles sidebar and breadcrumb navigation clicks.
-	 *
-	 * @description
-	 * This function follows the new architecture:
-	 * 1. It signals the user's "intent" by setting the clicked node as the `activeViewNode` in the state.
-	 *    This allows the `determineActiveNode` function in the next `load` cycle to give this
-	 *    click the highest priority.
-	 * 2. It resolves the declarative `href` pattern from the node's configuration.
-	 * 3. It calls `goto()`, which triggers the main `load` function to handle all the complex
-	 *    context reconciliation and state updates.
-	 *
-	 * @param node The runtime node that was selected by the user.
-	 */
-	function handleSidebarNavigation(node: RuntimeHierarchyTreeNode) {
-		log.info(`UI navigation requested for node: '${node.item.key}'`);
+  /**
+   * Handles sidebar and breadcrumb navigation clicks.
+   *
+   * @description
+   * This function follows the new, simplified architecture:
+   * 1. It resolves the declarative `href` pattern from the node's configuration.
+   * 2. It calls `goto()`, which triggers the main `load` function to handle all context
+   *    reconciliation and state updates. The `setActiveViewNode` intent is no longer needed.
+   *
+   * @param node The runtime node that was selected by the user.
+   */
+  function handleSidebarNavigation(node: RuntimeHierarchyTreeNode) {
+    log.info(`UI navigation requested for node: '${node.item.key}'`);
 
-		try {
-			if (node.item.disabled) {
-				log.warn(`Navigation aborted for disabled node: '${node.item.key}'`);
-				return;
-			}
+    try {
+      if (node.item.disabled) {
+        log.warn(`Navigation aborted for disabled node: '${node.item.key}'`);
+        return;
+      }
 
-			if (node.item.href) {
-				// Step 1: Signal our navigation intent to the state. This is consumed by `determineActiveNode`.
-				setActiveViewNode(node);
+      if (node.item.href) {
+        // Resolve the declarative href pattern using the current context's params.
+        const finalHref = resolveHref(node.item.href, urlParams);
+        log.debug(`Resolved href from pattern '${node.item.href}' to '${finalHref}', navigating...`);
 
-				// Step 2: Resolve the declarative href pattern using the current context's params.
-				const finalHref = resolveHref(node.item.href, urlParams);
-				log.debug(`Resolved href from pattern '${node.item.href}' to '${finalHref}', navigating...`);
-
-				// Step 3: Trigger the navigation. The `load` function will now take over.
-				goto(finalHref);
-			} else {
-				log.warn(`Navigation aborted for node: '${node.item.key}' (no href pattern defined)`);
-			}
-		} catch (error) {
-			log.error('Failed to handle sidebar navigation:', error);
-		}
-	}
+        // Trigger the navigation. The `load` function will now take over.
+        goto(finalHref);
+      } else {
+        log.warn(`Navigation aborted for node: '${node.item.key}' (no href pattern defined)`);
+      }
+    } catch (error) {
+      log.error("Failed to handle sidebar navigation:", error);
+    }
+  }
 </script>
 
 <!-- TEMPLATE (unchanged) -->
 <div class="browser-layout">
-	<aside class="sidebar">
-		<HierarchySidebar
-			{hierarchy}
-			active={activeNode}
-			onselect={handleSidebarNavigation}
-			shouldRenderHierarchyRootTitle={false}
-		/>
-	</aside>
+  <aside class="sidebar">
+    <HierarchySidebar
+      {hierarchy}
+      active={activeNode}
+      onselect={handleSidebarNavigation}
+      shouldRenderHierarchyRootTitle={false}
+    />
+  </aside>
 
-	<main class="main-content">
-		<header class="main-header">
-			<div class="breadcrumbs-wrapper">
-				<Breadcrumb items={crumbItems} onselect={handleSidebarNavigation} />
-			</div>
+  <main class="main-content">
+    <header class="main-header">
+      <div class="breadcrumbs-wrapper">
+        <Breadcrumb
+          items={crumbItems}
+          onselect={handleSidebarNavigation}
+        />
+      </div>
 
-			{#if $isAnythingLoading}
-				<div class="loader-wrapper" transition:fade={{ duration: 150, delay: 200 }}>
-					<div class="spinner"></div>
-				</div>
-			{/if}
-		</header>
+      {#if $isAnythingLoading}
+        <div
+          class="loader-wrapper"
+          transition:fade={{ duration: 150, delay: 200 }}
+        >
+          <div class="spinner"></div>
+        </div>
+      {/if}
+    </header>
 
-		<div class="page-content-wrapper">
-			{@render children()}
-		</div>
-	</main>
+    <div class="page-content-wrapper">
+      {@render children()}
+    </div>
+  </main>
 </div>
 
 <!-- STYLES (unchanged) -->
 <style>
-	.browser-layout {
-		display: grid;
-		grid-template-columns: 320px 1fr;
-		height: 100vh;
-		width: 100vw;
-		overflow: hidden;
-	}
-	.sidebar {
-		background: var(--pc-grid-header-bg, #f8fafc);
-		border-right: 1px solid var(--pc-grid-border, #e2e8f0);
-		overflow-y: auto;
-		white-space: nowrap;
-	}
-	.main-content {
-		display: grid;
-		grid-template-rows: auto 1fr;
-		overflow: hidden;
-		background: #f8fafc;
-	}
-	.main-header {
-		display: flex;
-		justify-content: flex-start;
-		align-items: center;
-		gap: 2rem;
-		padding: 0 1.5rem;
-		border-bottom: 1px solid var(--pc-grid-border, #e2e8f0);
-		background-color: white;
-		min-height: 54px;
-	}
-	.breadcrumbs-wrapper {
-		flex-grow: 0;
-		min-width: 0;
-		flex-shrink: 1;
-	}
+  .browser-layout {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+  }
+  .sidebar {
+    background: var(--pc-grid-header-bg, #f8fafc);
+    border-right: 1px solid var(--pc-grid-border, #e2e8f0);
+    overflow-y: auto;
+    white-space: nowrap;
+  }
+  .main-content {
+    display: grid;
+    grid-template-rows: auto 1fr;
+    overflow: hidden;
+    background: #f8fafc;
+  }
+  .main-header {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 2rem;
+    padding: 0 1.5rem;
+    border-bottom: 1px solid var(--pc-grid-border, #e2e8f0);
+    background-color: white;
+    min-height: 54px;
+  }
+  .breadcrumbs-wrapper {
+    flex-grow: 0;
+    min-width: 0;
+    flex-shrink: 1;
+  }
 
-	.page-content-wrapper {
-		overflow-y: auto;
-		padding: 1.5rem;
-	}
+  .page-content-wrapper {
+    overflow-y: auto;
+    padding: 1.5rem;
+  }
 </style>

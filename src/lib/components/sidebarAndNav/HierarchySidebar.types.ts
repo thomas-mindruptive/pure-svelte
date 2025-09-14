@@ -56,6 +56,7 @@ export type RuntimeHierarchyTreeNode = {
 export type RuntimeHierarchyItem = HierarchyItem<string> & {
   urlParamValue: string | number | "leaf";
   level: number | undefined; // 0..3 for indentation
+  resolvedHref?: string | undefined;
   // href will be built based on urlParamName and urlParamValue
 };
 

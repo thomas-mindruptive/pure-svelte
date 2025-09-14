@@ -19,7 +19,9 @@ export function load({ params, fetch: loadEventFetch }: LoadEvent): SupplierCate
   const categoryId = Number(params.categoryId);
 
   if (isNaN(supplierId) || isNaN(categoryId)) {
-    throw error(400, 'Invalid Supplier or Category ID');
+    const message = 'supplerCategoryDetailPage: Invalid Supplier or Category ID'
+    log.error(message);
+    throw error(400, message);
   }
 
   log.info(`(CategoryDetailPage) Kicking off non-blocking load for supplierId: ${supplierId}, categoryId: ${categoryId}`);

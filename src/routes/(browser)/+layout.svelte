@@ -12,7 +12,6 @@
   import { derived } from "svelte/store";
   import { fade } from "svelte/transition";
   import type { RuntimeHierarchyTreeNode } from "$lib/components/sidebarAndNav/HierarchySidebar.types.js";
-  import { resolveHref } from "$lib/components/sidebarAndNav/hierarchyUtils.js";
   import "$lib/components/styles/loadingIndicator.css";
 
   const { data, children } = $props();
@@ -33,9 +32,9 @@
     },
   );
 
-  	$effect(() => {
-		log.debug("Layout props:", {crumbItems, activeNode, urlParams, hierarchy});
-	});
+  $effect(() => {
+    log.debug("Layout props:", { crumbItems, activeNode, urlParams, hierarchy });
+  });
 
   // === NAVIGATION HANDLER ===
 
@@ -51,7 +50,7 @@
    * @param node The runtime node that was selected by the user.
    */
   function handleSidebarNavigation(node: RuntimeHierarchyTreeNode) {
-    log.info(`UI navigation requested for node: '${node.item.key}'`);
+    log.info(`UI navigation requested for node: '${node.item.key}'`, node);
 
     try {
       if (node.item.disabled) {
@@ -59,13 +58,13 @@
         return;
       }
 
-      if (node.item.href) {
+      if (node.item.resolvedHref) {
         // Resolve the declarative href pattern using the current context's params.
-        const finalHref = resolveHref(node.item.href, urlParams);
-        log.debug(`Resolved href from pattern '${node.item.href}' to '${finalHref}', navigating...`);
+        // const finalHref = resolveHref(node.item.href, urlParams);
+        //log.debug(`Resolved href from pattern '${node.item.href}' to '${finalHref}', navigating...`);
 
         // Trigger the navigation. The `load` function will now take over.
-        goto(finalHref);
+        goto(node.item.resolvedHref);
       } else {
         log.warn(`Navigation aborted for node: '${node.item.key}' (no href pattern defined)`);
       }

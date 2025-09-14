@@ -164,7 +164,8 @@ The architecture is designed to be fully data-driven.
 *   **Simplified Code:** Complex, manual logic in components is eliminated.
 *   **Enhanced Maintainability:** Future changes to the navigation flow only require modifying the configuration data.
 
-#### **Example of the Target Configuration**```typescript
+#### **Example of the Target Configuration**
+```typescript
 export const supplierHierarchyConfig: HierarchyTree = {
   name: "suppliers",
   rootItem: createHierarchyNode({
@@ -178,4 +179,66 @@ export const supplierHierarchyConfig: HierarchyTree = {
     ],
   }),
 };
+```
+
+Of course. This is a crucial finding, and documenting it clearly is essential for the project's maintainability.
+
+Here is the translation of the chapter, formatted for your README file.
+
+---
+
+## **Architectural Detail: State Management in Server-Side Rendering (SSR)**
+
+The caching strategy for the `RuntimeHierarchyTree` offers significant performance benefits. However, in the context of SSR (Server-Side Rendering), it introduces a critical challenge: **managing shared state.**
+
+When the Node.js server starts, it loads all JavaScript modules into memory **only once.** This means that any module-level variables, caches, or Svelte stores are **shared across every single request** that the server handles. Without a clean separation, the state from one request can "leak" into another.
+
+### **The Problem: State Leak Between Requests**
+
+We observed this issue in practice:
+
+1.  A user (or a previous request) navigates to a deep URL like `/suppliers/3/categories/5`.
+2.  On the server, the `navigationState` store is populated with the deep path, and the `runtimeHierarchyCache` is modified with request-specific `urlParamValue`s (`3`, `5`).
+3.  Another user (or a subsequent reload) requests the simple URL `/suppliers`.
+4.  The `load` function for this new request reads the **old, shared `navigationState`**, incorrectly applies "Context Preservation," and generates breadcrumbs for the deep path, even though the URL does not warrant it.
+
+This not only results in incorrect data but also causes a UI "flicker" during hydration, as the (incorrect) state rendered by the server does not match the client's clean, initial state.
+
+### **The Solution: Strict State Isolation on a Per-Request Basis**
+
+To make the system robust, we must ensure that the state for each request is completely isolated on the server. This is achieved with a two-step strategy in the `+layout.ts` `load` function, which checks if it's running on the server (`!browser`).
+
+**1. Isolating the `navigationState` Store:**
+Each server request must start with a clean navigation context. Therefore, the store is explicitly reset at the beginning of every server-side execution of the `load` function.
+
+**2. Isolating the `runtimeHierarchyCache`:**
+Request-specific data (like `urlParamValue`) must never "pollute" the global cache. Instead of invalidating the cache, we work with a "disposable copy" of the relevant tree on the server. The original object in the cache remains untouched and "pristine."
+
+This logic ensures that the server renders the correct, clean state for every request. Because this state matches the expected initial client state, SvelteKit can perform hydration seamlessly without re-running the `load` function, which prevents any UI flicker.
+
+**Implementation Example in `+layout.ts`:**
+```typescript
+import { browser } from '$app/environment';
+import { resetNavigationState } from '$lib/components/sidebarAndNav/navigationState';
+import { cloneDeep } from 'lodash-es'; // or another deep-clone implementation
+
+export async function load({ url, params, ... }: LoadEvent) {
+
+  // Executes code only on the server
+  if (!browser) {
+    // 1. Isolate the store to prevent state leaks between requests
+    resetNavigationState();
+  }
+
+  const allHierarchies = initializeAndCacheHierarchies();
+  let activeTree = findTreeForUrl(allHierarchies, url);
+
+  if (!browser) {
+    // 2. Isolate the tree to prevent polluting the global cache.
+    //    All subsequent operations will safely modify only this copy.
+    activeTree = cloneDeep(activeTree);
+  }
+
+  // ... the rest of the load function can now safely work with the isolated state.
+}
 ```

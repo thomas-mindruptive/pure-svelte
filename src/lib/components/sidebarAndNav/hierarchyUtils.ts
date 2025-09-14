@@ -68,7 +68,7 @@ function updateNodeParameters(node: RuntimeHierarchyTreeNode, params: Record<str
  * @param params The new URL parameters.
  * @returns The same, but modified, array of runtime hierarchies.
  */
-export function updateRuntimeHierarchyParameters(
+export function old_updateRuntimeHierarchyParameters(
   runtimeHierarchies: RuntimeHierarchyTree[],
   params: Record<string, string | number | null>,
 ): RuntimeHierarchyTree[] {
@@ -91,6 +91,11 @@ function convertNodeToRuntime(staticNode: GenericStaticNode): RuntimeHierarchyTr
     urlParamValue: "leaf",
     level: undefined,
   };
+
+  // Copy the href to resolvedHref as default. For hrefs with a pattern like "/suppliers/[supplierId]",
+  // this will be ultimately resolved/replaced in +layout.ts.
+  runtimeItem.resolvedHref = runtimeItem.href;
+
   const runtimeChildren = staticNode.children?.map((child) => convertNodeToRuntime(child));
   return {
     item: runtimeItem,
@@ -136,12 +141,12 @@ export function convertToRuntimeTree(staticTree: HierarchyTree): RuntimeHierarch
  * @param params URL parameters object (e.g., {supplierId: 3, categoryId: 5}).
  * @returns A new array of RuntimeHierarchyTree with urlParamValues and levels set.
  */
-export function buildRuntimeHierarchy(
+export function old_buildRuntimeHierarchy(
   staticHierarchies: Hierarchy,
   params: Record<string, string | number | null>,
 ): RuntimeHierarchyTree[] {
   const initialHierarchies = staticHierarchies.map((tree) => convertToRuntimeTree(tree));
-  return updateRuntimeHierarchyParameters(initialHierarchies, params);
+  return old_updateRuntimeHierarchyParameters(initialHierarchies, params);
 }
 
 // === HIERARCHY UTILITIES =======================================================================
@@ -163,6 +168,33 @@ export function initLevels(tree: RuntimeHierarchyTree): RuntimeHierarchyTree {
   }
   setNodeLevels(tree.rootItem, 0);
   return tree;
+}
+
+/**
+ * Recursively traverses a runtime tree and updates the `resolvedHref` property
+ * for every node that has an `href` pattern.
+ * @param node The starting node to process.
+ * @param urlParams The complete set of URL parameters for the current context.
+ */
+export function resolveAllHrefsInTree(node: RuntimeHierarchyTreeNode, urlParams: Record<string, string | number | null>): void {
+  // Resolve the href for the current node if it exists
+  if (node.item.href) {
+    try {
+      node.item.resolvedHref = resolveHref(node.item.href, urlParams);
+    } catch (error) {
+      // It might fail if a parameter is missing; we log it but don't crash.
+      // The href will remain the unresolved pattern.
+      log.warn(`Could not resolve href for node '${node.item.key}':`, error);
+      node.item.resolvedHref = node.item.href; // Fallback
+    }
+  }
+
+  // Recurse through all children
+  if (node.children) {
+    for (const child of node.children) {
+      resolveAllHrefsInTree(child, urlParams);
+    }
+  }
 }
 
 // === QUERY TREE UTILITIES =======================================================================
@@ -378,6 +410,7 @@ export function reconcilePaths(
  * contextual object path. It serves as both a translator and a validator. It traverses
  * the hierarchy tree, guided by the segments of the primitive path, ensuring the
  * requested path is structurally valid according to the hierarchy configuration.
+ * ⚠️ And it sets the urlParamValue for each node.item.
  *
  * The algorithm works as follows:
  * 1. Validates that the root of the path matches the root of the tree.
@@ -393,67 +426,71 @@ export function reconcilePaths(
  * @returns An array of `RuntimeHierarchyTreeNode` objects representing the valid path.
  * @throws {Error} If the path is empty, does not match the tree's root, or is structurally invalid.
  */
-export function findNodesForPath(
-	tree: RuntimeHierarchyTree,
-	primitivePath: (string | number)[]
-): RuntimeHierarchyTreeNode[] {
-	log.debug(`Finding nodes for primitive path:`, {
-		treeName: tree.name,
-		path: primitivePath
-	});
+export function findNodesAndParamValuesForPath(tree: RuntimeHierarchyTree, primitivePath: (string | number)[]): RuntimeHierarchyTreeNode[] {
+  log.debug(`Finding nodes for primitive path:`, {
+    treeName: tree.name,
+    path: primitivePath,
+  });
 
-	// --- Step 1: Validate Root ---
-	if (primitivePath.length === 0) {
-		const message = `Validation failed: Primitive path is empty.`;
-		log.error(message);
-		throw new NavigationError(message, 'ERR_PATH_EMPTY');
-	}
+  // --- Step 1: Validate Root ---
+  if (primitivePath.length === 0) {
+    const message = `Validation failed: Primitive path is empty.`;
+    log.error(message);
+    throw new NavigationError(message, "ERR_PATH_EMPTY");
+  }
 
-	const rootNode = tree.rootItem;
-	if (rootNode.item.key !== primitivePath[0]) {
-		const message = `Validation failed: Path root '${primitivePath[0]}' does not match tree root '${rootNode.item.key}'.`;
-		log.error(message);
-		throw new NavigationError(message, 'ERR_ROOT_MISMATCH');
-	}
+  const rootNode = tree.rootItem;
+  if (rootNode.item.key !== primitivePath[0]) {
+    const message = `Validation failed: Path root '${primitivePath[0]}' does not match tree root '${rootNode.item.key}'.`;
+    log.error(message);
+    throw new NavigationError(message, "ERR_ROOT_MISMATCH");
+  }
 
-	// --- Step 2: Traverse the Path ---
-	const nodesOnPath: RuntimeHierarchyTreeNode[] = [rootNode];
-	let currentNode = rootNode;
+  // --- Step 2: Traverse the Path ---
+  const nodesOnPath: RuntimeHierarchyTreeNode[] = [rootNode];
+  let currentNode = rootNode;
 
-	for (let i = 1; i < primitivePath.length; i++) {
-		const segment = primitivePath[i];
-		let nextNode: RuntimeHierarchyTreeNode | undefined = undefined;
-		const children = currentNode.children ?? [];
+  for (let i = 1; i < primitivePath.length; i++) {
+    const segment = primitivePath[i];
+    let nextNode: RuntimeHierarchyTreeNode | undefined = undefined;
+    const children = currentNode.children ?? [];
 
-		if (typeof segment === 'string') {
-			nextNode = children.find((child) => child.item.key === segment);
-		} else if (typeof segment === 'number') {
-			nextNode = children.find((child) => child.item.type === 'object');
-		}
+    if (typeof segment === "string") {
+      nextNode = children.find((child) => child.item.key === segment);
+    } else if (typeof segment === "number") {
+      nextNode = children.find((child) => child.item.type === "object");
+      if (nextNode) {
+        nextNode.item.urlParamValue = Number(segment);
+        if (isNaN(nextNode.item.urlParamValue)) {
+          const message = `Validation failed: Segment '${segment}' must be a number (Node '${currentNode.item.key}').`;
+          log.error(message);
+          throw new NavigationError(message, "ERR_SEGMENT_MUST_BE_NUMBER");
+        }
+      }
+    }
 
-		// Definitive guard to handle all failure cases and satisfy TypeScript.
-		if (!nextNode) {
-			const pathSoFar = `/${primitivePath.slice(0, i).join('/')}`;
-			if (typeof segment === 'string') {
-				const message = `Validation failed: Path segment '${segment}' not found as a child of '${currentNode.item.key}' (path so far: ${pathSoFar}).`;
-				log.error(message);
-				throw new NavigationError(message, 'ERR_INVALID_STRING_SEGMENT');
-			} else { // segment must be a number here
-				const message = `Validation failed: Numeric ID '${segment}' is not allowed here. Node '${currentNode.item.key}' has no child of type 'object' (path so far: ${pathSoFar}).`;
-				log.error(message);
-				throw new NavigationError(message, 'ERR_ID_NOT_ALLOWED');
-			}
-		}
+    // Definitive guard to handle all failure cases and satisfy TypeScript.
+    if (!nextNode) {
+      const pathSoFar = `/${primitivePath.slice(0, i).join("/")}`;
+      if (typeof segment === "string") {
+        const message = `Validation failed: Path segment '${segment}' not found as a child of '${currentNode.item.key}' (path so far: ${pathSoFar}).`;
+        log.error(message);
+        throw new NavigationError(message, "ERR_INVALID_STRING_SEGMENT");
+      } else {
+        // segment must be a number here
+        const message = `Validation failed: Numeric ID '${segment}' is not allowed here. Node '${currentNode.item.key}' has no child of type 'object' (path so far: ${pathSoFar}).`;
+        log.error(message);
+        throw new NavigationError(message, "ERR_ID_NOT_ALLOWED");
+      }
+    }
 
-		// After the guard, TypeScript knows `nextNode` is `RuntimeHierarchyTreeNode`.
-		nodesOnPath.push(nextNode);
-		currentNode = nextNode;
-	}
+    nodesOnPath.push(nextNode);
+    currentNode = nextNode;
+  }
 
-	log.debug(`Successfully found ${nodesOnPath.length} nodes for path.`);
-	return nodesOnPath;
+  log.debug(`Successfully found ${nodesOnPath.length} nodes for path.`);
+  return nodesOnPath;
 }
-
 
 /**
  * Resolves an href pattern by replacing placeholders with values from a parameters object.
@@ -467,6 +504,7 @@ export function findNodesForPath(
 export function resolveHref(hrefPattern: string, urlParams: Record<string, string | number | null>): string {
   // Regular expression to find all placeholders in the format [paramName]
   const placeholderRegex = /\[(\w+)\]/g;
+  log.debug(`Resolving href`, { hrefPattern, urlParams });
 
   // Use .replace() with a replacer function to look up each placeholder
   const resolvedUrl = hrefPattern.replace(placeholderRegex, (match, paramName) => {

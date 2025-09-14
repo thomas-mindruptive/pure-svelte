@@ -4,7 +4,7 @@ import { describe, it, expect } from 'vitest';
 import {
 	getPrimitivePathFromUrl,
 	reconcilePaths,
-	findNodesForPath
+	findNodesAndParamValuesForPath
 } from './hierarchyUtils';
 import { validMockTree } from './hierarchyUtils.test.mock';
 import { NavigationError } from './navigationError';
@@ -90,14 +90,14 @@ describe('findNodesForPath', () => {
 	// --- Success cases ---
 	it('should return the correct nodes for a valid, deep path', () => {
 		const path = ['suppliers', 1, 'categories', 2, 'offerings', 3];
-		const nodes = findNodesForPath(validMockTree, path);
+		const nodes = findNodesAndParamValuesForPath(validMockTree, path);
 		expect(nodes).toHaveLength(6);
 		expect(nodes[nodes.length - 1].item.key).toBe('offering');
 	});
 
 	it('should return the correct nodes for a valid, shallow path with a sibling branch', () => {
 		const path = ['suppliers', 1, 'addresses'];
-		const nodes = findNodesForPath(validMockTree, path);
+		const nodes = findNodesAndParamValuesForPath(validMockTree, path);
 		expect(nodes).toHaveLength(3);
 		expect(nodes[nodes.length - 1].item.key).toBe('addresses');
 	});
@@ -106,7 +106,7 @@ describe('findNodesForPath', () => {
 	it('should throw ERR_ROOT_MISMATCH for a path that does not match the tree root', () => {
 		const path = ['wrong_root', 1];
 		try {
-			findNodesForPath(validMockTree, path);
+			findNodesAndParamValuesForPath(validMockTree, path);
 			expect.fail('Should have thrown a NavigationError');
 		} catch (e) {
 			expect(e).toBeInstanceOf(NavigationError);
@@ -119,7 +119,7 @@ describe('findNodesForPath', () => {
 	it('should throw ERR_PATH_EMPTY for an empty primitive path', () => {
 		const path: (string | number)[] = [];
 		try {
-			findNodesForPath(validMockTree, path);
+			findNodesAndParamValuesForPath(validMockTree, path);
 			expect.fail('Should have thrown a NavigationError');
 		} catch (e) {
 			expect(e).toBeInstanceOf(NavigationError);
@@ -132,7 +132,7 @@ describe('findNodesForPath', () => {
 	it('should throw ERR_INVALID_STRING_SEGMENT for a path with an invalid string segment', () => {
 		const path = ['suppliers', 1, 'nonexistent_key'];
 		try {
-			findNodesForPath(validMockTree, path);
+			findNodesAndParamValuesForPath(validMockTree, path);
 			expect.fail('Should have thrown a NavigationError');
 		} catch (e) {
 			expect(e).toBeInstanceOf(NavigationError);
@@ -146,7 +146,7 @@ describe('findNodesForPath', () => {
 		// The `addresses` node in our mock has no `object` child, so it cannot accept an ID.
 		const path = ['suppliers', 1, 'addresses', 100];
 		try {
-			findNodesForPath(validMockTree, path);
+			findNodesAndParamValuesForPath(validMockTree, path);
 			expect.fail('Should have thrown a NavigationError');
 		} catch (e) {
 			expect(e).toBeInstanceOf(NavigationError);
@@ -160,7 +160,7 @@ describe('findNodesForPath', () => {
 		// The `supplier` node expects a string key like 'categories', not another ID.
 		const path = ['suppliers', 1, 2];
 		try {
-			findNodesForPath(validMockTree, path);
+			findNodesAndParamValuesForPath(validMockTree, path);
 			expect.fail('Should have thrown a NavigationError');
 		} catch (e) {
 			expect(e).toBeInstanceOf(NavigationError);
@@ -174,7 +174,7 @@ describe('findNodesForPath', () => {
 		// The `suppliers` node expects a numeric ID for its `object` child, not the string 'categories'.
 		const path = ['suppliers', 'categories'];
 		try {
-			findNodesForPath(validMockTree, path);
+			findNodesAndParamValuesForPath(validMockTree, path);
 			expect.fail('Should have thrown a NavigationError');
 		} catch (e) {
 			expect(e).toBeInstanceOf(NavigationError);

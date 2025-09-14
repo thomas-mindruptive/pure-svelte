@@ -14,9 +14,18 @@ import {
   updateDisabledStates,
   getPrimitivePathFromUrl,
   reconcilePaths,
-  findNodesForPath,
+  findNodesAndParamValuesForPath as findNodesAnParamValuesForPath,
+  resolveAllHrefsInTree,
 } from "$lib/components/sidebarAndNav/hierarchyUtils";
-import { getCurrentPathForContext, setCurrentPathForContext } from "$lib/components/sidebarAndNav/navigationState";
+import {
+  getCurrentPathForContext,
+  navigationState,
+  resetNavigationState,
+  setCurrentPathForContext,
+} from "$lib/components/sidebarAndNav/navigationState";
+import { get } from "svelte/store";
+import { browser } from "$app/environment";
+import { cloneDeep } from "lodash-es";
 
 // ================================================================================================
 // CACHING & INITIALIZATION
@@ -92,7 +101,7 @@ function determineActiveNode(url: URL, activeTree: RuntimeHierarchyTree): Runtim
   const urlPrimitivePath = getPrimitivePathFromUrl(url);
   let urlNodesOnPath: RuntimeHierarchyTreeNode[] = [];
   try {
-    urlNodesOnPath = findNodesForPath(activeTree, urlPrimitivePath);
+    urlNodesOnPath = findNodesAnParamValuesForPath(activeTree, urlPrimitivePath);
   } catch (e) {
     log.warn(`Unable to resolve urlNodesOnPath for '${url.pathname}': ${String(e)}`);
   }
@@ -136,41 +145,56 @@ function determineActiveNode(url: URL, activeTree: RuntimeHierarchyTree): Runtim
  * @param event The SvelteKit LoadEvent object, containing URL, params, and fetch.
  * @returns A data object containing the hierarchies, breadcrumb items, active node, and URL params for the layout.
  */
-export async function load({ url, params, depends, fetch: loadEventFetch }: LoadEvent) {
+export async function load({ url, params: urlParamsFromLoadEvent, depends, fetch: loadEventFetch }: LoadEvent) {
   log.info(`Load function triggered for URL: ${url.pathname}`);
   depends(`url:${url.href}`);
 
-  // --- 1. Setup & Reconciliation ---
-  const allHierarchies = initializeAndCacheHierarchies();
-  const activeTree = findTreeForUrl(allHierarchies, url);
-  const currentContextKey = activeTree.name;
+  // ⚠️ Due to SSR, state leak between requests and/or multiple user is a problem => Reset.
+  if (!browser) {
+    resetNavigationState();
+  }
 
+  // --- 1. Setup & Reconciliation ---
+
+  const allHierarchies = initializeAndCacheHierarchies();
+  let activeTree = findTreeForUrl(allHierarchies, url);
+
+  // ⚠️ Due to SSR, state leak between requests and/or multiple user is a problem => Clone the tree.
+  if (!browser) {
+    // Erstelle eine tiefe Kopie des Baumes NUR für diese Server-Anfrage.
+    // Das Original im Cache bleibt unberührt ("pristine").
+    // Alle nachfolgenden Operationen (wie findNodesForPath) modifizieren
+    // sicher diese Wegwerf-Kopie.
+    activeTree = cloneDeep(activeTree);
+  }
+
+  const currentNavState = get(navigationState);
+  const previousContextKey = currentNavState.activeContextKey;
+  const currentContextKey = activeTree.name;
   const urlPrimitivePath = getPrimitivePathFromUrl(url);
-  // KORREKTUR 2: `getCurrentPathForContext` benötigt nur noch ein Argument mit dem neuen Store
+
+  const previousContextPath = previousContextKey ? getCurrentPathForContext(previousContextKey) : null;
+  if (previousContextKey !== currentContextKey) {
+    log.info(`*** Context switch detected from '${previousContextKey}' to '${currentContextKey}'.`, {
+      previousContextPath,
+      currentNavState,
+    });
+  }
   const preservedPrimitivePath = getCurrentPathForContext(currentContextKey);
   const definitivePrimitivePath = reconcilePaths(urlPrimitivePath, preservedPrimitivePath);
   setCurrentPathForContext(currentContextKey, definitivePrimitivePath);
-  log.info(`Definitive context path=${JSON.stringify(definitivePrimitivePath)}`);
+  log.info(`Definitive context path=${JSON.stringify(definitivePrimitivePath)}`, definitivePrimitivePath);
 
   // --- 2. Resolve Context Path & Update UI State ---
   let nodesOnPath: RuntimeHierarchyTreeNode[];
   try {
-    nodesOnPath = findNodesForPath(activeTree, definitivePrimitivePath);
+    nodesOnPath = findNodesAnParamValuesForPath(activeTree, definitivePrimitivePath);
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "An unknown error occurred";
     throw error(404, `Page not found: ${message}`);
   }
 
-  nodesOnPath.forEach((node) => {
-    if (node.item.urlParamName) {
-      // KORREKTUR 3: `params` casten, um den TypeScript-Fehler beim dynamischen Zugriff zu beheben
-      const paramValue = (params as Record<string, string>)[node.item.urlParamName];
-      if (paramValue) {
-        const numericValue = Number(paramValue);
-        node.item.urlParamValue = isNaN(numericValue) ? paramValue : numericValue;
-      }
-    }
-  });
+  log.debug(`nodesOnPath found by findNodesAnParamValuesForPath:`, nodesOnPath);
 
   updateDisabledStates(activeTree, nodesOnPath);
 
@@ -218,28 +242,35 @@ export async function load({ url, params, depends, fetch: loadEventFetch }: Load
   }
   await Promise.all(promises);
 
-  // --- 5. Final Data Assembly (Corrected Logic) ---
+  // --- 5. Final Data Assembly  ---
   const breadcrumbItems = buildBreadcrumb({
     navigationPath: nodesOnPath,
     entityNameMap,
     activeNode: activeNode,
   });
 
+  // Merge the context path parameters with the current URL parameters,
+  // ensuring the URL parameters (the source of truth for the current view) take precedence.
+  const urlParamsFromNodePath = {
+    ...Object.fromEntries(
+      nodesOnPath
+        .filter((n) => n.item.urlParamName && n.item.urlParamValue && n.item.urlParamValue !== "leaf")
+        .map((n) => [n.item.urlParamName!, n.item.urlParamValue!]),
+    ),
+    ...urlParamsFromLoadEvent,
+  };
+
+  // --- Resolve All Hrefs for UI consumption, e.g. layout.svelte ---
+  // This ensures that every single node in the tree (not just those on the path)
+  // has a ready-to-use URL for the UI components.
+  resolveAllHrefsInTree(activeTree.rootItem, urlParamsFromNodePath);
+
   const returnData = {
     hierarchy: allHierarchies,
     breadcrumbItems,
     activeNode,
-    // CORRECTED: Merge the context path parameters with the current URL parameters,
-    // ensuring the URL parameters (the source of truth for the current view) take precedence.
-    urlParams: {
-      ...Object.fromEntries(
-        nodesOnPath
-          .filter((n) => n.item.urlParamName && n.item.urlParamValue && n.item.urlParamValue !== "leaf")
-          .map((n) => [n.item.urlParamName!, n.item.urlParamValue!]),
-      ),
-      ...params,
-    },
+    urlParams: urlParamsFromNodePath,
   };
-  log.debug(`load complete, returning the data`, returnData);
+  log.debug(`load complete, returning the data dor context '${currentContextKey}'`, returnData);
   return returnData;
 }

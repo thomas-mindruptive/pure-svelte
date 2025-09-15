@@ -36,6 +36,6 @@ export function load({ params, fetch: loadEventFetch }: LoadEvent): SupplierCate
     assignmentDetails: supplierApi.loadCategoryAssignmentForSupplier(supplierId, categoryId),
     
     // 2. Fetches the list of offerings for this context.
-    offerings: categoryApi.loadOfferingsForCategory(supplierId, categoryId)
+    offerings: categoryApi.loadOfferingsForSupplierCategory(supplierId, categoryId)
   };
 }

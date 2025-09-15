@@ -59,27 +59,27 @@ type IdField<T> = Extract<keyof T, `${string}_id`>;
 /**
  * Assignment between two master entities (n:m relationships)
  */
-export type AssignmentRequest<TParent, TChild> = {
-    parentId: TParent[IdField<TParent>];
-    childId: TChild[IdField<TChild>];
+export type AssignmentRequest<TParent1, TParent2, TChild> = {
+    parent1Id: TParent1[IdField<TParent1>];
+    parent2Id: TParent2[IdField<TParent2>];
     data?: TChild
 }
 
 /**
  * Update assignment between two master entities
  */
-export type AssignmentUpdateRequest<TParent, TChild> = {
-    parentId: TParent[IdField<TParent>];
-    childId: TChild[IdField<TChild>];
+export type AssignmentUpdateRequest<TParent1, TParent2,TChild> = {
+    parent1Id: TParent1[IdField<TParent1>];
+    parent2Id: TParent2[IdField<TParent2>];
     data?: TChild
 }
 
 /**
  * Remove assignment between two master entities
  */
-export type RemoveAssignmentRequest<TParent, TChild> = {
-    parentId: TParent[IdField<TParent>];
-    childId: TChild[IdField<TChild>];
+export type RemoveAssignmentRequest<TParent1, TParent2> = {
+    parent1Id: TParent1[IdField<TParent1>];
+    parent2Id: TParent2[IdField<TParent2>];
     cascade?: boolean;
 };
 

@@ -178,7 +178,7 @@
 				assertDefined(id, "offering_id is required for update");
 				offering = await categoryApi.updateOffering(id, dataToSubmit);
 			} else {
-				offering = await categoryApi.createOfferingForCategory(
+				offering = await categoryApi.createOffering(
 					categoryId,
 					dataToSubmit,
 				);

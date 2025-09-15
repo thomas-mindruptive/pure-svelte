@@ -291,9 +291,9 @@ export function getSupplierApi(client: ApiClient) {
       const operationId = 'assignCategoryToSupplier';
       supplierLoadingOperations.start(operationId);
       try {
-        const requestBody: AssignmentRequest<Wholesaler, Omit<WholesalerCategory, "wholesaler_id">> = {
-          parentId: supplierId,
-          childId: category.category_id,
+        const requestBody: AssignmentRequest<Wholesaler, ProductCategory, Omit<WholesalerCategory, "wholesaler_id">> = {
+          parent1Id: supplierId,
+          parent2Id: category.category_id,
           data: category
         };
         const response = await client.apiFetch<AssignmentSuccessData<WholesalerCategory>>(
@@ -318,8 +318,8 @@ export function getSupplierApi(client: ApiClient) {
       supplierLoadingOperations.start(operationId);
       try {
         const requestBody: RemoveAssignmentRequest<Wholesaler, ProductCategory> = {
-          parentId: removalData.supplierId,
-          childId: removalData.categoryId,
+          parent1Id: removalData.supplierId,
+          parent2Id: removalData.categoryId,
           cascade: removalData.cascade || false
         };
         return await client.apiFetchUnion<RemoveCategoryApiResponse>(

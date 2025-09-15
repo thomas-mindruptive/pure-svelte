@@ -1,5 +1,3 @@
 // This file delegates the loading logic to the page's logic file.
 // This keeps the route clean and adheres to our architecture.
-// SCAFFOLD-REMOVE-BEGIN ...
-// SCAFFOLD-REMOVE-END ...
-export { load } from '$lib/components/domain/categories/CategoryDetailPage';
+export { load } from '$lib/components/domain/categories/categoryDetailPage';

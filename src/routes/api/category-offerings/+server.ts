@@ -12,13 +12,12 @@ import { db } from '$lib/server/db';
 import { log } from '$lib/utils/logger';
 import { validateOffering } from '$lib/server/validation/domainValidator';
 import { mssqlErrorMapper } from '$lib/server/errors/mssqlErrorMapper';
-import type { ProductCategory, WholesalerItemOffering, WholesalerItemOffering_ProductDef_Category } from '$lib/domain/domainTypes';
+import type { WholesalerItemOffering, WholesalerItemOffering_ProductDef_Category } from '$lib/domain/domainTypes';
 import { v4 as uuidv4 } from 'uuid';
 
 import type {
     ApiErrorResponse,
     ApiSuccessResponse,
-    CreateChildRequest,
     DeleteConflictResponse,
     DeleteRequest,
     DeleteSuccessResponse,
@@ -46,42 +45,12 @@ export const POST: RequestHandler = async ({ request }) => {
         await transaction.begin()
 
         // 1. Expect the request body to be CreateChildRequest.
-        const chilRequestData = (await request.json()) as CreateChildRequest<ProductCategory, Omit<WholesalerItemOffering, 'offering_id'>>;
-        const categoryId = chilRequestData.parentId;
-        const offeringData = chilRequestData.data;
-        log.info(`[${operationId}] Parsed request body`, { fields: Object.keys(chilRequestData) });
+        const offering = (await request.json()) as Omit<WholesalerItemOffering, 'offering_id'>;
+         log.info(`[${operationId}] Parsed request body`, { fields: Object.keys(offering) });
 
-        // The parent must be defined
-        if (!categoryId) {
-            const errRes: ApiErrorResponse = {
-                success: false,
-                message: 'Parent ID (==Category ID) is required.',
-                status_code: 400,
-                error_code: 'CATEGORY_ID_REQUIRED',
-                meta: { timestamp: new Date().toISOString() }
-            };
-            log.warn(`[${operationId}] FN_FAILURE: Category ID is required.`, { categoryId });
-            return json(errRes, { status: 400 });
-        }
-        // Check for category ID mismatch
-        if (offeringData.category_id) {
-            if (offeringData.category_id !== categoryId) {
-                const errRes: ApiErrorResponse = {
-                    success: false,
-                    message: `Category ID mismatch. Expected ${categoryId}, got ${offeringData.category_id}.`,
-                    status_code: 400,
-                    error_code: 'CATEGORY_ID_MISMATCH',
-                    meta: { timestamp: new Date().toISOString() }
-                };
-                log.warn(`[${operationId}] FN_FAILURE: Category ID mismatch.`, { categoryId, offeringData });
-                return json(errRes, { status: 400 });
-            }
-        } else {
-            offeringData.category_id = categoryId;
-        }
 
         // 2. Validate the incoming data in 'create' mode.
-        const validation = validateOffering(offeringData, { mode: 'create' });
+        const validation = validateOffering(offering, { mode: 'create' });
         if (!validation.isValid) {
             const errRes: ApiErrorResponse = {
                 success: false,

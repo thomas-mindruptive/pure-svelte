@@ -456,7 +456,15 @@ export function findNodesAndParamValuesForPath(tree: RuntimeHierarchyTree, primi
     const children = currentNode.children ?? [];
 
     if (typeof segment === "string") {
-      nextNode = children.find((child) => child.item.key === segment);
+      // Special case "new": The next child must be an object just like segment were a number.
+      if (segment.toLowerCase() === "new") {
+        nextNode = children.find((child) => child.item.type === "object");
+        if (nextNode) {
+          nextNode.item.urlParamValue = "new";
+        }
+      } else {
+        nextNode = children.find((child) => child.item.key === segment);
+      }
     } else if (typeof segment === "number") {
       nextNode = children.find((child) => child.item.type === "object");
       if (nextNode) {

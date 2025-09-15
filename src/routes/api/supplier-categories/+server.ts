@@ -34,8 +34,8 @@ export const POST: RequestHandler = async ({ request }) => {
     log.info(`[${operationId}] POST /supplier-categories: FN_START`);
 
     try {
-        const body = (await request.json()) as AssignmentRequest<Wholesaler, WholesalerCategory>;
-        const { parentId: supplierId, childId: categoryId, data: wholesalerProductCategory } = body;
+        const body = (await request.json()) as AssignmentRequest<Wholesaler, ProductCategory, WholesalerCategory>;
+        const { parent1Id: supplierId, parent2Id: categoryId, data: wholesalerProductCategory } = body;
         log.info(`[${operationId}] Parsed request body`, { supplierId, categoryId });
 
         if (!supplierId || !categoryId) {
@@ -112,7 +112,7 @@ export const DELETE: RequestHandler = async ({ request }) => {
 
     try {
         const body = (await request.json()) as RemoveAssignmentRequest<Wholesaler, ProductCategory>;
-        const { parentId: supplierId, childId: categoryId, cascade = false } = body;
+        const { parent1Id: supplierId, parent2Id: categoryId, cascade = false } = body;
         log.info(`[${operationId}] Parsed request body`, { supplierId, categoryId, cascade });
 
         if (!supplierId || !categoryId) {

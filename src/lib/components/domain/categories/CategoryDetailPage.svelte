@@ -10,34 +10,35 @@
   import "$lib/components/styles/assignment-section.css";
   import "$lib/components/styles/grid-section.css";
   import SupplierForm from "$lib/components/domain/suppliers/SupplierForm.svelte";
-  import SupplierCategoriesGrid from "$lib/components/domain/suppliers/SupplierCategoriesGrid.svelte";
-  import CategoryAssignment from "$lib/components/domain/suppliers/CategoryAssignment.svelte";
 
   // API & Type Imports
-  import { getSupplierApi, supplierLoadingState } from "$lib/api/client/supplier";
-  import type { ProductCategory, WholesalerCategory_Category, WholesalerCategory, Wholesaler } from "$lib/domain/domainTypes";
-  import { categoryLoadingState } from "$lib/api/client/category";
+  import { supplierLoadingState } from "$lib/api/client/supplier";
+  import type { Wholesaler, ProductDefinition } from "$lib/domain/domainTypes";
+  import { categoryLoadingState, getCategoryApi } from "$lib/api/client/category";
   import { ApiClient } from "$lib/api/client/ApiClient";
   import type { ID, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
 
   // Schemas
-  import {
-    SupplierDetailPage_LoadDataSchema,
-    type SupplierDetailPage_LoadData,
-    type SupplierDetailPage_LoadDataAsync,
-  } from "$lib/components/domain/suppliers/supplierDetailPage.types";
+
   import { assertDefined } from "$lib/utils/validation/assertions";
+  import {
+    type CategoryDetailPage_LoadDataAsync,
+    type CategoryDetailPage_LoadData,
+    CategoryDetailPage_LoadDataSchema,
+  } from "./categoryDetailPage.types";
+  import { getProductDefinitionApi } from "$lib/api/client/productDefinition";
+    import CategoryProductDefsGrid from "./CategoryProductDefsGrid.svelte";
 
   // === PROPS ====================================================================================
 
-  let { data }: { data: SupplierDetailPage_LoadDataAsync } = $props();
+  let { data }: { data: CategoryDetailPage_LoadDataAsync } = $props();
 
   // === STATE ====================================================================================
 
-  let resolvedData = $state<SupplierDetailPage_LoadData | null>(null);
+  let resolvedData = $state<CategoryDetailPage_LoadData | null>(null);
   let isLoading = $state(true);
   let loadingError = $state<{ message: string; status?: number } | null>(null);
-  const isCreateMode = $derived(!resolvedData?.supplier);
+  const isCreateMode = $derived(!resolvedData?.category);
 
   // === LOAD =====================================================================================
 
@@ -53,23 +54,17 @@
 
       try {
         // 2. Resolve all promises in parallel.
-        const [supplier, assignedCategories, availableCategories] = await Promise.all([
-          data.supplier,
-          data.assignedCategories,
-          data.availableCategories,
-        ]);
+        const [supplier] = await Promise.all([data.category, data.productDefinitions]);
 
         if (aborted) return;
 
         // 3. Assemble the data object for validation.
         const dataToValidate = {
           supplier,
-          assignedCategories,
-          availableCategories,
         };
 
         // 4. Validate the resolved data against the Zod schema.
-        const validationResult = SupplierDetailPage_LoadDataSchema.safeParse(dataToValidate);
+        const validationResult = CategoryDetailPage_LoadDataSchema.safeParse(dataToValidate);
 
         if (!validationResult.success) {
           log.error("Zod validation failed", validationResult.error.issues);
@@ -105,7 +100,8 @@
   // === EVENTS & STRATEGIES ======================================================================
 
   const client = new ApiClient(fetch);
-  const supplierApi = getSupplierApi(client);
+  const categoryApi = getCategoryApi(client);
+  const productDefApi = getProductDefinitionApi(client);
 
   async function handleFormSubmitted(info: { data: Wholesaler; result: unknown }) {
     addNotification(`Supplier saved successfully.`, "success");
@@ -115,18 +111,18 @@
 
       // Get the new ID from the event data.
       // Thanks to our FormShell fix, info.data is the complete object from the API.
-      const newSupplierId = info.data?.wholesaler_id;
+      const newCategoryId = info.data?.wholesaler_id;
 
-      if (newSupplierId) {
+      if (newCategoryId) {
         // Build the new "edit mode" URL.
-        const newUrl = `/suppliers/${newSupplierId}`;
+        const newUrl = `/categories/${newCategoryId}`;
 
         // Navigate to the new URL to switch to edit mode.
         // invalidateAll is crucial to re-run the load function with the new ID.
         await goto(newUrl, { invalidateAll: true });
       } else {
         // This is a fallback case in case the API response was malformed.
-        log.error("Could not redirect after create: new wholesaler_id is missing from response.", { data: info.data });
+        log.error("Could not redirect after create: newCategoryId is missing from response.", { data: info.data });
         addNotification("Could not redirect to edit page, returning to list.", "error");
         // Do not go to suppliers because we are in an invalid state.
       }
@@ -156,95 +152,52 @@
   /**
    * Reload categories and set them into the state.
    */
-  async function reloadCategories() {
+  async function reloadProductDefs() {
     assertDefined(resolvedData, "reloadCategories: Supplier must be loaded/available", ["supplier"]);
 
-    const supplierId = resolvedData.supplier?.wholesaler_id;
+    // We validated above that the data is correct.
+    const categoryId = resolvedData.category!.category_id;
 
-    log.info("Re-fetching category lists after assignment...");
-    const [updatedAssigned, updatedAvailable] = await Promise.all([
-      supplierApi.loadCategoriesForSupplier(supplierId),
-      supplierApi.loadAvailableCategoriesForSupplier(supplierId),
-    ]);
-    resolvedData.assignedCategories = updatedAssigned;
-    resolvedData.availableCategories = updatedAvailable;
+    log.info("Re-fetching lists after assignment...");
+    const [updatedProductDefs] = await Promise.all([categoryApi.loadProductDefsForCategory(categoryId)]);
+    resolvedData.productDefinitions = updatedProductDefs;
     log.info("Local state updated. UI will refresh seamlessly.");
   }
 
   // ===== BUSINESS LOGIC =====
 
   /**
-   * Handles the assignment of a new category.
+   * Executes the deletion process for product definitions.
    */
-  async function assignCategory(category: ProductCategory, comment?: string, link?: string) {
-    if (!resolvedData) return;
-    const supplierId = resolvedData.supplier?.wholesaler_id;
-
-    if (!supplierId) {
-      log.error("Cannot assign category in create mode.");
-      addNotification("Cannot assign category in create mode.", "error");
-      return;
-    }
-    try {
-      const wholesalerCategory: Omit<WholesalerCategory, "wholesaler_id"> = {
-        category_id: category.category_id,
-        ...(comment !== undefined ? { comment } : {}),
-        ...(link !== undefined ? { link } : {}),
-      };
-      await supplierApi.assignCategoryToSupplier(supplierId, wholesalerCategory);
-      addNotification(`Category "${category.name}" assigned successfully.`, "success");
-
-      // await!
-      await reloadCategories();
-    } catch (error) {
-      log.error(`Failed to assign category`, {
-        supplierId,
-        error,
-      });
-      addNotification("Failed to assign category.", "error");
-    }
-  }
-
-  /**
-   * Executes the deletion process for category assignments.
-   */
-  async function handleCategoryDelete(ids: ID[]): Promise<void> {
-    if (!resolvedData?.supplier) {
-      const msg = "Cannot delete catagory in create mode or when supplier not yet loaded.";
+  async function handleProductDefDelete(ids: ID[]): Promise<void> {
+    if (!resolvedData?.category) {
+      const msg = "Cannot delete product definition in create mode or when catgory not yet loaded.";
       addNotification(msg, "error");
       throw new Error(msg);
     }
 
-    // The logic for this function remains complex and is unchanged.
-    // It correctly uses the client-side API.
     let dataChanged = false;
     for (const id of ids) {
-      const [supplierIdStr, categoryIdStr] = String(id).split("-");
-      const supplierId = Number(supplierIdStr);
+      const [categoryIdStr, productDefIdStr] = String(id).split("-");
       const categoryId = Number(categoryIdStr);
-      if (isNaN(supplierId) || isNaN(categoryId)) continue;
+      const productDefId = Number(productDefIdStr);
+      if (isNaN(productDefId) || isNaN(categoryId)) {
+        throw new Error(`Invalid categoryId or productDefId: ${id}`);
+      }
 
-      const initialResult = await supplierApi.removeCategoryFromSupplier({
-        supplierId,
-        categoryId,
-        cascade: false,
-      });
+      const initialResult = await productDefApi.deleteProductDefinition(productDefId);
 
       if (initialResult.success) {
-        addNotification(`Category assignment removed.`, "success");
+        addNotification(`Product definition delted.`, "success");
         dataChanged = true;
       } else if ("cascade_available" in initialResult && initialResult.cascade_available) {
         const offeringCount = (initialResult.dependencies as any)?.offering_count ?? 0;
         const confirmed = await requestConfirmation(
-          `This category has ${offeringCount} offerings for this supplier. Remove the assignment and all these offerings?`,
+          `This category has ${offeringCount} offerings for this category. Remove these offerings (will be removed from suppliers, too!)?`,
           "Confirm Cascade Delete",
         );
         if (confirmed) {
-          const cascadeResult = await supplierApi.removeCategoryFromSupplier({
-            supplierId,
-            categoryId,
-            cascade: true,
-          });
+          const cascadeResult = await productDefApi.deleteProductDefinition(productDefId, true);
           if (cascadeResult.success) {
             addNotification("Category assignment and its offerings removed.", "success");
             dataChanged = true;
@@ -258,29 +211,28 @@
     }
 
     if (dataChanged) {
-      goto(`/suppliers/${resolvedData.supplier.wholesaler_id}`, {
-        invalidateAll: true,
-      });
+      reloadProductDefs();
     }
   }
 
   /**
    * Navigates to the next hierarchy level (offerings for a category).
    */
-  function handleCategorySelect(category: WholesalerCategory_Category) {
-    goto(`/suppliers/${category.wholesaler_id}/categories/${category.category_id}`);
+  function handleProductDefSelect(pd: ProductDefinition) {
+    goto(`/categories/${pd.category_id}/productdefs/${pd.product_def_id}`);
   }
 
   // Strategy objects for the CategoryGrid component.
-  const deleteStrategy: DeleteStrategy<WholesalerCategory_Category> = {
-    execute: handleCategoryDelete,
+  const deleteStrategy: DeleteStrategy<ProductDefinition> = {
+    execute: handleProductDefDelete,
   };
-  const rowActionStrategy: RowActionStrategy<WholesalerCategory_Category> = {
-    click: handleCategorySelect,
+  const rowActionStrategy: RowActionStrategy<ProductDefinition> = {
+    click: handleProductDefSelect,
   };
 </script>
 
 <!-- TEMPLATE  with conditional rendering based on loading state -->
+
 {#if loadingError}
   <div class="component-error-boundary">
     <h3>Error Loading Supplier (Status: {loadingError.status})</h3>
@@ -294,7 +246,7 @@
     <!-- Section 1: Supplier details form -->
     <div class="form-section">
       <SupplierForm
-        initial={resolvedData.supplier}
+        initial={{} as any}   
         disabled={$supplierLoadingState}
         onSubmitted={handleFormSubmitted}
         onCancelled={handleFormCancelled}
@@ -303,29 +255,14 @@
       />
     </div>
 
-    <!-- Section 2: Assign new categories -->
-    <div class="assignment-section">
-      {#if resolvedData.supplier}
-        <CategoryAssignment
-          supplierId={resolvedData.supplier.wholesaler_id}
-          availableCategories={resolvedData.availableCategories}
-          loading={$categoryLoadingState}
-          assignCbk={assignCategory}
-          onError={(msg) => addNotification(msg, "error")}
-        />
-      {:else}
-        <p>Category assignment selection will be available after supplier has been saved.</p>
-      {/if}
-    </div>
-
     <!-- Section 3: Grid of assigned categories -->
 
     <div class="grid-section">
-      {#if resolvedData.supplier}
+      {#if resolvedData.productDefinitions}
         <h2>Assigned Categories</h2>
         <p>Products this supplier can offer are organized by these categories. Click a category to manage its product offerings.</p>
-        <SupplierCategoriesGrid
-          rows={resolvedData.assignedCategories}
+        <CategoryProductDefsGrid
+          rows={resolvedData.productDefinitions}
           loading={$categoryLoadingState}
           {deleteStrategy}
           {rowActionStrategy}

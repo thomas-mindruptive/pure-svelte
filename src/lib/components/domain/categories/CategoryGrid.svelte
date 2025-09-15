@@ -1,6 +1,4 @@
 <script lang="ts">
-  // Thin wrapper around Datagrid for categoriesAA
-
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
   import type { DeleteStrategy, RowActionStrategy, ID, ColumnDefDirect } from "$lib/components/grids/Datagrid.types";
 

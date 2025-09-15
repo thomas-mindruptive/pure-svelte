@@ -14,7 +14,7 @@ import {
   updateDisabledStates,
   getPrimitivePathFromUrl,
   reconcilePaths,
-  findNodesAndParamValuesForPath as findNodesAnParamValuesForPath,
+  findNodesAndParamValuesForPath,
   resolveAllHrefsInTree,
 } from "$lib/components/sidebarAndNav/hierarchyUtils";
 import {
@@ -91,6 +91,27 @@ function findTreeForUrl(allHierarchies: RuntimeHierarchyTree[], url: URL): Runti
 function determineActiveNode(url: URL, activeTree: RuntimeHierarchyTree): RuntimeHierarchyTreeNode {
   log.debug(`<determineActiveNode> Determining active node for tree='${activeTree.name}' ...`);
 
+  const urlPrimitivePath = getPrimitivePathFromUrl(url);
+
+  // Special case: If the last segment is "new", the active highlight should be
+  // the parent list, not the default child of the (invisible) object node.
+  if (urlPrimitivePath.length > 1 && urlPrimitivePath[urlPrimitivePath.length - 1] === "new") {
+    try {
+      // Find the path for the parent (everything except "/new")
+      const parentPath = urlPrimitivePath.slice(0, -1);
+      const nodes = findNodesAndParamValuesForPath(activeTree, parentPath);
+      const parentNode = nodes[nodes.length - 1];
+      if (parentNode) {
+        log.info(`new_case_match chosen='${parentNode.item.key}'`);
+        return parentNode;
+      }
+    } catch (e: unknown)  {
+      const originalMessage = e instanceof Error ? e.message : String(e);
+      log.error(`Unrecoverable error resolving parent path for "/new" route.`, e);
+      throw error(500, `Failed to determine the active navigation node: ${originalMessage}`);
+    }
+  }
+
   const isSelectableNode = (node: RuntimeHierarchyTreeNode): boolean => {
     return node.item.display !== false && !node.item.disabled;
   };
@@ -98,10 +119,10 @@ function determineActiveNode(url: URL, activeTree: RuntimeHierarchyTree): Runtim
   const findDirectChild = (parent: RuntimeHierarchyTreeNode, childKey: string): RuntimeHierarchyTreeNode | undefined =>
     parent.children?.find((c) => c.item.key === childKey);
 
-  const urlPrimitivePath = getPrimitivePathFromUrl(url);
+
   let urlNodesOnPath: RuntimeHierarchyTreeNode[] = [];
   try {
-    urlNodesOnPath = findNodesAnParamValuesForPath(activeTree, urlPrimitivePath);
+    urlNodesOnPath = findNodesAndParamValuesForPath(activeTree, urlPrimitivePath);
   } catch (e) {
     log.warn(`Unable to resolve urlNodesOnPath for '${url.pathname}': ${String(e)}`);
   }
@@ -188,7 +209,7 @@ export async function load({ url, params: urlParamsFromLoadEvent, depends, fetch
   // --- 2. Resolve Context Path & Update UI State ---
   let nodesOnPath: RuntimeHierarchyTreeNode[];
   try {
-    nodesOnPath = findNodesAnParamValuesForPath(activeTree, definitivePrimitivePath);
+    nodesOnPath = findNodesAndParamValuesForPath(activeTree, definitivePrimitivePath);
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "An unknown error occurred";
     throw error(404, `Page not found: ${message}`);

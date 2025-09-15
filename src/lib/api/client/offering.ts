@@ -7,12 +7,7 @@
  */
 
 import { log } from "$lib/utils/logger";
-import {
-  ComparisonOperator,
-  JoinType,
-  LogicalOperator,
-  type QueryPayload,
-} from "$lib/backendQueries/queryGrammar";
+import { ComparisonOperator, JoinType, LogicalOperator, type QueryPayload } from "$lib/backendQueries/queryGrammar";
 import type {
   WholesalerItemOffering,
   WholesalerItemOffering_ProductDef_Category,
@@ -56,20 +51,14 @@ export function getOfferingApi(client: ApiClient) {
     /**
      * Loads a single offering with all its details by ID.
      */
-    async loadOffering(
-      offeringId: number
-    ): Promise<WholesalerItemOffering_ProductDef_Category> {
+    async loadOffering(offeringId: number): Promise<WholesalerItemOffering_ProductDef_Category> {
       log.info(`API, Loading offering: ${offeringId}`);
       const operationId = `loadOffering-${offeringId}`;
       offeringLoadingOperations.start(operationId);
       try {
         const responseData = await client.apiFetch<{
           offering: WholesalerItemOffering_ProductDef_Category;
-        }>(
-          `/api/offerings/${offeringId}`,
-          { method: "GET" },
-          { context: operationId }
-        );
+        }>(`/api/offerings/${offeringId}`, { method: "GET" }, { context: operationId });
         return responseData.offering;
       } catch (err) {
         log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
@@ -84,9 +73,7 @@ export function getOfferingApi(client: ApiClient) {
     /**
      * Loads all attributes assigned to a specific offering.
      */
-    async loadOfferingAttributes(
-      offeringId: number
-    ): Promise<WholesalerOfferingAttribute_Attribute[]> {
+    async loadOfferingAttributes(offeringId: number): Promise<WholesalerOfferingAttribute_Attribute[]> {
       const operationId = `loadOfferingAttributes-${offeringId}`;
       offeringLoadingOperations.start(operationId);
       try {
@@ -113,12 +100,10 @@ export function getOfferingApi(client: ApiClient) {
             orderBy: [{ key: "a.name", direction: "asc" }],
           },
         };
-        const responseData = await client.apiFetch<
-          QueryResponseData<WholesalerOfferingAttribute_Attribute>
-        >(
+        const responseData = await client.apiFetch<QueryResponseData<WholesalerOfferingAttribute_Attribute>>(
           "/api/query",
           { method: "POST", body: createPostBody(request) },
-          { context: operationId }
+          { context: operationId },
         );
         return responseData.results as WholesalerOfferingAttribute_Attribute[];
       } catch (err) {
@@ -144,12 +129,10 @@ export function getOfferingApi(client: ApiClient) {
           select: ["attribute_id", "name", "description"],
           orderBy: [{ key: "name", direction: "asc" }],
         };
-        const responseData = await client.apiFetch<
-          QueryResponseData<Attribute>
-        >(
+        const responseData = await client.apiFetch<QueryResponseData<Attribute>>(
           "/api/attributes",
           { method: "POST", body: createQueryBody(query) },
-          { context: operationId }
+          { context: operationId },
         );
         return responseData.results as Attribute[];
       } catch (err) {
@@ -165,9 +148,7 @@ export function getOfferingApi(client: ApiClient) {
     /**
      * Gets available attributes that are not yet assigned to a specific offering.
      */
-    async getAvailableAttributesForOffering(
-      offeringId: number
-    ): Promise<Attribute[]> {
+    async getAvailableAttributesForOffering(offeringId: number): Promise<Attribute[]> {
       const operationId = `getAvailableAttributesForOffering-${offeringId}`;
       offeringLoadingOperations.start(operationId);
       try {
@@ -176,12 +157,8 @@ export function getOfferingApi(client: ApiClient) {
           api.loadOfferingAttributes(offeringId),
         ]);
 
-        const assignedIds = new Set(
-          assignedAttributes.map((a) => a.attribute_id)
-        );
-        const availableAttributes = allAttributes.filter(
-          (attr) => !assignedIds.has(attr.attribute_id)
-        );
+        const assignedIds = new Set(assignedAttributes.map((a) => a.attribute_id));
+        const availableAttributes = allAttributes.filter((attr) => !assignedIds.has(attr.attribute_id));
         return availableAttributes;
       } catch (err) {
         log.error(`[${operationId}] Failed.`, {
@@ -197,26 +174,19 @@ export function getOfferingApi(client: ApiClient) {
     /**
      * Creates a new offering-attribute assignment.
      */
-    async createOfferingAttribute(
-      assignmentData: Omit<WholesalerOfferingAttribute, "id">
-    ): Promise<WholesalerOfferingAttribute> {
+    async createOfferingAttribute(assignmentData: Omit<WholesalerOfferingAttribute, "id">): Promise<WholesalerOfferingAttribute> {
       const operationId = "createOfferingAttribute";
       offeringLoadingOperations.start(operationId);
       try {
-        const requestBody: AssignmentRequest<
-          WholesalerItemOffering,
-          Omit<WholesalerOfferingAttribute, "id">
-        > = {
-          parentId: assignmentData.offering_id,
-          childId: assignmentData.attribute_id,
+        const requestBody: AssignmentRequest<WholesalerItemOffering, Attribute, Omit<WholesalerOfferingAttribute, "id">> = {
+          parent1Id: assignmentData.offering_id,
+          parent2Id: assignmentData.attribute_id,
           data: assignmentData,
         };
-        const responseData = await client.apiFetch<
-          AssignmentSuccessData<WholesalerOfferingAttribute>
-        >(
+        const responseData = await client.apiFetch<AssignmentSuccessData<WholesalerOfferingAttribute>>(
           "/api/offering-attributes",
           { method: "POST", body: createPostBody(requestBody) },
-          { context: operationId }
+          { context: operationId },
         );
         return responseData.assignment;
       } catch (err) {
@@ -233,26 +203,19 @@ export function getOfferingApi(client: ApiClient) {
     /**
      * Updates an existing offering-attribute assignment.
      */
-    async updateOfferingAttribute(
-      offeringAttribute: WholesalerOfferingAttribute
-    ): Promise<WholesalerOfferingAttribute> {
+    async updateOfferingAttribute(offeringAttribute: WholesalerOfferingAttribute): Promise<WholesalerOfferingAttribute> {
       const operationId = `updateOfferingAttribute-${offeringAttribute.offering_id}-${offeringAttribute.attribute_id}`;
       offeringLoadingOperations.start(operationId);
       try {
-        const requestBody: AssignmentUpdateRequest<
-          WholesalerItemOffering,
-          WholesalerOfferingAttribute
-        > = {
-          parentId: offeringAttribute.offering_id,
-          childId: offeringAttribute.attribute_id,
+        const requestBody: AssignmentUpdateRequest<WholesalerItemOffering, Attribute, WholesalerOfferingAttribute> = {
+          parent1Id: offeringAttribute.offering_id,
+          parent2Id: offeringAttribute.attribute_id,
           data: offeringAttribute,
         };
-        const responseData = await client.apiFetch<
-          AssignmentSuccessData<WholesalerOfferingAttribute>
-        >(
+        const responseData = await client.apiFetch<AssignmentSuccessData<WholesalerOfferingAttribute>>(
           `/api/offering-attributes`,
           { method: "PUT", body: createPostBody(requestBody) },
-          { context: operationId }
+          { context: operationId },
         );
         return responseData.assignment;
       } catch (err) {
@@ -272,22 +235,14 @@ export function getOfferingApi(client: ApiClient) {
     async deleteOfferingAttribute(
       offeringId: number,
       attributeId: number,
-      cascade = false
-    ): Promise<
-      DeleteApiResponse<
-        { offering_id: number; attribute_id: number; attribute_name: string },
-        string[]
-      >
-    > {
+      cascade = false,
+    ): Promise<DeleteApiResponse<{ offering_id: number; attribute_id: number; attribute_name: string }, string[]>> {
       const operationId = `deleteOfferingAttribute-${offeringId}-${attributeId}`;
       offeringLoadingOperations.start(operationId);
       try {
-        const requestBody: RemoveAssignmentRequest<
-          WholesalerItemOffering,
-          Attribute
-        > = {
-          parentId: offeringId,
-          childId: attributeId,
+        const requestBody: RemoveAssignmentRequest<WholesalerItemOffering, Attribute> = {
+          parent1Id: offeringId,
+          parent2Id: attributeId,
           cascade,
         };
         return await client.apiFetchUnion<
@@ -299,11 +254,7 @@ export function getOfferingApi(client: ApiClient) {
             },
             string[]
           >
-        >(
-          "/api/offering-attributes",
-          { method: "DELETE", body: createPostBody(requestBody) },
-          { context: operationId }
-        );
+        >("/api/offering-attributes", { method: "DELETE", body: createPostBody(requestBody) }, { context: operationId });
       } catch (err) {
         log.error(`[${operationId}] Failed.`, {
           offeringId,
@@ -317,27 +268,19 @@ export function getOfferingApi(client: ApiClient) {
       }
     },
 
-    // ===== LEVEL 5: LINK MANAGEMENT =====
+    // ===== LINK MANAGEMENT =====
 
     /**
      * Loads all links for a specific offering.
      */
-    async loadOfferingLinks(
-      offeringId: number
-    ): Promise<WholesalerOfferingLink[]> {
+    async loadOfferingLinks(offeringId: number): Promise<WholesalerOfferingLink[]> {
       const operationId = `loadOfferingLinks-${offeringId}`;
       offeringLoadingOperations.start(operationId);
       try {
         const request: PredefinedQueryRequest = {
           namedQuery: "offering_links",
           payload: {
-            select: [
-              "wol.link_id",
-              "wol.offering_id",
-              "wol.url",
-              "wol.notes",
-              "wol.created_at",
-            ],
+            select: ["wol.link_id", "wol.offering_id", "wol.url", "wol.notes", "wol.created_at"],
             where: {
               whereCondOp: LogicalOperator.AND,
               conditions: [
@@ -351,17 +294,12 @@ export function getOfferingApi(client: ApiClient) {
             orderBy: [{ key: "wol.created_at", direction: "desc" }],
           },
         };
-        const responseData = await client.apiFetch<
-          QueryResponseData<WholesalerOfferingLink>
-        >(
+        const responseData = await client.apiFetch<QueryResponseData<WholesalerOfferingLink>>(
           "/api/query",
           { method: "POST", body: createPostBody(request) },
-          { context: operationId }
+          { context: operationId },
         );
-        log.info(
-          `[${operationId}] Loaded ${responseData.results.length} links for offering ${offeringId}.`,
-          responseData.results
-        );
+        log.info(`[${operationId}] Loaded ${responseData.results.length} links for offering ${offeringId}.`, responseData.results);
         return responseData.results as WholesalerOfferingLink[];
       } catch (err) {
         log.error(`[${operationId}] Failed.`, {
@@ -377,26 +315,17 @@ export function getOfferingApi(client: ApiClient) {
     /**
      * Creates a new offering link.
      */
-    async createOfferingLink(
-      linkData: Omit<WholesalerOfferingLink, "link_id">
-    ): Promise<WholesalerOfferingLink> {
+    async createOfferingLink(linkData: Omit<WholesalerOfferingLink, "link_id">): Promise<WholesalerOfferingLink> {
       const operationId = "createOfferingLink";
       offeringLoadingOperations.start(operationId);
       try {
-        const requestBody: CreateChildRequest<
-          WholesalerItemOffering,
-          Omit<WholesalerOfferingLink, "link_id">
-        > = {
+        const requestBody: CreateChildRequest<WholesalerItemOffering, Omit<WholesalerOfferingLink, "link_id">> = {
           parentId: linkData.offering_id,
           data: linkData,
         };
         const responseData = await client.apiFetch<{
           link: WholesalerOfferingLink;
-        }>(
-          "/api/offering-links",
-          { method: "POST", body: createPostBody(requestBody) },
-          { context: operationId }
-        );
+        }>("/api/offering-links", { method: "POST", body: createPostBody(requestBody) }, { context: operationId });
         return responseData.link;
       } catch (err) {
         log.error(`[${operationId}] Failed.`, {
@@ -412,21 +341,14 @@ export function getOfferingApi(client: ApiClient) {
     /**
      * Updates an existing offering link.
      */
-    async updateOfferingLink(
-      linkId: number,
-      updates: Partial<Omit<WholesalerOfferingLink, "link_id">>
-    ): Promise<WholesalerOfferingLink> {
+    async updateOfferingLink(linkId: number, updates: Partial<Omit<WholesalerOfferingLink, "link_id">>): Promise<WholesalerOfferingLink> {
       const operationId = `updateOfferingLink-${linkId}`;
       offeringLoadingOperations.start(operationId);
       try {
         const rb = { link_id: linkId, ...updates };
         const responseData = await client.apiFetch<{
           link: WholesalerOfferingLink;
-        }>(
-          `/api/offering-links`,
-          { method: "PUT", body: createPostBody(rb) },
-          { context: operationId }
-        );
+        }>(`/api/offering-links`, { method: "PUT", body: createPostBody(rb) }, { context: operationId });
         return responseData.link;
       } catch (err) {
         log.error(`[${operationId}] Failed.`, {
@@ -443,10 +365,7 @@ export function getOfferingApi(client: ApiClient) {
     /**
      * Deletes an offering link.
      */
-    async deleteOfferingLink(
-      linkId: number,
-      cascade = false
-    ): Promise<DeleteApiResponse<{ link_id: number; url: string }, string[]>> {
+    async deleteOfferingLink(linkId: number, cascade = false): Promise<DeleteApiResponse<{ link_id: number; url: string }, string[]>> {
       const operationId = `deleteOfferingLink-${linkId}`;
       offeringLoadingOperations.start(operationId);
       try {
@@ -454,12 +373,10 @@ export function getOfferingApi(client: ApiClient) {
           id: linkId,
           cascade,
         };
-        return await client.apiFetchUnion<
-          DeleteApiResponse<{ link_id: number; url: string }, string[]>
-        >(
+        return await client.apiFetchUnion<DeleteApiResponse<{ link_id: number; url: string }, string[]>>(
           "/api/offering-links",
           { method: "DELETE", body: createPostBody(requestBody) },
-          { context: operationId }
+          { context: operationId },
         );
       } catch (err) {
         log.error(`[${operationId}] Failed.`, {
@@ -481,10 +398,7 @@ export function getOfferingApi(client: ApiClient) {
      * @param supplierId The ID of the supplier for whom to check for existing offerings.
      * @returns A promise that resolves to an array of available ProductDefinition objects.
      */
-    async getAvailableProductDefsForOffering(
-      categoryId: number,
-      supplierId: number
-    ): Promise<ProductDefinition[]> {
+    async getAvailableProductDefsForOffering(categoryId: number, supplierId: number): Promise<ProductDefinition[]> {
       const operationId = `getAvailableProductDefsForOffering-${categoryId}-${supplierId}`;
       productDefinitionLoadingOperations.start(operationId);
 
@@ -551,12 +465,10 @@ export function getOfferingApi(client: ApiClient) {
         // };
 
         // This complex query is sent to the generic /api/query endpoint
-        const responseData = await client.apiFetch<
-          QueryResponseData<ProductDefinition>
-        >(
+        const responseData = await client.apiFetch<QueryResponseData<ProductDefinition>>(
           "/api/query",
           { method: "POST", body: createQueryBody(antiJoinQuery) },
-          { context: operationId }
+          { context: operationId },
         );
 
         return responseData.results as ProductDefinition[];
@@ -578,10 +490,7 @@ export function getOfferingApi(client: ApiClient) {
      * Creates a composite ID for attribute grid operations.
      * This is used by the DataGrid component for row identification.
      */
-    createAttributeCompositeId: (
-      offeringId: number,
-      attributeId: number
-    ): string => {
+    createAttributeCompositeId: (offeringId: number, attributeId: number): string => {
       return `${offeringId}-${attributeId}`;
     },
 
@@ -589,9 +498,7 @@ export function getOfferingApi(client: ApiClient) {
      * Parses a composite ID back to offering and attribute IDs.
      * This is used when processing grid selection events.
      */
-    parseAttributeCompositeId: (
-      compositeId: string
-    ): { offeringId: number; attributeId: number } | null => {
+    parseAttributeCompositeId: (compositeId: string): { offeringId: number; attributeId: number } | null => {
       try {
         const [offeringIdStr, attributeIdStr] = compositeId.split("-");
         const offeringId = Number(offeringIdStr);

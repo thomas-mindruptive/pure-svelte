@@ -7,7 +7,7 @@
  */
 
 import { log } from '$lib/utils/logger';
-import { ComparisonOperator, LogicalOperator, type QueryPayload } from '$lib/backendQueries/queryGrammar';
+import { ComparisonOperator, type QueryPayload } from '$lib/backendQueries/queryGrammar';
 import type {
     ProductCategory,
     ProductDefinition,
@@ -19,7 +19,6 @@ import type {
 import type { ApiClient } from './ApiClient';
 import { createPostBody, createQueryBody, getErrorMessage } from './common';
 import type {
-    CreateChildRequest,
     DeleteRequest,
     PredefinedQueryRequest,
     QueryResponseData,
@@ -30,6 +29,7 @@ import type {
 } from '$lib/api/app/appSpecificTypes'; // CORRECTED IMPORT PATH
 import { LoadingState } from './loadingState';
 import { productDefinitionLoadingOperations } from './productDefinition';
+import { assertDefined } from '$lib/utils/validation/assertions';
 
 
 const categoryLoadingManager = new LoadingState();
@@ -195,8 +195,8 @@ export function getCategoryApi(client: ApiClient) {
         /**
          * Loads all offerings for a specific supplier and category.
          */
-        async loadOfferingsForCategory(supplierId: number, categoryId: number): Promise<OfferingWithDetails[]> {
-            const operationId = `loadOfferingsForCategory-${supplierId}-${categoryId}`;
+        async loadOfferingsForSupplierCategory(supplierId: number, categoryId: number): Promise<OfferingWithDetails[]> {
+            const operationId = `loadOfferingsForSupplierCategory-${supplierId}-${categoryId}`;
             categoryLoadingOperations.start(operationId);
             try {
                 const request: PredefinedQueryRequest = {
@@ -209,10 +209,10 @@ export function getCategoryApi(client: ApiClient) {
                             'pc.name AS category_name'
                         ],
                         where: {
-                            whereCondOp: LogicalOperator.AND,
+                            whereCondOp: "AND",
                             conditions: [
-                                { key: 'wio.wholesaler_id', whereCondOp: ComparisonOperator.EQUALS, val: supplierId },
-                                { key: 'wio.category_id', whereCondOp: ComparisonOperator.EQUALS, val: categoryId }
+                                { key: 'wio.wholesaler_id', whereCondOp: "=", val: supplierId },
+                                { key: 'wio.category_id', whereCondOp: "=", val: categoryId }
                             ]
                         },
                         orderBy: [{ key: 'wio.created_at', direction: 'desc' }]
@@ -235,17 +235,15 @@ export function getCategoryApi(client: ApiClient) {
         /**
          * Creates a new offering for a category.
          */
-        async createOfferingForCategory(categoryId: number, offeringData: Omit<WholesalerItemOffering, 'offering_id'>): Promise<WholesalerItemOffering_ProductDef> {
+        async createOffering(categoryId: number, offeringData: Omit<WholesalerItemOffering, 'offering_id'>): Promise<WholesalerItemOffering_ProductDef> {
+            assertDefined(offeringData, "offeringData.supplierId and offeringData.categoryId must be defined", ["wholesaler_id"], ["category_id"])
             const operationId = 'createOfferingForCategory';
             categoryLoadingOperations.start(operationId);
             try {
-                const requestBody: CreateChildRequest<ProductCategory, Omit<WholesalerItemOffering, 'offering_id'>> = {
-                    parentId: categoryId,
-                    data: offeringData
-                };
+                const body = createPostBody(offeringData) ;
                 const responseData = await client.apiFetch<{ offering: WholesalerItemOffering_ProductDef }>(
                     '/api/category-offerings',
-                    { method: 'POST', body: createPostBody(requestBody) },
+                    { method: 'POST', body },
                     { context: operationId }
                 );
                 return responseData.offering;
@@ -264,9 +262,10 @@ export function getCategoryApi(client: ApiClient) {
             const operationId = `updateOffering-${offeringId}`;
             categoryLoadingOperations.start(operationId);
             try {
+                const body = createPostBody({ offering_id: offeringId, ...updates });
                 const responseData = await client.apiFetch<{ offering: WholesalerItemOffering }>(
                     `/api/category-offerings`,
-                    { method: 'PUT', body: createPostBody({ offering_id: offeringId, ...updates }) },
+                    { method: 'PUT', body },
                     { context: operationId }
                 );
                 return responseData.offering;

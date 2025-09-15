@@ -35,7 +35,6 @@ EXCLUDE_PATTERNS = [
     "tools",
     "node_modules",
     "lib/server",
-    "routes/api",
     ".git",
     ".venv",
     ".vscode",
@@ -58,8 +57,8 @@ EXCLUDE_FILES = ["package-lock.json", ".gitignore", "package.json", "package-loc
 # Positivliste: Leer = alles zulassen
 INCLUDE_PATTERNS: List[str] = [
     # z.B. "src/**", "app/*.svelte",
-    "src/lib/components/sidebarAndNav/**",
-    "src/routes/(browser)/*.*",
+    # "src/lib/components/sidebarAndNav/**",
+    # "src/routes/(browser)/*.*",
     # "**"
 ]  
 

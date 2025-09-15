@@ -8,7 +8,7 @@
   <!-- $notifications ist die magische Svelte-Syntax, um einen Store zu abonnieren -->
   {#each $notifications as notification (notification.id)}
     <div class="snackbar {notification.type}">
-      {notification.message}
+      {@html notification.message}
     </div>
   {/each}
 </div>

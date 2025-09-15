@@ -181,7 +181,7 @@ export type DeleteSuccessResponse<TDeletedResource> = ApiSuccessResponse<DeleteS
 export interface DeleteConflictResponse<TDependencies> extends ApiErrorResponse {
     error_code: 'DEPENDENCY_CONFLICT';
     dependencies: TDependencies;
-    cascade_available: boolean;
+    cascade_available: boolean; 
 }
 
 export type DeleteApiResponse<TDeletedResource, TDependencies> =

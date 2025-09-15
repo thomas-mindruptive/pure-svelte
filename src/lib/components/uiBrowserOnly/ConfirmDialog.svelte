@@ -1,12 +1,27 @@
-
 <script lang="ts">
-  import { default as confirmationStore } from '$lib/stores/confirmation';
-  import { fade } from 'svelte/transition';
+  import { default as confirmationStore } from "$lib/stores/confirmation";
+  import { fade } from "svelte/transition";
+  import DOMPurify from "dompurify";
+  import { browser } from "$app/environment";
+  import { log } from "$lib/utils/logger";
 
   let dialog: HTMLDialogElement;
 
+  const rawMessage = $state($confirmationStore.message);
+
+  const formattedMessage = $derived.by(() => {
+    if (browser) {
+      const sanitizedMessage = DOMPurify.sanitize(rawMessage.replace(/\n/g, "<br>"));
+      log.debug(`Raw message: ${rawMessage}, Sanitized message: ${sanitizedMessage}`);
+      return sanitizedMessage;
+    } else {
+      log.debug(`browser is undefined, original message: ${rawMessage}`);
+      return rawMessage;
+    }
+  });
+
   // Reagiert auf Änderungen im Store
-  confirmationStore.subscribe(state => {
+  confirmationStore.subscribe((state) => {
     if (dialog && state.isOpen && !dialog.open) {
       dialog.showModal();
     } else if (dialog && !state.isOpen && dialog.open) {
@@ -34,14 +49,31 @@
 </script>
 
 <!-- Das 'bind:this' ist entscheidend, um eine Referenz auf das DOM-Element zu erhalten -->
-<dialog bind:this={dialog} oncancel={onCancel} class="confirm-dialog">
+<dialog
+  bind:this={dialog}
+  oncancel={onCancel}
+  class="confirm-dialog"
+>
   {#if $confirmationStore.isOpen}
-    <div class="dialog-content" transition:fade={{ duration: 150 }}>
+    <div
+      class="dialog-content"
+      transition:fade={{ duration: 150 }}
+    >
       <h3>{$confirmationStore.title}</h3>
-      <p>{$confirmationStore.message}</p>
+      <p>{@html formattedMessage}</p>
       <div class="dialog-actions">
-        <button class="secondary-button" onclick={handleCancel}>Abbrechen</button>
-        <button class="confirm-button" onclick={handleConfirm}>Bestätigen</button>
+        <button
+          class="secondary-button"
+          onclick={handleCancel}
+        >
+          Abbrechen
+        </button>
+        <button
+          class="confirm-button"
+          onclick={handleConfirm}
+        >
+          Bestätigen
+        </button>
       </div>
     </div>
   {/if}
@@ -51,7 +83,7 @@
   .confirm-dialog {
     border: none;
     border-radius: 12px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
     padding: 0;
     max-width: 450px;
     width: 90%;
@@ -94,7 +126,7 @@
     cursor: pointer;
     transition: all 0.2s ease;
   }
-  
+
   .confirm-button {
     background-color: #dc3545; /* Rot für eine destruktive Aktion */
     color: white;
@@ -103,5 +135,4 @@
   .confirm-button:hover {
     background-color: #c82333;
   }
-
 </style>

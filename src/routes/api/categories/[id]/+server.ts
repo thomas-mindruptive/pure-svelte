@@ -131,13 +131,15 @@ export const DELETE: RequestHandler = async ({ params, url }): Promise<Response>
     try {
         const cascade = url.searchParams.get('cascade') === 'true';
         const { hard, soft } = await checkProductCategoryMasterDependencies(id);
+        log.info(`Product categrory has dependent objects:`, { hard, soft });
 
         // Rule 1: Hard dependencies (e.g., offerings) always block deletion.
         if (hard.length > 0) {
             const conflictResponse: DeleteCategoryConflictResponse = {
                 success: false, message: 'Cannot delete category: It is still in use by other entities (e.g., offerings).',
                 status_code: 409, error_code: 'DEPENDENCY_CONFLICT',
-                dependencies: hard, cascade_available: false,
+                dependencies: hard, 
+                cascade_available: false,
                 meta: { timestamp: new Date().toISOString() }
             };
             log.warn(`[${operationId}] FN_FAILURE: Deletion blocked by hard dependencies.`, { dependencies: hard });
@@ -149,7 +151,8 @@ export const DELETE: RequestHandler = async ({ params, url }): Promise<Response>
             const conflictResponse: DeleteCategoryConflictResponse = {
                 success: false, message: 'Category has active supplier assignments. Use cascade to remove them.',
                 status_code: 409, error_code: 'DEPENDENCY_CONFLICT',
-                dependencies: soft, cascade_available: true,
+                dependencies: soft, 
+                cascade_available: true,
                 meta: { timestamp: new Date().toISOString() }
             };
             log.warn(`[${operationId}] FN_FAILURE: Deletion blocked by soft dependencies, cascade not requested.`, { dependencies: soft });

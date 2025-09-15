@@ -14,7 +14,7 @@
   // === PROPS ====================================================================================
 
   export type CategoryGridProps = {
-    data: { categories: Promise<ProductCategory[]>}
+    data: { categories: Promise<ProductCategory[]> };
   };
 
   let { data }: CategoryGridProps = $props();
@@ -122,7 +122,10 @@
         }
       } else {
         log.debug(`categoryApi.deleteCategory was not successful but cascade_available`);
-        addNotification(`Could not delete category (ID: ${id}). Error: ${result.error_code} - ${result.message}`, "error");
+        addNotification(
+          `Could not delete category (ID: ${id}).\nError: ${result.error_code} - ${result.message}\nDependencies: ${JSON.stringify(result.dependencies)}`,
+          "error",
+        );
       }
     }
 

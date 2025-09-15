@@ -14,7 +14,7 @@
   // === PROPS ====================================================================================
 
   export type CategoryGridProps = {
-    data: { suppliers: Promise<ProductCategory[]>}
+    data: { categories: Promise<ProductCategory[]>}
   };
 
   let { data }: CategoryGridProps = $props();
@@ -40,29 +40,29 @@
       loadingOrValidationError = null;
       resolvedCategories = []; // Clear old data to prevent stale UI
 
-      if (!data.suppliers) {
-        const message = `Cannot load suppliers because data.suppliers is not defined`;
+      if (!data.categories) {
+        const message = `Cannot load categories because data.categories is not defined`;
         log.error(message);
         loadingOrValidationError = { message, status: 0 };
       } else {
         try {
           // b. Await the promise to get the data.
           if (!aborted) {
-            resolvedCategories = await data.suppliers;
-            log.debug(`Suppliers promise resolved successfully.`);
+            resolvedCategories = await data.categories;
+            log.debug(`Categroies promise resolved successfully.`);
           }
         } catch (rawError: any) {
           // c. If the promise rejects, perform the robust error handling.
 
           if (!aborted) {
             const status = rawError.status ?? 500;
-            const message = rawError.body?.message || rawError.message || "An unknown error occurred while loading suppliers.";
+            const message = rawError.body?.message || rawError.message || "An unknown error occurred while loading categories.";
 
             // Set the clean error state for the UI to display.
             loadingOrValidationError = { message, status };
 
             // Log the full, raw error object for debugging purposes.
-            log.error("(SupplierListPage) Promise rejected while loading suppliers", { rawError });
+            log.error("(CategoryListPage) Promise rejected while loading categories", { rawError });
           }
         } finally {
           // Always set loading to false when the process is complete (success or fail).
@@ -89,22 +89,24 @@
   const categoryApi = getCategoryApi(client);
 
   function handleCategorySelect(category: ProductCategory): void {
-    log.info(`Navigating to detail for supplierId: ${category.category_id}`);
+    log.info(`Navigating to detail for categoryId: ${category.category_id}`);
     goto(`/categories/${category.category_id}`);
   }
 
   async function handleCategoryDelete(ids: ID[]): Promise<void> {
-    log.info(`(SupplierListPage) Deleting suppliers`, { ids });
+    log.info(`Deleting categories`, { ids });
     let dataChanged = false;
 
     for (const id of ids) {
       const numericId = Number(id);
       const result = await categoryApi.deleteCategory(numericId, false);
+      log.debug(`categoryApi.deleteCategory returned:`, result);
 
       if (result.success) {
         addNotification(`Category "${result.data.deleted_resource.name}" deleted.`, "success");
         dataChanged = true;
       } else if ("cascade_available" in result && result.cascade_available) {
+        log.debug(`categoryApi.deleteCategory was not successful but cascade_available`);
         const dependencies = (result.dependencies as string[]).join(", ");
         const confirmed = await requestConfirmation(
           `Category has dependencies: ${dependencies}. Delete with all related data?`,
@@ -119,11 +121,12 @@
           }
         }
       } else {
-        addNotification(`Could not delete category (ID: ${id}).`, "error");
+        log.debug(`categoryApi.deleteCategory was not successful but cascade_available`);
+        addNotification(`Could not delete category (ID: ${id}). Error: ${result.error_code} - ${result.message}`, "error");
       }
     }
 
-    // TODO: Stay on page, just reload categories!!! See OfferingDetailAttributes -> Delete attribute.
+    // TODO: Stay on page, just reload categories!!! See OfferingDetailAttributes -> Delete category.
     if (dataChanged) {
       goto("/categories", { invalidateAll: true });
     }
@@ -148,8 +151,8 @@
 <!--- TEMPLATE ----------------------------------------------------------------------------------->
 
 <div class="page-content-wrapper">
-  <h1>Suppliers</h1>
-  <p>Select a supplier to view their details and manage their product categories.</p>
+  <h1>Cattegories</h1>
+  <p>Select a category to view their details and manage their products.</p>
 
   <!-- 
     4. The template is now extremely simple and clean. It is purely presentational,
@@ -157,7 +160,7 @@
   -->
   {#if loadingOrValidationError}
     <div class="component-error-boundary">
-      <h3>Error Loading Suppliers (Status: {loadingOrValidationError.status})</h3>
+      <h3>Error Loading Categories (Status: {loadingOrValidationError.status})</h3>
       <p>{loadingOrValidationError.message}</p>
     </div>
   {:else}
@@ -166,7 +169,7 @@
         class="pc-grid__createbtn"
         onclick={handleCategoryCreate}
       >
-        Create Supplier
+        Create Category
       </button>
       <CategoryGrid
         rows={resolvedCategories}

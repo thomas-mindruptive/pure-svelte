@@ -87,6 +87,7 @@
   border-radius: var(--_radius);
   box-shadow: var(--pc-grid-shadow);
   overflow: hidden;
+  user-select: none;
 }
 
 /* Toolbar area (use as wrapper above the table) */
@@ -160,6 +161,7 @@
   transition: var(--button-transition);
   font-size: var(--button-font-size);
   text-align: var(--button-text-align);
+  user-select: none;
 }
 
 .pc-grid__createbtn:hover:not(:disabled) {

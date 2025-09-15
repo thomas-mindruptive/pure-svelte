@@ -9,10 +9,8 @@ export interface Notification {
   timeout: number;
 }
 
-// `writable` erstellt einen Store, den wir von überall beschreiben können
 export const notifications = writable<Notification[]>([]);
 
-// Das ist unsere "Helfer"-Funktion, die wir in unseren Seiten aufrufen werden
 export function addNotification(message: string, type: 'success' | 'error' | 'info' = 'info', timeout = 3000) {
   const id = uuidv4();
   

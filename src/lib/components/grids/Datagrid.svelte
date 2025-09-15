@@ -488,17 +488,14 @@
 
     // Generate unique batch ID for correlation across log entries
     const batchId = newBatchId();
-    log.info(
-      {
-        component: "DataGrid:orchestrateDelete",
-        gridId,
-        entity,
-        batchId,
-        count: pendingIds.length,
-        selection,
-      },
-      "DELETE_REQUESTED",
-    );
+    log.info("DELETE_REQUESTED", {
+      component: "DataGrid:orchestrateDelete",
+      gridId,
+      entity,
+      batchId,
+      count: pendingIds.length,
+      selection,
+    });
 
     // === PHASE 2: DRY-RUN (Optional Impact Analysis) ===
 
@@ -553,17 +550,14 @@
           entity,
         });
 
-        log.info(
-          {
-            component: "DataGrid",
-            gridId,
-            entity,
-            batchId,
-            ok: confirmResult.ok,
-            durationMs: Math.round(nowMs() - t1),
-          },
-          confirmResult.ok ? "DELETE_CONFIRMED" : "DELETE_REJECTED",
-        );
+        log.info(confirmResult.ok ? "DELETE_CONFIRMED" : "DELETE_REJECTED", {
+          component: "DataGrid",
+          gridId,
+          entity,
+          batchId,
+          ok: confirmResult.ok,
+          durationMs: Math.round(nowMs() - t1),
+        });
 
         if (!confirmResult.ok) {
           log.info(`DataGrid:orchestrateDelete: confirmResult.ok == false - aborting`);

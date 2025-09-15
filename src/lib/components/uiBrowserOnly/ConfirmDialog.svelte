@@ -98,17 +98,10 @@
   .confirm-button {
     background-color: #dc3545; /* Rot für eine destruktive Aktion */
     color: white;
+    user-select: none;
   }
   .confirm-button:hover {
     background-color: #c82333;
   }
 
-  .secondary-button {
-    background-color: #f1f5f9;
-    color: var(--color-text);
-    border: 1px solid var(--color-border);
-  }
-  .secondary-button:hover {
-    background-color: #e2e8f0;
-  }
 </style>

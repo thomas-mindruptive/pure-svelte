@@ -139,7 +139,7 @@
           }
         }
       } else {
-        addNotification(`Could not delete supplier (ID: ${id}).`, "error");
+        addNotification(`Could not delete supplier (ID: ${id}). Error: ${result.error_code} - ${result.message}`, "error");
       }
     }
 

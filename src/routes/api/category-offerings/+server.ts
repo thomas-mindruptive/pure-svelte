@@ -29,7 +29,7 @@ import { checkOfferingDependencies } from "$lib/dataModel/dependencyChecks";
 
 /**
  * POST /api/category-offerings
- * @description Creates a new offering within a category context.
+ * @description Creates a new offering.
  */
 export const POST: RequestHandler = async ({ request }) => {
   log.infoHeader("POST /api/category-offerings");

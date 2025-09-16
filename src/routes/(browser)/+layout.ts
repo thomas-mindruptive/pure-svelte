@@ -4,7 +4,7 @@ import { log } from "$lib/utils/logger";
 import { error, type LoadEvent } from "@sveltejs/kit";
 import { ApiClient } from "$lib/api/client/ApiClient";
 import { getSupplierApi } from "$lib/api/client/supplier";
-import { getCategoryApi } from "$lib/api/client/category";
+import { getCategoryApi } from '$lib/api/client/offering';
 import { getOfferingApi } from "$lib/api/client/offering";
 import { buildBreadcrumb } from "$lib/components/sidebarAndNav/buildBreadcrumb";
 import type { RuntimeHierarchyTree, RuntimeHierarchyTreeNode } from "$lib/components/sidebarAndNav/HierarchySidebar.types";

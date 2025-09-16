@@ -15,7 +15,8 @@
 	import OfferingGrid from '$lib/components/domain/offerings/OfferingGrid.svelte';
 
 	// API & Type Imports
-	import { categoryLoadingState, getCategoryApi } from '$lib/api/client/category';
+	import { categoryLoadingState } from '$lib/api/client/category';
+	import { getCategoryApi } from '$lib/api/client/offering';
 	import type { WholesalerItemOffering_ProductDef_Category } from '$lib/domain/domainTypes';
 	import { ApiClient } from '$lib/api/client/ApiClient';
 	import type { ID, DeleteStrategy, RowActionStrategy } from '$lib/components/grids/Datagrid.types';

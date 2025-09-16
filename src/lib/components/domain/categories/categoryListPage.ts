@@ -3,7 +3,7 @@ import { type LoadEvent } from '@sveltejs/kit';
 
 // Import the new dependencies
 import { ApiClient } from '$lib/api/client/ApiClient';
-import { getCategoryApi } from '$lib/api/client/category';
+import { getCategoryApi } from '$lib/api/client/offering';
 
 /**
  * Loads the data required for the Category List Page.

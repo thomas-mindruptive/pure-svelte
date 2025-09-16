@@ -17,7 +17,6 @@ import { LoadingState } from "./loadingState";
 // Create a dedicated loading state manager for this entity.
 const productDefinitionLoadingManager = new LoadingState();
 export const productDefinitionLoadingState = productDefinitionLoadingManager.isLoadingStore;
-export const productDefinitionLoadingOperations = productDefinitionLoadingManager;
 
 /**
  * The default query payload used when fetching product definitions.
@@ -40,7 +39,7 @@ export function getProductDefinitionApi(client: ApiClient) {
      */
     async loadProductDefinitions(query: Partial<QueryPayload<ProductDefinition>> = {}): Promise<ProductDefinition[]> {
       const operationId = "loadProductDefinitions";
-      productDefinitionLoadingOperations.start(operationId);
+      productDefinitionLoadingManager.start(operationId);
       try {
         const fullQuery: QueryPayload<ProductDefinition> = {
           ...DEFAULT_PRODUCT_DEFINITION_QUERY,
@@ -56,7 +55,7 @@ export function getProductDefinitionApi(client: ApiClient) {
         log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
         throw err;
       } finally {
-        productDefinitionLoadingOperations.finish(operationId);
+        productDefinitionLoadingManager.finish(operationId);
       }
     },
 
@@ -65,7 +64,7 @@ export function getProductDefinitionApi(client: ApiClient) {
      */
     async loadProductDefinition(productDefId: number): Promise<ProductDefinition> {
       const operationId = `loadProductDefinition-${productDefId}`;
-      productDefinitionLoadingOperations.start(operationId);
+      productDefinitionLoadingManager.start(operationId);
       try {
         const responseData = await client.apiFetch<{ productDefinition: ProductDefinition }>(
           `/api/product-definitions/${productDefId}`,
@@ -77,7 +76,7 @@ export function getProductDefinitionApi(client: ApiClient) {
         log.error(`[${operationId}] Failed.`, { productDefId, error: getErrorMessage(err) });
         throw err;
       } finally {
-        productDefinitionLoadingOperations.finish(operationId);
+        productDefinitionLoadingManager.finish(operationId);
       }
     },
 
@@ -86,7 +85,7 @@ export function getProductDefinitionApi(client: ApiClient) {
      */
     async createProductDefinition(productDefData: Omit<ProductDefinition, "product_def_id">): Promise<ProductDefinition> {
       const operationId = "createProductDefinition";
-      productDefinitionLoadingOperations.start(operationId);
+      productDefinitionLoadingManager.start(operationId);
       try {
         const responseData = await client.apiFetch<{ productDefinition: ProductDefinition }>(
           "/api/product-definitions/new",
@@ -98,7 +97,7 @@ export function getProductDefinitionApi(client: ApiClient) {
         log.error(`[${operationId}] Failed.`, { productDefData, error: getErrorMessage(err) });
         throw err;
       } finally {
-        productDefinitionLoadingOperations.finish(operationId);
+        productDefinitionLoadingManager.finish(operationId);
       }
     },
 
@@ -107,7 +106,7 @@ export function getProductDefinitionApi(client: ApiClient) {
      */
     async updateProductDefinition(productDefId: number, updates: Partial<ProductDefinition>): Promise<ProductDefinition> {
       const operationId = `updateProductDefinition-${productDefId}`;
-      productDefinitionLoadingOperations.start(operationId);
+      productDefinitionLoadingManager.start(operationId);
       try {
         const responseData = await client.apiFetch<{ productDefinition: ProductDefinition }>(
           `/api/product-definitions/${productDefId}`,
@@ -119,7 +118,7 @@ export function getProductDefinitionApi(client: ApiClient) {
         log.error(`[${operationId}] Failed.`, { productDefId, updates, error: getErrorMessage(err) });
         throw err;
       } finally {
-        productDefinitionLoadingOperations.finish(operationId);
+        productDefinitionLoadingManager.finish(operationId);
       }
     },
 
@@ -132,7 +131,7 @@ export function getProductDefinitionApi(client: ApiClient) {
 	  cascade = false
     ): Promise<DeleteApiResponse<Pick<ProductDefinition, "product_def_id" | "title">, string[]>> {
       const operationId = `deleteProductDefinition-${productDefId}`;
-      productDefinitionLoadingOperations.start(operationId);
+      productDefinitionLoadingManager.start(operationId);
       try {
         // Note: Cascade might fail due to due to hard dependencies. => To be configured on server in "checkProductDefinitionDependencies".
          const removeRequest: DeleteRequest<ProductDefinition> = {
@@ -151,7 +150,7 @@ export function getProductDefinitionApi(client: ApiClient) {
         log.error(`[${operationId}] Failed.`, { productDefId, error: getErrorMessage(err) });
         throw err;
       } finally {
-        productDefinitionLoadingOperations.finish(operationId);
+        productDefinitionLoadingManager.finish(operationId);
       }
     },
   };

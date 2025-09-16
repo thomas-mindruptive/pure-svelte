@@ -33,15 +33,11 @@ import type {
   DeleteRequest,
 } from "$lib/api/api.types";
 import { LoadingState } from "./loadingState";
-import { productDefinitionLoadingOperations } from "./productDefinition";
 import { Query } from "$lib/backendQueries/fluentQueryBuilder";
 import { assertDefined } from "$lib/utils/validation/assertions";
 import type { DeleteOfferingApiResponse } from "../app/appSpecificTypes";
-import { categoryLoadingOperations } from "./category";
-
 const offeringLoadingManager = new LoadingState();
 export const offeringLoadingState = offeringLoadingManager.isLoadingStore;
-export const offeringLoadingOperations = offeringLoadingManager;
 
 /**
  * Factory function to create an offering-specific API client.
@@ -58,7 +54,7 @@ export function getOfferingApi(client: ApiClient) {
     async loadOffering(offeringId: number): Promise<WholesalerItemOffering_ProductDef_Category> {
       log.info(`API, Loading offering: ${offeringId}`);
       const operationId = `loadOffering-${offeringId}`;
-      offeringLoadingOperations.start(operationId);
+      offeringLoadingManager.start(operationId);
       try {
         const responseData = await client.apiFetch<{
           offering: WholesalerItemOffering_ProductDef_Category;
@@ -68,7 +64,7 @@ export function getOfferingApi(client: ApiClient) {
         log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
         throw err;
       } finally {
-        offeringLoadingOperations.finish(operationId);
+        offeringLoadingManager.finish(operationId);
       }
     },
 
@@ -83,7 +79,7 @@ export function getOfferingApi(client: ApiClient) {
         ["category_id"],
       );
       const operationId = "createOfferingForCategory";
-      categoryLoadingOperations.start(operationId);
+      offeringLoadingManager.start(operationId);
       try {
         const body = createPostBody(offeringData);
         const responseData = await client.apiFetch<{ offering: WholesalerItemOffering_ProductDef }>(
@@ -96,7 +92,7 @@ export function getOfferingApi(client: ApiClient) {
         log.error(`[${operationId}] Failed.`, { offeringData, error: getErrorMessage(err) });
         throw err;
       } finally {
-        categoryLoadingOperations.finish(operationId);
+        offeringLoadingManager.finish(operationId);
       }
     },
 
@@ -106,7 +102,7 @@ export function getOfferingApi(client: ApiClient) {
     async updateOffering(offeringId: number, updates: Partial<WholesalerItemOffering>): Promise<WholesalerItemOffering> {
       assertDefined(offeringId, "offeringID");
       const operationId = `updateOffering-${offeringId}`;
-      categoryLoadingOperations.start(operationId);
+      offeringLoadingManager.start(operationId);
       try {
         const body = createPostBody({ offering_id: offeringId, ...updates });
         const responseData = await client.apiFetch<{ offering: WholesalerItemOffering }>(
@@ -119,7 +115,7 @@ export function getOfferingApi(client: ApiClient) {
         log.error(`[${operationId}] Failed.`, { updates, error: getErrorMessage(err) });
         throw err;
       } finally {
-        categoryLoadingOperations.finish(operationId);
+        offeringLoadingManager.finish(operationId);
       }
     },
 
@@ -129,7 +125,7 @@ export function getOfferingApi(client: ApiClient) {
     async deleteOffering(offeringId: number, cascade = false): Promise<DeleteOfferingApiResponse> {
       assertDefined(offeringId, "offeringId");
       const operationId = `deleteOffering-${offeringId}`;
-      categoryLoadingOperations.start(operationId);
+      offeringLoadingManager.start(operationId);
       try {
         const url = `/api/offerings/${offeringId}`;
 
@@ -140,7 +136,7 @@ export function getOfferingApi(client: ApiClient) {
         const body = createPostBody(removeRequest);
         return await client.apiFetchUnion<DeleteOfferingApiResponse>(url, { method: "DELETE", body }, { context: operationId });
       } finally {
-        categoryLoadingOperations.finish(operationId);
+        offeringLoadingManager.finish(operationId);
       }
     },
 
@@ -151,7 +147,7 @@ export function getOfferingApi(client: ApiClient) {
      */
     async loadOfferingAttributes(offeringId: number): Promise<WholesalerOfferingAttribute_Attribute[]> {
       const operationId = `loadOfferingAttributes-${offeringId}`;
-      offeringLoadingOperations.start(operationId);
+      offeringLoadingManager.start(operationId);
       try {
         const request: PredefinedQueryRequest = {
           namedQuery: "offering_attributes",
@@ -189,7 +185,7 @@ export function getOfferingApi(client: ApiClient) {
         });
         throw err;
       } finally {
-        offeringLoadingOperations.finish(operationId);
+        offeringLoadingManager.finish(operationId);
       }
     },
 
@@ -199,7 +195,7 @@ export function getOfferingApi(client: ApiClient) {
      */
     async loadAvailableAttributes(): Promise<Attribute[]> {
       const operationId = "loadAvailableAttributes";
-      offeringLoadingOperations.start(operationId);
+      offeringLoadingManager.start(operationId);
       try {
         const query: QueryPayload<Attribute> = {
           select: ["attribute_id", "name", "description"],
@@ -217,7 +213,7 @@ export function getOfferingApi(client: ApiClient) {
         });
         throw err;
       } finally {
-        offeringLoadingOperations.finish(operationId);
+        offeringLoadingManager.finish(operationId);
       }
     },
 
@@ -226,7 +222,7 @@ export function getOfferingApi(client: ApiClient) {
      */
     async getAvailableAttributesForOffering(offeringId: number): Promise<Attribute[]> {
       const operationId = `getAvailableAttributesForOffering-${offeringId}`;
-      offeringLoadingOperations.start(operationId);
+      offeringLoadingManager.start(operationId);
       try {
         const [allAttributes, assignedAttributes] = await Promise.all([
           api.loadAvailableAttributes(),
@@ -243,7 +239,7 @@ export function getOfferingApi(client: ApiClient) {
         });
         throw err;
       } finally {
-        offeringLoadingOperations.finish(operationId);
+        offeringLoadingManager.finish(operationId);
       }
     },
 
@@ -252,7 +248,7 @@ export function getOfferingApi(client: ApiClient) {
      */
     async createOfferingAttribute(assignmentData: Omit<WholesalerOfferingAttribute, "id">): Promise<WholesalerOfferingAttribute> {
       const operationId = "createOfferingAttribute";
-      offeringLoadingOperations.start(operationId);
+      offeringLoadingManager.start(operationId);
       try {
         const requestBody: AssignmentRequest<WholesalerItemOffering, Attribute, Omit<WholesalerOfferingAttribute, "id">> = {
           parent1Id: assignmentData.offering_id,
@@ -272,7 +268,7 @@ export function getOfferingApi(client: ApiClient) {
         });
         throw err;
       } finally {
-        offeringLoadingOperations.finish(operationId);
+        offeringLoadingManager.finish(operationId);
       }
     },
 
@@ -281,7 +277,7 @@ export function getOfferingApi(client: ApiClient) {
      */
     async updateOfferingAttribute(offeringAttribute: WholesalerOfferingAttribute): Promise<WholesalerOfferingAttribute> {
       const operationId = `updateOfferingAttribute-${offeringAttribute.offering_id}-${offeringAttribute.attribute_id}`;
-      offeringLoadingOperations.start(operationId);
+      offeringLoadingManager.start(operationId);
       try {
         const requestBody: AssignmentUpdateRequest<WholesalerItemOffering, Attribute, WholesalerOfferingAttribute> = {
           parent1Id: offeringAttribute.offering_id,
@@ -301,7 +297,7 @@ export function getOfferingApi(client: ApiClient) {
         });
         throw err;
       } finally {
-        offeringLoadingOperations.finish(operationId);
+        offeringLoadingManager.finish(operationId);
       }
     },
 
@@ -314,7 +310,7 @@ export function getOfferingApi(client: ApiClient) {
       cascade = false,
     ): Promise<DeleteApiResponse<{ offering_id: number; attribute_id: number; attribute_name: string }, string[]>> {
       const operationId = `deleteOfferingAttribute-${offeringId}-${attributeId}`;
-      offeringLoadingOperations.start(operationId);
+      offeringLoadingManager.start(operationId);
       try {
         const requestBody: RemoveAssignmentRequest<WholesalerItemOffering, Attribute> = {
           parent1Id: offeringId,
@@ -340,7 +336,7 @@ export function getOfferingApi(client: ApiClient) {
         });
         throw err;
       } finally {
-        offeringLoadingOperations.finish(operationId);
+        offeringLoadingManager.finish(operationId);
       }
     },
 
@@ -351,7 +347,7 @@ export function getOfferingApi(client: ApiClient) {
      */
     async loadOfferingLinks(offeringId: number): Promise<WholesalerOfferingLink[]> {
       const operationId = `loadOfferingLinks-${offeringId}`;
-      offeringLoadingOperations.start(operationId);
+      offeringLoadingManager.start(operationId);
       try {
         const request: PredefinedQueryRequest = {
           namedQuery: "offering_links",
@@ -384,7 +380,7 @@ export function getOfferingApi(client: ApiClient) {
         });
         throw err;
       } finally {
-        offeringLoadingOperations.finish(operationId);
+        offeringLoadingManager.finish(operationId);
       }
     },
 
@@ -393,7 +389,7 @@ export function getOfferingApi(client: ApiClient) {
      */
     async createOfferingLink(linkData: Omit<WholesalerOfferingLink, "link_id">): Promise<WholesalerOfferingLink> {
       const operationId = "createOfferingLink";
-      offeringLoadingOperations.start(operationId);
+      offeringLoadingManager.start(operationId);
       try {
         const requestBody: CreateChildRequest<WholesalerItemOffering, Omit<WholesalerOfferingLink, "link_id">> = {
           parentId: linkData.offering_id,
@@ -410,7 +406,7 @@ export function getOfferingApi(client: ApiClient) {
         });
         throw err;
       } finally {
-        offeringLoadingOperations.finish(operationId);
+        offeringLoadingManager.finish(operationId);
       }
     },
 
@@ -419,7 +415,7 @@ export function getOfferingApi(client: ApiClient) {
      */
     async updateOfferingLink(linkId: number, updates: Partial<Omit<WholesalerOfferingLink, "link_id">>): Promise<WholesalerOfferingLink> {
       const operationId = `updateOfferingLink-${linkId}`;
-      offeringLoadingOperations.start(operationId);
+      offeringLoadingManager.start(operationId);
       try {
         const rb = { link_id: linkId, ...updates };
         const responseData = await client.apiFetch<{
@@ -434,7 +430,7 @@ export function getOfferingApi(client: ApiClient) {
         });
         throw err;
       } finally {
-        offeringLoadingOperations.finish(operationId);
+        offeringLoadingManager.finish(operationId);
       }
     },
 
@@ -443,7 +439,7 @@ export function getOfferingApi(client: ApiClient) {
      */
     async deleteOfferingLink(linkId: number, cascade = false): Promise<DeleteApiResponse<{ link_id: number; url: string }, string[]>> {
       const operationId = `deleteOfferingLink-${linkId}`;
-      offeringLoadingOperations.start(operationId);
+      offeringLoadingManager.start(operationId);
       try {
         const requestBody: DeleteRequest<WholesalerOfferingLink> = {
           id: linkId,
@@ -462,7 +458,7 @@ export function getOfferingApi(client: ApiClient) {
         });
         throw err;
       } finally {
-        offeringLoadingOperations.finish(operationId);
+        offeringLoadingManager.finish(operationId);
       }
     },
 
@@ -476,7 +472,7 @@ export function getOfferingApi(client: ApiClient) {
      */
     async getAvailableProductDefsForOffering(categoryId: number, supplierId: number): Promise<ProductDefinition[]> {
       const operationId = `getAvailableProductDefsForOffering-${categoryId}-${supplierId}`;
-      productDefinitionLoadingOperations.start(operationId);
+      offeringLoadingManager.start(operationId);
 
       try {
         // prettier-ignore
@@ -495,51 +491,6 @@ export function getOfferingApi(client: ApiClient) {
         const antiJoinQuery = payload;
         void JoinType;
 
-        // const antiJoinQuery: QueryPayload<ProductDefinition> = {
-        //   from: { table: 'dbo.product_definitions', alias: 'pd' },
-        //   select: ['pd.product_def_id', 'pd.title', 'pd.description', 'pd.category_id'],
-        //   joins: [
-        //     {
-        //       type: JoinType.LEFT,
-        //       table: 'dbo.wholesaler_item_offerings',
-        //       alias: 'wio',
-        //       on: {
-        //         joinCondOp: "AND",
-        //         conditions: [
-        //           // Standard JOIN condition
-        //           {
-        //             columnA: 'pd.product_def_id',
-        //             op: "=",
-        //             columnB: 'wio.product_def_id'
-        //           },
-        //           // Dynamic parameter injected into the ON clause
-        //           {
-        //             key: 'wio.wholesaler_id',
-        //             whereCondOp: ComparisonOperator.EQUALS,
-        //             val: supplierId
-        //           }
-        //         ]
-        //       }
-        //     }
-        //   ],
-        //   where: {
-        //     whereCondOp: LogicalOperator.AND,
-        //     conditions: [
-        //       // The core of the anti-join: only return rows where the JOIN found no match
-        //       {
-        //         key: 'wio.offering_id',
-        //         whereCondOp: ComparisonOperator.IS_NULL
-        //       },
-        //       {
-        //         key: 'pd.category_id', // `pd` ist der Alias für `dbo.product_definitions`
-        //         whereCondOp: ComparisonOperator.EQUALS,
-        //         val: categoryId // Die ID der aktuellen Kategorie aus den Funktionsargumenten
-        //       }
-        //     ]
-        //   },
-        //   orderBy: [{ key: 'pd.title', direction: 'asc' }]
-        // };
-
         // This complex query is sent to the generic /api/query endpoint
         const responseData = await client.apiFetch<QueryResponseData<ProductDefinition>>(
           "/api/query",
@@ -556,7 +507,7 @@ export function getOfferingApi(client: ApiClient) {
         });
         throw err;
       } finally {
-        productDefinitionLoadingOperations.finish(operationId);
+        offeringLoadingManager.finish(operationId);
       }
     },
 

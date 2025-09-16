@@ -25,9 +25,11 @@
   const urlParams = $derived(data.urlParams);
 
   // === LOADING INDICATOR ===
+
   const isAnythingLoading = derived(
     [supplierLoadingState, categoryLoadingState, offeringLoadingState, attributeLoadingState, productDefinitionLoadingState],
     ([$supplierLoading, $categoryLoading, $offeringLoading, $attributeLoading, $productDefLoading]) => {
+      log.debug(`isAnythingLoading changed:`, {$supplierLoading, $categoryLoading, $offeringLoading, $attributeLoading, $productDefLoading });
       return $supplierLoading || $categoryLoading || $offeringLoading || $attributeLoading || $productDefLoading;
     },
   );

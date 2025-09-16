@@ -14,11 +14,8 @@ import { createPostBody, createQueryBody, getErrorMessage } from "./common";
 import type { PredefinedQueryRequest, QueryResponseData } from "$lib/api/api.types";
 import type { DeleteCategoryApiResponse } from "$lib/api/app/appSpecificTypes"; // CORRECTED IMPORT PATH
 import { LoadingState } from "./loadingState";
-import { productDefinitionLoadingOperations } from "./productDefinition";
-
 const categoryLoadingManager = new LoadingState();
 export const categoryLoadingState = categoryLoadingManager.isLoadingStore;
-export const categoryLoadingOperations = categoryLoadingManager;
 
 export type OfferingWithDetails = WholesalerItemOffering_ProductDef_Category;
 
@@ -36,7 +33,7 @@ export function getCategoryApi(client: ApiClient) {
      */
     async loadCategories(query: Partial<QueryPayload<ProductCategory>> = {}): Promise<ProductCategory[]> {
       const operationId = "loadCategories";
-      categoryLoadingOperations.start(operationId);
+      categoryLoadingManager.start(operationId);
       try {
         const fullQuery: QueryPayload<ProductCategory> = {
           select: ["category_id", "name", "description"],
@@ -54,7 +51,7 @@ export function getCategoryApi(client: ApiClient) {
         log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
         throw err;
       } finally {
-        categoryLoadingOperations.finish(operationId);
+        categoryLoadingManager.finish(operationId);
       }
     },
 
@@ -63,7 +60,7 @@ export function getCategoryApi(client: ApiClient) {
      */
     async loadCategory(categoryId: number): Promise<ProductCategory> {
       const operationId = `loadCategory-${categoryId}`;
-      categoryLoadingOperations.start(operationId);
+      categoryLoadingManager.start(operationId);
       try {
         const responseData = await client.apiFetch<{ category: ProductCategory }>(
           `/api/categories/${categoryId}`,
@@ -75,7 +72,7 @@ export function getCategoryApi(client: ApiClient) {
         log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
         throw err;
       } finally {
-        categoryLoadingOperations.finish(operationId);
+        categoryLoadingManager.finish(operationId);
       }
     },
 
@@ -84,7 +81,7 @@ export function getCategoryApi(client: ApiClient) {
      */
     async createCategory(categoryData: Omit<ProductCategory, "category_id">): Promise<ProductCategory> {
       const operationId = "createCategory";
-      categoryLoadingOperations.start(operationId);
+      categoryLoadingManager.start(operationId);
       try {
         const responseData = await client.apiFetch<{ category: ProductCategory }>(
           "/api/categories/new",
@@ -96,7 +93,7 @@ export function getCategoryApi(client: ApiClient) {
         log.error(`[${operationId}] Failed.`, { categoryData, error: getErrorMessage(err) });
         throw err;
       } finally {
-        categoryLoadingOperations.finish(operationId);
+        categoryLoadingManager.finish(operationId);
       }
     },
 
@@ -105,7 +102,7 @@ export function getCategoryApi(client: ApiClient) {
      */
     async updateCategory(categoryId: number, updates: Partial<ProductCategory>): Promise<ProductCategory> {
       const operationId = `updateCategory-${categoryId}`;
-      categoryLoadingOperations.start(operationId);
+      categoryLoadingManager.start(operationId);
       try {
         const responseData = await client.apiFetch<{ category: ProductCategory }>(
           `/api/categories/${categoryId}`,
@@ -117,7 +114,7 @@ export function getCategoryApi(client: ApiClient) {
         log.error(`[${operationId}] Failed.`, { updates, error: getErrorMessage(err) });
         throw err;
       } finally {
-        categoryLoadingOperations.finish(operationId);
+        categoryLoadingManager.finish(operationId);
       }
     },
 
@@ -126,12 +123,12 @@ export function getCategoryApi(client: ApiClient) {
      */
     async deleteCategory(categoryId: number, cascade = false): Promise<DeleteCategoryApiResponse> {
       const operationId = `deleteCategory-${categoryId}`;
-      categoryLoadingOperations.start(operationId);
+      categoryLoadingManager.start(operationId);
       try {
         const url = `/api/categories/${categoryId}${cascade ? "?cascade=true" : ""}`;
         return await client.apiFetchUnion<DeleteCategoryApiResponse>(url, { method: "DELETE" }, { context: operationId });
       } finally {
-        categoryLoadingOperations.finish(operationId);
+        categoryLoadingManager.finish(operationId);
       }
     },
 
@@ -139,7 +136,7 @@ export function getCategoryApi(client: ApiClient) {
 
     async loadProductDefsForCategory(categoryId: number): Promise<ProductDefinition[]> {
       const operationId = `loadProductDefsForCategory-${categoryId}`;
-      productDefinitionLoadingOperations.start(operationId);
+      categoryLoadingManager.start(operationId);
       try {
         const query: QueryPayload<ProductDefinition> = {
           from: { table: "dbo.product_definitions", alias: "pd" },
@@ -162,7 +159,7 @@ export function getCategoryApi(client: ApiClient) {
         log.error(`[${operationId}] Failed.`, { categoryId, error: getErrorMessage(err) });
         throw err;
       } finally {
-        categoryLoadingOperations.finish(operationId);
+        categoryLoadingManager.finish(operationId);
       }
     },
 
@@ -173,7 +170,7 @@ export function getCategoryApi(client: ApiClient) {
      */
     async loadOfferingsForSupplierCategory(supplierId: number, categoryId: number): Promise<OfferingWithDetails[]> {
       const operationId = `loadOfferingsForSupplierCategory-${supplierId}-${categoryId}`;
-      categoryLoadingOperations.start(operationId);
+      categoryLoadingManager.start(operationId);
       try {
         const request: PredefinedQueryRequest = {
           namedQuery: "category_offerings",
@@ -213,7 +210,7 @@ export function getCategoryApi(client: ApiClient) {
         log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
         throw err;
       } finally {
-        categoryLoadingOperations.finish(operationId);
+        categoryLoadingManager.finish(operationId);
       }
     },
   };

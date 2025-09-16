@@ -9,7 +9,6 @@
   import "$lib/components/styles/detail-page-layout.css";
   import "$lib/components/styles/assignment-section.css";
   import "$lib/components/styles/grid-section.css";
-  import SupplierForm from "$lib/components/domain/suppliers/SupplierForm.svelte";
 
   // API & Type Imports
   import { supplierLoadingState } from "$lib/api/client/supplier";
@@ -28,6 +27,7 @@
   } from "./categoryDetailPage.types";
   import { getProductDefinitionApi } from "$lib/api/client/productDefinition";
     import CategoryProductDefsGrid from "./CategoryProductDefsGrid.svelte";
+    import CategoryForm from "./CategoryForm.svelte";
 
   // === PROPS ====================================================================================
 
@@ -54,13 +54,14 @@
 
       try {
         // 2. Resolve all promises in parallel.
-        const [supplier] = await Promise.all([data.category, data.productDefinitions]);
+        const [category, productDefinitions] = await Promise.all([data.category, data.productDefinitions]);
 
         if (aborted) return;
 
         // 3. Assemble the data object for validation.
         const dataToValidate = {
-          supplier,
+          category,
+          productDefinitions
         };
 
         // 4. Validate the resolved data against the Zod schema.
@@ -245,8 +246,8 @@
   <div class="detail-page-layout">
     <!-- Section 1: Supplier details form -->
     <div class="form-section">
-      <SupplierForm
-        initial={{} as any}   
+      <CategoryForm
+        initial={resolvedData.category}   
         disabled={$supplierLoadingState}
         onSubmitted={handleFormSubmitted}
         onCancelled={handleFormCancelled}

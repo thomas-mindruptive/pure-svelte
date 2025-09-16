@@ -113,7 +113,7 @@ select {
 
 .field-hint {
   font-size: 0.75rem;
-  color: var(--color-muted, #64748b);
+  color: var(--color-muted);
   margin-top: 0.25rem;
   font-style: italic;
 }

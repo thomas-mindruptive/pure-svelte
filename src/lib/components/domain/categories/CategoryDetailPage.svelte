@@ -260,7 +260,7 @@
 
     <div class="grid-section">
       {#if resolvedData.productDefinitions}
-        <h2>Assigned Categories</h2>
+        <h2>Assigned Product Definitions</h2>
         <p>Products this supplier can offer are organized by these categories. Click a category to manage its product offerings.</p>
         <CategoryProductDefsGrid
           rows={resolvedData.productDefinitions}

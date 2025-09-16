@@ -3,7 +3,7 @@
  * It imports the basic element styles and adds LAYOUT styles on top.
  */
 
-@import './form-elements.css'; /* <-- NEUER IMPORT */
+@import './form-elements.css'; /* 
 
 /* --- LAYOUT STYLES --- */
 .form-header {
@@ -46,7 +46,7 @@
   display: grid;
   grid-template-columns: 1fr 1fr 1fr 1fr;
   gap: 1rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: 0.5rem;
 }
 
 .form-group {
@@ -134,8 +134,7 @@
   display: flex;
   gap: 0.75rem;
   justify-content: flex-end;
-  padding-top: 1rem;
-  border-top: 1px solid var(--color-border, #e2e8f0);
+  padding-top: 0.5rem;
 }
 
 /* --- Responsive Design for LAYOUT --- */

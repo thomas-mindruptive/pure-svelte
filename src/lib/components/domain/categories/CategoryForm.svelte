@@ -137,8 +137,7 @@
       <div class="form-header">
         <div>
           {#if category?.category_id}
-            <h3>{category.name || "Unnamed Category"}</h3>
-            <span class="field-hint">ID: {category.category_id}</span>
+            <h3>{category.name || "Unnamed Category"} <span class="field-hint">ID: {category.category_id}</span></h3> 
           {:else}
             <h3>{category.name || "New Category"}</h3>
           {/if}

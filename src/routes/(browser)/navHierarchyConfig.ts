@@ -71,7 +71,6 @@ export const supplierHierarchyConfig: HierarchyTree = {
   }),
 };
 
-
 // ================================================================================================
 // PRODUCT CATEGORIES HIERARCHY CONFIGURATION (NEW DATA-DRIVEN STRUCTURE)
 // ================================================================================================
@@ -95,14 +94,38 @@ export const productCategoriesHierarchyConfig: HierarchyTree = {
             // LEVEL 2 (List) - Visible product definitions list.
             // The CategoryDetailPage contains a list of productDefinitions => href = "/categories/[categoryId]/"
             item: { key: "productDefinitions", type: "list", href: "/categories/[categoryId]/", label: "Product Definitions", urlParamName: "categoryId" },
-            // Could be expanded with a hidden "productDefinition" Object-node if drill-down is needed.
+            children: [
+                createHierarchyNode({
+                item: { key: "productDefintition", type: "object", href: "/categories/[categoryId]/productdefinitions/[productDefId]", label: "Product Definition", display: false, urlParamName: "productDefId" },
+                children: [
+                  createHierarchyNode({
+                    item: { key: "offerings", type: "list", href: "/suppliers/[supplierId]/categories/[categoryId]/productdefinitions/[productDefId]", label: "Offerings", urlParamName: "offeringId" },
+                    children: [
+                      createHierarchyNode({
+                        item: { key: "offering", type: "object", href: "/suppliers/[supplierId]/categories/[categoryId]/offerings/[offeringId]", label: "Offering", display: false, urlParamName: "offeringId" },
+                        defaultChild: "links",
+                        children: [
+                          createHierarchyNode({
+                            // LEVEL 6 (Leaf)
+                            item: { key: "attributes", type: "list", href:"/suppliers/[supplierId]/categories/[categoryId]/offerings/[offeringId]/attributes", label: "Attributes" },
+                          }),
+                          createHierarchyNode({
+                            // LEVEL 6 (Leaf)
+                            item: { key: "links", type: "list", href:"/suppliers/[supplierId]/categories/[categoryId]/offerings/[offeringId]/links", label: "Links" },
+                          }),
+                        ]
+                      })
+                    ]
+                  })
+                ]
+              }),
+            ],
           }),
         ],
       }),
     ],
   }),
 };
-
 
 // ================================================================================================
 // MAIN EXPORT FUNCTIONS (Unchanged)
@@ -113,10 +136,7 @@ export const productCategoriesHierarchyConfig: HierarchyTree = {
  * This is the main entry point for getting hierarchy definitions.
  */
 export function getAppHierarchies(): Hierarchy {
-  return [
-    supplierHierarchyConfig,
-    productCategoriesHierarchyConfig,
-  ];
+  return [supplierHierarchyConfig, productCategoriesHierarchyConfig];
 }
 
 /**
@@ -127,7 +147,6 @@ export function getHierarchyByName(name: string): HierarchyTree | undefined {
   const hierarchies = getAppHierarchies();
   return hierarchies.find((tree) => tree.name === name);
 }
-
 
 // ================================================================================================
 // DEVELOPMENT VALIDATION (Unchanged)

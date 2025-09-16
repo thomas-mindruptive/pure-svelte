@@ -105,7 +105,7 @@ function determineActiveNode(url: URL, activeTree: RuntimeHierarchyTree): Runtim
         log.info(`new_case_match chosen='${parentNode.item.key}'`);
         return parentNode;
       }
-    } catch (e: unknown)  {
+    } catch (e: unknown) {
       const originalMessage = e instanceof Error ? e.message : String(e);
       log.error(`Unrecoverable error resolving parent path for "/new" route.`, e);
       throw error(500, `Failed to determine the active navigation node: ${originalMessage}`);
@@ -118,7 +118,6 @@ function determineActiveNode(url: URL, activeTree: RuntimeHierarchyTree): Runtim
 
   const findDirectChild = (parent: RuntimeHierarchyTreeNode, childKey: string): RuntimeHierarchyTreeNode | undefined =>
     parent.children?.find((c) => c.item.key === childKey);
-
 
   let urlNodesOnPath: RuntimeHierarchyTreeNode[] = [];
   try {
@@ -217,7 +216,26 @@ export async function load({ url, params: urlParamsFromLoadEvent, depends, fetch
 
   log.debug(`nodesOnPath found by findNodesAnParamValuesForPath:`, nodesOnPath);
 
-  updateDisabledStates(activeTree, nodesOnPath);
+  // Disable inactive tree
+  for (const tree of allHierarchies) {
+    if (tree.name === activeTree.name) {
+      // Für den active tree: USe logic based on consvered context navPath.
+      updateDisabledStates(tree, nodesOnPath);
+    } else {
+      // For inactive trees: Use logic with their own conserved navPath.
+      const preservedPath = getCurrentPathForContext(tree.name);
+      let preservedNodes: RuntimeHierarchyTreeNode[] = [];
+
+      if (preservedPath && preservedPath.length > 0) {
+        try {
+          preservedNodes = findNodesAndParamValuesForPath(tree, preservedPath);
+        } catch (err) {
+          log.warn(`Could not resolve preserved path for inactive tree '${tree.name}'.`, err);
+        }
+      }
+      updateDisabledStates(tree, preservedNodes);
+    }
+  }
 
   // --- 3. Determine Active Node (New Logic) ---
   const activeNode = determineActiveNode(url, activeTree);

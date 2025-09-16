@@ -33,7 +33,6 @@ import type {
   DeleteRequest,
 } from "$lib/api/api.types";
 import { LoadingState } from "./loadingState";
-import { Query } from "$lib/backendQueries/fluentQueryBuilder";
 import { assertDefined } from "$lib/utils/validation/assertions";
 import type { DeleteOfferingApiResponse } from "../app/appSpecificTypes";
 const offeringLoadingManager = new LoadingState();
@@ -475,20 +474,46 @@ export function getOfferingApi(client: ApiClient) {
       offeringLoadingManager.start(operationId);
 
       try {
-        // prettier-ignore
-        const payload = Query.for<ProductDefinition>()
-          .from('dbo.product_definitions', 'pd')
-          .select(['pd.product_def_id', 'pd.title', 'pd.description', 'pd.category_id'])
-          .leftJoin('dbo.wholesaler_item_offerings', 'wio')
-            .onColumnCondition('pd.product_def_id', '=', 'wio.product_def_id')
-            .onValueCondition('wio.wholesaler_id', '=', supplierId)
-          .where()
-            .and('wio.offering_id', 'IS NULL')
-            .and('pd.category_id', '=', categoryId)
-          .orderBy('pd.title', 'asc')
-          .build()
+        const antiJoinPayload: QueryPayload<ProductDefinition> = {
+          select: ["pd.product_def_id", "pd.title", "pd.description", "pd.category_id"],
+          from: { table: "dbo.product_definitions", alias: "pd" },
+          joins: [
+            {
+              type: "LEFT JOIN",
+              table: "dbo.wholesaler_item_offerings",
+              alias: "wio",
+              on: {
+                joinCondOp: "AND",
+                conditions: [
+                  { columnA: "pd.product_def_id", op: "=", columnB: "wio.product_def_id" },
+                  { key: "wio.wholesaler_id", whereCondOp: "=", val: supplierId },
+                ],
+              },
+            },
+          ],
+          where: {
+            whereCondOp: "AND",
+            conditions: [
+              { key: "wio.offering_id", whereCondOp: "IS NULL" },
+              { key: "pd.category_id", whereCondOp: "=", val: categoryId },
+            ],
+          },
+          orderBy: [{ key: "pd.title", direction: "asc" }],
+        };
 
-        const antiJoinQuery = payload;
+        // const payload = Query.for<ProductDefinition>()
+        //   .from('dbo.product_definitions', 'pd')
+        //   .select(['pd.product_def_id', 'pd.title', 'pd.description', 'pd.category_id'])
+        //   .leftJoin('dbo.wholesaler_item_offerings', 'wio')
+        //     .onColumnCondition('pd.product_def_id', '=', 'wio.product_def_id')
+        //     .onValueCondition('wio.wholesaler_id', '=', supplierId)
+        //   .where()
+        //     .and('wio.offering_id', 'IS NULL')
+        //     .and('pd.category_id', '=', categoryId)
+        //   .orderBy('pd.title', 'asc')
+        //   .build()
+
+        const antiJoinQuery = antiJoinPayload;
         void JoinType;
 
         // This complex query is sent to the generic /api/query endpoint
@@ -550,4 +575,3 @@ export function getOfferingApi(client: ApiClient) {
   };
   return api;
 }
-

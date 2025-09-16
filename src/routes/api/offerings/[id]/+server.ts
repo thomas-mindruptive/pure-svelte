@@ -7,7 +7,7 @@
  */
 
 import { json, error, type RequestHandler } from '@sveltejs/kit';
-import { db } from '$lib/server/db';
+import { db } from '$lib/backendQueries/db';
 import { log } from '$lib/utils/logger';
 import { mssqlErrorMapper } from '$lib/server/errors/mssqlErrorMapper';
 import type { WholesalerItemOffering_ProductDef_Category_Supplier } from '$lib/domain/domainTypes';

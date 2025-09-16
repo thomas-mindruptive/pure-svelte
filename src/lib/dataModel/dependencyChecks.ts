@@ -1,6 +1,6 @@
 // File: src/lib/dataModel/dependencyChecks.ts
 
-import { db } from '$lib/server/db';
+import { db } from '$lib/backendQueries/db';
 import { log } from '$lib/utils/logger';
 import type { Transaction } from 'mssql';
 

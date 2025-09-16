@@ -10,12 +10,12 @@
  */
 
 import { log } from '$lib/utils/logger';
-import { db } from '$lib/server/db';
+import { db } from '$lib/backendQueries/db';
 import type { QueryPayload, WhereCondition, WhereConditionGroup, JoinClause, SortDescriptor, FromClause, JoinConditionGroup } from '$lib/backendQueries/queryGrammar';
 import { isJoinColCondition, isWhereCondition, isWhereConditionGroup } from '$lib/backendQueries/queryGrammar';
 import type { QueryConfig } from '$lib/backendQueries/queryConfig';
-import { aliasedTablesConfig } from '$lib/backendQueries/queryConfig';
 import type { Transaction } from 'mssql';
+import { aliasedTablesConfig } from '$lib/backendQueries/queryConfig.types';
 
 // --- TYPE DEFINITIONS for internal use ---
 

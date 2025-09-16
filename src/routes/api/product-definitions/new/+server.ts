@@ -7,7 +7,7 @@
  */
 
 import { json, error, type RequestHandler } from '@sveltejs/kit';
-import { db } from '$lib/server/db';
+import { db } from '$lib/backendQueries/db';
 import { log } from '$lib/utils/logger';
 import { validateProductDefinition } from '$lib/server/validation/domainValidator';
 import { mssqlErrorMapper } from '$lib/server/errors/mssqlErrorMapper';

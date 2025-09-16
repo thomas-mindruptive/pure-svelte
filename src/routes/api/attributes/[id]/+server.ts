@@ -7,9 +7,9 @@
  */
 
 import { json, error, type RequestHandler } from '@sveltejs/kit';
-import { db } from '$lib/server/db';
+import { db } from '$lib/backendQueries/db';
 import { log } from '$lib/utils/logger';
-import { buildQuery, executeQuery } from '$lib/server/queryBuilder';
+import { buildQuery, executeQuery } from '$lib/backendQueries/queryBuilder';
 //import { supplierQueryConfig } from '$lib/backendQueries/queryConfig';
 import { supplierQueryConfig } from '$lib/backendQueries/queryConfig';
 import { validateAttribute } from '$lib/server/validation/domainValidator';

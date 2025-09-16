@@ -9,14 +9,14 @@
 
 import { json, error, type RequestHandler } from '@sveltejs/kit';
 import { log } from '$lib/utils/logger';
-import { buildQuery, executeQuery } from '$lib/server/queryBuilder';
+import { buildQuery, executeQuery } from '$lib/backendQueries/queryBuilder';
 import { supplierQueryConfig } from '$lib/backendQueries/queryConfig';
 import { mssqlErrorMapper } from '$lib/server/errors/mssqlErrorMapper';
 import type { WholesalerItemOffering } from '$lib/domain/domainTypes';
 import type { QueryRequest, QuerySuccessResponse, ApiErrorResponse, ApiSuccessResponse, DeleteConflictResponse, DeleteRequest, DeleteSuccessResponse } from '$lib/api/api.types';
 import { v4 as uuidv4 } from 'uuid';
 import { checkOfferingDependencies } from '$lib/dataModel/dependencyChecks';
-import { db } from '$lib/server/db';
+import { db } from '$lib/backendQueries/db';
 import { validateOffering } from '$lib/server/validation/domainValidator';
 
 /**

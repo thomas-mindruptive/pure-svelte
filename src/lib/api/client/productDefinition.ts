@@ -13,7 +13,7 @@ import type { ApiClient } from "./ApiClient";
 import { createPostBody, createQueryBody, getErrorMessage } from "./common";
 import type { DeleteApiResponse, DeleteRequest, PredefinedQueryRequest, QueryResponseData } from "$lib/api/api.types";
 import { LoadingState } from "./loadingState";
-import { Query } from "$lib/backendQueries/fluentQueryBuilder";
+
 
 // Create a dedicated loading state manager for this entity.
 const productDefinitionLoadingManager = new LoadingState();
@@ -167,20 +167,39 @@ export function getProductDefinitionApi(client: ApiClient) {
       const operationId = `loadOfferingsForProductDefinition-${productDefId}`;
       productDefinitionLoadingManager.start(operationId);
       try {
-        const payload = Query.for<WholesalerItemOffering_ProductDef_Category_Supplier>()
-          .select([
+        const payload: QueryPayload<WholesalerItemOffering_ProductDef_Category_Supplier> = {
+          select: [
             "wio.offering_id",
             "wio.price",
             "wio.currency",
             "wio.comment",
             "pd.title AS product_def_title",
             "pc.name AS category_name",
-            "w.name AS supplier_name", // We need the supplier name for the grid!
-          ])
-          .where()
-          .and("wio.product_def_id", "=", productDefId)
-          .orderBy("w.name", "asc")
-          .build();
+            "w.name AS supplier_name",
+          ],
+          // from: FEHLT!
+          // joins: FEHLEN!
+          where: {
+            whereCondOp: "AND",
+            conditions: [{ key: "wio.product_def_id", whereCondOp: "=", val: productDefId }],
+          },
+          orderBy: [{ key: "w.name", direction: "asc" }],
+        };
+
+        // const payload2 = Query.for<WholesalerItemOffering_ProductDef_Category_Supplier>()
+        //   .select([
+        //     "wio.offering_id",
+        //     "wio.price",
+        //     "wio.currency",
+        //     "wio.comment",
+        //     "pd.title AS product_def_title",
+        //     "pc.name AS category_name",
+        //     "w.name AS supplier_name", // We need the supplier name for the grid!
+        //   ])
+        //   .where()
+        //   .and("wio.product_def_id", "=", productDefId)
+        //   .orderBy("w.name", "asc")
+        //   .build();
 
         const request: PredefinedQueryRequest = {
           namedQuery: "product_definition_offerings",

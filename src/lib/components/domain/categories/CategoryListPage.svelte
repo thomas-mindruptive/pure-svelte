@@ -9,8 +9,7 @@
   import type { ID, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
   import { page } from "$app/stores";
   import type { ProductCategory } from "$lib/domain/domainTypes";
-  import { categoryLoadingState } from "$lib/api/client/category";
-  import { getCategoryApi } from '$lib/api/client/offering';
+  import { categoryLoadingState, getCategoryApi } from "$lib/api/client/category";
 
   // === PROPS ====================================================================================
 

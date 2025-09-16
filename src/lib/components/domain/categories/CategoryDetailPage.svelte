@@ -14,8 +14,7 @@
   // API & Type Imports
   import { supplierLoadingState } from "$lib/api/client/supplier";
   import type { Wholesaler, ProductDefinition } from "$lib/domain/domainTypes";
-  import { categoryLoadingState } from "$lib/api/client/category";
-  import { getCategoryApi } from '$lib/api/client/offering';
+  import { categoryLoadingState, getCategoryApi } from "$lib/api/client/category";
   import { ApiClient } from "$lib/api/client/ApiClient";
   import type { ID, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
 

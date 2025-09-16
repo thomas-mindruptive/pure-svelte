@@ -16,7 +16,6 @@
 
 	// API & Type Imports
 	import { categoryLoadingState } from '$lib/api/client/category';
-	import { getCategoryApi } from '$lib/api/client/offering';
 	import type { WholesalerItemOffering_ProductDef_Category } from '$lib/domain/domainTypes';
 	import { ApiClient } from '$lib/api/client/ApiClient';
 	import type { ID, DeleteStrategy, RowActionStrategy } from '$lib/components/grids/Datagrid.types';
@@ -25,6 +24,7 @@
 		type SupplierCategoryDetailPage_LoadData,
 		type SupplierCategoryDetailPage_LoadDataAsync
 	} from './supplierCategoryDetailPage.types';
+    import { getOfferingApi } from '$lib/api/client/offering';
 
 	// ========================================================================
 	// PROPS
@@ -109,11 +109,11 @@
 		let dataChanged = false;
 
 		const client = new ApiClient(fetch);
-		const categoryApi = getCategoryApi(client);
+		const offeringApi = getOfferingApi(client);
 
 		for (const id of ids) {
 			const numericId = Number(id);
-			const result = await categoryApi.deleteOffering(numericId);
+			const result = await offeringApi.deleteOffering(numericId);
 
 			if (result.success) {
 				addNotification(`Offering (ID: ${numericId}) deleted successfully.`, 'success');

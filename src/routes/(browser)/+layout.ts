@@ -4,7 +4,6 @@ import { log } from "$lib/utils/logger";
 import { error, type LoadEvent } from "@sveltejs/kit";
 import { ApiClient } from "$lib/api/client/ApiClient";
 import { getSupplierApi } from "$lib/api/client/supplier";
-import { getCategoryApi } from '$lib/api/client/offering';
 import { getOfferingApi } from "$lib/api/client/offering";
 import { buildBreadcrumb } from "$lib/components/sidebarAndNav/buildBreadcrumb";
 import type { RuntimeHierarchyTree, RuntimeHierarchyTreeNode } from "$lib/components/sidebarAndNav/HierarchySidebar.types";
@@ -26,6 +25,7 @@ import {
 import { get } from "svelte/store";
 import { browser } from "$app/environment";
 import { cloneDeep } from "lodash-es";
+import { getCategoryApi } from "$lib/api/client/category";
 
 // ================================================================================================
 // CACHING & INITIALIZATION

@@ -10,7 +10,7 @@ import { log } from "$lib/utils/logger";
 import { ComparisonOperator, JoinType, LogicalOperator, type QueryPayload } from "$lib/backendQueries/queryGrammar";
 import type {
   WholesalerItemOffering,
-  WholesalerItemOffering_ProductDef_Category,
+  WholesalerItemOffering_ProductDef_Category_Supplier,
   WholesalerOfferingAttribute,
   WholesalerOfferingAttribute_Attribute,
   WholesalerOfferingLink,
@@ -51,13 +51,13 @@ export function getOfferingApi(client: ApiClient) {
     /**
      * Loads a single offering with all its details by ID.
      */
-    async loadOffering(offeringId: number): Promise<WholesalerItemOffering_ProductDef_Category> {
+    async loadOffering(offeringId: number): Promise<WholesalerItemOffering_ProductDef_Category_Supplier> {
       log.info(`API, Loading offering: ${offeringId}`);
       const operationId = `loadOffering-${offeringId}`;
       offeringLoadingManager.start(operationId);
       try {
         const responseData = await client.apiFetch<{
-          offering: WholesalerItemOffering_ProductDef_Category;
+          offering: WholesalerItemOffering_ProductDef_Category_Supplier;
         }>(`/api/offerings/${offeringId}`, { method: "GET" }, { context: operationId });
         return responseData.offering;
       } catch (err) {

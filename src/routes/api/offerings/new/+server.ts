@@ -12,7 +12,7 @@ import { log } from '$lib/utils/logger';
 import { buildQuery, executeQuery } from '$lib/server/queryBuilder';
 import { supplierQueryConfig } from '$lib/backendQueries/queryConfig';
 import { mssqlErrorMapper } from '$lib/server/errors/mssqlErrorMapper';
-import type { WholesalerItemOffering, WholesalerItemOffering_ProductDef_Category } from '$lib/domain/domainTypes';
+import type { WholesalerItemOffering, WholesalerItemOffering_ProductDef_Category_Supplier } from '$lib/domain/domainTypes';
 import type { ApiErrorResponse, ApiSuccessResponse } from '$lib/api/api.types';
 import { v4 as uuidv4 } from 'uuid';
 import type { QueryPayload } from '$lib/backendQueries/queryGrammar';
@@ -137,7 +137,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
     // ===== JOIN QUERY TO RETRIEVE OFFERING + PRODCUT_DEF_TITLE =====
 
-    const queryPayloadOfferingPlusProdDef: QueryPayload<WholesalerItemOffering_ProductDef_Category> = {
+    const queryPayloadOfferingPlusProdDef: QueryPayload<WholesalerItemOffering_ProductDef_Category_Supplier> = {
       select: [
         // Select all columns from the offering itself (alias 'wio')
         "wio.offering_id",
@@ -174,7 +174,7 @@ export const POST: RequestHandler = async ({ request }) => {
       throw new Error(`Could not retrieve the newly created offering (ID: ${newOfferingId}) using the predefined query.`);
     }
 
-    const newOfferingFull = fullObjectResult[0] as WholesalerItemOffering_ProductDef_Category;
+    const newOfferingFull = fullObjectResult[0] as WholesalerItemOffering_ProductDef_Category_Supplier;
 
     await transaction.commit();
     log.debug(`[${operationId}] Transaction committed successfully.`);

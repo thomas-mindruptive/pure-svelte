@@ -9,15 +9,15 @@
 
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
   import type { DeleteStrategy, RowActionStrategy, ColumnDef, ID } from "$lib/components/grids/Datagrid.types";
-  import type { WholesalerItemOffering_ProductDef_Category } from "$lib/domain/domainTypes";
+  import type { WholesalerItemOffering_ProductDef_Category_Supplier } from "$lib/domain/domainTypes";
 
   // === PROPS  ===================================================================================
 
   export type OfferingGridProps = {
-    rows: WholesalerItemOffering_ProductDef_Category[];
+    rows: WholesalerItemOffering_ProductDef_Category_Supplier[];
     loading?: boolean;
-    deleteStrategy: DeleteStrategy<WholesalerItemOffering_ProductDef_Category>;
-    rowActionStrategy?: RowActionStrategy<WholesalerItemOffering_ProductDef_Category>;
+    deleteStrategy: DeleteStrategy<WholesalerItemOffering_ProductDef_Category_Supplier>;
+    rowActionStrategy?: RowActionStrategy<WholesalerItemOffering_ProductDef_Category_Supplier>;
   }
 
   const {
@@ -32,7 +32,7 @@
 
   // === COLUMNS  =================================================================================
 
-  const columns: ColumnDef<WholesalerItemOffering_ProductDef_Category>[] = [
+  const columns: ColumnDef<WholesalerItemOffering_ProductDef_Category_Supplier>[] = [
     {
       key: "product_def_title",
       header: "Product",
@@ -71,7 +71,7 @@
     },
   ];
 
-  const getId = (offering: WholesalerItemOffering_ProductDef_Category): ID => offering.offering_id;
+  const getId = (offering: WholesalerItemOffering_ProductDef_Category_Supplier): ID => offering.offering_id;
 </script>
 
 <Datagrid

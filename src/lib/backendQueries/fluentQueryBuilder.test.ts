@@ -11,7 +11,7 @@ import type {
 
 describe('FluentQueryBuilder with Real Domain Types', () => {
   
-  describe('Simple Queries', () => {
+  describe('Simple Queries', () => {   
     it('should build wholesaler query with string operators', () => {
       const payload = Query.for<Wholesaler>()
         .from('dbo.wholesalers', 'w')

@@ -8,7 +8,7 @@
 
 import { log } from "$lib/utils/logger";
 import { ComparisonOperator, type QueryPayload } from "$lib/backendQueries/queryGrammar";
-import type { ProductCategory, ProductDefinition, WholesalerItemOffering_ProductDef_Category } from "$lib/domain/domainTypes";
+import type { ProductCategory, ProductDefinition, WholesalerItemOffering_ProductDef_Category_Supplier } from "$lib/domain/domainTypes";
 import type { ApiClient } from "./ApiClient";
 import { createPostBody, createQueryBody, getErrorMessage } from "./common";
 import type { PredefinedQueryRequest, QueryResponseData } from "$lib/api/api.types";
@@ -17,7 +17,7 @@ import { LoadingState } from "./loadingState";
 const categoryLoadingManager = new LoadingState();
 export const categoryLoadingState = categoryLoadingManager.isLoadingStore;
 
-export type OfferingWithDetails = WholesalerItemOffering_ProductDef_Category;
+export type OfferingWithDetails = WholesalerItemOffering_ProductDef_Category_Supplier;
 
 /**
  * Factory function to create a category-specific API client.

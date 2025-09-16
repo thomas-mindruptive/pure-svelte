@@ -8,11 +8,12 @@
 
 import { log } from "$lib/utils/logger";
 import { type QueryPayload } from "$lib/backendQueries/queryGrammar";
-import type { ProductDefinition } from "$lib/domain/domainTypes";
+import type { ProductDefinition, WholesalerItemOffering_ProductDef_Category_Supplier } from "$lib/domain/domainTypes";
 import type { ApiClient } from "./ApiClient";
 import { createPostBody, createQueryBody, getErrorMessage } from "./common";
-import type { DeleteApiResponse, DeleteRequest, QueryResponseData } from "$lib/api/api.types";
+import type { DeleteApiResponse, DeleteRequest, PredefinedQueryRequest, QueryResponseData } from "$lib/api/api.types";
 import { LoadingState } from "./loadingState";
+import { Query } from "$lib/backendQueries/fluentQueryBuilder";
 
 // Create a dedicated loading state manager for this entity.
 const productDefinitionLoadingManager = new LoadingState();
@@ -124,17 +125,17 @@ export function getProductDefinitionApi(client: ApiClient) {
 
     /**
      * Deletes a product definition.
-	 * Note: Cascade might fail due to due to hard dependencies. => To be configured on server in "checkProductDefinitionDependencies".
+     * Note: Cascade might fail due to due to hard dependencies. => To be configured on server in "checkProductDefinitionDependencies".
      */
     async deleteProductDefinition(
       productDefId: number,
-	  cascade = false
+      cascade = false,
     ): Promise<DeleteApiResponse<Pick<ProductDefinition, "product_def_id" | "title">, string[]>> {
       const operationId = `deleteProductDefinition-${productDefId}`;
       productDefinitionLoadingManager.start(operationId);
       try {
         // Note: Cascade might fail due to due to hard dependencies. => To be configured on server in "checkProductDefinitionDependencies".
-         const removeRequest: DeleteRequest<ProductDefinition> = {
+        const removeRequest: DeleteRequest<ProductDefinition> = {
           id: productDefId,
           cascade,
         };
@@ -146,6 +147,52 @@ export function getProductDefinitionApi(client: ApiClient) {
           { method: "DELETE", body },
           { context: operationId },
         );
+      } catch (err) {
+        log.error(`[${operationId}] Failed.`, { productDefId, error: getErrorMessage(err) });
+        throw err;
+      } finally {
+        productDefinitionLoadingManager.finish(operationId);
+      }
+    },
+
+    // === RELATED LISTS ============================================================================
+
+    /**
+     * Loads all offerings for a specific product definition across all suppliers.
+     * Uses a named query to join with supplier and category data for a rich result.
+     * @param productDefId The ID of the product definition.
+     * @returns A promise that resolves to an array of offerings with details.
+     */
+    async loadOfferingsForProductDefinition(productDefId: number): Promise<WholesalerItemOffering_ProductDef_Category_Supplier[]> {
+      const operationId = `loadOfferingsForProductDefinition-${productDefId}`;
+      productDefinitionLoadingManager.start(operationId);
+      try {
+        const payload = Query.for<WholesalerItemOffering_ProductDef_Category_Supplier>()
+          .select([
+            "wio.offering_id",
+            "wio.price",
+            "wio.currency",
+            "wio.comment",
+            "pd.title AS product_def_title",
+            "pc.name AS category_name",
+            "w.name AS supplier_name", // We need the supplier name for the grid!
+          ])
+          .where()
+          .and("wio.product_def_id", "=", productDefId)
+          .orderBy("w.name", "asc")
+          .build();
+
+        const request: PredefinedQueryRequest = {
+          namedQuery: "product_definition_offerings",
+          payload: payload,
+        };
+
+        const responseData = await client.apiFetch<QueryResponseData<WholesalerItemOffering_ProductDef_Category_Supplier>>(
+          "/api/query",
+          { method: "POST", body: createPostBody(request) },
+          { context: operationId },
+        );
+        return responseData.results as WholesalerItemOffering_ProductDef_Category_Supplier[];
       } catch (err) {
         log.error(`[${operationId}] Failed.`, { productDefId, error: getErrorMessage(err) });
         throw err;

@@ -10,7 +10,7 @@ import { json, error, type RequestHandler } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { log } from '$lib/utils/logger';
 import { mssqlErrorMapper } from '$lib/server/errors/mssqlErrorMapper';
-import type { WholesalerItemOffering_ProductDef_Category } from '$lib/domain/domainTypes';
+import type { WholesalerItemOffering_ProductDef_Category_Supplier } from '$lib/domain/domainTypes';
 import { v4 as uuidv4 } from 'uuid';
 import type { ApiSuccessResponse } from '$lib/api/api.types';
 
@@ -50,10 +50,10 @@ export const GET: RequestHandler = async ({ params }) => {
             throw error(404, `Offering with ID ${id} not found.`);
         }
 
-        const offering = result.recordset[0] as WholesalerItemOffering_ProductDef_Category;
+        const offering = result.recordset[0] as WholesalerItemOffering_ProductDef_Category_Supplier;
 
         // The response now correctly wraps the data in an 'offering' property.
-        const response: ApiSuccessResponse<{ offering: WholesalerItemOffering_ProductDef_Category }> = {
+        const response: ApiSuccessResponse<{ offering: WholesalerItemOffering_ProductDef_Category_Supplier }> = {
             success: true,
             message: 'Offering retrieved successfully.',
             data: { offering },

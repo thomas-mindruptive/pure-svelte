@@ -13,7 +13,7 @@ import type {
 // Values (Enums, die zur Laufzeit verwendet werden)
 import { 
   JoinType, 
-  ComparisonOperator,
+  type ComparisonOperator,
   LogicalOperator
 } from './queryGrammar';
 

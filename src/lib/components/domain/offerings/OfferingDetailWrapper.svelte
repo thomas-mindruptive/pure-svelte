@@ -2,7 +2,7 @@
 <script lang="ts">
 	import type {
 		ProductDefinition,
-		WholesalerItemOffering_ProductDef_Category,
+		WholesalerItemOffering_ProductDef_Category_Supplier,
 	} from "$lib/domain/domainTypes";
 
 	import type { Snippet } from "svelte";
@@ -49,7 +49,7 @@
 	// ===== EVENT HANDLERS =====
 
 	async function handleFormSubmitted(p: {
-		data: WholesalerItemOffering_ProductDef_Category;
+		data: WholesalerItemOffering_ProductDef_Category_Supplier;
 		result: unknown;
 	}): Promise<void> {
 		assertDefined(p, "OfferingFormDetailWrapper.handleFormSubmitted");
@@ -80,7 +80,7 @@
 	}
 
 	async function handleSubmitError(p: {
-		data: WholesalerItemOffering_ProductDef_Category;
+		data: WholesalerItemOffering_ProductDef_Category_Supplier;
 		reason?: string;
 	}): Promise<void> {
 		assertDefined(p, "OfferingFormDetailWrapper.handleSubmitError");
@@ -89,7 +89,7 @@
 	}
 
 	async function handleCancelled(p: {
-		data: WholesalerItemOffering_ProductDef_Category;
+		data: WholesalerItemOffering_ProductDef_Category_Supplier;
 		reason?: string;
 	}): Promise<void> {
 		assertDefined(p, "OfferingFormDetailWrapper.handleCancelled");
@@ -98,7 +98,7 @@
 	}
 
 	async function handleChanged(info: {
-		data: WholesalerItemOffering_ProductDef_Category;
+		data: WholesalerItemOffering_ProductDef_Category_Supplier;
 		dirty: boolean;
 	}): Promise<void> {
 		assertDefined(info, "OfferingFormDetailWrapper.handleChanged");

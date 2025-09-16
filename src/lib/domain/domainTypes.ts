@@ -83,11 +83,12 @@ export const WholesalerItemOffering_ProductDefSchema = WholesalerItemOfferingSch
 });
 
 // ===== WHOLESALER ITEM OFFERING including joins (dbo.wholesaler_item_offerings) to product_def and category =====
-export const WholesalerItemOffering_ProductDef_CategorySchema = WholesalerItemOfferingSchema.extend({
+export const WholesalerItemOffering_ProductDef_Category_SupplierSchema = WholesalerItemOfferingSchema.extend({
   product_def_title: z.string().optional(),
   product_def_description: z.string().nullable().optional(),
   category_name: z.string().optional(),
-  category_description: z.string().nullable().optional()
+  category_description: z.string().nullable().optional(),
+  supplier_name: z.string().optional(),
 });
 
 // ===== WHOLESALER OFFERING LINK (dbo.wholesaler_offering_links) =====
@@ -135,7 +136,7 @@ export type WholesalerCategory_Category = z.infer<typeof WholesalerCategory_Cate
 export type WholesalerCategoryWithCount = z.infer<typeof WholesalerCategoryWithCountSchema>;
 export type WholesalerItemOffering = z.infer<typeof WholesalerItemOfferingSchema>;
 export type WholesalerItemOffering_ProductDef = z.infer<typeof WholesalerItemOffering_ProductDefSchema>;
-export type WholesalerItemOffering_ProductDef_Category = z.infer<typeof WholesalerItemOffering_ProductDef_CategorySchema>;
+export type WholesalerItemOffering_ProductDef_Category_Supplier = z.infer<typeof WholesalerItemOffering_ProductDef_Category_SupplierSchema>;
 export type WholesalerOfferingLink = z.infer<typeof WholesalerOfferingLinkSchema>;
 export type WholesalerOfferingAttribute = z.infer<typeof WholesalerOfferingAttributeSchema>;
 export type WholesalerOfferingAttribute_Attribute = z.infer<typeof WholesalerOfferingAttribute_AttributeSchema>;

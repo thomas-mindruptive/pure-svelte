@@ -16,7 +16,7 @@
 
 	// API & Type Imports
 	import { categoryLoadingState } from '$lib/api/client/category';
-	import type { WholesalerItemOffering_ProductDef_Category } from '$lib/domain/domainTypes';
+	import type { WholesalerItemOffering_ProductDef_Category_Supplier } from '$lib/domain/domainTypes';
 	import { ApiClient } from '$lib/api/client/ApiClient';
 	import type { ID, DeleteStrategy, RowActionStrategy } from '$lib/components/grids/Datagrid.types';
 	import {
@@ -99,7 +99,7 @@
 		goto(`${$page.url.pathname}/offerings/new`);
 	}
 
-	function handleOfferingSelect(offering: WholesalerItemOffering_ProductDef_Category): void {
+	function handleOfferingSelect(offering: WholesalerItemOffering_ProductDef_Category_Supplier): void {
 		log.info(`(CategoryDetailPage) Navigating to offering detail for offeringId: ${offering.offering_id}`);
 		goto(`${$page.url.pathname}/offerings/${offering.offering_id}`);
 	}
@@ -132,11 +132,11 @@
 	// GRID STRATEGIES
 	// ========================================================================
 
-	const deleteStrategy: DeleteStrategy<WholesalerItemOffering_ProductDef_Category> = {
+	const deleteStrategy: DeleteStrategy<WholesalerItemOffering_ProductDef_Category_Supplier> = {
 		execute: handleOfferingDelete
 	};
 
-	const rowActionStrategy: RowActionStrategy<WholesalerItemOffering_ProductDef_Category> = {
+	const rowActionStrategy: RowActionStrategy<WholesalerItemOffering_ProductDef_Category_Supplier> = {
 		click: handleOfferingSelect
 	};
 </script>

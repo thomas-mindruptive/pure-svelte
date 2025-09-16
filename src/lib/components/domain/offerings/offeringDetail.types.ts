@@ -1,5 +1,5 @@
 import {
-    WholesalerItemOffering_ProductDef_CategorySchema,
+    WholesalerItemOffering_ProductDef_Category_SupplierSchema,
     WholesalerOfferingAttribute_AttributeSchema,
     AttributeSchema,
     ProductDefinitionSchema,
@@ -15,7 +15,7 @@ export const OfferingDetail_LoadDataSchema = z.object({
     supplierId: z.number().int().positive(),                                          // Mandatory: This is needed for the "create" mode anyway => Always pass it.
     categoryId: z.number().int().positive(),                                          // Mandatory: This is needed for the "create" mode anyway => Always pass it.
     offering:
-        WholesalerItemOffering_ProductDef_CategorySchema.nullable().optional(),       // CREATE-mode: can be null
+        WholesalerItemOffering_ProductDef_Category_SupplierSchema.nullable().optional(),       // CREATE-mode: can be null
     availableProducts: z.array(ProductDefinitionSchema).nullable().optional(), // This is only needed for the "create" mode: We need the available products for the combobox.
 });
 
@@ -38,7 +38,7 @@ export type OfferingDetailAttributes_LoadDataAsync = PromisifyComplex<OfferingDe
 // ===== OFFERING DETAIL LINKS LOAD DATA =====
 
 export const OfferingDetailLinks_LoadDataSchema = OfferingDetail_LoadDataSchema.extend({
-    offering: WholesalerItemOffering_ProductDef_CategorySchema.nullable().optional(), // CREATE-mode: can be null
+    offering: WholesalerItemOffering_ProductDef_Category_SupplierSchema.nullable().optional(), // CREATE-mode: can be null
     links: z.array(WholesalerOfferingLinkSchema),
     availableProducts: z.array(ProductDefinitionSchema).optional()                    // This is only needed for the "create" mode: We need the available products for the combobox.
 });

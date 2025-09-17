@@ -242,8 +242,9 @@
     {#snippet fields({ data, getS, set, errors, markTouched })}
       <div class="form-body">
         <div class="form-grid">
-          <div class="form-group span-4">
-            <!--- Create mode and suppliers route => render "products" combo --->
+          <!-- "product defs" combo -------------------------------------------------------------->
+          <div class="form-group span-2">
+            <!--- Create mode and suppliers route => render "productdefs" combo --->
             {#if isCreateMode}
               {#if isSuppliersRoute}
                 <label for="offering-product">Product *</label>
@@ -286,8 +287,11 @@
                 {errors.product_def_id[0]}
               </div>
             {/if}
+          </div>
 
-            <!--- Create mode and categories route => render "product defs" combo --->
+          <!-- "suppliers" combo ----------------------------------------------------------------->
+          <div class="form-group span-2">
+            <!--- Create mode and categories route => render "suppliers" combo --->
             {#if isCreateMode}
               {#if isCategoriesRoute}
                 <label for="offering-supplier">Supplier *</label>
@@ -332,6 +336,7 @@
             {/if}
           </div>
 
+          <!-- price ----------------------------------------------------------------------------->
           <div class="form-group span-2">
             <label for="offering-price">Price*</label>
             <input
@@ -357,6 +362,8 @@
               </div>
             {/if}
           </div>
+
+          <!-- curreny --------------------------------------------------------------------------->
           <div class="form-group span-2">
             <label for="offering-currency">Currency</label>
             <input
@@ -387,6 +394,7 @@
             {/if}
           </div>
 
+          <!-- size ------------------------------------------------------------------------------>
           <div class="form-group span-2">
             <label for="offering-size">Size</label>
             <!-- KORREKTUR 2: `get` wurde zu `getS` geändert -->
@@ -399,6 +407,8 @@
               onblur={() => markTouched("size")}
             />
           </div>
+
+          <!-- dimensions ------------------------------------------------------------------------>
           <div class="form-group span-2">
             <label for="offering-dimensions">Dimensions</label>
             <input
@@ -411,6 +421,8 @@
             />
           </div>
 
+          <!-- comment --------------------------------------------------------------------------->
+          <!-- NOTE: the closing "</textarea>" must follow "{getS("comment") ?? ""}" immediately-->
           <div class="form-group span-4">
             <label for="offering-comment">Comment</label>
             <textarea
@@ -426,6 +438,7 @@
       </div>
     {/snippet}
 
+    <!-- ACTIONS --------------------------------------------------------------------------------->
     {#snippet actions({ submitAction, cancel, submitting, dirty })}
       {assertDefined(submitAction, "OfferingForm, actions snippet, submitAction")}
       {assertDefined(cancel, "OfferingForm, actions snippet, cancel")}

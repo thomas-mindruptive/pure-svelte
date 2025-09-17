@@ -10,12 +10,16 @@ import { log } from "$lib/utils/logger";
 import { error, type LoadEvent } from "@sveltejs/kit";
 import type { OfferingDetail_LoadDataAsync } from "./offeringDetail.types";
 import { getSupplierApi } from "$lib/api/client/supplier";
+import { type ProductDefinition, type Wholesaler } from "$lib/domain/domainTypes";
 
 /**
  * Lädt alle Daten für die Angebots-Detailseite (Links).
  * Diese Seite ist eigenständig und lädt alle ihre Daten selbst.
  */
-export function loadOfferingDetailBasisData({ params, fetch: fetchLoad }: Pick<LoadEvent, 'params' | 'fetch'>): OfferingDetail_LoadDataAsync {
+export function loadOfferingDetailBasisData({
+  params,
+  fetch: fetchLoad,
+}: Pick<LoadEvent, "params" | "fetch">): OfferingDetail_LoadDataAsync {
   log.info("(OfferDetailLinksPage) load called with params:", params);
 
   const offeringId = Number(params.offeringId);
@@ -58,42 +62,49 @@ export function loadOfferingDetailBasisData({ params, fetch: fetchLoad }: Pick<L
 
   // --- CREATE LOAD PROMISES through API clients -------------------------------------------------
 
+  let availableProducts = (async () => [] as ProductDefinition[])();
+  let availableSuppliers = (async () => [] as Wholesaler[])();
+
+  if (isSuppliersRoute) {
+    // TODO:
+    //   Replace old algorithm which was an "anti-join":
+    //     API only loads those product definitions that are available for the selected category and supplier
+    //     and have NOT YET been assigned to supplier.
+    //  New: load all product defs because multiple assignments may exist, e.g. with different sizes.
+    availableProducts = offeringApi.getAvailableProductDefsForOffering(categoryId, supplierId);
+    //  New: load all product defs because multiple assignments may exist, e.g. with different size
+  } else {
+    availableSuppliers = supplierApi.loadSuppliers();
+  }
+
+  // --- RETURN LOADDATA --------------------------------------------------------------------------
+
   if (isCreateMode) {
     // --- CREATE MODE -----
     log.info(`Kicking off promises for CREATE mode: offeringId: ${offeringId}, categoryId: ${categoryId}, supplierId: ${supplierId}`);
     const asyncLoadData: OfferingDetail_LoadDataAsync = {
-      supplierId, 
-      categoryId, 
+      supplierId,
+      categoryId,
       offering: Promise.resolve(null), // No initial offering to edit
       isCreateMode,
       isSuppliersRoute,
       isCategoriesRoute,
-
-      // TODO:
-      //   Replace old algorithm which was an "anti-join":
-      //     API only loads those product definitions that are available for the selected category and supplier
-      //     and have NOT YET been assigned to supplier.
-      //  New: load all product defs because multiple assignments may exist, e.g. with different sizes.
-
-      availableProducts: offeringApi.getAvailableProductDefsForOffering(categoryId, supplierId),
-
-      // Same as for product defs: Load all suppliers because multiple assignments may exist.
-      availableSuppliers: supplierApi.loadSuppliers(),
+      availableProducts,
+      availableSuppliers,
     };
-
     return asyncLoadData;
   } else {
     // --- EDIT MODE -----
     log.info(`Kicking off promises for EDIT mode: offeringId: ${offeringId}, categoryId: ${categoryId}, supplierId: ${supplierId}`);
     const asyncLoadData: OfferingDetail_LoadDataAsync = {
-      supplierId, 
-      categoryId, 
+      supplierId,
+      categoryId,
       offering: offeringApi.loadOffering(offeringId),
       isCreateMode,
       isSuppliersRoute,
       isCategoriesRoute,
-      availableProducts: Promise.resolve(null),
-      availableSuppliers: Promise.resolve(null),
+      availableProducts,
+      availableSuppliers,
     };
     log.info(`(OfferDetailLinksPage) Kicked off loading promises offeringId: ${offeringId}`);
     return asyncLoadData;

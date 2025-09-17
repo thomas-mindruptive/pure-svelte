@@ -1,7 +1,6 @@
 <!-- src/lib/components/domain/offerings/OfferingDetailWrapper.svelte -->
 <script lang="ts">
 	import type {
-		ProductDefinition,
 		WholesalerItemOffering_ProductDef_Category_Supplier,
 	} from "$lib/domain/domainTypes";
 
@@ -25,7 +24,6 @@
 		initialLoadedData:
 			| OfferingDetailLinks_LoadData
 			| OfferingDetailAttributes_LoadData;
-		availableProducts: ProductDefinition[] | null | undefined;
 		children: Snippet;
 		// We do not expose the "on" handlers because we handle them themselves, not the page!
 		// onSubmitted?: SubmittedCallback;
@@ -36,7 +34,6 @@
 
 	const {
 		initialLoadedData,
-		availableProducts,
 		children,
 	}: OfferingDetailWrapperProps = $props();
 
@@ -116,7 +113,6 @@
 		{/if}
 		<OfferingForm
 			{initialLoadedData}
-			{availableProducts}
 			onSubmitted={handleFormSubmitted}
 			onSubmitError={handleSubmitError}
 			onCancelled={handleCancelled}

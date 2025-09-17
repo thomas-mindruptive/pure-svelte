@@ -7,7 +7,7 @@
   // ===== IMPORTS =====
   import FormShell from "$lib/components/forms/FormShell.svelte";
   import { log } from "$lib/utils/logger";
-  import type { WholesalerItemOffering, ProductDefinition, WholesalerItemOffering_ProductDef_Category_Supplier, Wholesaler } from "$lib/domain/domainTypes";
+  import type { WholesalerItemOffering, WholesalerItemOffering_ProductDef_Category_Supplier } from "$lib/domain/domainTypes";
   import { ApiClient } from "$lib/api/client/ApiClient";
   import "$lib/components/styles/form.css";
   import "$lib/components/styles/grid.css";
@@ -31,8 +31,8 @@
 
   interface OfferingFormProps {
     initialLoadedData: OfferingDetail_LoadData;
-    availableProducts?: ProductDefinition[] | null | undefined;
-    availableSuppliers?: Wholesaler[] | null | undefined;
+    //availableProducts?: ProductDefinition[] | null | undefined;
+    //availableSuppliers?: Wholesaler[] | null | undefined;
     disabled?: boolean;
     onSubmitted?: SubmittedCallback;
     onSubmitError?: SubmitErrorCallback;
@@ -42,8 +42,8 @@
 
   const {
     initialLoadedData,
-    availableProducts = [] as ProductDefinition[],
-    availableSuppliers = [] as Wholesaler[],
+    //availableProducts = [] as ProductDefinition[],
+    //availableSuppliers = [] as Wholesaler[],
     disabled = false,
     onSubmitted,
     onSubmitError,
@@ -53,23 +53,57 @@
 
   log.debug(`(OfferingForm) Loaded props:`, {
     initialLoadedData,
-    availableProducts,
     disabled,
   });
 
   // ===== LOAD DATA ASYNC =====
 
-  let { supplierId, categoryId, initialValidatedOfferingData, errors, validatedData } = $derived.by(() => {
-    const result = OfferingDetail_LoadDataSchema.safeParse(initialLoadedData);
-    return {
-      validatedData: result.success ? result.data : null,
-      errors: result.success ? null : result.error.issues,
-      isValid: result.success,
-      initialValidatedOfferingData: result.success ? (result.data?.offering ?? null) : null,
-      supplierId: result.success ? (result.data?.supplierId ?? null) : null,
-      categoryId: result.success ? (result.data?.categoryId ?? null) : null,
-    };
-  });
+  let { supplierId, categoryId, initialValidatedOfferingData, errors, validatedData, availableProducts, availableSuppliers } = $derived.by(
+    () => {
+      const result = OfferingDetail_LoadDataSchema.safeParse(initialLoadedData);
+
+      // Route logic: Which route do we come from? => Props mus be set accordingly.
+      if (result.success) {
+        if (!result.data.supplierId && !!result.data.productDefId) {
+          const msg = `OfferingForm: Either supplierId or productDefId mus be defined.`;
+          log.error(msg);
+          const errors = [msg];
+          return { errors };
+        }
+
+        // No supplierId? => We are on route "/categories/1/productdefinitions/5/offerings/..."
+        if (!result.data.supplierId) {
+          if (!result.data.productDefId) {
+            const msg = `We are on "/categories" route => "productDefId" must be defined.`;
+            log.error(msg);
+            const errors = [msg];
+            return { errors };
+          }
+        }
+
+        // No productDefId? => We are on route "/suppliers/1/categories/3/offerings/..."
+        if (!result.data.productDefId) {
+          if (!result.data.supplierId) {
+            const msg = `We are on "/suppliers" route => "supplierId" must be defined.`;
+            log.error(msg);
+            const errors = [msg];
+            return { errors };
+          }
+        }
+      }
+      return {
+        validatedData: result.success ? result.data : null,
+        errors: result.success ? null : result.error.issues,
+        isValid: result.success,
+        initialValidatedOfferingData: result.success ? (result.data?.offering ?? null) : null,
+        supplierId: result.success ? (result.data?.supplierId ?? null) : null,
+        categoryId: result.success ? (result.data?.categoryId ?? null) : null,
+        productDefId: result.success ? (result.data?.productDefId ?? null) : null,
+        availableProducts: result.success ? (result.data?.availableProducts ?? null) : null,
+        availableSuppliers: result.success ? (result.data?.availableSuppliers ?? null) : null,
+      };
+    },
+  );
 
   $effect(() => {
     if (errors) {
@@ -82,6 +116,8 @@
   // ===== STATE =====
 
   const isCreateMode = $derived(!initialValidatedOfferingData);
+  const isSuppliersRoute = $derived(!validatedData?.productDefId);
+  const isCategoriesRoute = $derived(!validatedData?.supplierId);
   let formShell: InstanceType<typeof FormShell<WholesalerItemOffering_ProductDef_Category_Supplier>>;
 
   // ===== API =====
@@ -92,10 +128,22 @@
   // Set the default product definition in create mode.
   $effect(() => {
     if (isCreateMode && availableProducts && availableProducts.length > 0) {
-      const firstProduct = availableProducts[0];
-      if (firstProduct && formShell) {
-        log.debug(`(OfferingForm) Initializing product_def_id to first available product: ${firstProduct.product_def_id}`);
-        formShell.set(["product_def_id"], firstProduct.product_def_id);
+      // No productDefId? => We are on route "/suppliers/1/categories/3/offerings/..."
+      if (!validatedData?.productDefId) {
+        const firstProduct = availableProducts[0];
+        if (firstProduct && formShell) {
+          log.debug(`(OfferingForm) Initializing product_def_id to first available product: ${firstProduct.product_def_id}`);
+          formShell.set(["product_def_id"], firstProduct.product_def_id);
+        }
+      }
+
+      // No supplierId? => We are on route "/categories/1/productdefinitions/5/offerings/..."
+      if (!validatedData?.supplierId) {
+        const firstSupplier = availableSuppliers?.[0];
+        if (firstSupplier && formShell) {
+          log.debug(`(OfferingForm) Initializing wholesaler_id to first available supplier: ${firstSupplier.wholesaler_id}`);
+          formShell.set(["wholesaler_id"], firstSupplier.wholesaler_id);
+        }
       }
     }
   });
@@ -208,6 +256,7 @@
     onCancelled={handleCancelled}
     onChanged={handleChanged}
   >
+    <!--- HEADER --------------------------------------------------------------------------------->
     {#snippet header({ data, dirty })}
       <div class="form-header">
         <div>
@@ -226,36 +275,41 @@
       </div>
     {/snippet}
 
+    <!--- FIELDS --------------------------------------------------------------------------------->
     {#snippet fields({ data, getS, set, errors, markTouched })}
       <div class="form-body">
         <div class="form-grid">
           <div class="form-group span-4">
+            <!--- Create mode and suppliers route => render "products" combo --->
             {#if isCreateMode}
-              <label for="offering-product">Product *</label>
-              <select
-                id="offering-product"
-                value={getS("product_def_id")}
-                class:error={errors.product_def_id}
-                onchange={(e) => {
-                  log.debug(`onchange: Product selected: ${(e.currentTarget as HTMLSelectElement).value}`);
-                  set(["product_def_id"], Number((e.currentTarget as HTMLSelectElement).value));
-                }}
-                onblur={() => markTouched("product_def_id")}
-                required
-                aria-invalid={!!errors.product_def_id}
-                aria-describedby={errors.product_def_id ? "err-product" : undefined}
-              >
-                <option
-                  value=""
-                  disabled
+              {#if isSuppliersRoute}
+                <label for="offering-product">Product *</label>
+                <select
+                  id="offering-product"
+                  value={getS("product_def_id")}
+                  class:error={errors.product_def_id}
+                  onchange={(e) => {
+                    log.debug(`onchange: Product selected: ${(e.currentTarget as HTMLSelectElement).value}`);
+                    set(["product_def_id"], Number((e.currentTarget as HTMLSelectElement).value));
+                  }}
+                  onblur={() => markTouched("product_def_id")}
+                  required
+                  aria-invalid={!!errors.product_def_id}
+                  aria-describedby={errors.product_def_id ? "err-product" : undefined}
                 >
-                  Select a product...
-                </option>
-                {#each availableProducts ?? [] as product (product.product_def_id)}
-                  <option value={product.product_def_id}>{product.title}</option>
-                {/each}
-              </select>
+                  <option
+                    value=""
+                    disabled
+                  >
+                    Select a product...
+                  </option>
+                  {#each availableProducts ?? [] as product (product.product_def_id)}
+                    <option value={product.product_def_id}>{product.title}</option>
+                  {/each}
+                </select>
+              {/if}
             {:else}
+              <!--- Not create mode => Render static text for prodcuct def --->
               <p>
                 {getS("product_def_title") ?? "product_def_title missing"}
               </p>
@@ -267,6 +321,50 @@
                 class="error-text"
               >
                 {errors.product_def_id[0]}
+              </div>
+            {/if}
+
+            <!--- Create mode and categories route => render "product defs" combo --->
+            {#if isCreateMode}
+              {#if isCategoriesRoute}
+                <label for="offering-supplier">Supplier *</label>
+                <select
+                  id="offering-supplier"
+                  value={getS("wholesaler_id")}
+                  class:error={errors.supplier_id}
+                  onchange={(e) => {
+                    log.debug(`onchange: Supplier selected: ${(e.currentTarget as HTMLSelectElement).value}`);
+                    set(["wholesaler_id"], Number((e.currentTarget as HTMLSelectElement).value));
+                  }}
+                  onblur={() => markTouched("supplier_id")}
+                  required
+                  aria-invalid={!!errors.supplier_id}
+                  aria-describedby={errors.supplier_id ? "err-product" : undefined}
+                >
+                  <option
+                    value=""
+                    disabled
+                  >
+                    Select a product...
+                  </option>
+                  {#each availableSuppliers ?? [] as supplier (supplier.wholesaler_id)}
+                    <option value={supplier.wholesaler_id}>{supplier.name}</option>
+                  {/each}
+                </select>
+              {/if}
+            {:else}
+              <!--- Not create mode => Render static text for supplier --->
+              <p>
+                {getS("wholesaler_name") ?? "supplier_name missing"}
+              </p>
+              <p class="field-hint">The supplier cannot be changed for an existing offering.</p>
+            {/if}
+            {#if errors.wholesaler_id}
+              <div
+                id="err-product"
+                class="error-text"
+              >
+                {errors.wholesaler_id[0]}
               </div>
             {/if}
           </div>

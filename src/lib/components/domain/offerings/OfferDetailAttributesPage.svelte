@@ -199,6 +199,7 @@
 </script>
 
 <!-- TEMPLATE mit bedingtem Rendering -->
+
 {#if loadingError}
   <div class="component-error-boundary">
     <h3>Error Loading Data (Status: {loadingError.status})</h3>
@@ -209,7 +210,6 @@
 {:else}
   <OfferingDetailWrapper
     initialLoadedData={resolvedData}
-    availableProducts={resolvedData.availableProducts}
   >
     <div class="grid-section">
       <!----- ASSGIN ATTRIBUTE ----->

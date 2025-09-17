@@ -501,18 +501,6 @@ export function getOfferingApi(client: ApiClient) {
           orderBy: [{ key: "pd.title", direction: "asc" }],
         };
 
-        // const payload = Query.for<ProductDefinition>()
-        //   .from('dbo.product_definitions', 'pd')
-        //   .select(['pd.product_def_id', 'pd.title', 'pd.description', 'pd.category_id'])
-        //   .leftJoin('dbo.wholesaler_item_offerings', 'wio')
-        //     .onColumnCondition('pd.product_def_id', '=', 'wio.product_def_id')
-        //     .onValueCondition('wio.wholesaler_id', '=', supplierId)
-        //   .where()
-        //     .and('wio.offering_id', 'IS NULL')
-        //     .and('pd.category_id', '=', categoryId)
-        //   .orderBy('pd.title', 'asc')
-        //   .build()
-
         const antiJoinQuery = antiJoinPayload;
         void JoinType;
 

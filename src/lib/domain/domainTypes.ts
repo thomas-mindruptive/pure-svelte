@@ -88,7 +88,7 @@ export const WholesalerItemOffering_ProductDef_Category_SupplierSchema = Wholesa
   product_def_description: z.string().nullable().optional(),
   category_name: z.string().optional(),
   category_description: z.string().nullable().optional(),
-  supplier_name: z.string().optional(),
+  wholesaler_name: z.string().optional(),
 });
 
 // ===== WHOLESALER OFFERING LINK (dbo.wholesaler_offering_links) =====

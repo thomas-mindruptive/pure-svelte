@@ -178,7 +178,6 @@
 {:else}
   <OfferingDetailWrapper
     initialLoadedData={resolvedData}
-    availableProducts={resolvedData.availableProducts}
   >
     <div class="grid-section">
       <div class="assignment-section">

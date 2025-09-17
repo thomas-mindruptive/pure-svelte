@@ -13,8 +13,9 @@ import z from "zod";
 // ===== OFFERING DETAIL ATTRIBUTES BASE DATA =====
 
 export const OfferingDetail_LoadDataSchema = z.object({
-    supplierId: z.number().int().positive(),                                                 // Mandatory: This is needed for the "create" mode anyway => Always pass it.
-    categoryId: z.number().int().positive(),                                                 // Mandatory: This is needed for the "create" mode anyway => Always pass it.
+    supplierId: z.number().int().positive().optional().nullable(),                           // Needed for the "create" in route context "/suppliers"
+    categoryId: z.number().int().positive().optional().nullable(),                           // Needed for the "create" mode in both route contexts
+    productDefId: z.number().int().positive().optional().nullable(),                         // Needed for the "create" in route context "/categories"
     offering:
         WholesalerItemOffering_ProductDef_Category_SupplierSchema.nullable().optional(),     // CREATE-mode: can be null
     availableProducts: z.array(ProductDefinitionSchema).nullable().optional(),               // This is only needed for the "create" mode: We need the available products for the combobox.

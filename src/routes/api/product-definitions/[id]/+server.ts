@@ -10,7 +10,7 @@ import { json, error, type RequestHandler } from '@sveltejs/kit';
 import { db } from '$lib/backendQueries/db';
 import { log } from '$lib/utils/logger';
 import { validateProductDefinition } from '$lib/server/validation/domainValidator';
-import { mssqlErrorMapper } from '$lib/server/errors/mssqlErrorMapper';
+import { mssqlErrorMapper } from '$lib/backendQueries/mssqlErrorMapper';
 import { checkProductDefinitionDependencies } from '$lib/dataModel/dependencyChecks';
 import type { ProductDefinition } from '$lib/domain/domainTypes';
 import { v4 as uuidv4 } from 'uuid';

@@ -12,7 +12,7 @@ import { db } from '$lib/backendQueries/db';
 import { log } from '$lib/utils/logger';
 import { buildQuery, executeQuery } from '$lib/backendQueries/queryBuilder';
 import { supplierQueryConfig } from '$lib/backendQueries/queryConfig';
-import { mssqlErrorMapper } from '$lib/server/errors/mssqlErrorMapper';
+import { mssqlErrorMapper } from '$lib/backendQueries/mssqlErrorMapper';
 import { LogicalOperator, ComparisonOperator, type QueryPayload, type WhereCondition } from '$lib/backendQueries/queryGrammar';
 import type { WholesalerOfferingLink } from '$lib/domain/domainTypes';
 import { v4 as uuidv4 } from 'uuid';

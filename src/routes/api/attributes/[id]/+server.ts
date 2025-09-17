@@ -13,7 +13,7 @@ import { buildQuery, executeQuery } from '$lib/backendQueries/queryBuilder';
 //import { supplierQueryConfig } from '$lib/backendQueries/queryConfig';
 import { supplierQueryConfig } from '$lib/backendQueries/queryConfig';
 import { validateAttribute } from '$lib/server/validation/domainValidator';
-import { mssqlErrorMapper } from '$lib/server/errors/mssqlErrorMapper';
+import { mssqlErrorMapper } from '$lib/backendQueries/mssqlErrorMapper';
 //import { LogicalOperator, ComparisonOperator, type QueryPayload, type WhereCondition } from '$lib/backendQueries/queryGrammar';
 import { type WhereCondition, ComparisonOperator, type QueryPayload, LogicalOperator } from '$lib/backendQueries/queryGrammar';
 import type { Attribute } from '$lib/domain/domainTypes';

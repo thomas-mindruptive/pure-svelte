@@ -7,7 +7,7 @@
  */
 
 import { log } from "$lib/utils/logger";
-import { ComparisonOperator, JoinType, LogicalOperator, type QueryPayload } from "$lib/backendQueries/queryGrammar";
+import { ComparisonOperator, LogicalOperator, type QueryPayload } from "$lib/backendQueries/queryGrammar";
 import type {
   WholesalerItemOffering,
   WholesalerItemOffering_ProductDef_Category_Supplier,
@@ -469,12 +469,12 @@ export function getOfferingApi(client: ApiClient) {
      * @param supplierId The ID of the supplier for whom to check for existing offerings.
      * @returns A promise that resolves to an array of available ProductDefinition objects.
      */
-    async getAvailableProductDefsForOffering(categoryId: number, supplierId: number): Promise<ProductDefinition[]> {
+    async getNotYetAssignedProductDefsForSupplierAndOffering(categoryId: number, supplierId: number): Promise<ProductDefinition[]> {
       const operationId = `getAvailableProductDefsForOffering-${categoryId}-${supplierId}`;
       offeringLoadingManager.start(operationId);
 
       try {
-        const antiJoinPayload: QueryPayload<ProductDefinition> = {
+        const payload: QueryPayload<ProductDefinition> = {
           select: ["pd.product_def_id", "pd.title", "pd.description", "pd.category_id"],
           from: { table: "dbo.product_definitions", alias: "pd" },
           joins: [
@@ -501,13 +501,10 @@ export function getOfferingApi(client: ApiClient) {
           orderBy: [{ key: "pd.title", direction: "asc" }],
         };
 
-        const antiJoinQuery = antiJoinPayload;
-        void JoinType;
-
         // This complex query is sent to the generic /api/query endpoint
         const responseData = await client.apiFetch<QueryResponseData<ProductDefinition>>(
           "/api/query",
-          { method: "POST", body: createQueryBody(antiJoinQuery) },
+          { method: "POST", body: createQueryBody(payload) },
           { context: operationId },
         );
 

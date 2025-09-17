@@ -11,10 +11,10 @@ import { error, type LoadEvent } from "@sveltejs/kit";
 import type { OfferingDetail_LoadDataAsync } from "./offeringDetail.types";
 import { getSupplierApi } from "$lib/api/client/supplier";
 import { type ProductDefinition, type Wholesaler } from "$lib/domain/domainTypes";
+import { getCategoryApi } from "$lib/api/client/category";
 
 /**
- * Lädt alle Daten für die Angebots-Detailseite (Links).
- * Diese Seite ist eigenständig und lädt alle ihre Daten selbst.
+ * Load the basis data for offering detail pages.
  */
 export function loadOfferingDetailBasisData({
   params,
@@ -34,6 +34,7 @@ export function loadOfferingDetailBasisData({
   const client = new ApiClient(fetchLoad);
   const offeringApi = getOfferingApi(client);
   const supplierApi = getSupplierApi(client);
+  const categoryApi = getCategoryApi(client);
 
   // --- MODE and ROUTE CONTEXT and VALIDATION ----------------------------------------------------
 
@@ -66,14 +67,10 @@ export function loadOfferingDetailBasisData({
   let availableSuppliers = (async () => [] as Wholesaler[])();
 
   if (isSuppliersRoute) {
-    // TODO:
-    //   Replace old algorithm which was an "anti-join":
-    //     API only loads those product definitions that are available for the selected category and supplier
-    //     and have NOT YET been assigned to supplier.
-    //  New: load all product defs because multiple assignments may exist, e.g. with different sizes.
-    availableProducts = offeringApi.getAvailableProductDefsForOffering(categoryId, supplierId);
-    //  New: load all product defs because multiple assignments may exist, e.g. with different size
+    //  Load all product defs for category because multiple offerings for same product def may exist, e.g. with different sizes.
+    availableProducts = categoryApi.loadProductDefsForCategory(categoryId);
   } else {
+    //  Load suppliers because multiple offerings for the same supplier may exist, e.g. with different size
     availableSuppliers = supplierApi.loadSuppliers();
   }
 

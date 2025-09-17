@@ -7,7 +7,7 @@
   // ===== IMPORTS =====
   import FormShell from "$lib/components/forms/FormShell.svelte";
   import { log } from "$lib/utils/logger";
-  import type { WholesalerItemOffering, ProductDefinition, WholesalerItemOffering_ProductDef_Category_Supplier } from "$lib/domain/domainTypes";
+  import type { WholesalerItemOffering, ProductDefinition, WholesalerItemOffering_ProductDef_Category_Supplier, Wholesaler } from "$lib/domain/domainTypes";
   import { ApiClient } from "$lib/api/client/ApiClient";
   import "$lib/components/styles/form.css";
   import "$lib/components/styles/grid.css";
@@ -32,6 +32,7 @@
   interface OfferingFormProps {
     initialLoadedData: OfferingDetail_LoadData;
     availableProducts?: ProductDefinition[] | null | undefined;
+    availableSuppliers?: Wholesaler[] | null | undefined;
     disabled?: boolean;
     onSubmitted?: SubmittedCallback;
     onSubmitError?: SubmitErrorCallback;
@@ -39,9 +40,10 @@
     onChanged?: ChangedCallback;
   }
 
-  let {
+  const {
     initialLoadedData,
     availableProducts = [] as ProductDefinition[],
+    availableSuppliers = [] as Wholesaler[],
     disabled = false,
     onSubmitted,
     onSubmitError,

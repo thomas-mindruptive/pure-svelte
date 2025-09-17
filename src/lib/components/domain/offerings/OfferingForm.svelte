@@ -30,9 +30,8 @@
   // ===== COMPONENT PROPS =====
 
   interface OfferingFormProps {
+    // initialLoadData.isCreateMode/isSuppliersRoute/isCategoriesRoute must be set correctly!
     initialLoadedData: OfferingDetail_LoadData;
-    //availableProducts?: ProductDefinition[] | null | undefined;
-    //availableSuppliers?: Wholesaler[] | null | undefined;
     disabled?: boolean;
     onSubmitted?: SubmittedCallback;
     onSubmitError?: SubmitErrorCallback;
@@ -40,16 +39,7 @@
     onChanged?: ChangedCallback;
   }
 
-  const {
-    initialLoadedData,
-    //availableProducts = [] as ProductDefinition[],
-    //availableSuppliers = [] as Wholesaler[],
-    disabled = false,
-    onSubmitted,
-    onSubmitError,
-    onCancelled,
-    onChanged,
-  }: OfferingFormProps = $props();
+  const { initialLoadedData, disabled = false, onSubmitted, onSubmitError, onCancelled, onChanged }: OfferingFormProps = $props();
 
   log.debug(`(OfferingForm) Loaded props:`, {
     initialLoadedData,
@@ -61,36 +51,8 @@
   let { supplierId, categoryId, initialValidatedOfferingData, errors, validatedData, availableProducts, availableSuppliers } = $derived.by(
     () => {
       const result = OfferingDetail_LoadDataSchema.safeParse(initialLoadedData);
-
-      // Route logic: Which route do we come from? => Props mus be set accordingly.
-      if (result.success) {
-        if (!result.data.supplierId && !!result.data.productDefId) {
-          const msg = `OfferingForm: Either supplierId or productDefId mus be defined.`;
-          log.error(msg);
-          const errors = [msg];
-          return { errors };
-        }
-
-        // No supplierId? => We are on route "/categories/1/productdefinitions/5/offerings/..."
-        if (!result.data.supplierId) {
-          if (!result.data.productDefId) {
-            const msg = `We are on "/categories" route => "productDefId" must be defined.`;
-            log.error(msg);
-            const errors = [msg];
-            return { errors };
-          }
-        }
-
-        // No productDefId? => We are on route "/suppliers/1/categories/3/offerings/..."
-        if (!result.data.productDefId) {
-          if (!result.data.supplierId) {
-            const msg = `We are on "/suppliers" route => "supplierId" must be defined.`;
-            log.error(msg);
-            const errors = [msg];
-            return { errors };
-          }
-        }
-      }
+      // The validation checks for the combination of "isCreateMode" etc. are done by the caller(s), e.g.
+      // in offingBaseLoads.ts.
       return {
         validatedData: result.success ? result.data : null,
         errors: result.success ? null : result.error.issues,
@@ -115,9 +77,9 @@
 
   // ===== STATE =====
 
-  const isCreateMode = $derived(!initialValidatedOfferingData);
-  const isSuppliersRoute = $derived(!validatedData?.productDefId);
-  const isCategoriesRoute = $derived(!validatedData?.supplierId);
+  const isCreateMode = $derived(validatedData?.isCreateMode);
+  const isSuppliersRoute = $derived(validatedData?.productDefId);
+  const isCategoriesRoute = $derived(validatedData?.isCategoriesRoute);
   let formShell: InstanceType<typeof FormShell<WholesalerItemOffering_ProductDef_Category_Supplier>>;
 
   // ===== API =====
@@ -214,6 +176,7 @@
   }
 
   // ===== EVENT HANDLERS =====
+
   function handleSubmitted(p: { data: Record<string, any>; result: unknown }) {
     assertDefined(p, "handleSubmitted");
     log.info({ component: "OfferingForm", event: "submitted" }, "FORM_EVENT");

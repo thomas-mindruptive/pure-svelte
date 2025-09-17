@@ -35,6 +35,7 @@
   const isCreateMode = $derived(!resolvedData?.productDefinition);
 
   // === LOAD DATA ================================================================================
+
   $effect(() => {
     let aborted = false;
     const processPromises = async () => {
@@ -79,6 +80,7 @@
   });
 
   // === API & STRATEGIES =========================================================================
+
   const client = new ApiClient(fetch);
   const productDefinitionApi = getProductDefinitionApi(client);
   const offeringApi = getOfferingApi(client);
@@ -94,9 +96,9 @@
   }
 
   function handleOfferingSelect(offering: WholesalerItemOffering_ProductDef_Category_Supplier) {
-    const { wholesaler_id, category_id, offering_id } = offering;
-    if (wholesaler_id && category_id && offering_id) {
-      goto(`/suppliers/${wholesaler_id}/categories/${category_id}/offerings/${offering_id}`);
+    const { wholesaler_id, category_id, offering_id, product_def_id } = offering;
+    if (wholesaler_id && category_id && offering_id & product_def_id) {
+      goto(`/categories/${category_id}/productdefinitions/${product_def_id}/offerings/${offering_id}`);
     } else {
       log.error("Cannot navigate to offering, missing IDs", { offering });
       addNotification("Cannot navigate: offering data is incomplete.", "error");

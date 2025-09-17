@@ -72,7 +72,7 @@
 
         if (!validationResult.success) {
           log.error("Zod validation failed", validationResult.error.issues);
-          throw new Error(`Received invalid data structure from the API: ${JSON.stringify(validationResult.error.issues)}`);
+          throw new Error(`OfferingDetailAttributesPage: Received invalid data structure from the API: ${JSON.stringify(validationResult.error.issues)}`);
         }
 
         resolvedData = validationResult.data;

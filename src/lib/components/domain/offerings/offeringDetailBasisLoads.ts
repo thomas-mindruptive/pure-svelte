@@ -1,7 +1,7 @@
 // src/lib/pages/offerings/offeringDetailBasisLoads.ts
 
 /**
- * Load the basis data for offering detail pages.
+ * Load the base data for offering detail pages.
  */
 
 import { ApiClient } from "$lib/api/client/ApiClient";

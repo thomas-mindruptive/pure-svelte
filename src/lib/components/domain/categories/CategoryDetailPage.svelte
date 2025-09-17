@@ -70,7 +70,7 @@
         if (!validationResult.success) {
           log.error("Zod validation failed", validationResult.error.issues);
           // Treat a validation failure as a loading error.
-          throw new Error("Received invalid data structure from the API.");
+          throw new Error("CategoryDetailPage: Received invalid data structure from the API.");
         }
 
         // 5. On success, populate the state with the validated, resolved data.

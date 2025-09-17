@@ -49,29 +49,30 @@
       resolvedData = null;
 
       try {
-        const [offering, assignedAttributes, availableAttributes, availableProducts] = await Promise.all([
+        const [offering, assignedAttributes, availableAttributes, availableProducts, availableSuppliers] = await Promise.all([
           data.offering,
           data.assignedAttributes,
           data.availableAttributes,
           data.availableProducts,
+          data.availableSuppliers
         ]);
 
         if (aborted) return;
 
-        const dataToValidate = {
-          supplierId: data.supplierId,
-          categoryId: data.categoryId,
+        const dataToValidate: OfferingDetailAttributes_LoadData = {
+          ...data,
           offering,
           assignedAttributes,
           availableAttributes,
           availableProducts,
+          availableSuppliers
         };
 
         const validationResult = OfferingDetailAttributes_LoadDataSchema.safeParse(dataToValidate);
 
         if (!validationResult.success) {
           log.error("Zod validation failed", validationResult.error.issues);
-          throw new Error("Received invalid data structure from the API.");
+          throw new Error(`Received invalid data structure from the API: ${JSON.stringify(validationResult.error.issues)}`);
         }
 
         resolvedData = validationResult.data;

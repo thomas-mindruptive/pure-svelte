@@ -39,23 +39,28 @@
       resolvedData = null;
 
       try {
-        const [offering, links, availableProducts] = await Promise.all([data.offering, data.links, data.availableProducts]);
+        const [offering, links, availableProducts, availableSuppliers] = await Promise.all([
+          data.offering,
+          data.links,
+          data.availableProducts,
+          data.availableSuppliers,
+        ]);
 
         if (aborted) return;
 
-        const dataToValidate = {
-          supplierId: data.supplierId,
-          categoryId: data.categoryId,
+        const dataToValidate: OfferingDetailLinks_LoadData = {
+          ...data,
           offering,
           links,
           availableProducts,
+          availableSuppliers
         };
 
         const validationResult = OfferingDetailLinks_LoadDataSchema.safeParse(dataToValidate);
 
         if (!validationResult.success) {
           log.error("(OfferDetailLinksPage) Zod validation failed", validationResult.error.issues);
-          throw new Error("Received invalid data structure from the API.");
+          throw new Error(`Received invalid data structure from the API: ${JSON.stringify(validationResult.error.issues)}`);
         }
 
         resolvedData = validationResult.data;
@@ -176,9 +181,7 @@
 {:else if isLoading || !resolvedData}
   <div class="detail-page-layout">Loading link details...</div>
 {:else}
-  <OfferingDetailWrapper
-    initialLoadedData={resolvedData}
-  >
+  <OfferingDetailWrapper initialLoadedData={resolvedData}>
     <div class="grid-section">
       <div class="assignment-section">
         <h3>Add New Link</h3>

@@ -157,7 +157,7 @@ export function getAttributeApi(client: ApiClient) {
             if (!searchTerm.trim()) return [];
             const query: QueryPayload<Attribute> = {
                 select: ['attribute_id', 'name', 'description'],
-                where: { key: 'name', whereCondOp: ComparisonOperator.LIKE, val: `%${searchTerm.trim()}%` },
+                where: { key: 'name', whereCondOp: "LIKE", val: `%${searchTerm.trim()}%` },
                 orderBy: [{ key: 'name', direction: 'asc' }],
                 limit
             };

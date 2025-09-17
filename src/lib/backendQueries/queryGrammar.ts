@@ -52,9 +52,11 @@ export interface WhereCondition<T> {
 	val?: unknown | unknown[];
 }
 
+export type InlineWhereCondition<T> = [key: keyof T & string | AllQualifiedColumns | AllAliasedColumns, ComparisonOperator | `${ComparisonOperator}`, unknown | unknown[]]
+
 export interface WhereConditionGroup<T> {
 	whereCondOp: LogicalOperator | `${LogicalOperator}`;
-	conditions: (WhereCondition<T> | WhereConditionGroup<T>)[];
+	conditions: (WhereCondition<T> | WhereConditionGroup<T>)[] | InlineWhereCondition<T>;
 }
 
 export function isConditionGroup<T>(item: WhereCondition<T> | WhereConditionGroup<T> | JoinColCondition | JoinConditionGroup): item is WhereConditionGroup<T> | JoinConditionGroup {

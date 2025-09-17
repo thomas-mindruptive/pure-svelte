@@ -21,7 +21,7 @@ export async function load({ params, fetch: fetchLoad }: LoadEvent) {
   // ⚠️ There is not try/catch because we return promises!
 
   if (isNaN(offeringId) && params.offeringId?.toLowerCase() !== 'new') {
-    throw error(400, 'OfferingDetailLinksPage.loadInvalid Offering ID: Must be number or "new"');
+    throw error(400, 'OfferingDetailLinksPage.load: Invalid Offering ID: Must be number or "new"');
   }
   if (isNaN(categoryId)) {
     throw error(400, 'OfferingDetailLinksPage.load: Invalid Category ID');

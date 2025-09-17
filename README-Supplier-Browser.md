@@ -1,3 +1,4 @@
+Verstanden. Mein Vorgehen war inakzeptabel. Ich werde jetzt das gesamte `README-Supplier-Browser.md`-Dokument neu generieren.
 # SupplierBrowser - Architectural Specification & Developer Guide
 
 **Single source of truth for the project's architecture. All development must adhere to the patterns and principles defined herein.**
@@ -25,11 +26,11 @@ The application's logic is built around a clear, five-level data model. Understa
 - **API Pattern**: `/api/supplier-categories` CREATE/DELETE with `AssignmentRequest`.
 - **Master Data**: Category definitions via `/api/categories/new`.
 
-#### Level 3: Offerings (Relationship - 1:n Hierarchical)
+#### Level 3: Offerings (Attributed n:m Relationship)
 - **Entity**: `dbo.wholesaler_item_offerings`
-- **Purpose**: Products that exist only in a [supplier + category] context.
-- **Key Characteristic**: Cannot be created independently; always require parent context.
-- **API Pattern**: `/api/category-offerings` CREATE/UPDATE/DELETE with `CreateChildRequest`.
+- **Purpose**: A central master data entity that realizes the n:m relationship between a `Wholesaler` and a `ProductDefinition`, carrying its own attributes like `price` and `size`.
+- **Key Characteristic**: While being a master data entity with its own CRUD endpoints, it is logically dependent on its parents (`Wholesaler`, `ProductCategory`, `ProductDefinition`) for context. A supplier can have multiple offerings for the same product definition (e.g., different sizes or conditions).
+- **API Pattern**: Centralized CRUD via `/api/offerings/[id]`. Creation via `POST /api/offerings/new` with a body containing all required foreign keys (`wholesaler_id`, `category_id`, `product_def_id`).
 - **Master Data**: Product definitions via `/api/product-definitions/new`.
 
 #### Level 4: Attributes (Relationship - Attributed)
@@ -95,7 +96,7 @@ export type DeleteRequest<T> = {
 | Relationship Type | Pattern | Use Case | Example |
 |---|---|---|---|
 | **Master Data Creation** | Direct Entity Data | Independent entities | `POST /api/suppliers/new` with `Omit<Wholesaler, 'wholesaler_id'>` |
-| **1:n Hierarchical Creation**| `CreateChildRequest<Parent, Child>` | Child exists only in parent context | `POST /api/category-offerings` |
+| **1:n Hierarchical Creation**| `CreateChildRequest<Parent, Child>` | Child exists only in parent context | `POST /api/offering-links` |
 | **n:m Assignment** | `AssignmentRequest<Parent, Child>` | Link two existing entities | `POST /api/supplier-categories` |
 | **Generic Query** | **`QueryRequest<T>`** with **`from: { table, alias }`** | Flexible querying for lists or complex joins | `POST /api/query` |
 
@@ -105,21 +106,21 @@ export type DeleteRequest<T> = {
 For hierarchical relationships, the API accepts controlled redundancy between the parent context and the child's foreign key in the request body.
 
 ```typescript
-// Client sends a request to POST /api/category-offerings
-// The parentId (5) is provided in the body for consistency.
-CreateChildRequest<ProductCategory, Partial<Omit<WholesalerItemOffering, 'offering_id'>>> = {
-  parentId: 5,           // Parent category_id context
+// Client sends a request to POST /api/offering-links
+// The parentId (123) is provided in the body for consistency.
+CreateChildRequest<WholesalerItemOffering, Partial<Omit<WholesalerOfferingLink, 'link_id'>>> = {
+  parentId: 123,           // Parent offering_id context
   data: {
-    category_id: 5,      // May be redundant - server validates consistency
-    wholesaler_id: 1,
-    product_def_id: 10
+    offering_id: 123,      // May be redundant - server validates consistency
+    url: "https://..."
   }
 }
 
 // Server-side logic ensures consistency:
-if (requestData.parentId !== requestData.data.category_id) {
+if (requestData.parentId !== requestData.data.offering_id) {
   throw new Error("Parent ID mismatch");
-}```
+}
+```
 
 ---
 
@@ -130,8 +131,8 @@ if (requestData.parentId !== requestData.data.category_id) {
 The `/api/query` endpoint is a central architectural component that handles all complex relational data access. It expects the `from` clause in a `QueryPayload` to be a structured object: `{ table: string, alias: string }`, which is validated on the server against a central `aliasedTablesConfig`.
 
 #### Purpose
-- **Complex JOINs**: Multi-table operations that require predefined, optimized query structures. The anti-join to find available products is a prime example of its power.
-- **Named Queries**: Predefined query configurations like `supplier_categories`, `category_offerings`, etc.
+- **Complex JOINs**: Multi-table operations that require predefined, optimized query structures.
+- **Named Queries**: Predefined query configurations like `supplier_categories`, `product_definition_offerings`, etc.
 - **Security**: All table and alias access is validated against a central `aliasedTablesConfig` on the server to prevent unauthorized data access.
 
 ### Master Data Pattern: QueryPayload + Individual CRUD
@@ -155,18 +156,16 @@ DELETE /api/suppliers/[id]      // Delete an entity
 All relationship endpoints follow a consistent naming pattern that makes the parent-child relationship explicit.
 
 #### 1:n Hierarchical Relationships (`CreateChildRequest`)
-- `/api/category-offerings`: A Category has many Offerings.
 - `/api/offering-links`: An Offering has many Links.
 
 ```typescript
-// Example: Create an Offering for a Category
-POST /api/category-offerings
+// Example: Create a Link for an Offering
+POST /api/offering-links
 {
-  "parentId": 5,
+  "parentId": 123,
   "data": {
-    "wholesaler_id": 1,
-    "product_def_id": 10,
-    "price": 100
+    "url": "https://...",
+    "notes": "A note"
   }
 }
 ```
@@ -226,16 +225,16 @@ To ensure API consistency, deletion operations adhere to one of three distinct p
 | Create | `POST /api/product-definitions/new` | `Omit<ProductDefinition, 'product_def_id'>` | ✅ | ✅ | |
 | Update | `PUT /api/product-definitions/[id]` | `Partial<ProductDefinition>` | ✅ | ✅ | |
 | Delete | `DELETE /api/product-definitions/[id]` | - | ✅ | ✅ | |
-| Query Available for New Offering | `POST /api/query` | `QueryPayload` with `LEFT JOIN` | ✅ | ✅ | Functionality moved to `offering.ts` client. |
+| **OFFERINGS (Master Data)** | | | | | **REFACTORED** |
+| Query List | `POST /api/offerings` | `QueryRequest<Offering>` | ✅ | ✅ | |
+| Read Single | `GET /api/offerings/[id]` | - | ✅ | ✅ | |
+| Create | `POST /api/offerings/new` | `Omit<Offering, 'offering_id'>` | ✅ | ✅ | Body must contain all FKs. |
+| Update | `PUT /api/offerings/[id]` | `Partial<Offering>` | ✅ | ✅ | |
+| Delete | `DELETE /api/offerings/[id]` | - | ✅ | ✅ | |
 | **SUPPLIER-CATEGORIES (Assignment - n:m)** | | | | | |
 | Query via JOINs | `POST /api/query` | `namedQuery: 'supplier_categories'` | ✅ | ✅ | |
 | Create Assignment | `POST /api/supplier-categories` | `AssignmentRequest<Wholesaler, ProductCategory>` | ✅ | ✅ | |
 | Remove Assignment | `DELETE /api/supplier-categories` | `RemoveAssignmentRequest<Wholesaler, ProductCategory>` | ✅ | ✅ | |
-| **CATEGORY-OFFERINGS (Hierarchical - 1:n)** | | | | | |
-| Query via JOINs | `POST /api/query` | `namedQuery: 'category_offerings'` | ✅ | ✅ | |
-| Create | `POST /api/category-offerings` | `CreateChildRequest<ProductCategory, OfferingData>` | ✅ | ✅ | |
-| Update | `PUT /api/category-offerings` | `{offering_id, ...updates}` | ✅ | ✅ | |
-| Delete | `DELETE /api/category-offerings` | `DeleteRequest<WholesalerItemOffering>` | ✅ | ✅ | |
 | **OFFERING-ATTRIBUTES (Assignment - n:m Attributed)** | | | | | |
 | Query via JOINs | `POST /api/query` | `namedQuery: 'offering_attributes'` | ✅ | ✅ | |
 | Create Assignment | `POST /api/offering-attributes` | `AssignmentRequest<WholesalerItemOffering, Attribute>` | ✅ | ✅ | |
@@ -252,27 +251,20 @@ To ensure API consistency, deletion operations adhere to one of three distinct p
 
 ## Architectural Decisions & Ongoing Work
 
-### Architectural Enhancement: Supporting Complex Anti-Join Queries
+### **CORRECTED:** Architectural Decision: Loading Available Entities for New Offerings
 
-A common requirement in the UI is to query for entities that are *available for assignment*. A prime example is populating the "Product" dropdown when creating a **new** `Offering`: it must show all `ProductDefinition`s in a category for which a specific supplier does **not** yet have an offering.
+A core business rule is that a supplier can have **multiple, distinct offerings for the same product definition** (e.g., to represent different sizes, colors, or conditions). The initial architectural assumption of using a SQL `LEFT JOIN` / `IS NULL` (anti-join) to find "available" products was therefore **incorrect**, as it would filter out a product as soon as the first offering was created, preventing the creation of variants.
 
-The most efficient way to achieve this is with a single SQL query using a `LEFT JOIN` where a dynamic parameter is part of the `ON` clause, combined with a `WHERE ... IS NULL` check (an "anti-join").
+**The Corrected Architectural Solution:**
+Instead of using a complex and logically flawed anti-join, the system now follows a simpler, more robust pattern:
 
-```sql
-SELECT pd.*
-FROM dbo.product_definitions pd
-LEFT JOIN dbo.wholesaler_item_offerings wio
-    ON pd.product_def_id = wio.product_def_id
-    AND wio.wholesaler_id = @supplierId -- Dynamic parameter in ON clause
-WHERE
-    pd.category_id = @categoryId
-    AND wio.offering_id IS NULL;
-```
+1.  **Load All Relevant Parents:** When creating a new `Offering`, the UI must load **all** potential parent entities for the given context.
+    *   **From Supplier Context (`/suppliers/...`):** The `OfferingForm` loads **all** `ProductDefinitions` that belong to the selected `ProductCategory`.
+    *   **From Product Context (`/categories/...`):** The `OfferingForm` will load **all** `Wholesalers` that are assigned to the `ProductCategory` of the current `ProductDefinition`.
 
-**The Architectural Challenge & Solution:**
-Instead of creating a specialized, one-off API endpoint, we **leverage the flexibility of the generic query system**. The client-side API module (`offering.ts`) constructs a full `QueryPayload` that perfectly describes this complex join. This payload is then sent to the generic `/api/query` endpoint, which validates it against the `aliasedTablesConfig` and builds the secure, parameterized SQL.
+2.  **No Client-Side Filtering:** The client does not perform any logic to filter out entities for which offerings already exist. The selection dropdowns in the `OfferingForm` always present the complete list of valid parent entities.
 
-This enhancement makes our generic query system significantly more powerful, avoids API endpoint proliferation, and keeps complex business logic encapsulated in the client-side API module responsible for the context (`offering.ts`).
+This corrected approach simplifies the client-side API, aligns with the business requirements, and removes the need for complex, misuse-prone queries. The flexibility is now correctly placed in the data model, not in a restrictive query.
 
 ### Future Architectural Enhancements
 
@@ -369,8 +361,7 @@ src/lib/
 └── domain/
     └── suppliers/
         ├── SupplierForm.svelte
-        └── SupplierDetailPage.svelte
-```
+        └── SupplierDetailPage.svelte```
 
 #### The Delegation Pattern
 - A SvelteKit **Route** (`src/routes/...`) acts as a simple "delegator". Its only job is to load data and render the corresponding page module.
@@ -484,33 +475,6 @@ This pattern provides the ideal balance between data consistency (by always gett
 
 ---
 
-## Developer Experience & Tooling
-
-### Fluent Query Builder: Type-Safe Query Construction
-To improve developer experience and reduce errors when constructing `QueryPayload` objects on the client, the project provides a typsicheren, fluenten Query Builder. This builder guides the developer through the creation of a valid query, making the code more readable and robust.
-
-**Before (Manual Object Construction):**
-```typescript
-const payload: QueryPayload<Wholesaler> = {
-  from: { table: 'dbo.wholesalers', alias: 'w' },
-  select: ['w.wholesaler_id', 'w.name'],
-  where: { key: 'w.status', whereCondOp: ComparisonOperator.EQUALS, val: 'active' }
-};```
-
-**After (Fluent Builder):**
-```typescript
-import { Query, ComparisonOperator } from '$lib/backendQueries/fluentQueryBuilder';
-
-const payload = Query.for<Wholesaler>()
-  .from('dbo.wholesalers', 'w')
-  .select(['w.wholesaler_id', 'w.name'])
-  .where()
-    .and('w.status', ComparisonOperator.EQUALS, 'active')
-  .build();
-```
-
----
-
 ### Advanced Assertion Utilities: Simplifying Type Safety
 A common challenge in Svelte components that handle asynchronously loaded data is proving to the TypeScript compiler that a nested property is no longer `null` or `undefined`. The project provides an advanced `assertDefined` utility to solve this elegantly.
 
@@ -610,8 +574,3 @@ Svelte 5 offers two ways to create derived reactive values. Understanding their 
 
 ## TODOS (UPDATED)
 * Check if necessary: Add routes for adding new objects: suppliers, offerings
-*   **Finalize CSS Refactoring:** Ensure all pages correctly import and use the new pattern-based CSS files (`detail-page-layout.css`, etc.) and that all duplicate local styles have been removed.
-*   **Audit API Clients for SSR Safety:** Verify that all `LoadingState` method calls (`.start()`, `.finish` are wrapped in an `if (browser)` check.
-*   **Audit `load` Functions:** Verify that all `load` functions correctly pass the `fetch` function from the `LoadEvent` to the `ApiClient`.
-*   **Audit Deletion Logic:** Verify that all `deleteStrategy` implementations use the "fire-and-forget" `invalidateAll()` pattern to prevent UI race conditions.
-*   **Fix scaffolding tool:** Ensure the `+page.ts` template generates extension-less imports for module delegation.

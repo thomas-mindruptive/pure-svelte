@@ -220,7 +220,7 @@
    * Navigates to the next hierarchy level (offerings for a category).
    */
   function handleProductDefSelect(pd: ProductDefinition) {
-    goto(`/categories/${pd.category_id}/productdefs/${pd.product_def_id}`);
+    goto(`/categories/${pd.category_id}/productdefinitions/${pd.product_def_id}`);
   }
 
   // Strategy objects for the CategoryGrid component.
@@ -236,15 +236,15 @@
 
 {#if loadingError}
   <div class="component-error-boundary">
-    <h3>Error Loading Supplier (Status: {loadingError.status})</h3>
+    <h3>Error Loading (Status: {loadingError.status})</h3>
     <p>{loadingError.message}</p>
   </div>
 {:else if isLoading || !resolvedData}
-  <div class="detail-page-layout">Loading supplier details...</div>
+  <div class="detail-page-layout">Loading details...</div>
 {:else}
   <!-- The main UI is only rendered on success, using the `resolvedData` state. -->
   <div class="detail-page-layout">
-    <!-- Section 1: Supplier details form -->
+    <!-- Section 1: Details form -->
     <div class="form-section">
       <CategoryForm
         initial={resolvedData.category}   
@@ -260,7 +260,7 @@
 
     <div class="grid-section">
       {#if resolvedData.productDefinitions}
-        <h2>Assigned Product Definitions</h2>
+        <h2>Product Definitions</h2>
         <p>Products this supplier can offer are organized by these categories. Click a category to manage its product offerings.</p>
         <CategoryProductDefsGrid
           rows={resolvedData.productDefinitions}
@@ -269,7 +269,7 @@
           {rowActionStrategy}
         />
       {:else}
-        <p>Assigned categories will be available after supplier has been saved.</p>
+        <p>Product defintions will be available after supplier has been saved.</p>
       {/if}
     </div>
   </div>

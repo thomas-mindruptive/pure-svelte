@@ -92,7 +92,7 @@
    */
   interface FormShellProps<T> {
     // Data and validation
-    initial?: FormData<T>;
+    initial?: FormData<T> | undefined | null;
     validate?: ValidateCallback<T>;
     submitCbk: SubmitCallback<T>;
     onCancel?: CancelCallback<T>;

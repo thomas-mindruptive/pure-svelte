@@ -123,6 +123,7 @@
 			}
 		}
 
+		// TODO: Reload instead of goto!
 		if (dataChanged) {
 			await goto($page.url.href, { invalidateAll: true });
 		}

@@ -169,11 +169,14 @@ export function getProductDefinitionApi(client: ApiClient) {
       try {
         const payload: QueryPayload<WholesalerItemOffering_ProductDef_Category_Supplier> = {
           select: [
+            "wio.wholesaler_id",
             "wio.offering_id",
             "wio.price",
             "wio.currency",
             "wio.comment",
             "pd.title AS product_def_title",
+            "pd.product_def_id",
+            "pc.category_id",
             "pc.name AS category_name",
             "w.name AS supplier_name",
           ],
@@ -185,21 +188,6 @@ export function getProductDefinitionApi(client: ApiClient) {
           },
           orderBy: [{ key: "w.name", direction: "asc" }],
         };
-
-        // const payload2 = Query.for<WholesalerItemOffering_ProductDef_Category_Supplier>()
-        //   .select([
-        //     "wio.offering_id",
-        //     "wio.price",
-        //     "wio.currency",
-        //     "wio.comment",
-        //     "pd.title AS product_def_title",
-        //     "pc.name AS category_name",
-        //     "w.name AS supplier_name", // We need the supplier name for the grid!
-        //   ])
-        //   .where()
-        //   .and("wio.product_def_id", "=", productDefId)
-        //   .orderBy("w.name", "asc")
-        //   .build();
 
         const request: PredefinedQueryRequest = {
           namedQuery: "product_definition_offerings",

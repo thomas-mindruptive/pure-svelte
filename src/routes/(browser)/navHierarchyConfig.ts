@@ -88,12 +88,12 @@ export const productCategoriesHierarchyConfig: HierarchyTree = {
       createHierarchyNode({
         // LEVEL 1 (Object) - Hidden, represents the selected category. Has urlParamName.
         item: { key: "category", type: "object", href: "/categories/[categoryId]", label: "Category", display: false, urlParamName: "categoryId" },
-        defaultChild: "productDefinitions",
+        defaultChild: "productdefinitions",
         children: [
           createHierarchyNode({
             // LEVEL 2 (List) - Visible product definitions list.
-            // The CategoryDetailPage contains a list of productDefinitions => href = "/categories/[categoryId]/"
-            item: { key: "productDefinitions", type: "list", href: "/categories/[categoryId]/", label: "Product Definitions", urlParamName: "categoryId" },
+            // The CategoryDetailPage contains a list of productdefinitions => href = "/categories/[categoryId]/"
+            item: { key: "productdefinitions", type: "list", href: "/categories/[categoryId]/", label: "Product Definitions", urlParamName: "categoryId" },
             children: [
                 createHierarchyNode({
                 item: { key: "productDefintition", type: "object", href: "/categories/[categoryId]/productdefinitions/[productDefId]", label: "Product Definition", display: false, urlParamName: "productDefId" },

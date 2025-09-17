@@ -33,8 +33,8 @@
   {columns}
   {getId}
   {loading}
-  gridId="categories"
-  entity="category"
+  gridId="product defintions"
+  entity="product definition"
   {deleteStrategy}
   {rowActionStrategy}
 />

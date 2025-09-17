@@ -22,10 +22,10 @@ export function loadOfferingDetailBasisData({
 }: Pick<LoadEvent, "params" | "fetch">): OfferingDetail_LoadDataAsync {
   log.info("(OfferDetailLinksPage) load called with params:", params);
 
-  const offeringId = Number(params.offeringId);
-  const categoryId = Number(params.categoryId);
-  const supplierId = Number(params.supplierId);
-  const productDefId = Number(params.productDefId);
+  let offeringId: number | null = Number(params.offeringId);
+  let categoryId: number | null  = Number(params.categoryId);
+  let supplierId: number | null  = Number(params.supplierId);
+  let productDefId: number | null  = Number(params.productDefId);
 
   // ------------------------------------------------------
   // ⚠️ There is not try/catch because we return promises!
@@ -44,21 +44,28 @@ export function loadOfferingDetailBasisData({
 
   if (isNaN(offeringId)) {
     isCreateMode = true;
+    offeringId = null;
     if (params.offeringId?.toLowerCase() !== "new") {
-      throw error(422, 'OfferingDetailLinksPage.load: Invalid Offering ID: Must be number or "new"');
+      throw error(422, 'offeringDetailBaseLoads.load: Invalid Offering ID: Must be number or "new"');
     }
   }
   if (isNaN(supplierId)) {
     isCategoriesRoute = true;
+    supplierId = null;
     if (isNaN(productDefId)) {
-      throw error(422, "OfferingDetailLinksPage.load: Either supplierID or productDefId must be defined.");
+      throw error(422, "offeringDetailBaseLoads.load: Either supplierID or productDefId must be defined.");
     }
   }
   if (isNaN(productDefId)) {
     isSuppliersRoute = true;
-    if (isNaN(supplierId)) {
-      throw error(422, "OfferingDetailLinksPage.load: Either supplierID or productDefId must be defined.");
+    productDefId = null;
+    if (null === supplierId || isNaN(supplierId)) {
+      throw error(422, "offeringDetailBaseLoads.load: Either supplierID or productDefId must be defined.");
     }
+  }
+  if (isNaN(categoryId)) {
+    categoryId = null;
+    throw error(422, "offeringDetailBaseLoads.load: categoryId must be defined.");
   }
 
   // --- CREATE LOAD PROMISES through API clients -------------------------------------------------
@@ -96,7 +103,7 @@ export function loadOfferingDetailBasisData({
     const asyncLoadData: OfferingDetail_LoadDataAsync = {
       supplierId,
       categoryId,
-      offering: offeringApi.loadOffering(offeringId),
+      offering: offeringApi.loadOffering(offeringId!),      // We made sure above that we only enter "CREATE" mode, if offeringId is invalid.
       isCreateMode,
       isSuppliersRoute,
       isCategoriesRoute,

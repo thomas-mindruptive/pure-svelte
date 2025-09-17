@@ -137,7 +137,7 @@ function flattenTreeNode(
 	// === EVENT HANDLERS ===========================================================================
 
 	function handleSelect(node: RuntimeHierarchyTreeNode) {
-		log.debug('Sidebar item selected', { nodeKey: node.item.key });
+		log.debug('Sidebar item selected', { nodeKey: node.item.key, href: node.item.href });
 		try {
 			onselect?.(node);
 		} catch (error: unknown) {

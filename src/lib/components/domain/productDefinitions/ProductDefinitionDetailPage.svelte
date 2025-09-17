@@ -96,9 +96,12 @@
   }
 
   function handleOfferingSelect(offering: WholesalerItemOffering_ProductDef_Category_Supplier) {
+    log.info(`Selected offering: `, offering);
     const { wholesaler_id, category_id, offering_id, product_def_id } = offering;
     if (wholesaler_id && category_id && offering_id & product_def_id) {
-      goto(`/categories/${category_id}/productdefinitions/${product_def_id}/offerings/${offering_id}`);
+      const targetUrl = `/categories/${category_id}/productdefinitions/${product_def_id}/offerings/${offering_id}`;
+      log.debug(`Going to: ${targetUrl}`);
+      goto(targetUrl);
     } else {
       log.error("Cannot navigate to offering, missing IDs", { offering });
       addNotification("Cannot navigate: offering data is incomplete.", "error");

@@ -181,6 +181,7 @@ export function resolveAllHrefsInTree(node: RuntimeHierarchyTreeNode, urlParams:
   if (node.item.href) {
     try {
       node.item.resolvedHref = resolveHref(node.item.href, urlParams);
+      log.debug(`Resolved href: node: ${node.item.key}, href: ${node.item.href}`);
     } catch {
       // It might fail if a parameter is missing; we log it but don't crash.
       // The href will remain the unresolved pattern.

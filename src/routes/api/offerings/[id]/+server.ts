@@ -39,10 +39,12 @@ export const GET: RequestHandler = async ({ params }) => {
                     wio.*,
                     pd.title AS product_def_title,
                     pd.description AS product_def_description,
-                    pc.name AS category_name
+                    pc.name AS category_name,
+                    w.name AS wholesaler_name
                 FROM dbo.wholesaler_item_offerings wio
                 LEFT JOIN dbo.product_definitions pd ON wio.product_def_id = pd.product_def_id
                 LEFT JOIN dbo.product_categories pc ON wio.category_id = pc.category_id
+                LEFT JOIN dbo.wholesalers w ON wio.wholesaler_id = w.wholesaler_id
                 WHERE wio.offering_id = @id
             `);
 

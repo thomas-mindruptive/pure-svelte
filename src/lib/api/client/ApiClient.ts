@@ -52,9 +52,9 @@ export class ApiClient {
 				signal: controller.signal
 			});
 			clearTimeout(timeoutId);
-			log.info(`ApiClient.fetch - ${url}, response`, { status: response.status, ok: response.ok, statusText: response.statusText });
+			log.info(`ApiClient.fetch - ${url}, response:`, { status: response.status, ok: response.ok, statusText: response.statusText });
 
-			// STABILE PARSING-LOGIK
+			// STABLE PARSING LOGIC
 			const responseText = await response.text();
 			let parsedData: unknown;
 			try {
@@ -65,7 +65,7 @@ export class ApiClient {
 			}
 
 			if (response.ok) {
-				log.debug(`Parsed data:`, parsedData)
+				log.debug(`Parsed data from  ${url}:`, parsedData)
 				return (parsedData as ApiSuccessResponse<TSuccessData>).data;
 			} else {
 				// Bei Fehlern den gesamten geparsten Body als Detail an den ApiError anhängen.

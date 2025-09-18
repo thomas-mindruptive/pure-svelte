@@ -13,82 +13,119 @@ import type { AllAliasedColumns, AllQualifiedColumns, ValidFromClause } from "./
 
 // --- Enums for SQL Operators ---
 
-export enum LogicalOperator { AND = 'AND', OR = 'OR', NOT = 'NOT' }
-export enum ComparisonOperator { EQUALS = '=', NOT_EQUALS = '!=', GT = '>', LT = '<', GTE = '>=', LTE = '<=', IN = 'IN', NOT_IN = 'NOT IN', LIKE = 'LIKE', IS_NULL = 'IS NULL', IS_NOT_NULL = 'IS NOT NULL' }
-export enum JoinType { INNER = 'INNER JOIN', LEFT = 'LEFT JOIN', RIGHT = 'RIGHT JOIN', FULL = 'FULL OUTER JOIN' }
+export enum LogicalOperator {
+  AND = "AND",
+  OR = "OR",
+  NOT = "NOT",
+}
+export enum ComparisonOperator {
+  EQUALS = "=",
+  NOT_EQUALS = "!=",
+  GT = ">",
+  LT = "<",
+  GTE = ">=",
+  LTE = "<=",
+  IN = "IN",
+  NOT_IN = "NOT IN",
+  LIKE = "LIKE",
+  IS_NULL = "IS NULL",
+  IS_NOT_NULL = "IS NOT NULL",
+}
+export enum JoinType {
+  INNER = "INNER JOIN",
+  LEFT = "LEFT JOIN",
+  RIGHT = "RIGHT JOIN",
+  FULL = "FULL OUTER JOIN",
+}
 
 // --- Base Interface for Joins ---
 
 export interface JoinClause {
-	type: JoinType | `${JoinType}`;
-	table: string;
-	alias?: string;
-	on: JoinConditionGroup; // dieselbe Struktur wie WHERE-Bedingungen
+  type: JoinType | `${JoinType}`;
+  table: string;
+  alias?: string;
+  on: JoinConditionGroup; // dieselbe Struktur wie WHERE-Bedingungen
 }
 
 // E.g. on columnA = columnB
 export interface JoinColCondition {
-	columnA: AllQualifiedColumns | AllAliasedColumns;
-	op: ComparisonOperator | `${ComparisonOperator}`;
-	columnB: AllQualifiedColumns | AllAliasedColumns;
+  columnA: AllQualifiedColumns | AllAliasedColumns;
+  op: ComparisonOperator | `${ComparisonOperator}`;
+  columnB: AllQualifiedColumns | AllAliasedColumns;
 }
 
 // E.g. on columnA = columnB AND columnA = "hugo" where columnA = ...
 export interface JoinConditionGroup {
-	joinCondOp: LogicalOperator | `${LogicalOperator}`;
-	conditions: (JoinColCondition | JoinConditionGroup | WhereCondition<unknown> | WhereConditionGroup<unknown>)[];
+  joinCondOp: LogicalOperator | `${LogicalOperator}`;
+  conditions: (JoinColCondition | JoinConditionGroup | WhereCondition<unknown> | WhereConditionGroup<unknown>)[];
 }
 
 export interface JoinSortDescriptor {
-	key: string; // Flexible `string`
-	direction: 'asc' | 'desc';
+  key: string; // Flexible `string`
+  direction: "asc" | "desc";
 }
 
 // --- STRUCTURE 1: For Strictly Typed Single-Entity Queries ---
 
 export interface WhereCondition<T> {
-	key: keyof T & string | AllQualifiedColumns | AllAliasedColumns;
-	whereCondOp: ComparisonOperator | `${ComparisonOperator}`;
-	val?: unknown | unknown[];
+  key: (keyof T & string) | AllQualifiedColumns | AllAliasedColumns;
+  whereCondOp: ComparisonOperator | `${ComparisonOperator}`;
+  val?: unknown | unknown[];
 }
-
-export type InlineWhereCondition<T> = [key: keyof T & string | AllQualifiedColumns | AllAliasedColumns, ComparisonOperator | `${ComparisonOperator}`, unknown | unknown[]]
 
 export interface WhereConditionGroup<T> {
-	whereCondOp: LogicalOperator | `${LogicalOperator}`;
-	conditions: (WhereCondition<T> | WhereConditionGroup<T>)[] | InlineWhereCondition<T>;
+  whereCondOp: LogicalOperator | `${LogicalOperator}`;
+  conditions: (WhereCondition<T> | WhereConditionGroup<T>)[]; // TODO LATER: | InlineWhereCondition<T> | InlineWhereConditionGroup<T>)[];
 }
 
-export function isConditionGroup<T>(item: WhereCondition<T> | WhereConditionGroup<T> | JoinColCondition | JoinConditionGroup): item is WhereConditionGroup<T> | JoinConditionGroup {
-	return 'conditions' in item;
+export type InlineWhereCondition<T> = [
+  key: (keyof T & string) | AllQualifiedColumns | AllAliasedColumns,
+  ComparisonOperator | `${ComparisonOperator}`,
+  unknown | unknown[],
+];
+
+export type InlineWhereConditionGroup<T> = [
+  InlineWhereCondition<T>,
+  LogicalOperator | `${LogicalOperator}`,
+  InlineWhereCondition<T> | InlineWhereConditionGroup<T>, 
+];
+
+export function isConditionGroup<T>(
+  item: WhereCondition<T> | WhereConditionGroup<T> | JoinColCondition | JoinConditionGroup,
+): item is WhereConditionGroup<T> | JoinConditionGroup {
+  return "conditions" in item;
 }
 
-export function isWhereCondition(item: JoinColCondition | JoinConditionGroup | WhereCondition<unknown> | WhereConditionGroup<unknown>): item is WhereCondition<unknown> {
-	return 'key' in item && 'whereCondOp' in item;
+export function isWhereCondition(
+  item: JoinColCondition | JoinConditionGroup | WhereCondition<unknown> | WhereConditionGroup<unknown>,
+): item is WhereCondition<unknown> {
+  return "key" in item && "whereCondOp" in item;
 }
 
-export function isWhereConditionGroup<T>(item: JoinColCondition | JoinConditionGroup | WhereCondition<T> | WhereConditionGroup<T>): item is WhereConditionGroup<T> {
-	return 'conditions' in item && 'whereCondOp' in item;
+export function isWhereConditionGroup<T>(
+  item: JoinColCondition | JoinConditionGroup | WhereCondition<T> | WhereConditionGroup<T>,
+): item is WhereConditionGroup<T> {
+  return "conditions" in item && "whereCondOp" in item;
 }
 
 export function isJoinConditionGroup(item: JoinColCondition | JoinConditionGroup): item is JoinConditionGroup {
-	return 'joinCondOp' in item && 'conditions' in item;
+  return "joinCondOp" in item && "conditions" in item;
 }
 
-export function isJoinColCondition(item: JoinColCondition | JoinConditionGroup | WhereCondition<unknown> | WhereConditionGroup<unknown>): item is JoinColCondition {
-	return 'columnA' in item && 'columnB' in item && 'op' in item;
+export function isJoinColCondition(
+  item: JoinColCondition | JoinConditionGroup | WhereCondition<unknown> | WhereConditionGroup<unknown>,
+): item is JoinColCondition {
+  return "columnA" in item && "columnB" in item && "op" in item;
 }
-
-
 
 export interface SortDescriptor<T> {
-	key: keyof T & string | AllQualifiedColumns | AllAliasedColumns
-	direction: 'asc' | 'desc';
+  key: (keyof T & string) | AllQualifiedColumns | AllAliasedColumns;
+  direction: "asc" | "desc";
 }
 
 export interface FromClause {
-	table: string; 
-	alias: string;
+  table: string;
+  alias: string;
 }
 
 /**
@@ -96,11 +133,11 @@ export interface FromClause {
  * impossible to specify an invalid key like `'color'`, providing compile-time safety.
  */
 export interface QueryPayload<T> {
-	select: Array<keyof T | AllQualifiedColumns | AllAliasedColumns>;
-	from?: ValidFromClause;
-	joins?: JoinClause[];
-	where?: WhereCondition<T> | WhereConditionGroup<T>;
-	orderBy?: SortDescriptor<T>[];
-	limit?: number;
-	offset?: number;
+  select: Array<keyof T | AllQualifiedColumns | AllAliasedColumns>;
+  from?: ValidFromClause;
+  joins?: JoinClause[];
+  where?: WhereCondition<T> | WhereConditionGroup<T>; // TODO LATER: | InlineWhereCondition<T> | InlineWhereConditionGroup<T>;
+  orderBy?: SortDescriptor<T>[];
+  limit?: number;
+  offset?: number;
 }

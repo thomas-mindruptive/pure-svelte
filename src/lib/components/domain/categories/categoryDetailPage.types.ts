@@ -30,7 +30,8 @@ export type CategoryDetail_LoadDataAsync = PromisifyComplex<CategoryDetail_LoadD
  * This is used to validate the data shape after all promises from the `load` function have been resolved.
  */
 export const CategoryDetailPage_LoadDataSchema = CategoryDetail_LoadDataSchema.extend({
-  productDefinitions: z.array(ProductDefinitionSchema)
+  productDefinitions: z.array(ProductDefinitionSchema),
+  isCreateMode: z.boolean()
 });
 
 // --- TypeScript Type Exports ---

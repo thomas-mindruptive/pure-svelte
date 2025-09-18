@@ -1,8 +1,4 @@
 <script lang="ts">
-  /**
-   * SupplierForm Component (Svelte 5 + Runes)
-   */
-
   import FormShell from "$lib/components/forms/FormShell.svelte";
   import { log } from "$lib/utils/logger";
   import { ProductCategorySchema, type ProductCategory } from "$lib/domain/domainTypes";
@@ -27,13 +23,14 @@
   export type Props = {
     initial?: ProductCategory | undefined | null;
     disabled?: boolean;
+    isCreateMode: boolean;
     onSubmitted?: SubmittedCallback;
     onSubmitError?: SubmitErrorCallback;
     onCancelled?: CancelledCallback;
     onChanged?: ChangedCallback;
   };
 
-  const { initial: initialData, disabled = false, onSubmitted, onSubmitError, onCancelled, onChanged }: Props = $props();
+  const { initial: initialData, disabled = false, onSubmitted, isCreateMode, onSubmitError, onCancelled, onChanged }: Props = $props();
 
   type CategoryFormData = ProductCategory;
 
@@ -44,7 +41,7 @@
 
   // === VALIDATE =================================================================================
 
-  let { initialValidatedData: initialValidateSupplierData, errors } = $derived.by(() => {
+  let { errors } = $derived.by(() => {
     const result = ProductCategorySchema.nullable().safeParse(initialData);
     if (result.error) {
       log.error(`Validation of category to ProductCategorySchema failed.`, {error: result.error, initial: initialData});
@@ -59,7 +56,7 @@
 
   // === STATE ====================================================================================
 
-  const isCreateMode = $derived(!initialValidateSupplierData);
+  // Passed as prop! - const isCreateMode = $derived(!initialValidatedData);
 
   // === BUSINESS FUNCTIONALITY ===================================================================
 
@@ -69,7 +66,7 @@
 
     // Beispiel für eine Regel, die HTML nicht kann:
     if (data.name?.toLowerCase() === "test") {
-      errors.name = ['"Test" is not a valid supplier name.'];
+      errors.name = ['"Test" is not a valid category name.'];
     }
 
     // Die 'required' Checks sind jetzt redundant, aber schaden nicht als zweite Verteidigungslinie.
@@ -212,7 +209,7 @@
               aria-hidden="true"
             ></span>
           {/if}
-          Save Supplier
+          Save Category
         </button>
       </div>
     {/snippet}

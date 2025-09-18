@@ -1,4 +1,3 @@
-<!-- src/lib/pages/suppliers/SupplierDetailPage.svelte -->
 <script lang="ts">
   import { goto } from "$app/navigation";
   import { log } from "$lib/utils/logger";
@@ -11,7 +10,6 @@
   import "$lib/components/styles/grid-section.css";
 
   // API & Type Imports
-  import { supplierLoadingState } from "$lib/api/client/supplier";
   import type { Wholesaler, ProductDefinition } from "$lib/domain/domainTypes";
   import { categoryLoadingState, getCategoryApi } from "$lib/api/client/category";
   import { ApiClient } from "$lib/api/client/ApiClient";
@@ -26,8 +24,8 @@
     CategoryDetailPage_LoadDataSchema,
   } from "./categoryDetailPage.types";
   import { getProductDefinitionApi } from "$lib/api/client/productDefinition";
-    import CategoryProductDefsGrid from "./CategoryProductDefsGrid.svelte";
-    import CategoryForm from "./CategoryForm.svelte";
+  import CategoryProductDefsGrid from "./CategoryProductDefsGrid.svelte";
+  import CategoryForm from "./CategoryForm.svelte";
 
   // === PROPS ====================================================================================
 
@@ -61,7 +59,7 @@
         // 3. Assemble the data object for validation.
         const dataToValidate = {
           category,
-          productDefinitions
+          productDefinitions,
         };
 
         // 4. Validate the resolved data against the Zod schema.
@@ -79,7 +77,7 @@
         if (aborted) return;
         // 6. Handle any error from fetching or validation.
         const status = rawError.status ?? 500;
-        const message = rawError.message || "Failed to load supplier details.";
+        const message = rawError.message || "Failed to load category details.";
         loadingError = { message, status };
         log.error("Promise processing failed", {
           rawError,
@@ -105,7 +103,7 @@
   const productDefApi = getProductDefinitionApi(client);
 
   async function handleFormSubmitted(info: { data: Wholesaler; result: unknown }) {
-    addNotification(`Supplier saved successfully.`, "success");
+    addNotification(`Category saved successfully.`, "success");
 
     if (isCreateMode) {
       log.info("Submit successful in CREATE mode. Navigating to edit page...");
@@ -124,8 +122,8 @@
       } else {
         // This is a fallback case in case the API response was malformed.
         log.error("Could not redirect after create: newCategoryId is missing from response.", { data: info.data });
-        addNotification("Could not redirect to edit page, returning to list.", "error");
-        // Do not go to suppliers because we are in an invalid state.
+        addNotification("Could not redirect to edit page: newCategoryId is missing from response.", "error");
+        // Do not go to categories because we are in an invalid state.
       }
     } else {
       // FormShell has already updated its state.
@@ -154,7 +152,7 @@
    * Reload categories and set them into the state.
    */
   async function reloadProductDefs() {
-    assertDefined(resolvedData, "reloadCategories: Supplier must be loaded/available", ["supplier"]);
+    assertDefined(resolvedData, "reloadCategories: Category must be loaded/available", ["category"]);
 
     // We validated above that the data is correct.
     const categoryId = resolvedData.category!.category_id;
@@ -247,8 +245,9 @@
     <!-- Section 1: Details form -->
     <div class="form-section">
       <CategoryForm
-        initial={resolvedData.category}   
-        disabled={$supplierLoadingState}
+        isCreateMode
+        initial={resolvedData.category}
+        disabled={$categoryLoadingState}
         onSubmitted={handleFormSubmitted}
         onCancelled={handleFormCancelled}
         onSubmitError={handleFormSubmitError}
@@ -259,17 +258,17 @@
     <!-- Section 3: Grid of assigned categories -->
 
     <div class="grid-section">
-      {#if resolvedData.productDefinitions}
+      {#if isCreateMode}
+        <p>Product defintions will be available after category has been saved.</p>
+      {:else}
         <h2>Product Definitions</h2>
-        <p>Products this supplier can offer are organized by these categories. Click a category to manage its product offerings.</p>
+        <p>Offerings offer are organized by product definitions. Click a product definition to manage its product offerings.</p>
         <CategoryProductDefsGrid
           rows={resolvedData.productDefinitions}
           loading={$categoryLoadingState}
           {deleteStrategy}
           {rowActionStrategy}
         />
-      {:else}
-        <p>Product defintions will be available after supplier has been saved.</p>
       {/if}
     </div>
   </div>

@@ -21,16 +21,14 @@
   } from "$lib/components/domain/offerings/offeringDetail.types";
   import { assertDefined } from "$lib/utils/validation/assertions";
 
-
   // === PROPS ==================================================================================
 
   export type OfferDetailAttributesPageProps = {
-	data: OfferingDetailAttributes_LoadDataAsync 
-  }
+    data: OfferingDetailAttributes_LoadDataAsync;
+  };
 
   // Empfängt das Objekt mit den Promises aus der `load`-Funktion.
   let { data }: OfferDetailAttributesPageProps = $props();
-
 
   // === STATE ==================================================================================
 
@@ -38,7 +36,6 @@
   let isLoading = $state(true);
   let loadingError = $state<{ message: string; status?: number } | null>(null);
 
-  
   // === LOAD ===================================================================================
 
   $effect(() => {
@@ -54,7 +51,7 @@
           data.assignedAttributes,
           data.availableAttributes,
           data.availableProducts,
-          data.availableSuppliers
+          data.availableSuppliers,
         ]);
 
         if (aborted) return;
@@ -65,14 +62,16 @@
           assignedAttributes,
           availableAttributes,
           availableProducts,
-          availableSuppliers
+          availableSuppliers,
         };
 
         const validationResult = OfferingDetailAttributes_LoadDataSchema.safeParse(dataToValidate);
 
         if (!validationResult.success) {
           log.error("Zod validation failed", validationResult.error.issues);
-          throw new Error(`OfferingDetailAttributesPage: Received invalid data structure from the API: ${JSON.stringify(validationResult.error.issues)}`);
+          throw new Error(
+            `OfferingDetailAttributesPage: Received invalid data structure from the API: ${JSON.stringify(validationResult.error.issues)}`,
+          );
         }
 
         resolvedData = validationResult.data;
@@ -209,9 +208,7 @@
 {:else if isLoading || !resolvedData}
   <div class="detail-page-layout">Loading offering details...</div>
 {:else}
-  <OfferingDetailWrapper
-    initialLoadedData={resolvedData}
-  >
+  <OfferingDetailWrapper initialLoadedData={resolvedData}>
     <div class="grid-section">
       <!----- ASSGIN ATTRIBUTE ----->
 

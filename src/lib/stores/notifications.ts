@@ -14,7 +14,7 @@ export interface Notification {
 
 export const notifications = writable<Notification[]>([]);
 
-export function addNotification(message: string, type: "success" | "error" | "info" = "info", timeout = 3000) {
+export function addNotification(message: string, type: "success" | "error" | "info" = "info", timeout = 4000) {
   const id = uuidv4();
 
   if (browser) {

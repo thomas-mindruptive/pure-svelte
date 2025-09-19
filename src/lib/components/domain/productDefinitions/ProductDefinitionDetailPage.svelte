@@ -29,14 +29,15 @@
   let { data }: { data: ProductDefinitionDetailPage_LoadDataAsync } = $props();
 
   // === STATE ====================================================================================
+
   let resolvedData = $state<ProductDefinitionDetailPage_LoadData | null>(null);
   let isLoading = $state(true);
   let loadingError = $state<{ message: string; status?: number } | null>(null);
-  const isCreateMode = $derived(!resolvedData?.productDefinition);
-
+  
   // === LOAD DATA ================================================================================
 
   $effect(() => {
+    log.debug(`data props:`, data);
     let aborted = false;
     const processPromises = async () => {
       isLoading = true;
@@ -49,17 +50,19 @@
 
         if (aborted) return;
 
-        const validationResult = ProductDefinitionDetailPage_LoadDataSchema.safeParse({
+        // Init with all passed load data and overwrite with fulfilled promise data.
+        const dataToValidate: ProductDefinitionDetailPage_LoadData = {
+          ...data,
           productDefinition,
           offerings,
-        });
-
+        }
+        const validationResult = ProductDefinitionDetailPage_LoadDataSchema.safeParse(dataToValidate);
         if (!validationResult.success) {
           log.error("Zod validation failed for ProductDefinitionDetailPage", validationResult.error.issues);
           throw new Error(`ProductDefinitionDetailPage: Received invalid data structure from the API. ${JSON.stringify(validationResult.error.issues)}`);
         }
-
         resolvedData = validationResult.data;
+
       } catch (rawError: any) {
         if (aborted) return;
         const status = rawError.status ?? 500;
@@ -155,7 +158,7 @@
 
   function handleFormSubmitted(event: { data: ProductDefinition; result: unknown }) {
     addNotification("Product Definition saved successfully.", "success");
-    if (isCreateMode) {
+    if (resolvedData!.isCreateMode) {
       const newId = event.data?.product_def_id;
       if (newId) {
         // Redirect to the new edit page
@@ -196,6 +199,8 @@
     <!-- Section 1: Product Definition Form -->
     <div class="form-section">
       <ProductDefinitionForm
+        categoryId={resolvedData.categoryId}
+        isCreateMode={resolvedData.isCreateMode}
         initial={resolvedData.productDefinition}
         onSubmitted={handleFormSubmitted}
         onSubmitError={handleFormSubmitError}
@@ -206,7 +211,7 @@
 
     <!-- Section 2: Grid of associated Offerings -->
     <div class="grid-section">
-      {#if !isCreateMode}
+      {#if !resolvedData.isCreateMode}
         <h2>Offerings for this Product</h2>
         <p>This product is offered by the following suppliers with these conditions.</p>
         <OfferingGrid

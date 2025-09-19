@@ -3,6 +3,7 @@
   import { log } from "$lib/utils/logger";
   import { addNotification } from "$lib/stores/notifications";
   import { requestConfirmation } from "$lib/stores/confirmation";
+  import { page } from "$app/state";
 
   // Component Imports
   import "$lib/components/styles/detail-page-layout.css";
@@ -10,7 +11,7 @@
   import "$lib/components/styles/grid-section.css";
 
   // API & Type Imports
-  import type { Wholesaler, ProductDefinition } from "$lib/domain/domainTypes";
+  import type { Wholesaler, ProductDefinition, ProductCategory } from "$lib/domain/domainTypes";
   import { categoryLoadingState, getCategoryApi } from "$lib/api/client/category";
   import { ApiClient } from "$lib/api/client/ApiClient";
   import type { ID, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
@@ -56,8 +57,9 @@
 
         if (aborted) return;
 
-        // 3. Assemble the data object for validation.
-        const dataToValidate = {
+        // 3. Assemble the data object for validation. Use original dat and overwrite with loaded data.
+        const dataToValidate: CategoryDetailPage_LoadData = {
+          ...data,
           category,
           productDefinitions,
         };
@@ -68,7 +70,9 @@
         if (!validationResult.success) {
           log.error("Zod validation failed", validationResult.error.issues);
           // Treat a validation failure as a loading error.
-          throw new Error("CategoryDetailPage: Received invalid data structure from the API.");
+          throw new Error(
+            `CategoryDetailPage: Received invalid data structure from the API: ${JSON.stringify(validationResult.error.issues)}`,
+          );
         }
 
         // 5. On success, populate the state with the validated, resolved data.
@@ -102,7 +106,7 @@
   const categoryApi = getCategoryApi(client);
   const productDefApi = getProductDefinitionApi(client);
 
-  async function handleFormSubmitted(info: { data: Wholesaler; result: unknown }) {
+  async function handleFormSubmitted(info: { data: ProductCategory; result: unknown }) {
     addNotification(`Category saved successfully.`, "success");
 
     if (isCreateMode) {
@@ -110,7 +114,7 @@
 
       // Get the new ID from the event data.
       // Thanks to our FormShell fix, info.data is the complete object from the API.
-      const newCategoryId = info.data?.wholesaler_id;
+      const newCategoryId = info.data?.category_id;
 
       if (newCategoryId) {
         // Build the new "edit mode" URL.
@@ -164,6 +168,11 @@
   }
 
   // ===== BUSINESS LOGIC =====
+
+  function handleProductDefCreate(): void {
+    log.info(`Navigating to create new product def page.`);
+    goto(`${page.url.pathname}/productdefinitions/new`);
+  }
 
   /**
    * Executes the deletion process for product definitions.
@@ -221,6 +230,8 @@
     goto(`/categories/${pd.category_id}/productdefinitions/${pd.product_def_id}`);
   }
 
+  // ===== ROW STRATEGIES =====
+
   // Strategy objects for the CategoryGrid component.
   const deleteStrategy: DeleteStrategy<ProductDefinition> = {
     execute: handleProductDefDelete,
@@ -263,6 +274,12 @@
       {:else}
         <h2>Product Definitions</h2>
         <p>Offerings offer are organized by product definitions. Click a product definition to manage its product offerings.</p>
+        <button
+          class="pc-grid__createbtn"
+          onclick={handleProductDefCreate}
+        >
+          Create Product Definition
+        </button>
         <CategoryProductDefsGrid
           rows={resolvedData.productDefinitions}
           loading={$categoryLoadingState}

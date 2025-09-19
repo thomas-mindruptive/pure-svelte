@@ -1,10 +1,10 @@
 // File: src/lib/components/domain/productDefinitions/productDefinitionDetailPage.ts
 
-import { log } from '$lib/utils/logger';
-import { error, type LoadEvent } from '@sveltejs/kit';
-import { ApiClient } from '$lib/api/client/ApiClient';
-import { getProductDefinitionApi } from '$lib/api/client/productDefinition';
-import type { ProductDefinitionDetailPage_LoadDataAsync } from './productDefinitionDetailPage.types';
+import { log } from "$lib/utils/logger";
+import { error, type LoadEvent } from "@sveltejs/kit";
+import { ApiClient } from "$lib/api/client/ApiClient";
+import { getProductDefinitionApi } from "$lib/api/client/productDefinition";
+import type { ProductDefinitionDetailPage_LoadDataAsync } from "./productDefinitionDetailPage.types";
 
 /**
  * Loads all data for the Product Definition Detail Page using the non-blocking "app shell" pattern.
@@ -15,30 +15,40 @@ import type { ProductDefinitionDetailPage_LoadDataAsync } from './productDefinit
  * @returns An object where each property is a promise for the required data.
  */
 export function load({ params, fetch: loadEventFetch }: LoadEvent): ProductDefinitionDetailPage_LoadDataAsync {
-	const productDefId = Number(params.productDefId);
+  const productDefId = Number(params.productDefId);
 
-	// Handle "create new" mode
-	if (params.productDefId?.toLowerCase() === 'new') {
-		log.info(`Loading ProductDefinitionDetailPage in CREATE mode.`);
-		return {
-			productDefinition: Promise.resolve(null),
-			offerings: Promise.resolve([])
-		};
-	}
+  const categoryId = Number(params.categoryId);
+  // We must always come from a path like /.../categories/[categoryId]
+  if (isNaN(categoryId) || !params.categoryId) {
+    throw error(400, "categoryId must be passed in params.");
+  }
 
-	if (isNaN(productDefId) || productDefId <= 0) {
-		throw error(400, 'Invalid Product Definition ID. Must be a positive number.');
-	}
+  // Handle "create new" mode
+  if (params.productDefId?.toLowerCase() === "new") {
+    log.info(`Loading ProductDefinitionDetailPage in CREATE mode.`);
+    return {
+      categoryId,
+      isCreateMode: true,
+      productDefinition: Promise.resolve(null),
+      offerings: Promise.resolve([]),
+    };
+  }
 
-	log.info(`Kicking off non-blocking load for productDefId: ${productDefId}`);
+  if (isNaN(productDefId) || productDefId <= 0) {
+    throw error(400, "Invalid Product Definition ID. Must be a positive number.");
+  }
 
-	const client = new ApiClient(loadEventFetch);
-	const productDefinitionApi = getProductDefinitionApi(client);
+  log.info(`Kicking off non-blocking load for productDefId: ${productDefId}`);
 
-	// Return the object of promises directly without `await`.
-	// The page component will handle resolving and error states.
-	return {
-		productDefinition: productDefinitionApi.loadProductDefinition(productDefId),
-		offerings: productDefinitionApi.loadOfferingsForProductDefinition(productDefId)
-	};
+  const client = new ApiClient(loadEventFetch);
+  const productDefinitionApi = getProductDefinitionApi(client);
+
+  // Return the object of promises directly without `await`.
+  // The page component will handle resolving and error states.
+  return {
+	categoryId,
+    isCreateMode: false,
+    productDefinition: productDefinitionApi.loadProductDefinition(productDefId),
+    offerings: productDefinitionApi.loadOfferingsForProductDefinition(productDefId),
+  };
 }

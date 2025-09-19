@@ -95,7 +95,7 @@
         return await categoryApi.createCategory(data);
       }
     } catch (e) {
-      log.error({ component: "SupplierForm", error: String(e) }, "SUBMIT_FAILED");
+      log.error("SUBMIT_FAILED", { error: String(e) });
       throw e;
     }
   }
@@ -151,13 +151,13 @@
       <div class="form-body">
         <div class="form-grid">
           <div class="form-group span-2">
-            <label for="cat-name">Supplier Name *</label>
+            <label for="cat-name">Category Name *</label>
             <input
               id="cat-name"
               type="text"
               value={getS("name") ?? ""}
               class:error={errors.name}
-              placeholder="Enter supplier name"
+              placeholder="Enter category name"
               oninput={(e) => set(["name"], (e.currentTarget as HTMLInputElement).value)}
               onblur={() => markTouched("name")}
               required
@@ -196,7 +196,7 @@
         >
           Cancel
         </button>
-        <!-- KORREKTUR: type="submit" und kein onclick -->
+       
         <button
           class="primary-button"
           type="submit"

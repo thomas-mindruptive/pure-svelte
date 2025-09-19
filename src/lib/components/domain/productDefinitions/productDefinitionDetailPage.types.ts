@@ -13,6 +13,12 @@ import type { PromisifyComplex } from '$lib/utils/typeUtils';
  * have been resolved in the component.
  */
 export const ProductDefinitionDetailPage_LoadDataSchema = z.object({
+
+  /**
+   * Must always be defined, because we must always come from a path like /.../categories/[categoryId]
+   */
+  categoryId: z.number(),
+
   /**
    * The core ProductDefinition entity being displayed.
    * Can be null in create mode.
@@ -22,7 +28,12 @@ export const ProductDefinitionDetailPage_LoadDataSchema = z.object({
   /**
    * The list of all offerings across all suppliers for this specific product definition.
    */
-  offerings: z.array(WholesalerItemOffering_ProductDef_Category_SupplierSchema)
+  offerings: z.array(WholesalerItemOffering_ProductDef_Category_SupplierSchema),
+
+  /**
+   * Create or edit-mode.
+   */
+  isCreateMode: z.boolean()
 });
 
 // --- TypeScript Type Exports ---

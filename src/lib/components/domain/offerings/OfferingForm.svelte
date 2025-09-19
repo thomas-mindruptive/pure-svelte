@@ -48,24 +48,70 @@
 
   // ===== LOAD DATA ASYNC =====
 
-  let { supplierId, categoryId, initialValidatedOfferingData, errors, validatedData, availableProducts, availableSuppliers } = $derived.by(
-    () => {
-      const result = OfferingDetail_LoadDataSchema.safeParse(initialLoadedData);
-      // The validation checks for the combination of "isCreateMode" etc. are done by the caller(s), e.g.
-      // in offingBaseLoads.ts.
+  let { initialValidatedOfferingData, errors, validatedData, availableProducts, availableSuppliers } = $derived.by(() => {
+    const result = OfferingDetail_LoadDataSchema.safeParse(initialLoadedData);
+    if (!result.success) {
       return {
-        validatedData: result.success ? result.data : null,
-        errors: result.success ? null : result.error.issues,
-        isValid: result.success,
-        initialValidatedOfferingData: result.success ? (result.data?.offering ?? null) : null,
-        supplierId: result.success ? (result.data?.supplierId ?? null) : null,
-        categoryId: result.success ? (result.data?.categoryId ?? null) : null,
-        productDefId: result.success ? (result.data?.productDefId ?? null) : null,
-        availableProducts: result.success ? (result.data?.availableProducts ?? null) : null,
-        availableSuppliers: result.success ? (result.data?.availableSuppliers ?? null) : null,
+        validatedData: null,
+        errors: result.error.issues,
+        isValid: false,
+        initialValidatedOfferingData: null,
+        supplierId: null,
+        categoryId: null,
+        productDefId: null,
+        availableProducts: null,
+        availableSuppliers: null,
       };
-    },
-  );
+    }
+
+    const data = result.data;
+    let finalInitialData = data.offering ?? null;
+    let finalErrors: any[] = [];
+
+    if (data.isCreateMode) {
+      if (finalInitialData) {
+        finalErrors.push({
+          message: "In create mode, initialValidatedOfferingData should be null",
+          code: "custom",
+          path: ["initialValidatedOfferingData"],
+        });
+      } else {
+        // ⚠️⚠️⚠️ NOTE: This initialisation is key. Otherwise form validation and submit fails!
+        finalInitialData = {
+          category_id: data.categoryId,
+          product_def_id: data.productDefId,
+          wholesaler_id: data.supplierId,
+        } as WholesalerItemOffering_ProductDef_Category_Supplier;
+      }
+    }
+
+    return {
+      validatedData: data,
+      errors: finalErrors.length > 0 ? finalErrors : null,
+      isValid: true,
+      initialValidatedOfferingData: finalInitialData,
+      supplierId: data.supplierId ?? null,
+      categoryId: data.categoryId ?? null,
+      productDefId: data.productDefId ?? null,
+      availableProducts: data.availableProducts ?? null,
+      availableSuppliers: data.availableSuppliers ?? null,
+    };
+
+    // const result = OfferingDetail_LoadDataSchema.safeParse(initialLoadedData);
+    // // The validation checks for the combination of "isCreateMode" etc. are done by the caller(s), e.g.
+    // // in offingBaseLoads.ts.
+    // return {
+    //   validatedData: result.success ? result.data : null,
+    //   errors: result.success ? null : result.error.issues,
+    //   isValid: result.success,
+    //   initialValidatedOfferingData: result.success ? (result.data?.offering ?? null) : null,
+    //   supplierId: result.success ? (result.data?.supplierId ?? null) : null,
+    //   categoryId: result.success ? (result.data?.categoryId ?? null) : null,
+    //   productDefId: result.success ? (result.data?.productDefId ?? null) : null,
+    //   availableProducts: result.success ? (result.data?.availableProducts ?? null) : null,
+    //   availableSuppliers: result.success ? (result.data?.availableSuppliers ?? null) : null,
+    //};
+  });
 
   $effect(() => {
     if (errors) {
@@ -77,9 +123,10 @@
 
   // ===== STATE =====
 
-  const isCreateMode = $derived(validatedData?.isCreateMode);
-  const isSuppliersRoute = $derived(validatedData?.productDefId);
-  const isCategoriesRoute = $derived(validatedData?.isCategoriesRoute);
+  // NOTE: This flags MUST be derived from the original data, because they are set independently of the other data.
+  const isCreateMode = $derived(initialLoadedData.isCreateMode);
+  const isSuppliersRoute = $derived(initialLoadedData.isSuppliersRoute);
+  const isCategoriesRoute = $derived(initialLoadedData.isCategoriesRoute);
   let formShell: InstanceType<typeof FormShell<WholesalerItemOffering_ProductDef_Category_Supplier>>;
 
   // ===== API =====
@@ -90,8 +137,8 @@
   // Set the default product definition in create mode.
   $effect(() => {
     if (isCreateMode && availableProducts && availableProducts.length > 0) {
-      // No productDefId? => We are on route "/suppliers/1/categories/3/offerings/..."
-      if (!validatedData?.productDefId) {
+      // We are on route "/suppliers/1/categories/3/offerings/..."
+      if (isSuppliersRoute) {
         const firstProduct = availableProducts[0];
         if (firstProduct && formShell) {
           log.debug(`(OfferingForm) Initializing product_def_id to first available product: ${firstProduct.product_def_id}`);
@@ -99,8 +146,8 @@
         }
       }
 
-      // No supplierId? => We are on route "/categories/1/productdefinitions/5/offerings/..."
-      if (!validatedData?.supplierId) {
+      // We are on route "/categories/1/productdefinitions/5/offerings/..."
+      if (isCategoriesRoute) {
         const firstSupplier = availableSuppliers?.[0];
         if (firstSupplier && formShell) {
           log.debug(`(OfferingForm) Initializing wholesaler_id to first available supplier: ${firstSupplier.wholesaler_id}`);
@@ -116,8 +163,14 @@
     assertDefined(raw, "validateOfferingForSubmit");
     const data = raw as WholesalerItemOffering_ProductDef_Category_Supplier;
     const errors: ValidationErrors = {};
+    if (!data.wholesaler_id) {
+      errors.wholesaler_id = ["OfferingForm.validateOfferingForSubmit: A supplier must be selected."];
+    }
     if (!data.product_def_id) {
-      errors.product_def_id = ["A product must be selected."];
+      errors.product_def_id = ["OfferingForm.validateOfferingForSubmit: A product must be selected."];
+    }
+    if (!data.category_id) {
+      errors.category_id = ["OfferingForm.validateOfferingForSubmit: A category must be defined."];
     }
     if (data.price != null) {
       if (isNaN(Number(data.price)) || Number(data.price) < 0) {
@@ -135,43 +188,52 @@
 
   // ===== SUBMISSION LOGIC =====
 
-  async function submitOffering(formStateCloneOfExistingOffering: Record<string, any>) {
-    assertDefined(formStateCloneOfExistingOffering, "submitOffering");
-    const isUpdateMode = !isCreateMode;
-    if (!supplierId || !categoryId) {
-      const errorMsg =
-        "Cannot submit offering: Missing supplierId or categoryId context. This should never happen if the component is used correctly. => OfferingDetail_LoadDataSchema validation should have caught it.";
-      log.error(`(OfferingForm) ${errorMsg}`, { raw: formStateCloneOfExistingOffering });
-      throw new Error(errorMsg);
-    }
-    const dataToSubmit: Omit<WholesalerItemOffering, "offering_id"> = {
-      ...(formStateCloneOfExistingOffering as WholesalerItemOffering),
-      wholesaler_id: supplierId,
-      category_id: categoryId,
-    };
-    log.warn(`(OfferingForm) Submitting to API...`, {
-      isUpdate: isUpdateMode,
-      raw: formStateCloneOfExistingOffering,
-    });
-    try {
-      let offering;
-      if (isUpdateMode) {
-        // Assert that the id exists in update mode
-        const id = (formStateCloneOfExistingOffering as WholesalerItemOffering).offering_id;
-        assertDefined(id, "offering_id is required for update");
-        offering = await offeringApi.updateOffering(id, dataToSubmit);
-      } else {
-        offering = await offeringApi.createOffering(dataToSubmit);
+  async function submitOffering(formStateClone: Record<string, any>): Promise<WholesalerItemOffering> {
+    log.debug(`Submitting data:`, formStateClone);
+    // Wir können uns darauf verlassen, dass der formStateClone dank der Vorbereitung
+    // im $derived.by-Block bereits alle notwendigen IDs und Platzhalter enthält.
+    assertDefined(formStateClone, "submitOffering: formStateClone cannot be null");
+
+    // Cast zum Ziel-Datentyp ist hier sicher, da wir den initialen Zustand kontrollieren.
+    const dataToSubmit = formStateClone as WholesalerItemOffering_ProductDef_Category_Supplier;
+    assertDefined(dataToSubmit, "submitOffering: wholsaler_id, category_id, product_def_id must be defined", ["wholesaler_id"], ["category_id"], ["product_def_id"]);
+
+    if (isCreateMode) {
+      // --- CREATE MODE ---
+      log.info("(OfferingForm) Submitting in CREATE mode...");
+
+      // Wir entfernen die Platzhalter-ID '0' und alle schreibgeschützten Join-Felder,
+      // bevor wir die Daten an die create-API senden.
+      const {
+        offering_id,
+        product_def_title,
+        category_name,
+        wholesaler_name,
+        // ...alle anderen Felder, die nur zum Lesen da sind...
+        ...createData
+      } = dataToSubmit;
+
+      log.warn(`(OfferingForm) Submitting CREATE to API...`, { createData });
+      return await offeringApi.createOffering(createData);
+    } else {
+      // --- UPDATE MODE ---
+      log.info("(OfferingForm) Submitting in UPDATE mode...");
+
+      // Die ID ist für das Update zwingend erforderlich.
+      const { offering_id } = dataToSubmit;
+      assertDefined(offering_id, "offering_id must be a positive number for an update");
+
+      if (offering_id === 0) {
+        // Sicherheitsnetz, falls doch mal was schiefgeht
+        throw new Error("Cannot update offering with placeholder ID 0.");
       }
-      log.info(`(OfferingForm) Submitted successfully to category API`, {
-        isUpdate: isUpdateMode,
-        raw: formStateCloneOfExistingOffering,
-        offering,
-      });
-      return offering;
-    } catch (e) {
-      log.error(`(OfferingForm) Submit failed`, { error: String(e) });
-      throw e;
+
+      // Für das Update-API können wir das gesamte Objekt übergeben.
+      // Die API sollte robust genug sein, nur die änderbaren Felder zu berücksichtigen.
+      const updateData = dataToSubmit as Partial<WholesalerItemOffering>;
+
+      log.warn(`(OfferingForm) Submitting UPDATE to API...`, { id: offering_id, updateData });
+      return await offeringApi.updateOffering(offering_id, updateData);
     }
   }
 
@@ -206,9 +268,13 @@
   }
 </script>
 
-<ValidationWrapper {errors}>
+<ValidationWrapper
+  {errors}
+  renderChildrenInCaseOfErrors={true}
+>
   <FormShell
     bind:this={formShell}
+    autoValidate="blur"
     entity="Offering"
     initial={initialValidatedOfferingData as WholesalerItemOffering_ProductDef_Category_Supplier}
     validate={validateOfferingForSubmit}
@@ -247,7 +313,7 @@
             <!--- Create mode and suppliers route => render "productdefs" combo --->
             {#if isCreateMode}
               {#if isSuppliersRoute}
-                <label for="offering-product">Product *</label>
+                <label for="offering-product">####Product *</label>
                 <select
                   id="offering-product"
                   value={getS("product_def_id")}
@@ -294,7 +360,7 @@
             <!--- Create mode and categories route => render "suppliers" combo --->
             {#if isCreateMode}
               {#if isCategoriesRoute}
-                <label for="offering-supplier">Supplier *</label>
+                <label for="offering-supplier">+++Supplier *</label>
                 <select
                   id="offering-supplier"
                   value={getS("wholesaler_id")}
@@ -397,7 +463,6 @@
           <!-- size ------------------------------------------------------------------------------>
           <div class="form-group span-2">
             <label for="offering-size">Size</label>
-            <!-- KORREKTUR 2: `get` wurde zu `getS` geändert -->
             <input
               id="offering-size"
               type="text"

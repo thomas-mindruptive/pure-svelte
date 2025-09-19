@@ -11,6 +11,7 @@
 	// Step 1: Import validation utilities
 	import { validateRuntimeTree } from '$lib/components/sidebarAndNav/hierarchyUtils';
 	import ValidationWrapper from '$lib/components/validation/ValidationWrapper.svelte';
+    import type { ValidationError } from '../validation/validation.types';
 
 	// === TYPES ====================================================================================
 
@@ -33,12 +34,6 @@
 		ariaLabel?: string;
 		onselect?: SelectCallback;
 		shouldRenderHierarchyRootTitle: boolean;
-	};
-
-	/** The expected structure for a single validation error for the wrapper. */
-	type ValidationError = {
-		path: string[];
-		message: string;
 	};
 
 	// === PROPS ====================================================================================

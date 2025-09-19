@@ -1,9 +1,16 @@
 <!-- ValidationWrapper.svelte -->
-<script>
+<script lang="ts">
   import { log } from "$lib/utils/logger";
+  import type { Snippet } from "svelte";
+  import type { ValidationError } from "./validation.types";
 
-  let { errors, children } = $props();
-  log.debug(`(ValidationWrapper) Props:`, { errors});
+  interface Props {
+    renderChildrenInCaseOfErrors?: Boolean | undefined;
+    errors: ValidationError[] | null | undefined;
+    children: Snippet;
+  }
+  let { renderChildrenInCaseOfErrors = true, errors, children }: Props = $props();
+  log.debug(`(ValidationWrapper) Props:`, { errors, renderChildrenInCaseOfErrors });
 </script>
 
 {#if errors}
@@ -13,6 +20,8 @@
       <p>{error.path.join(".")}: {error.message}</p>
     {/each}
   </div>
-{:else}
+{/if}
+{#if !errors || renderChildrenInCaseOfErrors}
   {@render children()}
 {/if}
+

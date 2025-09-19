@@ -1,10 +1,5 @@
 /**
  * Type-safe object-path utilities with clean recursive types.
- *
- * Features:
- * - NonEmptyPath<T>: all possible non-empty paths through T as tuples
- * - PathValue<T, P>: the value type at the end of a path P in T
- * - get / set / has: runtime helpers with compile-time type safety
  */
 
 import type { NonEmptyPath, PathValue } from './pathUtils.types';

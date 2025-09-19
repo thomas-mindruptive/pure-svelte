@@ -24,6 +24,7 @@
   } from "./productDefinitionDetailPage.types";
   import { assertDefined } from "$lib/utils/validation/assertions";
   import { getProductDefinitionApi } from "$lib/api/client/productDefinition";
+    import { page } from "$app/state";
 
   // === PROPS ====================================================================================
   let { data }: { data: ProductDefinitionDetailPage_LoadDataAsync } = $props();
@@ -96,6 +97,13 @@
     const updatedOfferings = await productDefinitionApi.loadOfferingsForProductDefinition(productDefId);
     resolvedData.offerings = updatedOfferings;
     log.info("Local state for offerings updated.");
+  }
+
+  // === BUSINESS LOGIC ===========================================================================
+
+  function handleOfferingCreate(): void {
+    log.info(`Navigating to create new offering.`);
+    goto(`${page.url.pathname}/offerings/new`);
   }
 
   function handleOfferingSelect(offering: WholesalerItemOffering_ProductDef_Category_Supplier) {
@@ -213,7 +221,12 @@
     <div class="grid-section">
       {#if !resolvedData.isCreateMode}
         <h2>Offerings for this Product</h2>
-        <p>This product is offered by the following suppliers with these conditions.</p>
+        <button
+          class="pc-grid__createbtn"
+          onclick={handleOfferingCreate}
+        >
+          Create Offering
+        </button>
         <OfferingGrid
           rows={resolvedData.offerings}
           loading={$offeringLoadingState}

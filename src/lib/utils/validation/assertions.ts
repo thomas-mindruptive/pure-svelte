@@ -26,11 +26,17 @@ export function assertDefined<T>(
  * Assert that object exists and specified paths are defined. Throws on failure.
  * Returns type where specified paths are guaranteed to be non-null/undefined.
  */
-export function assertDefined<T, const Paths extends readonly (readonly PropertyKey[])[]>(
+export function assertDefined<T, const Paths extends readonly NonEmptyPath<NonNullable<T>>[]>(
   obj: T | null | undefined, 
   message: string,
   ...paths: Paths
 ): asserts obj is WithDefinedPaths<NonNullable<T>, Paths>;
+
+// export function assertDefined<T, const Paths extends readonly (readonly PropertyKey[])[]>(
+//   obj: T | null | undefined, 
+//   message: string,
+//   ...paths: Paths
+// ): asserts obj is WithDefinedPaths<NonNullable<T>, Paths>;
 
 /**
  * Runtime implementation for both overloads.
@@ -158,16 +164,6 @@ export function assertAnyDefined<T>(
   }
 }
 
-/**
- * Assert that all specified paths exist and are not null/undefined.
- */
-export function assertAllDefined<T, const Paths extends readonly (readonly PropertyKey[])[]>(
-  obj: T | null | undefined,
-  message: string,
-  paths: Paths
-): asserts obj is WithDefinedPaths<NonNullable<T>, Paths> {
-  assertDefined(obj, message, ...paths);
-}
 
 // -----------------------------------------------------------------------------
 // USAGE EXAMPLES

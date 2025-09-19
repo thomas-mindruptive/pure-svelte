@@ -2,7 +2,6 @@
   lang="ts"
   generics="T extends Record<string, any> = Record<string, any>"
 >
-
   // ========================================================================
   // IMPORTS
   // ========================================================================
@@ -214,7 +213,7 @@
 
     // Auto-validate on change if configured
     if (autoValidate === "change") {
-      void runValidate(path.join("."));
+      void runValidate(path.join("."), true);
     }
   }
 
@@ -302,7 +301,7 @@
   /**
    * Run validation on form data, optionally for a specific field
    */
-  async function runValidate(path?: string): Promise<boolean> {
+  async function runValidate(path?: string, validateWholeForm?: boolean): Promise<boolean> {
     if (!validate) return true;
 
     formState.validating = true;
@@ -314,7 +313,8 @@
           const msgs = res.errors[path] ?? [];
           clearErrors([path]);
           if (msgs.length) setFieldErrors(path, msgs);
-        } else {
+        }
+        if (!path || validateWholeForm) {
           // Validate entire form
           for (const k in formState.errors) delete formState.errors[k];
           formState.errors = res.errors;
@@ -339,7 +339,7 @@
     formState.touched.add(path);
     if (autoValidate === "blur") {
       // Run validation for this field only when marked as touched
-      void runValidate(path);
+      void runValidate(path, true);
     }
   }
 
@@ -544,7 +544,7 @@
   <details class="component-debug-boundary">
     <summary>FormShell Debug:</summary>
     <div>
-      <pre>{@html JSON.stringify({ initial, disabled, entity }, null, 4)}</pre>
+      <pre>{@html JSON.stringify({ initial, disabled, entity, formState_data: formState.data }, null, 4)}</pre>
     </div>
   </details>
 

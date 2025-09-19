@@ -11,13 +11,13 @@ import { loadOfferingDetailBasisData } from "./offeringDetailBasisLoads";
  * Lädt alle Daten für die Angebots-Detailseite (Links).
  * Diese Seite ist eigenständig und lädt alle ihre Daten selbst.
  */
-export function load({ params, fetch: fetchLoad }: LoadEvent): OfferingDetailLinks_LoadDataAsync {
+export function load({ url, params, fetch: fetchLoad }: LoadEvent): OfferingDetailLinks_LoadDataAsync {
  log.debug(`OfferingDetailLinksPage: load page-specific data`);
 
-  // --- PARAMS ans basis data for all offering detail pages --------------------------------------
+  // --- PARAMS and basis data for all offering detail pages --------------------------------------
 
   const offeringId = Number(params.offeringId);
-  const offeringDetailBasisData: OfferingDetail_LoadDataAsync = loadOfferingDetailBasisData({ params, fetch: fetchLoad });
+  const offeringDetailBasisData: OfferingDetail_LoadDataAsync = loadOfferingDetailBasisData({ url, params, fetch: fetchLoad });
 
   // --- LOAD SPECIFIC DATA -----------------------------------------------------------------------
 

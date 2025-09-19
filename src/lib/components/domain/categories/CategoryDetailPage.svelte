@@ -273,7 +273,6 @@
         <p>Product defintions will be available after category has been saved.</p>
       {:else}
         <h2>Product Definitions</h2>
-        <p>Offerings offer are organized by product definitions. Click a product definition to manage its product offerings.</p>
         <button
           class="pc-grid__createbtn"
           onclick={handleProductDefCreate}

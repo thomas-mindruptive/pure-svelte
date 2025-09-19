@@ -3,7 +3,7 @@
   import { addNotification } from "$lib/stores/notifications";
   import LinkGrid from "$lib/components/links/LinkGrid.svelte";
   import { getOfferingApi, offeringLoadingState } from "$lib/api/client/offering";
-  import type { WholesalerOfferingLink } from "$lib/domain/domainTypes";
+  import { type WholesalerOfferingLink } from "$lib/domain/domainTypes";
   import { ApiClient } from "$lib/api/client/ApiClient";
   import "$lib/components/styles/assignment-section.css";
   import "$lib/components/styles/grid-section.css";
@@ -45,6 +45,7 @@
           data.availableProducts,
           data.availableSuppliers,
         ]);
+        log.debug(`All promises resolved: `, {offering, links, availableProducts, availableSuppliers})
 
         if (aborted) return;
 
@@ -53,17 +54,34 @@
           offering,
           links,
           availableProducts,
-          availableSuppliers
+          availableSuppliers,
         };
 
         const validationResult = OfferingDetailLinks_LoadDataSchema.safeParse(dataToValidate);
 
         if (!validationResult.success) {
           log.error("(OfferDetailLinksPage) Zod validation failed", validationResult.error.issues);
-          throw new Error(`OfferingDetailPageLinks: Received invalid data structure from the API: ${JSON.stringify(validationResult.error.issues)}`);
+          throw new Error(
+            `OfferingDetailPageLinks: Received invalid data structure from the API: ${JSON.stringify(validationResult.error.issues)}`,
+          );
+        } else {
+          log.debug("(OfferDetailLinksPage) Zod validation succeeded");
         }
 
-        resolvedData = validationResult.data;
+        resolvedData = validationResult.data!;
+
+        // if (resolvedData.isCreateMode) {
+        //   resolvedData.offering = {} as WholesalerItemOffering_ProductDef_Category_Supplier;
+        //   if (resolvedData.isSuppliersRoute) {
+        //     assertDefined(resolvedData, "supplierId", ["supplierId"]);
+        //     resolvedData.offering.wholesaler_id = resolvedData.supplierId!;
+        //   } else if (resolvedData.isCategoriesRoute) {
+        //     assertDefined(resolvedData, "categoryId", ["categoryId"]);
+        //     resolvedData.offering.product_def_id = resolvedData.productDefId!;
+        //   } else {
+        //     throw error(400, "Route must be suppliers or categories.");
+        //   }
+        // }
       } catch (rawError: any) {
         if (aborted) return;
         const status = rawError.status ?? 500;

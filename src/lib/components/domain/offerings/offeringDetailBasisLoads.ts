@@ -12,20 +12,22 @@ import type { OfferingDetail_LoadDataAsync } from "./offeringDetail.types";
 import { getSupplierApi } from "$lib/api/client/supplier";
 import { type ProductDefinition, type Wholesaler } from "$lib/domain/domainTypes";
 import { getCategoryApi } from "$lib/api/client/category";
+import { parseUrlSegments } from "$lib/utils/url";
 
 /**
  * Load the basis data for offering detail pages.
  */
 export function loadOfferingDetailBasisData({
+  url,
   params,
   fetch: fetchLoad,
-}: Pick<LoadEvent, "params" | "fetch">): OfferingDetail_LoadDataAsync {
-  log.info("(OfferDetailLinksPage) load called with params:", params);
+}: Pick<LoadEvent, "url" | "params" | "fetch">): OfferingDetail_LoadDataAsync {
+  log.info("Load called with params:", {url, params});
 
   let offeringId: number | null = Number(params.offeringId);
-  let categoryId: number | null  = Number(params.categoryId);
-  let supplierId: number | null  = Number(params.supplierId);
-  let productDefId: number | null  = Number(params.productDefId);
+  let categoryId: number | null = Number(params.categoryId);
+  let supplierId: number | null = Number(params.supplierId);
+  let productDefId: number | null = Number(params.productDefId);
 
   // ------------------------------------------------------
   // ⚠️ There is not try/catch because we return promises!
@@ -42,6 +44,8 @@ export function loadOfferingDetailBasisData({
   let isSuppliersRoute = false;
   let isCategoriesRoute = false;
 
+  const urlSegments = parseUrlSegments(url);
+
   if (isNaN(offeringId)) {
     isCreateMode = true;
     offeringId = null;
@@ -49,21 +53,32 @@ export function loadOfferingDetailBasisData({
       throw error(422, 'offeringDetailBaseLoads.load: Invalid Offering ID: Must be number or "new"');
     }
   }
+
   if (isNaN(supplierId)) {
-    isCategoriesRoute = true;
     supplierId = null;
+  }
+    if (isNaN(categoryId)) {
+    categoryId = null;
+  }
     if (isNaN(productDefId)) {
-      throw error(422, "offeringDetailBaseLoads.load: Either supplierID or productDefId must be defined.");
-    }
-  }
-  if (isNaN(productDefId)) {
-    isSuppliersRoute = true;
     productDefId = null;
-    if (null === supplierId || isNaN(supplierId)) {
-      throw error(422, "offeringDetailBaseLoads.load: Either supplierID or productDefId must be defined.");
-    }
   }
-  if (isNaN(categoryId)) {
+
+  if (urlSegments[0].toLowerCase() === "suppliers") {
+    isSuppliersRoute = true;
+    if (null === supplierId || isNaN(supplierId)) {
+      throw error(422, "offeringDetailBaseLoads.load: supplierID must be defined for '/suppliers/...' route.");
+    }
+  } else if (urlSegments[0].toLowerCase() === "categories") {
+    isCategoriesRoute = true;
+    if (!productDefId) {
+      throw error(422, "offeringDetailBaseLoads.load: productDefId must be defined for '/categories/...' route.");
+    }
+  } else {
+    throw error(400, `url route must be "/suppliers..." or "/categories" but was "/${urlSegments[0]}"`);
+  }
+
+  if (!categoryId) {
     categoryId = null;
     throw error(422, "offeringDetailBaseLoads.load: categoryId must be defined.");
   }
@@ -89,6 +104,7 @@ export function loadOfferingDetailBasisData({
     const asyncLoadData: OfferingDetail_LoadDataAsync = {
       supplierId,
       categoryId,
+      productDefId,
       offering: Promise.resolve(null), // No initial offering to edit
       isCreateMode,
       isSuppliersRoute,
@@ -103,7 +119,8 @@ export function loadOfferingDetailBasisData({
     const asyncLoadData: OfferingDetail_LoadDataAsync = {
       supplierId,
       categoryId,
-      offering: offeringApi.loadOffering(offeringId!),      // We made sure above that we only enter "CREATE" mode, if offeringId is invalid.
+      productDefId,
+      offering: offeringApi.loadOffering(offeringId!), // We made sure above that we only enter "CREATE" mode, if offeringId is invalid.
       isCreateMode,
       isSuppliersRoute,
       isCategoriesRoute,

@@ -8,7 +8,12 @@
 
 import { log } from "$lib/utils/logger";
 import { ComparisonOperator, type QueryPayload } from "$lib/backendQueries/queryGrammar";
-import type { ProductCategory, ProductDefinition, WholesalerItemOffering_ProductDef_Category_Supplier } from "$lib/domain/domainTypes";
+import type {
+  ProductCategory,
+  ProductDefinition,
+  Wholesaler,
+  WholesalerItemOffering_ProductDef_Category_Supplier,
+} from "$lib/domain/domainTypes";
 import type { ApiClient } from "./ApiClient";
 import { createPostBody, createQueryBody, getErrorMessage } from "./common";
 import type { PredefinedQueryRequest, QueryResponseData } from "$lib/api/api.types";
@@ -155,6 +160,57 @@ export function getCategoryApi(client: ApiClient) {
           { context: operationId },
         );
         return responseData.results as ProductDefinition[];
+      } catch (err) {
+        log.error(`[${operationId}] Failed.`, { categoryId, error: getErrorMessage(err) });
+        throw err;
+      } finally {
+        categoryLoadingManager.finish(operationId);
+      }
+    },
+
+    // ===== SUPPLIERS  =====
+
+    /**
+     * Loads all suppliers that are assigned to a specific product category.
+     * This function utilizes the predefined 'supplier_categories' join configuration on the server,
+     * which connects wholesalers, wholesaler_categories, and product_categories.
+     * @param categoryId The ID of the category for which to load the assigned suppliers.
+     * @returns A promise that resolves to an array of Wholesaler objects.
+     */
+    async loadSuppliersForCategory(categoryId: number): Promise<Wholesaler[]> {
+      const operationId = `loadSuppliersForCategory-${categoryId}`;
+      categoryLoadingManager.start(operationId);
+      try {
+        // 1. Define the request object for the generic /api/query endpoint.
+        const request: PredefinedQueryRequest = {
+          // 2. Specify the name of the server-side join configuration to use.
+          //    This join correctly links wholesalers (w) to product_categories (pc).
+          namedQuery: "supplier_categories",
+          payload: {
+            // 3. Select only the columns from the 'wholesalers' table (aliased as 'w').
+            //    This ensures the result matches the Wholesaler type.
+            select: ["w.wholesaler_id", "w.name", "w.country", "w.region", "w.status", "w.dropship"],
+            // 4. Filter the result set by the provided categoryId.
+            //    The alias for the product_categories table in the join is 'pc'.
+            where: {
+              key: "pc.category_id",
+              whereCondOp: ComparisonOperator.EQUALS,
+              val: categoryId,
+            },
+            // 5. Order the results alphabetically by the supplier's name for a consistent UI.
+            orderBy: [{ key: "w.name", direction: "asc" }],
+          },
+        };
+
+        // 6. Send the request to the generic query endpoint.
+        const responseData = await client.apiFetch<QueryResponseData<Wholesaler>>(
+          "/api/query",
+          { method: "POST", body: createPostBody(request) },
+          { context: operationId },
+        );
+
+        // 7. Return the list of suppliers from the response.
+        return responseData.results as Wholesaler[];
       } catch (err) {
         log.error(`[${operationId}] Failed.`, { categoryId, error: getErrorMessage(err) });
         throw err;

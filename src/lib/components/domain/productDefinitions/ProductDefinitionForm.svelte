@@ -87,12 +87,14 @@
       : `Category: ${categoryId}`,
   );
 
-
   // === BUSINESS LOGIC ===========================================================================
 
   function validate(rawData: Record<string, any>): ValidateResult {
     // For this entity, Zod's parsing is sufficient.
     // We can use a more specific schema if needed (e.g., for create vs. update)
+    if (isCreateMode) {
+      delete rawData.product_def_id;
+    }
     const result = ProductDefinitionSchema.partial().safeParse(rawData);
     if (result.success) {
       return { valid: true };
@@ -157,16 +159,6 @@
             />
             {#if errors.title}
               <div class="error-text">{errors.title[0]}</div>
-            {/if}
-          </div>
-
-          <div class="form-group span-4">
-            <div>
-              <span class="label">Category ID:</span>
-              <span id="pd-category">{getS("category_id")}</span>
-            </div>
-            {#if errors.category_id}
-              <div class="error-text">{errors.category_id[0]}</div>
             {/if}
           </div>
 

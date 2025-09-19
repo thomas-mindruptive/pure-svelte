@@ -5,31 +5,49 @@
 /* 2. Definition von globalen CSS-Variablen im :root */
 :root {
   /* Fonts */
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
-  --font-serif: Georgia, Cambria, 'Times New Roman', Times, serif;
+  --font-sans:
+    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+  --font-serif: Georgia, Cambria, "Times New Roman", Times, serif;
 
-  /* Colors */
-  --color-text: #1e293b;
+  /* 
+   * === Colors ===================================================================================
+   */
+
   /* Dunkles Grau-Blau für Text */
-  --color-heading: #0f172a;
-  /* Fast Schwarz für Überschriften */
-  --color-background: #ffffff;
-  /* Weißer Hintergrund */
-  --color-primary: #4f46e5;
-  /* Primärfarbe (Indigo) */
-  --color-muted: #b8cbe6;
-  /* Gedämpftes Grau für Untertexte */
-  --color-border: #e2e8f0;
-  /* Helles Grau für Ränder */
+  --color-text: #1e293b;
 
-  /* Spacing */
+  /* Fast Schwarz für Überschriften */
+  --color-heading: #0f172a;
+
+  /* Weißer Hintergrund */
+  --color-background: #ffffff;
+
+  /* Primärfarbe (Indigo) und Abwandlungen */
+  --color-primary: #4f46e5;
+  --color-primary-lighter: color-mix(in srgb, var(--color-primary) 10%, white);
+
+  /* Gedämpftes Grau für Untertexte */
+  --color-muted: #b8cbe6;
+
+  /* Helles Grau für Ränder */
+  --color-border: #e2e8f0;
+
+  /* Colors for info/debug/etc. */
+  --color-background-info: var(--color-primary-lighter);
+  --color-background-border: var(--color-primary);
+  
+
+  /* 
+   * === Spacing ==================================================================================
+   */
+
   --spacing-sm: 0.5rem;
   --spacing-md: 1rem;
   --spacing-lg: 1.5rem;
   --spacing-xl: 2rem;
- 
+
   /* Buttons */
-  --button-padding:  0.5rem 1.25rem;
+  --button-padding: 0.5rem 1.25rem;
   --button-border-radius: 6px;
   --button-font-size: 0.875rem;
   --button-border: none;
@@ -40,7 +58,11 @@
   --button-primary-color: white;
 }
 
-/* 3. Ein einfacher CSS-Reset und globale Body-Stile */
+/* 
+ * === Resets & base CSS ==========================================================================
+ */
+
+/* Ein einfacher CSS-Reset und globale Body-Stile */
 *,
 *::before,
 *::after {
@@ -134,8 +156,6 @@ body {
   background: color-mix(in oklab, var(--color-primary) 20%, white);
 }
 
-
-
 /* Reduzierte Animationen respektieren (Barrierefreiheit) */
 @media (prefers-reduced-motion: reduce) {
   * {
@@ -155,6 +175,10 @@ html[data-theme="dark"] {
   --color-border: #1f2937;
 }
 
+/* 
+ * === Global styles ==============================================================================
+ */
+
 .component-error-boundary {
   /* Box-Model: Sorgt für Abstand zum Rest der App */
   margin: 1.5rem; /* Außenabstand, wie bei deinen anderen Sektionen */
@@ -162,11 +186,11 @@ html[data-theme="dark"] {
 
   /* Farben: Klare Fehler-Semantik mit sanften Tönen */
   background-color: #fff5f5; /* Sehr helles Rot, fast rosa (wie Tailwind red-50) */
-  color: #c53030;            /* Dunkles, gut lesbares Rot für Text (wie Tailwind red-700) */
-  
+  color: #c53030; /* Dunkles, gut lesbares Rot für Text (wie Tailwind red-700) */
+
   /* Rahmen: Definiert die "Grenze" der Komponente klar */
   border: 2px solid #ef4444; /* Klares, aber nicht zu grelles Rot (wie Tailwind red-500) */
-  border-radius: 8px;        /* Passt zu deinem bestehenden Design */
+  border-radius: 8px; /* Passt zu deinem bestehenden Design */
 }
 
 /* Styling für die Überschrift innerhalb der Fehlerbox */
@@ -174,7 +198,7 @@ html[data-theme="dark"] {
   margin-top: 0;
   margin-bottom: 0.75rem;
   font-size: 1.25rem; /* Etwas größer als normaler Text */
-  color: #9b2c2c;      /* Noch dunkleres Rot für mehr Gewicht (wie Tailwind red-800) */
+  color: #9b2c2c; /* Noch dunkleres Rot für mehr Gewicht (wie Tailwind red-800) */
   border-bottom: 1px solid #fecaca; /* Leichte Trennlinie */
   padding-bottom: 0.5rem;
 }
@@ -189,14 +213,28 @@ html[data-theme="dark"] {
 /* Styling für die technische Fehlermeldung (pre-Block) */
 .component-error-boundary pre {
   background-color: #fee2e2; /* Etwas dunklerer Hintergrund zur Abhebung (wie Tailwind red-100) */
-  color: #7f1d1d;            /* Sehr dunkles Rot für maximale Lesbarkeit (wie Tailwind red-900) */
+  color: #7f1d1d; /* Sehr dunkles Rot für maximale Lesbarkeit (wie Tailwind red-900) */
   padding: 0.75rem 1rem;
   border-radius: 6px;
-  
+
   /* Wichtige Eigenschaften für lange Fehlermeldungen */
-  white-space: pre-wrap;     /* Zeilenumbruch, verhindert horizontales Scrollen */
-  word-break: break-all;     /* Bricht auch sehr lange Wörter/Tokens um */
-  
-  font-size: 0.875rem;       /* Etwas kleiner, um es als "Code" zu kennzeichnen */
+  white-space: pre-wrap; /* Zeilenumbruch, verhindert horizontales Scrollen */
+  word-break: break-all; /* Bricht auch sehr lange Wörter/Tokens um */
+
+  font-size: 0.875rem; /* Etwas kleiner, um es als "Code" zu kennzeichnen */
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.component-debug-boundary {
+  /* Box-Model: Sorgt für Abstand zum Rest der App */
+  margin: 1.5rem; /* Außenabstand, wie bei deinen anderen Sektionen */
+  padding: 1.5rem; /* Innenabstand für den Inhalt */
+
+  /* Farben: Klare Fehler-Semantik mit sanften Tönen */
+  background-color: var(--color-background-info);
+  color: var(--color-background-border); 
+
+  /* Rahmen: Definiert die "Grenze" der Komponente klar */
+  border: 2px solid var(--color-background-border); /* Klares, aber nicht zu grelles Rot (wie Tailwind red-500) */
+  border-radius: 8px; /* Passt zu deinem bestehenden Design */
 }

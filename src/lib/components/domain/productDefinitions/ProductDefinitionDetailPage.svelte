@@ -162,7 +162,7 @@
       const newId = event.data?.product_def_id;
       if (newId) {
         // Redirect to the new edit page
-        goto(`/categories/0/product-definitions/${newId}`, { invalidateAll: true }); // categoryId is a placeholder
+        goto(`/categories/${resolvedData?.categoryId}/productdefinitions/${newId}`, { invalidateAll: true }); // categoryId is a placeholder
       } else {
         addNotification("Could not redirect to edit page, ID is missing.", "error");
       }

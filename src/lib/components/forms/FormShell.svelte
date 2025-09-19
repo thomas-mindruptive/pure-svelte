@@ -2,6 +2,7 @@
   lang="ts"
   generics="T extends Record<string, any> = Record<string, any>"
 >
+
   // ========================================================================
   // IMPORTS
   // ========================================================================
@@ -28,7 +29,7 @@
     ChangedCallback,
     FormData,
   } from "./forms.types";
-    import { coerceErrorMessage } from "$lib/utils/errorUtils";
+  import { coerceErrorMessage } from "$lib/utils/errorUtils";
 
   // ========================================================================
   // TYPE DEFINITIONS
@@ -49,14 +50,9 @@
     data: FormData<T>;
 
     // Path-based setters/getters for nested data
-    set<P extends NonEmptyPath<FormData<T>>>(
-      path: readonly [...P],
-      value: PathValue<T, P>,
-    ): void;
+    set<P extends NonEmptyPath<FormData<T>>>(path: readonly [...P], value: PathValue<T, P>): void;
 
-    get<P extends NonEmptyPath<FormData<T>>>(
-      path: readonly [...P],
-    ): PathValue<FormData<T>, P> | undefined;
+    get<P extends NonEmptyPath<FormData<T>>>(path: readonly [...P]): PathValue<FormData<T>, P> | undefined;
 
     // Simple key-based getter for top-level properties
     getS<K extends keyof FormData<T>>(key: K): FormData<T>[K] | undefined;
@@ -120,6 +116,7 @@
   // COMPONENT PROPS
   // ========================================================================
 
+  // Deconstruct props.
   const {
     // Core data and lifecycle
     initial = {} as FormData<T>,
@@ -164,12 +161,6 @@
    */
   function coerceMessage(e: unknown): string {
     return coerceErrorMessage(e);
-    // if (e instanceof Error) return e.message;
-    // try {
-    //   return JSON.stringify(e);
-    // } catch {
-    //   return String(e);
-    // }
   }
 
   // ========================================================================
@@ -202,20 +193,17 @@
   /**
    * Handle input changes with validation and change notifications
    */
-  export function set<P extends NonEmptyPath<FormData<T>>>(
-    path: readonly [...P],
-    value: PathValue<T, P>,
-  ): void {
+  export function set<P extends NonEmptyPath<FormData<T>>>(path: readonly [...P], value: PathValue<T, P>): void {
     internalSet(path, value);
 
     // Notify parent of data change
     try {
-      log.debug(`Before calling parent's onChanged`);
+      console.log(`Before calling parent's onChanged, vaule:`, value);
+      log.debug(`Before calling parent's onChanged, value:`, value);
       onChanged?.({
         data: pureDataDeepClone(formState.data),
         dirty: isDirty(),
       });
-      log.debug("AFTER calling parent's onChanged");
     } catch (e) {
       log.error("onChanged threw error", {
         component: "FormShell",
@@ -233,27 +221,19 @@
   /**
    * Internal setter for nested path-based updates
    */
-  function internalSet<P extends NonEmptyPath<FormData<T>>>(
-    path: readonly [...P],
-    value: PathValue<FormData<T>, P>,
-  ) {
+  function internalSet<P extends NonEmptyPath<FormData<T>>>(path: readonly [...P], value: PathValue<FormData<T>, P>) {
     log.debug(`path: ${path}, value: `, value);
     try {
       pathUtils.set<FormData<T>, P>(formState.data, path, value);
     } catch (e) {
-      log.error(
-        { component: "FormShell", entity, path, error: coerceMessage(e) },
-        "set failed",
-      );
+      log.error({ component: "FormShell", entity, path, error: coerceMessage(e) }, "set failed");
     }
   }
 
   /**
    * Get value at nested path
    */
-  export function get<P extends NonEmptyPath<FormData<T>>>(
-    path: readonly [...P],
-  ): PathValue<FormData<T>, P> | undefined {
+  export function get<P extends NonEmptyPath<FormData<T>>>(path: readonly [...P]): PathValue<FormData<T>, P> | undefined {
     try {
       return pathUtils.get(formState.data, path);
     } catch (e) {
@@ -270,9 +250,7 @@
   /**
    * Get value by simple key (top-level properties)
    */
-  export function getS<K extends keyof FormData<T>>(
-    key: K,
-  ): FormData<T>[K] | undefined {
+  export function getS<K extends keyof FormData<T>>(key: K): FormData<T>[K] | undefined {
     try {
       return pathUtils.get(formState.data, key);
     } catch (e) {
@@ -292,14 +270,9 @@
   function isDirty(): boolean {
     try {
       const currentSnapshot = pureDataDeepClone(formState.data);
-      return (
-        JSON.stringify(currentSnapshot) !== JSON.stringify(formState.snapshot)
-      );
+      return JSON.stringify(currentSnapshot) !== JSON.stringify(formState.snapshot);
     } catch {
-      log.warn(
-        { component: "FormShell", entity },
-        "isDirty comparison failed, assuming dirty",
-      );
+      log.warn({ component: "FormShell", entity }, "isDirty comparison failed, assuming dirty");
       return true; // Fail-safe: assume dirty if comparison fails
     }
   }
@@ -352,10 +325,7 @@
       }
       return !!res?.valid;
     } catch (e) {
-      log.warn(
-        { component: "FormShell", entity, error: coerceMessage(e) },
-        "validate threw",
-      );
+      log.warn({ component: "FormShell", entity, error: coerceMessage(e) }, "validate threw");
       return true; // Fail-open on validator errors
     } finally {
       formState.validating = false;
@@ -398,10 +368,7 @@
             error: new Error("Validation failed before submission."),
           });
         } catch (e) {
-          log.error(
-            { component: "FormShell", entity, error: coerceMessage(e) },
-            "onSubmitError threw",
-          );
+          log.error({ component: "FormShell", entity, error: coerceMessage(e) }, "onSubmitError threw");
         }
         return;
       }
@@ -426,23 +393,17 @@
         log.info("FORM_SUBMITTED", { entity, newObjectClone });
       } else {
         // Fallback if API returns no data: just mark the form as clean.
-        log.error(`submitCbk did not return a valid object. Should not happen.`, {result})
+        log.error(`submitCbk did not return a valid object. Should not happen.`, { result });
         formState.snapshot = pureDataClone;
-        // Do not call onsubmitted because we are in an invalid state. 
+        // Do not call onsubmitted because we are in an invalid state.
       }
     } catch (e) {
-      log.error(
-        { component: "FormShell", entity, error: coerceMessage(e) },
-        "FORM_SUBMIT_FAILED",
-      );
+      log.error({ component: "FormShell", entity, error: coerceMessage(e) }, "FORM_SUBMIT_FAILED");
 
       try {
         onSubmitError?.({ data: pureDataDeepClone(formState.data), error: e });
       } catch (e) {
-        log.error(
-          { component: "FormShell", entity, error: coerceMessage(e) },
-          "onSubmitError threw",
-        );
+        log.error({ component: "FormShell", entity, error: coerceMessage(e) }, "onSubmitError threw");
       }
     } finally {
       formState.submitting = false;
@@ -458,10 +419,7 @@
     try {
       onCancel?.(pureDataDeepClone(formState.data));
     } catch (e) {
-      log.warn(
-        { component: "FormShell", entity, error: coerceMessage(e) },
-        "onCancel threw",
-      );
+      log.warn({ component: "FormShell", entity, error: coerceMessage(e) }, "onCancel threw");
     } finally {
       const detail: { data: FormData<T>; reason?: string } = {
         data: pureDataDeepClone(formState.data),
@@ -471,10 +429,7 @@
       try {
         onCancelled?.(detail);
       } catch (e) {
-        log.error(
-          { component: "FormShell", entity, error: coerceMessage(e) },
-          "onCancelled threw",
-        );
+        log.error({ component: "FormShell", entity, error: coerceMessage(e) }, "onCancelled threw");
       }
     }
   }
@@ -560,7 +515,6 @@
     return () => formEl?.removeEventListener("keydown", keyHandler);
   });
 
-  // Debug logging
   log.debug(`(FormShell) props:`, {
     entity,
     initial,
@@ -587,6 +541,13 @@
   }}
   aria-busy={formState.submitting || formState.validating}
 >
+  <details class="component-debug-boundary">
+    <summary>FormShell Debug:</summary>
+    <div>
+      <pre>{@html JSON.stringify({ initial, disabled, entity }, null, 4)}</pre>
+    </div>
+  </details>
+
   <!-- Header area -->
   <div class="pc-grid__toolbar">
     {#if header}
@@ -600,16 +561,25 @@
 
   <!-- Error summary (polite) -->
   {#if Object.keys(formState.errors).length > 0}
-    <div class="pc-grid__empty" aria-live="polite">
+    <div
+      class="component-error-boundary pc-grid__empty"
+      aria-live="polite"
+    >
       <!-- Compact summary of first messages per field -->
       {#each Object.entries(formState.errors) as [path, msgs]}
-        <div><strong>{path}</strong>: {msgs[0]}</div>
+        <div>
+          <strong>{path}</strong>
+          : {msgs[0]}
+        </div>
       {/each}
     </div>
   {/if}
 
   <!-- Fields region -->
-  <div class="pc-grid__scroller" style="padding: 0.5rem 0.75rem;">
+  <div
+    class="pc-grid__scroller"
+    style="padding: 0.5rem 0.75rem;"
+  >
     {#if fields}
       {@render fields(fieldsProps)}
     {:else}
@@ -618,7 +588,10 @@
   </div>
 
   <!-- Footer / actions -->
-  <div class="pc-grid__toolbar" style="justify-content: end; gap: .5rem;">
+  <div
+    class="pc-grid__toolbar"
+    style="justify-content: end; gap: .5rem;"
+  >
     {#if actions}
       {@render actions(actionsProps)}
     {:else}

@@ -188,54 +188,48 @@
 
   // ===== SUBMISSION LOGIC =====
 
-  async function submitOffering(formStateClone: Record<string, any>): Promise<WholesalerItemOffering> {
-    log.debug(`Submitting data:`, formStateClone);
-    // Wir können uns darauf verlassen, dass der formStateClone dank der Vorbereitung
-    // im $derived.by-Block bereits alle notwendigen IDs und Platzhalter enthält.
-    assertDefined(formStateClone, "submitOffering: formStateClone cannot be null");
+/**
+ * Handles the submission logic for both creating a new offering and updating an existing one.
+ * It relies on the 'isCreateMode' flag to decide which API endpoint to call.
+ * The formStateClone is trusted to contain all necessary IDs for the operation.
+ * @param formStateClone A deep clone of the current form state.
+ * @returns A promise that resolves to the created or updated offering object.
+ */
+async function submitOffering(formStateClone: Record<string, any>): Promise<WholesalerItemOffering> {
+  // We trust that the formStateClone is a valid object, as FormShell creates it.
+  assertDefined(formStateClone, "submitOffering: formStateClone cannot be null.");
 
-    // Cast zum Ziel-Datentyp ist hier sicher, da wir den initialen Zustand kontrollieren.
-    const dataToSubmit = formStateClone as WholesalerItemOffering_ProductDef_Category_Supplier;
-    assertDefined(dataToSubmit, "submitOffering: wholsaler_id, category_id, product_def_id must be defined", ["wholesaler_id"], ["category_id"], ["product_def_id"]);
+  // Cast the generic record to our specific type for type safety.
+  const dataToSubmit = formStateClone as WholesalerItemOffering;
 
-    if (isCreateMode) {
-      // --- CREATE MODE ---
-      log.info("(OfferingForm) Submitting in CREATE mode...");
+  if (isCreateMode) {
+    // --- CREATE MODE ---
+    // In create mode, the object in formStateClone was built by our $derived.by logic.
+    // It already contains the correct context IDs (supplier_id, category_id, product_def_id).
+    log.info(`(OfferingForm) Submitting CREATE to API...`, { dataToSubmit });
+    assertDefined(dataToSubmit, `Must be defined: ["wholesaler_id"], ["category_id"], ["product_def_id"]`, ["wholesaler_id"], ["category_id"], ["product_def_id"]);
+    return await offeringApi.createOffering(dataToSubmit);
 
-      // Wir entfernen die Platzhalter-ID '0' und alle schreibgeschützten Join-Felder,
-      // bevor wir die Daten an die create-API senden.
-      const {
-        offering_id,
-        product_def_title,
-        category_name,
-        wholesaler_name,
-        // ...alle anderen Felder, die nur zum Lesen da sind...
-        ...createData
-      } = dataToSubmit;
+  } else {
+    // --- UPDATE MODE ---
+    // In update mode, the formStateClone contains the full offering object, including its real ID.
+    log.info("(OfferingForm) Submitting in UPDATE mode...");
 
-      log.warn(`(OfferingForm) Submitting CREATE to API...`, { createData });
-      return await offeringApi.createOffering(createData);
-    } else {
-      // --- UPDATE MODE ---
-      log.info("(OfferingForm) Submitting in UPDATE mode...");
-
-      // Die ID ist für das Update zwingend erforderlich.
-      const { offering_id } = dataToSubmit;
-      assertDefined(offering_id, "offering_id must be a positive number for an update");
-
-      if (offering_id === 0) {
-        // Sicherheitsnetz, falls doch mal was schiefgeht
-        throw new Error("Cannot update offering with placeholder ID 0.");
-      }
-
-      // Für das Update-API können wir das gesamte Objekt übergeben.
-      // Die API sollte robust genug sein, nur die änderbaren Felder zu berücksichtigen.
-      const updateData = dataToSubmit as Partial<WholesalerItemOffering>;
-
-      log.warn(`(OfferingForm) Submitting UPDATE to API...`, { id: offering_id, updateData });
-      return await offeringApi.updateOffering(offering_id, updateData);
+    // Use assertDefined to ensure the offering_id exists and is a valid number for the update operation.
+    // This is a crucial runtime check.
+    assertDefined(dataToSubmit, "submitOffering: offering_id must be defined for an update.", ["offering_id"]);
+    
+    // Safety check against placeholder ID, even though it shouldn't happen in update mode.
+    if (dataToSubmit.offering_id === 0) {
+      throw new Error("Cannot update offering with a placeholder ID of 0.");
     }
+    
+    const updateData = dataToSubmit as Partial<WholesalerItemOffering>;
+
+    log.warn(`(OfferingForm) Submitting UPDATE to API...`, { id: dataToSubmit.offering_id, updateData });
+    return await offeringApi.updateOffering(dataToSubmit.offering_id, updateData);
   }
+}
 
   // ===== EVENT HANDLERS =====
 

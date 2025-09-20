@@ -399,7 +399,6 @@
       }
     } catch (e) {
       log.error({ component: "FormShell", entity, error: coerceMessage(e) }, "FORM_SUBMIT_FAILED");
-
       try {
         onSubmitError?.({ data: pureDataDeepClone(formState.data), error: e });
       } catch (e) {

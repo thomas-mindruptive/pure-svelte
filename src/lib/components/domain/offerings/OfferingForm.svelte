@@ -96,21 +96,6 @@
       availableProducts: data.availableProducts ?? null,
       availableSuppliers: data.availableSuppliers ?? null,
     };
-
-    // const result = OfferingDetail_LoadDataSchema.safeParse(initialLoadedData);
-    // // The validation checks for the combination of "isCreateMode" etc. are done by the caller(s), e.g.
-    // // in offingBaseLoads.ts.
-    // return {
-    //   validatedData: result.success ? result.data : null,
-    //   errors: result.success ? null : result.error.issues,
-    //   isValid: result.success,
-    //   initialValidatedOfferingData: result.success ? (result.data?.offering ?? null) : null,
-    //   supplierId: result.success ? (result.data?.supplierId ?? null) : null,
-    //   categoryId: result.success ? (result.data?.categoryId ?? null) : null,
-    //   productDefId: result.success ? (result.data?.productDefId ?? null) : null,
-    //   availableProducts: result.success ? (result.data?.availableProducts ?? null) : null,
-    //   availableSuppliers: result.success ? (result.data?.availableSuppliers ?? null) : null,
-    //};
   });
 
   $effect(() => {

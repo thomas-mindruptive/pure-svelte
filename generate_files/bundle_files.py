@@ -35,6 +35,7 @@ EXCLUDE_PATTERNS = [
     "tools",
     "node_modules",
     "lib/server",
+    "src/routes"
     ".git",
     ".venv",
     ".vscode",
@@ -60,7 +61,7 @@ INCLUDE_PATTERNS: List[str] = [
     # "src/lib/components/sidebarAndNav/**",
     # "src/routes/(browser)/*.*",
     # "**"
-    "src/lib/components/domain/offerings/**",
+    # "src/lib/components/domain/offerings/**",
 ]  
 
 # =========================

@@ -194,6 +194,10 @@ To ensure API consistency, deletion operations adhere to one of three distinct p
 | **n:m Assignment** | `/api/[parent]-[child]` | `DELETE` | `RemoveAssignmentRequest` | Removes a link between two entities. Requires both IDs to identify the unique relationship. |
 | **1:n Child** | `/api/[parent]-[child]` | `DELETE` | `DeleteRequest<{id}>` | Deletes a child entity that has its own unique ID. Follows the standard `DeleteRequest` pattern. |
 
+### API Client Composition
+
+The architecture promotes the creation of specific, composable API client functions. A prime example is the new `categoryApi.loadSuppliersForCategory()` function. It fulfills the specific UI requirement of finding all suppliers for a category by intelligently reusing the existing, powerful `supplier_categories` named query on the `/api/query` endpoint. This demonstrates how the backend's flexible query capabilities can be leveraged to create clean, purposeful functions on the client without requiring new backend endpoints for every view.
+
 ---
 
 ## Current Implementation Status
@@ -241,20 +245,24 @@ To ensure API consistency, deletion operations adhere to one of three distinct p
 
 ## Architectural Decisions & Ongoing Work
 
-### **CORRECTED:** Architectural Decision: Loading Available Entities for New Offerings
+### **FINALIZED:** Architectural Decision: Loading Entities for New Offerings
 
 A core business rule is that a supplier can have **multiple, distinct offerings for the same product definition** (e.g., to represent different sizes, colors, or conditions). The initial architectural assumption of using a SQL `LEFT JOIN` / `IS NULL` (anti-join) to find "available" products was therefore **incorrect**, as it would filter out a product as soon as the first offering was created, preventing the creation of variants.
 
-**The Corrected Architectural Solution:**
-Instead of using a complex and logically flawed anti-join, the system now follows a simpler, more robust pattern:
+**The Corrected and Final Architectural Solution:**
+To support this business rule and enable a reusable `OfferingForm`, the system now follows a context-aware loading pattern. Instead of using a logically flawed anti-join, the UI's `load` function fetches the complete list of valid parent entities depending on the user's navigation context.
 
-1.  **Load All Relevant Parents:** When creating a new `Offering`, the UI must load **all** potential parent entities for the given context.
-    *   **From Supplier Context (`/suppliers/...`):** The `OfferingForm` loads **all** `ProductDefinitions` that belong to the selected `ProductCategory`.
-    *   **From Product Context (`/categories/...`):** The `OfferingForm` will load **all** `Wholesalers` that are assigned to the `ProductCategory` of the current `ProductDefinition`.
+1.  **Supplier Context (`/suppliers/.../offerings/new`):**
+    *   When a user creates an offering for a specific supplier, the UI must present a choice of all possible products.
+    *   **Action:** The `load` function calls the API to fetch **all** `ProductDefinitions` that belong to the selected `ProductCategory`.
+    *   **UI:** The `OfferingForm` renders a dropdown list of these products.
 
-2.  **No Client-Side Filtering:** The client does not perform any logic to filter out entities for which offerings already exist. The selection dropdowns in the `OfferingForm` always present the complete list of valid parent entities.
+2.  **Product Context (`/categories/.../productdefinitions/.../offerings/new`):**
+    *   When a user creates an offering for a specific product, the UI must present a choice of all possible suppliers.
+    *   **Action:** The `load` function calls the new `categoryApi.loadSuppliersForCategory()` function to fetch **all** `Wholesalers` assigned to the `ProductCategory` of the current `ProductDefinition`.
+    *   **UI:** The `OfferingForm` renders a dropdown list of these suppliers.
 
-This corrected approach simplifies the client-side API, aligns with the business requirements, and removes the need for complex, misuse-prone queries. The flexibility is now correctly placed in the data model, not in a restrictive query.
+This corrected approach simplifies the client-side API, aligns perfectly with the business requirements, and removes complex, misuse-prone queries. The flexibility is now correctly placed in the data model and handled by a context-aware UI.
 
 ### Future Architectural Enhancements
 
@@ -300,7 +308,7 @@ This payload is sent from the client to a server endpoint (e.g., `/api/suppliers
 Zod is the single source of truth for the **shape** of data on the frontend. It allows us to define a data structure once and get both static TypeScript types and runtime validation for free.
 
 #### Usage on the Frontend (Client-Side)
-1.  **Defining Data Contracts for `load` Functions:** Zod schemas (e.g., `SupplierDetailPage_LoadDataSchema`) define the exact shape of the data that a page component expects to receive.
+1.  **Defining Data Contracts for `load` Functions:** Zod schemas (e.g., `SupplierDetailPage_LoadDataSchema`) define the exact shape of the data that a page component expects to receive. A key example is the `OfferingDetail_LoadDataSchema`, which was adapted to include context flags (`isCreateMode`, `isSuppliersRoute`) and optional data lists (`availableProducts`, `availableSuppliers`) to support the reusable `OfferingForm`'s data requirements from different `load` functions.
 2.  **Validating Component Props:** Components use Zod schemas internally to validate their inputs upon initialization, creating robust, "self-defending" components.
 
 #### Current Status on the Server-Side
@@ -329,6 +337,16 @@ To create reusable yet fully type-safe forms, the project uses this robust patte
 
 #### The "Smart" Parent: `SupplierForm.svelte`
 - A specific component that knows everything about a `Wholesaler`. It provides the domain-specific `validate` and `submit` functions to the `FormShell`.
+
+### Case Study: Context-Aware Reusable Forms (`OfferingForm`)
+The `OfferingForm` is a prime example of the "Smart Parent / Dumb Shell" pattern applied to a complex, reusable component. It is designed to be used from two different navigation contexts: creating an offering for a specific supplier, or creating an offering for a specific product.
+
+- **Context Detection:** The form receives a comprehensive `initialLoadedData` prop from its parent wrapper. It uses Svelte 5's `$derived` rune to determine its context from boolean flags within this data (e.g., `isSuppliersRoute`, `isCategoriesRoute`).
+- **Conditional UI:** Based on the detected context, the form conditionally renders the appropriate UI. In the "Supplier Context", it displays a dropdown of available products. In the "Product Context", it displays a dropdown of available suppliers.
+- **Intelligent State Preparation:** A `$derived.by` block prepares a consistent `initial` data object for the underlying `FormShell`. In "Create" mode, this object is pre-populated with the fixed context IDs (e.g., `supplier_id` or `product_def_id`) received from the props.
+- **Contextual Submission Logic:** The `submitOffering` function contains the final piece of intelligence. In "Create" mode, it correctly assembles the final data payload for the API by combining the fixed context IDs with the IDs selected by the user in the dropdown.
+
+This pattern makes the `OfferingForm` highly reusable and decouples it from the specific routes, while keeping all context-specific logic clearly organized within the component itself.
 
 ### Frontend Navigation Architecture: Context Conservation
 The application employs a **"Context Conservation"** pattern to create an intuitive hierarchical browsing experience. The system remembers the deepest path the user has explored and reflects this state consistently across the `HierarchySidebar` and `Breadcrumb` components, only pruning the path when the user explicitly changes context on a higher level.
@@ -404,5 +422,3 @@ This application solves the problem by establishing a "Controlled Bridge" patter
 2.  **Casting Data Up (`{@const}`):** Immediately casting the weakly-typed `data` object from the shell's snippet back to the specific type within the parent's template.
 
 This guarantees that any property access is fully type-checked by the compiler, preventing runtime errors.
-
-

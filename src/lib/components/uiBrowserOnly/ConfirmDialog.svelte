@@ -7,8 +7,6 @@
 
   let dialog: HTMLDialogElement;
 
-  //const rawMessage = $state($confirmationStore.message);
-
   const formattedMessage = $derived.by(() => {
     const messageFromStore = $confirmationStore.message;
     if (browser) {

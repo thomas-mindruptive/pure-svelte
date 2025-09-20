@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { default as confirmationStore } from "$lib/stores/confirmation";
+  import { default as confirmationStore, type ConfirmationOption } from "$lib/stores/confirmation";
   import { fade } from "svelte/transition";
   import DOMPurify from "dompurify";
   import { browser } from "$app/environment";
@@ -7,7 +7,7 @@
 
   let dialog: HTMLDialogElement;
 
-  let selectedOptions = $state<string[]>([]);
+  let selectedOptions = $state<ConfirmationOption[]>([]);
 
   const formattedMessage = $derived.by(() => {
     const messageFromStore = $confirmationStore.message;
@@ -33,13 +33,13 @@
 
   function handleConfirm() {
     // Ruft die gespeicherte resolve-Funktion mit 'true' auf
-    $confirmationStore.resolve?.({confirmed: true, selectedOptions});
+    $confirmationStore.resolve?.({ confirmed: true, selectedOptions });
     confirmationStore.set({ ...$confirmationStore, isOpen: false });
   }
 
   function handleCancel() {
     // Ruft die gespeicherte resolve-Funktion mit 'false' auf
-    $confirmationStore.resolve?.({confirmed: false, selectedOptions});
+    $confirmationStore.resolve?.({ confirmed: false, selectedOptions });
     confirmationStore.set({ ...$confirmationStore, isOpen: false });
   }
 
@@ -64,13 +64,15 @@
       <h3>{$confirmationStore.title}</h3>
       <p>{@html formattedMessage}</p>
       <div id="options">
-        {#each $confirmationStore.options?? [] as option (option) }
-            <input class="option-checkbox" 
-            type="checkbox" 
-            name="{option}" 
-            value="{option}"
+        {#each $confirmationStore.options ?? [] as option (option.name)}
+          <input
+            class="option-checkbox"
+            type="checkbox"
+            name={option.name}
+            value={option}
             bind:group={selectedOptions}
-            /><span>{option}</span>
+          />
+          <span>{option.description}</span>
         {/each}
       </div>
       <div class="dialog-actions">
@@ -148,7 +150,7 @@
     background-color: #c82333;
   }
 
-.option-checkbox:not(:first-child) {
-  margin-left: 2rem; /* oder margin-top je nach Layout */
-}
+  .option-checkbox:not(:first-child) {
+    margin-left: 2rem; /* oder margin-top je nach Layout */
+  }
 </style>

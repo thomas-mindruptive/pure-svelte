@@ -130,6 +130,7 @@ export function getProductDefinitionApi(client: ApiClient) {
     async deleteProductDefinition(
       productDefId: number,
       cascade = false,
+      forceCascade = false
     ): Promise<DeleteApiResponse<Pick<ProductDefinition, "product_def_id" | "title">, string[]>> {
       const operationId = `deleteProductDefinition-${productDefId}`;
       productDefinitionLoadingManager.start(operationId);
@@ -138,6 +139,7 @@ export function getProductDefinitionApi(client: ApiClient) {
         const removeRequest: DeleteRequest<ProductDefinition> = {
           id: productDefId,
           cascade,
+          forceCascade
         };
         const body = createPostBody(removeRequest);
 

@@ -2,7 +2,7 @@
   import { goto } from "$app/navigation";
   import { log } from "$lib/utils/logger";
   import { addNotification } from "$lib/stores/notifications";
-  import { requestConfirmation } from "$lib/stores/confirmation";
+  import { requestConfirmation, type ConfirmationOption } from "$lib/stores/confirmation";
   import { page } from "$app/state";
 
   // Component Imports
@@ -38,6 +38,7 @@
   let isLoading = $state(true);
   let loadingError = $state<{ message: string; status?: number } | null>(null);
   const isCreateMode = $derived(!resolvedData?.category);
+  const allowForceCascadingDelte = $state(true);
 
   // === LOAD =====================================================================================
 
@@ -186,35 +187,52 @@
 
     let dataChanged = false;
     for (const id of ids) {
-      const [categoryIdStr, productDefIdStr] = String(id).split("-");
-      const categoryId = Number(categoryIdStr);
-      const productDefId = Number(productDefIdStr);
-      if (isNaN(productDefId) || isNaN(categoryId)) {
-        throw new Error(`Invalid categoryId or productDefId: ${id}`);
+      const productDefId = Number(id);
+      if (isNaN(productDefId)) {
+        throw new Error(`Invalid productDefId: ${id}`);
       }
 
       const initialResult = await productDefApi.deleteProductDefinition(productDefId);
 
       if (initialResult.success) {
+        log.debug(`Delte successful`);
         addNotification(`Product definition delted.`, "success");
         dataChanged = true;
-      } else if ("cascade_available" in initialResult && initialResult.cascade_available) {
+      } else if (("cascade_available" in initialResult && initialResult.cascade_available) || allowForceCascadingDelte) {
+        log.debug(`Delete not successful but cascade_available`, { initialResult, allowForceCascadingDelte });
         const offeringCount = (initialResult.dependencies as any)?.offering_count ?? 0;
         const confirmed = await requestConfirmation(
-          `This category has ${offeringCount} offerings for this category. Remove these offerings (will be removed from suppliers, too!)?`,
+          `This category has ${offeringCount} offerings for this category.` +
+            `\nRemove these offerings (will be removed from suppliers, too!)?` +
+            `\n${initialResult.dependencies}`,
           "Confirm Cascade Delete",
+          [{ name: "forceCascade", description: "Are you sure to force cascading delte?" }],
         );
-        if (confirmed.confirmed) {
-          const cascadeResult = await productDefApi.deleteProductDefinition(productDefId, true);
+        if (
+          confirmed.confirmed &&
+          confirmed.selectedOptions &&
+          confirmed.selectedOptions.findIndex((value: ConfirmationOption) => value.name === "forceCascade") >= 0
+        ) {
+          const cascadeResult = await productDefApi.deleteProductDefinition(productDefId, true, true);
           if (cascadeResult.success) {
+            log.debug(`Cascade delete successful`);
             addNotification("Category assignment and its offerings removed.", "success");
             dataChanged = true;
           } else {
-            addNotification(cascadeResult.message || "Failed to remove assignment.", "error");
+            log.debug(`Cascade delete NOT successful`, cascadeResult);
+            addNotification(cascadeResult.message || "Could not delete product defintion.", "error", 5000);
           }
+        } else {
+          log.debug(`Dialog not confirmed or no forceCascade`);
+          addNotification("Could not delete product defintion.", "error", 5000);
         }
       } else {
-        addNotification(initialResult.message || "Could not remove assignment.", "error");
+        log.debug(`Delete not successful and NO cascade_available`, initialResult);
+        addNotification(
+          (initialResult.message || "Could not delete product defintion.") + " - " + JSON.stringify(initialResult.dependencies),
+          "error",
+          5000,
+        );
       }
     }
 

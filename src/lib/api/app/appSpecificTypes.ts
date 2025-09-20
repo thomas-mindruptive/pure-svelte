@@ -48,10 +48,10 @@ type DeletedSupplierCategoryData = Pick<WholesalerCategory_Category, 'wholesaler
 export type RemoveCategorySuccessResponse = DeleteSuccessResponse<DeletedSupplierCategoryData>;
 
 /** The dependency structure for a category assignment removal conflict. */
-type SupplierCategoryDependencies = { offering_count: number };
+//type SupplierCategoryDependencies = { offering_count: number };
 
 /** The exact conflict response for removing a category assignment. */
-export type RemoveCategoryConflictResponse = DeleteConflictResponse<SupplierCategoryDependencies>;
+export type RemoveCategoryConflictResponse = DeleteConflictResponse<{hard: string[], soft: string[]}>;
 
 /** The complete, explicit response union for the `removeCategoryFromSupplier` operation. */
 export type RemoveCategoryApiResponse = 

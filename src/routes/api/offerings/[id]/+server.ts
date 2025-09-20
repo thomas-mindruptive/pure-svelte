@@ -222,7 +222,7 @@ export const DELETE: RequestHandler = async ({ request }) => {
         message: "Cannot delete offering: dependencies exist.",
         status_code: 409,
         error_code: "DEPENDENCY_CONFLICT",
-        dependencies: dependencies,
+        dependencies: {soft: dependencies, hard: []},
         cascade_available: true,
         meta: { timestamp: new Date().toISOString() },
       };

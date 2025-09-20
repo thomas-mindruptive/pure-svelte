@@ -1,23 +1,27 @@
 // src/lib/stores/confirmation.ts
-import { writable } from 'svelte/store';
+import { writable } from "svelte/store";
 
+export interface ConfirmationOption {
+  name: string;
+  description: string;
+}
 interface ConfirmationState {
   isOpen: boolean;
   message: string;
   title: string;
-  options?: string[] | undefined,
-  resolve?: (value: ConfirmationResult) => void; 
+  options?: ConfirmationOption[] | undefined;
+  resolve?: (value: ConfirmationResult) => void;
 }
 
 interface ConfirmationResult {
   confirmed: boolean;
-  selectedOptions?: string[];
+  selectedOptions?: ConfirmationOption[];
 }
 
 const initialState: ConfirmationState = {
   isOpen: false,
-  message: '',
-  title: 'Confirmation',
+  message: "",
+  title: "Confirmation",
 };
 
 const confirmationStore = writable<ConfirmationState>(initialState);
@@ -31,7 +35,7 @@ export function reset() {
  * @param message Die Frage, die dem Benutzer angezeigt wird.
  * @param title (Optional) Ein Titel für den Dialog.
  */
-export function requestConfirmation(message: string, title = 'Confirm', options?: string[]): Promise<ConfirmationResult> {
+export function requestConfirmation(message: string, title = "Confirm", options?: ConfirmationOption[]): Promise<ConfirmationResult> {
   return new Promise<ConfirmationResult>((resolve) => {
     confirmationStore.set({
       isOpen: true,

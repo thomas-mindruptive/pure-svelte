@@ -133,7 +133,7 @@
         const dialogResult = await requestConfirmation(
           `This offering has dependencies.\n${JSON.stringify(result.dependencies)}\nDelete the offering AND all its related data?`,
           "Confirm Cascade Delete",
-          ["aaa", "bbb"]
+          [{name: "aaa", description: "aaa description"}, {name: "bbb", description: "bbb description"}]
         );
         
         log.debug(`Confirm result: `, dialogResult);

@@ -97,6 +97,7 @@ export type CreateChildRequest<TParent, TChild> = {
 export type DeleteRequest<T> = {
     id: T[IdField<T>];
     cascade?: boolean;
+    forceCascade?: boolean
 };
 
 // /**
@@ -180,7 +181,7 @@ export type DeleteSuccessResponse<TDeletedResource> = ApiSuccessResponse<DeleteS
 
 export interface DeleteConflictResponse<TDependencies> extends ApiErrorResponse {
     error_code: 'DEPENDENCY_CONFLICT';
-    dependencies: TDependencies;
+    dependencies: {hard: TDependencies, soft: TDependencies};
     cascade_available: boolean; 
 }
 

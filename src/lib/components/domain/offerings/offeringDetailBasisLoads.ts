@@ -9,7 +9,6 @@ import { getOfferingApi } from "$lib/api/client/offering";
 import { log } from "$lib/utils/logger";
 import { error, type LoadEvent } from "@sveltejs/kit";
 import type { OfferingDetail_LoadDataAsync } from "./offeringDetail.types";
-import { getSupplierApi } from "$lib/api/client/supplier";
 import { type ProductDefinition, type Wholesaler } from "$lib/domain/domainTypes";
 import { getCategoryApi } from "$lib/api/client/category";
 import { parseUrlSegments } from "$lib/utils/url";
@@ -35,7 +34,6 @@ export function loadOfferingDetailBasisData({
 
   const client = new ApiClient(fetchLoad);
   const offeringApi = getOfferingApi(client);
-  const supplierApi = getSupplierApi(client);
   const categoryApi = getCategoryApi(client);
 
   // --- MODE and ROUTE CONTEXT and VALIDATION ----------------------------------------------------

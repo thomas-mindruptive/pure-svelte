@@ -113,7 +113,7 @@
           "Confirm Cascade Delete",
         );
 
-        if (confirmed) {
+        if (confirmed.confirmed) {
           const cascadeResult = await categoryApi.deleteCategory(numericId, true);
           if (cascadeResult.success) {
             addNotification("Category and related data deleted.", "success");

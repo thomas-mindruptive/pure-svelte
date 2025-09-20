@@ -239,7 +239,7 @@
           `This category has ${offeringCount} offerings for this supplier. Remove the assignment and all these offerings?`,
           "Confirm Cascade Delete",
         );
-        if (confirmed) {
+        if (confirmed.confirmed) {
           const cascadeResult = await supplierApi.removeCategoryFromSupplier({
             supplierId,
             categoryId,

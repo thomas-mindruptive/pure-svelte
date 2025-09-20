@@ -204,7 +204,7 @@
           `This category has ${offeringCount} offerings for this category. Remove these offerings (will be removed from suppliers, too!)?`,
           "Confirm Cascade Delete",
         );
-        if (confirmed) {
+        if (confirmed.confirmed) {
           const cascadeResult = await productDefApi.deleteProductDefinition(productDefId, true);
           if (cascadeResult.success) {
             addNotification("Category assignment and its offerings removed.", "success");

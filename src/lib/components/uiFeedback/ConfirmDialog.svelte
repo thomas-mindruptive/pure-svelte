@@ -7,6 +7,8 @@
 
   let dialog: HTMLDialogElement;
 
+  let selectedOptions = $state<string[]>([]);
+
   const formattedMessage = $derived.by(() => {
     const messageFromStore = $confirmationStore.message;
     if (browser) {
@@ -21,6 +23,7 @@
 
   // Reagiert auf Änderungen im Store
   confirmationStore.subscribe((state) => {
+    if (state.isOpen) selectedOptions = [];
     if (dialog && state.isOpen && !dialog.open) {
       dialog.showModal();
     } else if (dialog && !state.isOpen && dialog.open) {
@@ -30,13 +33,13 @@
 
   function handleConfirm() {
     // Ruft die gespeicherte resolve-Funktion mit 'true' auf
-    $confirmationStore.resolve?.(true);
+    $confirmationStore.resolve?.({confirmed: true, selectedOptions});
     confirmationStore.set({ ...$confirmationStore, isOpen: false });
   }
 
   function handleCancel() {
     // Ruft die gespeicherte resolve-Funktion mit 'false' auf
-    $confirmationStore.resolve?.(false);
+    $confirmationStore.resolve?.({confirmed: false, selectedOptions});
     confirmationStore.set({ ...$confirmationStore, isOpen: false });
   }
 
@@ -60,6 +63,16 @@
     >
       <h3>{$confirmationStore.title}</h3>
       <p>{@html formattedMessage}</p>
+      <div id="options">
+        {#each $confirmationStore.options?? [] as option (option) }
+            <input class="option-checkbox" 
+            type="checkbox" 
+            name="{option}" 
+            value="{option}"
+            bind:group={selectedOptions}
+            /><span>{option}</span>
+        {/each}
+      </div>
       <div class="dialog-actions">
         <button
           class="secondary-button"
@@ -134,4 +147,8 @@
   .confirm-button:hover {
     background-color: #c82333;
   }
+
+.option-checkbox:not(:first-child) {
+  margin-left: 2rem; /* oder margin-top je nach Layout */
+}
 </style>

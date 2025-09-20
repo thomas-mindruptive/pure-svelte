@@ -575,7 +575,7 @@
           "Confirm Removal",
         );
 
-        if (!confirmed) {
+        if (!confirmed.confirmed) {
           log.debug(`DataGrid:orchestrateDelete: Built-in confirm => user cancelled`);
           return; // User cancelled
         }

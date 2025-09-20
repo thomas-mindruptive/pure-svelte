@@ -130,18 +130,20 @@
         addNotification(`Offering (ID: ${id}) deleted successfully.`, "success");
         dataChanged = true;
       } else if (result.error_code === "DEPENDENCY_CONFLICT" && result.cascade_available) {
-        const confirmed = await requestConfirmation(
+        const dialogResult = await requestConfirmation(
           `This offering has dependencies.\n${JSON.stringify(result.dependencies)}\nDelete the offering AND all its related data?`,
           "Confirm Cascade Delete",
+          ["aaa", "bbb"]
         );
         
-        if (confirmed) {
+        log.debug(`Confirm result: `, dialogResult);
+        if (dialogResult.confirmed) {
           const cascadeResult = await offeringApi.deleteOffering(numericId, true);
           if (cascadeResult.success) {
             addNotification("Offering and all its data removed.", "success");
             dataChanged = true;
           } else {
-            addNotification(cascadeResult.message || "Failed to remove offering.", "error");
+            addNotification(cascadeResult.message || "Did not remove offering.", "error");
           }
         }
       } else {

@@ -131,7 +131,7 @@
           "Confirm Cascade Delete",
         );
 
-        if (confirmed) {
+        if (confirmed.confirmed) {
           const cascadeResult = await supplierApi.deleteSupplier(numericId, true);
           if (cascadeResult.success) {
             addNotification("Supplier and related data deleted.", "success");

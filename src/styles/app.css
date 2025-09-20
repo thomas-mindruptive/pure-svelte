@@ -35,7 +35,11 @@
   /* Colors for info/debug/etc. */
   --color-background-info: var(--color-primary-lighter);
   --color-background-border: var(--color-primary);
-  
+
+  /* Colors for error boundaries */
+  --color-error-boundary: #c53030;
+  --color-error-boundary-border: #ef4444;
+  --color-error-boundary-background: color-mix(in srgb, var(--color-error-boundary-border) 4%, white);
 
   /* 
    * === Spacing ==================================================================================
@@ -145,11 +149,11 @@ body {
   height: 100%;
 }
 
-/* Besser sichtbarer Tastaturfokus */
+/* Besser sichtbarer Tastaturfokus
 :focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
-}
+} */
 
 /* Text-Selektion in Primärfarbe (nettes Detail) */
 ::selection {
@@ -185,12 +189,12 @@ html[data-theme="dark"] {
   padding: 1.5rem; /* Innenabstand für den Inhalt */
 
   /* Farben: Klare Fehler-Semantik mit sanften Tönen */
-  background-color: #fff5f5; /* Sehr helles Rot, fast rosa (wie Tailwind red-50) */
-  color: #c53030; /* Dunkles, gut lesbares Rot für Text (wie Tailwind red-700) */
+  background-color: var(--color-error-boundary-background);
+  color: var(--color-error-boundary);
 
   /* Rahmen: Definiert die "Grenze" der Komponente klar */
-  border: 2px solid #ef4444; /* Klares, aber nicht zu grelles Rot (wie Tailwind red-500) */
-  border-radius: 8px; /* Passt zu deinem bestehenden Design */
+  border: 2px solid var(--color-error-boundary-border); 
+  border-radius: 8px; 
 }
 
 /* Styling für die Überschrift innerhalb der Fehlerbox */
@@ -232,7 +236,7 @@ html[data-theme="dark"] {
 
   /* Farben: Klare Fehler-Semantik mit sanften Tönen */
   background-color: var(--color-background-info);
-  color: var(--color-background-border); 
+  color: var(--color-background-border);
 
   /* Rahmen: Definiert die "Grenze" der Komponente klar */
   border: 2px solid var(--color-background-border); /* Klares, aber nicht zu grelles Rot (wie Tailwind red-500) */

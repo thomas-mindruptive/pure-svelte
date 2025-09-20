@@ -92,8 +92,9 @@ export function loadOfferingDetailBasisData({
     //  Load all product defs for category because multiple offerings for same product def may exist, e.g. with different sizes.
     availableProducts = categoryApi.loadProductDefsForCategory(categoryId);
   } else {
-    //  Load suppliers because multiple offerings for the same supplier may exist, e.g. with different size
-    availableSuppliers = supplierApi.loadSuppliers();
+    //  Load suppliers with the CORRECT category asigned. 
+    // Note: Multiple offerings for the same supplier may exist, e.g. with different size.
+    availableSuppliers = categoryApi.loadSuppliersForCategory(categoryId);
   }
 
   // --- RETURN LOADDATA --------------------------------------------------------------------------

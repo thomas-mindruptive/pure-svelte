@@ -3,7 +3,7 @@
  * It imports the basic element styles and adds LAYOUT styles on top.
  */
 
-@import './form-elements.css'; /* 
+@import "./form-elements.css"; /* 
 
 /* --- LAYOUT STYLES --- */
 .form-header {
@@ -137,7 +137,8 @@
   padding-top: 0.5rem;
 }
 
-/* --- Responsive Design for LAYOUT --- */
+/* --- Responsive Design for LAYOUT ------------------------------------------------------------ */
+
 @media (max-width: 768px) {
   .form-grid {
     grid-template-columns: 1fr;

@@ -27,6 +27,7 @@
     CancelledCallback,
     ChangedCallback,
     FormData,
+    ValidateResult,
   } from "./forms.types";
   import { coerceErrorMessage } from "$lib/utils/errorUtils";
 
@@ -185,6 +186,19 @@
   // Form DOM element reference for keyboard event handling
   let formEl: HTMLFormElement;
 
+  // This effect runs after the component has been mounted to the DOM,
+  // ensuring that `formEl` is available.
+  // It will run once when the form is first created.
+  $effect(() => {
+    log.debug(`Component has mounted. Running initial form validation.`);
+
+    // We call `runValidate()` to perform the initial check of the data.
+    // The `void` operator is used to explicitly signal that we are not
+    // awaiting the promise, as we just want to trigger the validation side effects
+    // (populating `formState.errors` and setting the CSS state).
+    void runValidate();
+  });
+
   // ========================================================================
   // CORE DATA MANIPULATION
   // ========================================================================
@@ -198,7 +212,7 @@
     // Notify parent of data change
     try {
       console.log(`Before calling parent's onChanged, vaule:`, value);
-      log.debug(`Before calling parent's onChanged, value:`, value);
+      log.detdebug(`Before calling parent's onChanged, value:`, value);
       onChanged?.({
         data: pureDataDeepClone(formState.data),
         dirty: isDirty(),
@@ -213,7 +227,7 @@
 
     // Auto-validate on change if configured
     if (autoValidate === "change") {
-      void runValidate(path.join("."), true);
+      void runValidate();
     }
   }
 
@@ -221,7 +235,7 @@
    * Internal setter for nested path-based updates
    */
   function internalSet<P extends NonEmptyPath<FormData<T>>>(path: readonly [...P], value: PathValue<FormData<T>, P>) {
-    log.debug(`path: ${path}, value: `, value);
+    log.detdebug(`path: ${path}, value: `, value);
     try {
       pathUtils.set<FormData<T>, P>(formState.data, path, value);
     } catch (e) {
@@ -291,45 +305,85 @@
     for (const p of paths) delete formState.errors[p];
   }
 
-  /**
-   * Set validation error messages for a specific field path
-   */
-  function setFieldErrors(path: string, msgs: string[]) {
-    formState.errors[path] = msgs;
-  }
+  // /**
+  //  * Set validation error messages for a specific field path
+  //  */
+  // function setFieldErrors(path: string, msgs: string[]) {
+  //   formState.errors[path] = msgs;
+  // }
+
+  // In src/lib/components/forms/FormShell.svelte
 
   /**
-   * Run validation on form data, optionally for a specific field
+   * Runs the complete, hybrid validation process.
+   * This function orchestrates custom validation logic with the browser's
+   * native validation engine, and ensures the Svelte error state is synchronized
+   * for UI components like the error summary block.
+   *
+   * @returns A promise that resolves to true if the form is valid, otherwise false.
    */
-  async function runValidate(path?: string, validateWholeForm?: boolean): Promise<boolean> {
-    if (!validate) return true;
+  async function runValidate(): Promise<boolean> {
+    log.debug(`Running validation to update DOM and Svelte state.`, { entity });
 
-    formState.validating = true;
-    try {
-      const res = await validate(formState.data);
-      if (res?.errors) {
-        if (path) {
-          // Validate specific field only
-          const msgs = res.errors[path] ?? [];
-          clearErrors([path]);
-          if (msgs.length) setFieldErrors(path, msgs);
-        }
-        if (!path || validateWholeForm) {
-          // Validate entire form
-          for (const k in formState.errors) delete formState.errors[k];
-          formState.errors = res.errors;
-        }
-      } else {
-        // No errors - clear all
-        for (const k in formState.errors) delete formState.errors[k];
+    // --- Step 1: Execute the parent's custom validation logic ---
+    // This provides the business rule violations.
+    let customResult: ValidateResult = { valid: true, errors: {} };
+    if (validate) {
+      try {
+        customResult = await validate(formState.data);
+      } catch (e) {
+        log.error({ component: "FormShell", entity, error: coerceMessage(e) }, "The 'validate' prop threw an unhandled error.");
+        // In case of a crash in the validation function, we assume it's valid to not block the UI.
+        return true;
       }
-      return !!res?.valid;
-    } catch (e) {
-      log.warn({ component: "FormShell", entity, error: coerceMessage(e) }, "validate threw");
-      return true; // Fail-open on validator errors
-    } finally {
-      formState.validating = false;
     }
+    const customErrors = customResult.errors || {};
+
+    // --- Step 2: Inject custom errors into the DOM ---
+    // This loop informs the browser's validation engine about our custom business rule violations.
+    const allElements = Array.from(formEl.elements).filter(
+      (el): el is HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement =>
+        el instanceof HTMLInputElement || el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement,
+    );
+
+    for (const element of allElements) {
+      const fieldName = element.name || element.id;
+      if (fieldName) {
+        const customErrorMessage = customErrors[fieldName]?.[0];
+        // If a custom error exists, set it. Otherwise, clear any previous custom error.
+        // Clearing with "" is crucial for the field to become valid again from a custom perspective.
+        element.setCustomValidity(customErrorMessage || "");
+      }
+    }
+
+    // --- Step 3: Check overall validity and synchronize Svelte state ---
+    // The browser is now the single source of truth for the form's validity state.
+    const isFormValid = formEl.checkValidity();
+
+    // Clear the Svelte error state before repopulating it.
+    clearErrors();
+
+    if (!isFormValid) {
+      // If the form is invalid, we read the validation messages from the DOM
+      // and populate our reactive `formState.errors` object.
+      // This is what makes the error summary block work.
+      for (const element of allElements) {
+        if (!element.validity.valid) {
+          const fieldName = element.name || element.id;
+          if (fieldName) {
+            // `validationMessage` will be our custom message if we set one,
+            // otherwise it will be the browser's default message (e.g., "Please fill out this field.").
+            formState.errors[fieldName] = [element.validationMessage];
+          }
+        }
+      }
+      log.warn(`Validation failed. Synchronized errors for UI:`, { entity, errors: formState.errors });
+    } else {
+      log.detdebug(`Validation passed.`, { entity });
+    }
+
+    // Return the final result.
+    return isFormValid;
   }
 
   /**
@@ -339,7 +393,7 @@
     formState.touched.add(path);
     if (autoValidate === "blur") {
       // Run validation for this field only when marked as touched
-      void runValidate(path, true);
+      void runValidate();
     }
   }
 
@@ -351,7 +405,7 @@
    * Handle form submission with validation and callbacks
    */
   async function doSubmit(): Promise<void> {
-    log.debug(`(FormShell) doSubmit called`, { entity });
+    log.debug(`doSubmit called`, { entity });
     if (disabled || formState.submitting) return;
 
     formState.submitting = true;
@@ -514,7 +568,7 @@
     return () => formEl?.removeEventListener("keydown", keyHandler);
   });
 
-  log.debug(`(FormShell) props:`, {
+  log.debug(`props:`, {
     entity,
     initial,
     autoValidate,
@@ -561,7 +615,7 @@
   <!-- Error summary (polite) -->
   {#if Object.keys(formState.errors).length > 0}
     <div
-      class="component-error-boundary pc-grid__empty"
+      class="component-error-boundary"
       aria-live="polite"
     >
       <!-- Compact summary of first messages per field -->

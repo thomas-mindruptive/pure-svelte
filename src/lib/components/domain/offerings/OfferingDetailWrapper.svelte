@@ -15,7 +15,9 @@
   } from "$lib/components/domain/offerings/offeringDetail.types";
   import { assertDefined } from "$lib/utils/validation/assertions";
   import { goto } from "$app/navigation";
-    import { coerceErrorMessage } from "$lib/utils/errorUtils";
+  import { coerceErrorMessage } from "$lib/utils/errorUtils";
+  import { parseUrlSegments } from "$lib/utils/url";
+  import { page } from "$app/stores";
 
   // ===== PROPS =====
 
@@ -44,20 +46,18 @@
     log.info(`Form submitted successfully`, p);
     addNotification("Offering updated successfully.", "success");
     if (isCreateMode) {
-      // 1. Benötigte IDs extrahieren
-      const newOffering = p.data; //
-      const newOfferingId = newOffering?.offering_id;
-      const { supplierId, categoryId } = initialLoadedData;
-
       // Defensive: Ensure ids.
-      if (newOfferingId && supplierId && categoryId) {
-        const newUrl = `/suppliers/${supplierId}/categories/${categoryId}/offerings/${newOfferingId}`;
+      if (p.data.offering_id && p.data.wholesaler_id && p.data.category_id && p.data.product_def_id) {
+        const urlSegments = parseUrlSegments($page.url.pathname);
+        const parentPathUrlSegments = urlSegments.slice(0, urlSegments.length - 1);
+        const newUrl = `/${parentPathUrlSegments.join("/")}/${p.data.offering_id}`;
         await goto(newUrl, { invalidateAll: true });
       } else {
         log.error("Could not redirect after create: Missing IDs.", {
-          newOfferingId,
-          supplierId,
-          categoryId,
+          newOfferingId: p.data.offering_id,
+          supplierId: p.data.wholesaler_id,
+          categoryId: p.data.category_id,
+          productDefId: p.data.product_def_id
         });
         addNotification("Could not redirect to edit page.", "error");
       }

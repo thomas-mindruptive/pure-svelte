@@ -282,11 +282,11 @@
 }
 
 /* Focus ring for interactive elements inside grid */
-.pc-grid :where(button, a, input, select, textarea):focus-visible {
+/* .pc-grid :where(button, a, input, select, textarea):focus-visible {
   outline: 2px solid var(--pc-grid-accent);
   outline-offset: 2px;
   border-radius: 6px;
-}
+} */
 
 /* ----------------------------- Utilities --------------------------------- */
 /* Visually hidden but accessible text */

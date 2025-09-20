@@ -35,7 +35,7 @@ EXCLUDE_PATTERNS = [
     "tools",
     "node_modules",
     "lib/server",
-    "src/routes"
+    "src/routes",
     ".git",
     ".venv",
     ".vscode",

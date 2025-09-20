@@ -67,7 +67,9 @@
 
         const validationResult = OfferingDetailAttributes_LoadDataSchema.safeParse(dataToValidate);
 
-        if (!validationResult.success) {
+        if (validationResult.success) {
+          log.debug(`Validation successful`, {offering, assignedAttributes, availableAttributes, availableProducts, availableSuppliers});
+        } else {
           log.error("Zod validation failed", validationResult.error.issues);
           throw new Error(
             `OfferingDetailAttributesPage: Received invalid data structure from the API: ${JSON.stringify(validationResult.error.issues)}`,

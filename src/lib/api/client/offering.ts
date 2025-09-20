@@ -7,7 +7,7 @@
  */
 
 import { log } from "$lib/utils/logger";
-import { ComparisonOperator, LogicalOperator, type QueryPayload } from "$lib/backendQueries/queryGrammar";
+import { ComparisonOperator, JoinType, LogicalOperator, type QueryPayload } from "$lib/backendQueries/queryGrammar";
 import type {
   WholesalerItemOffering,
   WholesalerItemOffering_ProductDef_Category_Supplier,
@@ -218,8 +218,81 @@ export function getOfferingApi(client: ApiClient) {
 
     /**
      * Gets available attributes that are not yet assigned to a specific offering.
+     * This has been refactored to use a single, efficient anti-join query
+     * executed on the database, replacing the previous client-side filtering logic.
+     * @param offeringId The ID of the offering to check against.
+     * @returns A promise that resolves to an array of available Attribute objects.
      */
     async getAvailableAttributesForOffering(offeringId: number): Promise<Attribute[]> {
+      const operationId = `getAvailableAttributesForOffering-${offeringId}`;
+      offeringLoadingManager.start(operationId);
+      log.debug(`(offeringApi) Getting available attributes for offering via anti-join.`, { offeringId });
+
+      try {
+        // This payload describes an SQL anti-join.
+        const payload: QueryPayload<Attribute> = {
+          // 1. We want to select columns that form a complete Attribute object.
+          select: ["a.attribute_id", "a.name", "a.description"],
+          from: { table: "dbo.attributes", alias: "a" },
+
+          // 2. We LEFT JOIN from the master attributes table to the assignments table.
+          //    This will give us all attributes, and for those that are assigned
+          //    to our specific offering, the `woa` columns will have values.
+          //    For unassigned attributes, `woa` columns will be NULL.
+          joins: [
+            {
+              type: JoinType.LEFT,
+              table: "dbo.wholesaler_offering_attributes",
+              alias: "woa",
+              on: {
+                joinCondOp: LogicalOperator.AND,
+                conditions: [
+                  // Standard join condition on the foreign key.
+                  { columnA: "a.attribute_id", op: "=", columnB: "woa.attribute_id" },
+                  // We crucially filter the JOIN to only consider assignments for the CURRENT offering.
+                  { key: "woa.offering_id", whereCondOp: "=", val: offeringId },
+                ],
+              },
+            },
+          ],
+
+          // 3. The "anti-join" condition: We only want rows where the LEFT JOIN
+          //    found NO match, meaning the attribute is not assigned to this offering.
+          //    Any column from the `woa` table will be NULL in this case.
+          where: {
+            key: "woa.offering_id",
+            whereCondOp: ComparisonOperator.IS_NULL,
+          },
+
+          // 4. Order the results for a consistent UI.
+          orderBy: [{ key: "a.name", direction: "asc" }],
+        };
+
+        // This single, efficient query is sent to the generic query endpoint.
+        const responseData = await client.apiFetch<QueryResponseData<Attribute>>(
+          "/api/query",
+          { method: "POST", body: createQueryBody(payload) },
+          { context: operationId },
+        );
+        
+        log.info(`(offeringApi) Found ${responseData.results.length} available attributes for offering ${offeringId}.`, responseData.results);
+        return responseData.results as Attribute[];
+
+      } catch (err) {
+        log.error(`[${operationId}] Failed to get available attributes.`, {
+          offeringId,
+          error: getErrorMessage(err),
+        });
+        throw err;
+      } finally {
+        offeringLoadingManager.finish(operationId);
+      }
+    },
+
+    /**
+     * Gets available attributes that are not yet assigned to a specific offering.
+     */
+    async getAvailableAttributesForOffering_old(offeringId: number): Promise<Attribute[]> {
       const operationId = `getAvailableAttributesForOffering-${offeringId}`;
       offeringLoadingManager.start(operationId);
       try {
@@ -227,6 +300,8 @@ export function getOfferingApi(client: ApiClient) {
           api.loadAvailableAttributes(),
           api.loadOfferingAttributes(offeringId),
         ]);
+
+        log.debug(`Loaded attributes for offering`, {offeringId, allAttributes, assignedAttributes});
 
         const assignedIds = new Set(assignedAttributes.map((a) => a.attribute_id));
         const availableAttributes = allAttributes.filter((attr) => !assignedIds.has(attr.attribute_id));

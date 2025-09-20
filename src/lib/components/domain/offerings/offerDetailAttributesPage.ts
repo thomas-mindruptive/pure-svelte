@@ -35,8 +35,8 @@ export function load({ url, params, fetch: fetchLoad }: LoadEvent): OfferingDeta
     // --- EDIT MODE
     const asyncLoadData: OfferingDetailAttributes_LoadDataAsync = {
       ...offeringDetailBasisData,
-      availableAttributes: Promise.resolve([]),
-      assignedAttributes: Promise.resolve([]),
+      assignedAttributes: offeringApi.loadOfferingAttributes(offeringId),
+      availableAttributes: offeringApi.getAvailableAttributesForOffering(offeringId),
     };
     return asyncLoadData;
   }

@@ -1,4 +1,4 @@
-// src/routes/api/offerings/+server.ts
+// src/routes/api/offerings/new/+server.ts
 
 /**
  * @file Offerings List API Endpoint - FINAL ARCHITECTURE
@@ -25,7 +25,7 @@ import { validateOffering } from '$lib/server/validation/domainValidator';
  */
 export const POST: RequestHandler = async ({ request }) => {
   const operationId = uuidv4();
-  log.infoHeader("POST /api/offerings/new - ${operationId}");
+  log.infoHeader(`POST /api/offerings/new - ${operationId}`);
 
   const transaction = db.transaction();
 

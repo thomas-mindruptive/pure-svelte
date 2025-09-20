@@ -612,7 +612,19 @@
     {/if}
   </div>
 
-  <!-- Error summary (polite) -->
+  <!-- Fields region -->
+  <div
+    class="pc-grid__scroller"
+    style="padding: 0.5rem 0.75rem;"
+  >
+    {#if fields}
+      {@render fields(fieldsProps)}
+    {:else}
+      <em style="color: var(--pc-grid-muted);">No fields snippet provided</em>
+    {/if}
+  </div>
+
+  <!-- Error region -->
   {#if Object.keys(formState.errors).length > 0}
     <div
       class="component-error-boundary"
@@ -627,18 +639,6 @@
       {/each}
     </div>
   {/if}
-
-  <!-- Fields region -->
-  <div
-    class="pc-grid__scroller"
-    style="padding: 0.5rem 0.75rem;"
-  >
-    {#if fields}
-      {@render fields(fieldsProps)}
-    {:else}
-      <em style="color: var(--pc-grid-muted);">No fields snippet provided</em>
-    {/if}
-  </div>
 
   <!-- Footer / actions -->
   <div

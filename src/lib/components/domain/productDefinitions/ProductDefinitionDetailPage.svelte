@@ -131,7 +131,7 @@
         dataChanged = true;
       } else if (result.error_code === "DEPENDENCY_CONFLICT" && result.cascade_available) {
         const confirmed = await requestConfirmation(
-          `This offering has dependencies. Delete the offering AND all its related data?`,
+          `This offering has dependencies.\n${JSON.stringify(result.dependencies)}\nDelete the offering AND all its related data?`,
           "Confirm Cascade Delete",
         );
         

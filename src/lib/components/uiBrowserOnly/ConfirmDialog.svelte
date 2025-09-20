@@ -7,16 +7,17 @@
 
   let dialog: HTMLDialogElement;
 
-  const rawMessage = $state($confirmationStore.message);
+  //const rawMessage = $state($confirmationStore.message);
 
   const formattedMessage = $derived.by(() => {
+    const messageFromStore = $confirmationStore.message;
     if (browser) {
-      const sanitizedMessage = DOMPurify.sanitize(rawMessage.replace(/\n/g, "<br>"));
-      log.debug(`Raw message: ${rawMessage}, Sanitized message: ${sanitizedMessage}`);
+      const sanitizedMessage = DOMPurify.sanitize(messageFromStore.replace(/\n/g, "<br>"));
+      log.debug(`Raw message: ${messageFromStore}, Sanitized message: ${sanitizedMessage}`);
       return sanitizedMessage;
     } else {
-      log.debug(`browser is undefined, original message: ${rawMessage}`);
-      return rawMessage;
+      log.debug(`browser is undefined, original message: ${messageFromStore}`);
+      return messageFromStore;
     }
   });
 

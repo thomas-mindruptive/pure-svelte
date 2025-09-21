@@ -198,7 +198,7 @@
         log.debug(`Delte successful`);
         addNotification(`Product definition delted.`, "success");
         dataChanged = true;
-      } else if (("cascade_available" in initialResult && initialResult.cascade_available) || allowForceCascadingDelte) {
+      } else if ((initialResult.cascade_available) || allowForceCascadingDelte) {
         log.debug(`Delete not successful but cascade_available`, { initialResult, allowForceCascadingDelte });
         const offeringCount = (initialResult.dependencies as any)?.offering_count ?? 0;
         const confirmed = await requestConfirmation(

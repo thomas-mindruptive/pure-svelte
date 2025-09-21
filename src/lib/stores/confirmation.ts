@@ -13,7 +13,7 @@ interface ConfirmationState {
   resolve?: (value: ConfirmationResult) => void;
 }
 
-interface ConfirmationResult {
+export interface ConfirmationResult {
   confirmed: boolean;
   selectedOptions?: ConfirmationOption[];
 }

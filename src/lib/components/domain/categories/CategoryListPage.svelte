@@ -24,6 +24,7 @@
   let resolvedCategories = $state<ProductCategory[]>([]);
   let isLoading = $state(true); // The component always starts in a loading state.
   let loadingOrValidationError = $state<{ message: string; status: number } | null>(null);
+  const allowForceCascadingDelte = $state(true);
 
   // === LOAD ======================================================================================
 
@@ -105,7 +106,7 @@
       if (result.success) {
         addNotification(`Category "${result.data.deleted_resource.name}" deleted.`, "success");
         dataChanged = true;
-      } else if ("cascade_available" in result && result.cascade_available) {
+      } else if ("cascade_available" in result && result.cascade_available || allowForceCascadingDelte) {
         log.debug(`categoryApi.deleteCategory was not successful but cascade_available`);
         const dependencies = (result.dependencies as string[]).join(", ");
         const confirmed = await requestConfirmation(

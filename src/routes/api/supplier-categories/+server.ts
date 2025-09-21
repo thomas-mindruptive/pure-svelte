@@ -11,7 +11,7 @@ import { json, error, type RequestHandler } from "@sveltejs/kit";
 import { db } from "$lib/backendQueries/db";
 import { log } from "$lib/utils/logger";
 import { mssqlErrorMapper } from "$lib/backendQueries/mssqlErrorMapper";
-import { checkCategoryDependencies } from "$lib/dataModel/dependencyChecks";
+import { checkSupplierCategoryDependencies } from "$lib/dataModel/dependencyChecks";
 import type { ProductCategory, Wholesaler, WholesalerCategory } from "$lib/domain/domainTypes";
 import { v4 as uuidv4 } from "uuid";
 
@@ -163,7 +163,7 @@ export const DELETE: RequestHandler = async ({ request }) => {
     log.info(`[${operationId}] Transaction started.`);
 
     try {
-      const dependencies = await checkCategoryDependencies(supplierId, categoryId, transaction);
+      const dependencies = await checkSupplierCategoryDependencies(supplierId, categoryId, transaction);
       const dependencyCount = dependencies.length;
 
       if (dependencyCount > 0 && !cascade) {

@@ -12,7 +12,7 @@ import type { Transaction } from 'mssql';
  * @param transaction The active database transaction object.
  * @returns The number of dependent offerings found.
  */
-export async function checkCategoryDependencies(wholesalerId: number, categoryId: number, transaction: Transaction): Promise<string[]> {
+export async function checkSupplierCategoryDependencies(wholesalerId: number, categoryId: number, transaction: Transaction): Promise<string[]> {
     log.info("(dependencyChecks) Checking assignment dependencies for", { wholesalerId, categoryId });
     const result = await transaction.request()
         .input('wholesalerId', wholesalerId)
@@ -31,7 +31,7 @@ export async function checkCategoryDependencies(wholesalerId: number, categoryId
  * @param wholesalerId The ID of the wholesaler to check.
  * @returns An array of strings describing the found dependencies.
  */
-export async function checkWholesalerDependencies(wholesalerId: number): Promise<string[]> {
+export async function checkWholesalerDependencies(wholesalerId: number): Promise<{hard: string[], soft: string[]}> {
     const dependencies: string[] = [];
     log.info(`(dependencyChecks) Checking master dependencies for wholesalerId: ${wholesalerId}`);
 
@@ -84,7 +84,7 @@ export async function checkWholesalerDependencies(wholesalerId: number): Promise
     }
 
     log.info(`(dependencyChecks) Found dependencies for wholesalerId: ${wholesalerId}`, { dependencies });
-    return dependencies;
+    return {soft: dependencies, hard:[]};
 }
 
 /**

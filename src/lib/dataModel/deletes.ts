@@ -3,14 +3,14 @@
 import { assertDefined } from "$lib/utils/validation/assertions";
 import { log } from "$lib/utils/logger";
 import type { Transaction } from "mssql";
-import type { ProductDefinition, Wholesaler } from "$lib/domain/domainTypes";
+import type { ProductCategory, ProductDefinition, Wholesaler } from "$lib/domain/domainTypes";
 
 /**
  * The shapes of the data returned after a successful deletion.
  */
 export type DeletedProductDefinitionData = Pick<ProductDefinition, "product_def_id" | "title">;
-export type DeletedSupplierData = Pick<Wholesaler, 'wholesaler_id' | 'name'>;
-
+export type DeletedSupplierData = Pick<Wholesaler, "wholesaler_id" | "name">;
+export type DeletedProductCategoryData = Pick<ProductCategory, "category_id" | "name">;
 
 /**
  * Deletes a Product Definition, with an option to cascade and delete all its dependencies.
@@ -28,55 +28,142 @@ export async function deleteProductDefinition(
   id: number,
   cascade: boolean,
   transaction: Transaction,
-): Promise<DeletedProductDefinitionData> {
+): Promise<{ deleted: DeletedProductDefinitionData; stats: Record<string, number> }> {
   assertDefined(id, `id must be defined for deleteProductDefinition`);
   log.info(`(delete) Preparing to delete ProductDefinition ID: ${id} with cascade=${cascade}`);
 
   const productDefIdParam = "productDefId";
 
-  // Step 1: Always query the product definition first to get its details for the response
-  // and to verify that it exists.
-  const selectResult = await transaction.request().input(productDefIdParam, id).query<DeletedProductDefinitionData>(`
-            SELECT product_def_id, title 
-            FROM dbo.product_definitions 
-            WHERE product_def_id = @${productDefIdParam};
-        `);
+  // 1) Read product definition first (existence check + data for return)
+  const selectResult = await transaction
+    .request()
+    .input(productDefIdParam, id)
+    .query<DeletedProductDefinitionData>(`
+      SELECT product_def_id, title
+      FROM dbo.product_definitions
+      WHERE product_def_id = @${productDefIdParam};
+    `);
 
   if (selectResult.recordset.length === 0) {
-    // If the record doesn't exist, we can't delete it.
     throw new Error(`Product Definition with ID ${id} not found.`);
   }
   const deletedProductDefData = selectResult.recordset[0];
-  log.debug(`(delete) Found product definition to delete: "${deletedProductDefData.title}"`);
+  log.debug(`(delete) Found product definition to delete: "${deletedProductDefData.title}" (ID: ${id})`);
 
-  // Step 2: Execute the appropriate delete logic based on the cascade flag.
+  let stats: Record<string, number> = {};
+
+  // 2) Execute delete path
   if (cascade) {
-    log.debug(`(delete) Executing CASCADE delete logic for ProductDefinition ID: ${id}`);
+    log.debug(`(delete) Executing CASCADE delete (manual) for ProductDefinition ID: ${id}`);
+
+    // One batch, deterministic ordering, returns per-step row counts for logging.
     const cascadeDeleteQuery = `
-            WITH OfferingsToDelete AS (
-                SELECT o.offering_id
-                FROM dbo.wholesaler_item_offerings AS o
-                WHERE o.product_def_id = @${productDefIdParam}
-            )
-            DELETE L FROM dbo.wholesaler_offering_links AS L JOIN OfferingsToDelete AS O ON O.offering_id = L.offering_id;
-            DELETE A FROM dbo.wholesaler_offering_attributes AS A JOIN OfferingsToDelete AS O ON O.offering_id = A.offering_id;
-            DELETE O FROM dbo.wholesaler_item_offerings AS O WHERE O.product_def_id = @${productDefIdParam};
-            DELETE P FROM dbo.product_definitions AS P WHERE P.product_def_id = @${productDefIdParam};
-        `;
-    await transaction.request().input(productDefIdParam, id).query(cascadeDeleteQuery);
+      SET XACT_ABORT ON;
+      SET NOCOUNT ON;
+
+      -- Use a temp table (not a CTE) because we need the set across multiple DELETE statements.
+      IF OBJECT_ID('tempdb..#OfferingsToDelete') IS NOT NULL DROP TABLE #OfferingsToDelete;
+      CREATE TABLE #OfferingsToDelete (offering_id INT NOT NULL PRIMARY KEY);
+
+      -- Lock the target offerings to prevent concurrent inserts until we finish deleting dependents.
+      INSERT INTO #OfferingsToDelete (offering_id)
+      SELECT o.offering_id
+      FROM dbo.wholesaler_item_offerings AS o WITH (UPDLOCK, HOLDLOCK)
+      WHERE o.product_def_id = @${productDefIdParam};
+
+      DECLARE
+        @deletedLinks       INT = 0,
+        @deletedAttributes  INT = 0,
+        @deletedOfferings   INT = 0,
+        @deletedPdefs       INT = 0;
+
+      -- 1) Delete indirect dependencies: links
+      DELETE L
+      FROM dbo.wholesaler_offering_links AS L
+      JOIN #OfferingsToDelete AS O ON O.offering_id = L.offering_id;
+      SET @deletedLinks = @@ROWCOUNT;
+
+      -- 2) Delete indirect dependencies: attributes
+      DELETE A
+      FROM dbo.wholesaler_offering_attributes AS A
+      JOIN #OfferingsToDelete AS O ON O.offering_id = A.offering_id;
+      SET @deletedAttributes = @@ROWCOUNT;
+
+      -- 3) Delete direct dependencies: offerings
+      DELETE O
+      FROM dbo.wholesaler_item_offerings AS O
+      WHERE O.product_def_id = @${productDefIdParam};
+      SET @deletedOfferings = @@ROWCOUNT;
+
+      -- 4) Finally, delete the product definition
+      DELETE P
+      FROM dbo.product_definitions AS P
+      WHERE P.product_def_id = @${productDefIdParam};
+      SET @deletedPdefs = @@ROWCOUNT;
+
+      -- Return deletion stats for logging
+      SELECT
+        @deletedLinks      AS deletedLinks,
+        @deletedAttributes AS deletedAttributes,
+        @deletedOfferings  AS deletedOfferings,
+        @deletedPdefs      AS deletedProductDefinitions;
+    `;
+
+    const res = await transaction.request().input(productDefIdParam, id).query(cascadeDeleteQuery);
+
+    if (res?.recordset?.[0]) {
+      stats = res.recordset[0];
+      // "total" = sum of children (not including the master row)
+      stats.total =
+        (stats.deletedLinks ?? 0) +
+        (stats.deletedAttributes ?? 0) +
+        (stats.deletedOfferings ?? 0);
+    } else {
+      stats = {
+        total: 0,
+        deletedLinks: 0,
+        deletedAttributes: 0,
+        deletedOfferings: 0,
+        deletedProductDefinitions: 0,
+      };
+    }
+
+    log.debug(
+      `(delete) Cascade stats for ProductDefinition ${id}: ` +
+        `links=${stats.deletedLinks}, attrs=${stats.deletedAttributes}, ` +
+        `offerings=${stats.deletedOfferings}, pdefs=${stats.deletedProductDefinitions}`,
+    );
   } else {
     log.debug(`(delete) Executing NON-CASCADE delete for ProductDefinition ID: ${id}`);
-    // This will fail with a foreign key constraint violation if dependencies exist, which is the expected behavior.
-    await transaction.request().input(productDefIdParam, id).query(`
-                DELETE FROM dbo.product_definitions
-                WHERE product_def_id = @${productDefIdParam};
-            `);
+    try {
+      const res = await transaction
+        .request()
+        .input(productDefIdParam, id)
+        .query(`
+          DELETE FROM dbo.product_definitions
+          WHERE product_def_id = @${productDefIdParam};
+        `);
+
+      const affected = Array.isArray(res.rowsAffected)
+        ? res.rowsAffected.reduce((a, b) => a + b, 0)
+        : (res.rowsAffected ?? 0);
+
+      log.debug(`(delete) Non-cascade delete affected rows: ${affected}`);
+      // NOTE: Do NOT populate stats here; keep it empty to match the supplier example contract.
+    } catch (err: any) {
+      if (err && (err.number === 547 || err.code === "EREQUEST")) {
+        throw new Error(
+          `Cannot delete ProductDefinition ID ${id} without cascade: dependent rows exist (offerings, links, attributes).`,
+        );
+      }
+      throw err;
+    }
   }
 
-  log.info(`(delete) Delete operation for ProductDefinition ID: ${id} completed successfully within the transaction.`);
+  log.info(`(delete) Delete operation for ProductDefinition ID: ${id} completed successfully.`);
 
-  // Step 3: Return the data of the now-deleted resource.
-  return deletedProductDefData;
+  // 3) Return the data of the now-deleted resource + stats
+  return { deleted: deletedProductDefData, stats };
 }
 
 /**
@@ -90,79 +177,304 @@ export async function deleteProductDefinition(
  * @throws An error if the supplier with the given ID is not found.
  */
 export async function deleteSupplier(
-    id: number,
-    cascade: boolean,
-    transaction: Transaction
-): Promise<DeletedSupplierData> {
-    assertDefined(id, `id must be defined for deleteSupplier`);
-    log.info(`(delete) Preparing to delete Supplier ID: ${id} with cascade=${cascade}`);
+  id: number,
+  cascade: boolean,
+  transaction: Transaction,
+): Promise<{ deleted: DeletedSupplierData; stats: Record<string, number> }> {
+  assertDefined(id, `id must be defined for deleteSupplier`);
+  log.info(`(delete) Preparing to delete Supplier ID: ${id} with cascade=${cascade}`);
 
-    const supplierIdParam = 'supplierId';
+  const supplierIdParam = "supplierId";
 
-    // Step 1: Always query the supplier first to get its details for the response
-    // and to verify that it exists.
-    const selectResult = await transaction.request()
-        .input(supplierIdParam, id)
-        .query<DeletedSupplierData>(`
-            SELECT wholesaler_id, name 
-            FROM dbo.wholesalers 
-            WHERE wholesaler_id = @${supplierIdParam};
+  // 1) Read supplier first (existence check + data for return)
+  const selectResult = await transaction.request().input(supplierIdParam, id).query<DeletedSupplierData>(`
+      SELECT wholesaler_id, name
+      FROM dbo.wholesalers
+      WHERE wholesaler_id = @${supplierIdParam};
+    `);
+
+  if (selectResult.recordset.length === 0) {
+    throw new Error(`Supplier with ID ${id} not found.`);
+  }
+  const deletedSupplierData = selectResult.recordset[0];
+  log.debug(`(delete) Found supplier to delete: "${deletedSupplierData.name}" (ID: ${id})`);
+
+  let stats: Record<string, number> = {};
+
+  // 2) Execute the appropriate delete path
+  if (cascade) {
+    log.debug(`(delete) Executing CASCADE delete (manual) for Supplier ID: ${id}`);
+
+    // One batch, deterministic ordering, returns per-step row counts for logging.
+    const cascadeDeleteQuery = `
+      SET XACT_ABORT ON;
+      SET NOCOUNT ON;
+
+      -- Use a temp table (not a CTE) because we need the set across multiple DELETE statements.
+      IF OBJECT_ID('tempdb..#OfferingsToDelete') IS NOT NULL DROP TABLE #OfferingsToDelete;
+      CREATE TABLE #OfferingsToDelete (offering_id INT NOT NULL PRIMARY KEY);
+
+      -- Lock the target offerings to prevent concurrent inserts until we finish deleting dependents.
+      INSERT INTO #OfferingsToDelete (offering_id)
+      SELECT o.offering_id
+      FROM dbo.wholesaler_item_offerings AS o WITH (UPDLOCK, HOLDLOCK)
+      WHERE o.wholesaler_id = @${supplierIdParam};
+
+      DECLARE
+        @deletedLinks        INT = 0,
+        @deletedAttributes   INT = 0,
+        @deletedOfferings    INT = 0,
+        @deletedWhCat        INT = 0,
+        @deletedSupplier     INT = 0;
+
+      -- 1) Delete indirect dependencies: links
+      DELETE L
+      FROM dbo.wholesaler_offering_links AS L
+      JOIN #OfferingsToDelete AS O ON O.offering_id = L.offering_id;
+      SET @deletedLinks = @@ROWCOUNT;
+
+      -- 2) Delete indirect dependencies: attributes
+      DELETE A
+      FROM dbo.wholesaler_offering_attributes AS A
+      JOIN #OfferingsToDelete AS O ON O.offering_id = A.offering_id;
+      SET @deletedAttributes = @@ROWCOUNT;
+
+      -- 3) Delete direct dependencies: offerings
+      DELETE O
+      FROM dbo.wholesaler_item_offerings AS O
+      WHERE O.wholesaler_id = @${supplierIdParam};
+      SET @deletedOfferings = @@ROWCOUNT;
+
+      -- 4) Delete direct dependencies: wholesaler-category assignments
+      DELETE C
+      FROM dbo.wholesaler_categories AS C
+      WHERE C.wholesaler_id = @${supplierIdParam};
+      SET @deletedWhCat = @@ROWCOUNT;
+
+      -- 5) Finally, delete the supplier
+      DELETE W
+      FROM dbo.wholesalers AS W
+      WHERE W.wholesaler_id = @${supplierIdParam};
+      SET @deletedSupplier = @@ROWCOUNT;
+
+      -- Return deletion stats for logging
+      SELECT
+        @deletedLinks      AS deletedLinks,
+        @deletedAttributes AS deletedAttributes,
+        @deletedOfferings  AS deletedOfferings,
+        @deletedWhCat      AS deletedWholesalerCategories,
+        @deletedSupplier   AS deletedSuppliers;
+    `;
+
+    const res = await transaction.request().input(supplierIdParam, id).query(cascadeDeleteQuery);
+
+    if (res?.recordset?.[0]) {
+      stats = res.recordset[0];
+      stats.total = stats.deletedLinks + stats.deletedAttributes + stats.deletedOfferings + stats.deletedWholesalerCategories;
+    } else {
+      stats = {
+        total: 0,
+        deletedLinks: 0,
+        deletedAttributes: 0,
+        deletedOfferings: 0,
+        deletedWholesalerCategories: 0,
+        deletedSuppliers: 0,
+      };
+    }
+
+    log.debug(
+      `(delete) Cascade stats for Supplier ${id}: ` +
+        `links=${stats.deletedLinks}, attrs=${stats.deletedAttributes}, ` +
+        `offerings=${stats.deletedOfferings}, whCat=${stats.deletedWholesalerCategories}, suppliers=${stats.deletedSuppliers}`,
+    );
+  } else {
+    log.debug(`(delete) Executing NON-CASCADE delete for Supplier ID: ${id}`);
+    try {
+      const res = await transaction.request().input(supplierIdParam, id).query(`
+          DELETE FROM dbo.wholesalers
+          WHERE wholesaler_id = @${supplierIdParam};
         `);
 
-    if (selectResult.recordset.length === 0) {
-        throw new Error(`Supplier with ID ${id} not found.`);
+      const affected = Array.isArray(res.rowsAffected) ? res.rowsAffected.reduce((a, b) => a + b, 0) : (res.rowsAffected ?? 0);
+      log.debug(`(delete) Non-cascade delete affected rows: ${affected}`);
+    } catch (err: any) {
+      // Helpful message when FK constraints block the delete
+      if (err && (err.number === 547 || err.code === "EREQUEST")) {
+        // 547 = FK violation in SQL Server; EREQUEST is the generic mssql error code
+        throw new Error(
+          `Cannot delete Supplier ID ${id} without cascade: dependent rows exist (offerings, links, attributes, or category assignments).`,
+        );
+      }
+      throw err;
     }
-    const deletedSupplierData = selectResult.recordset[0];
-    log.debug(`(delete) Found supplier to delete: "${deletedSupplierData.name}"`);
+  }
 
-    // Step 2: Execute the appropriate delete logic based on the cascade flag.
-    if (cascade) {
-        log.debug(`(delete) Executing CASCADE delete logic for Supplier ID: ${id}`);
-        const cascadeDeleteQuery = `
-            -- Define a CTE to find all offerings related to the supplier.
-            -- This is needed to delete the indirect dependencies (links, attributes).
-            WITH OfferingsToDelete AS (
-                SELECT o.offering_id
-                FROM dbo.wholesaler_item_offerings AS o
-                WHERE o.wholesaler_id = @${supplierIdParam}
-            )
-            
-            -- 1. Delete indirect dependencies: Links
-            DELETE L FROM dbo.wholesaler_offering_links AS L
-            JOIN OfferingsToDelete AS O ON O.offering_id = L.offering_id;
+  log.info(`(delete) Delete operation for Supplier ID: ${id} completed successfully.`);
 
-            -- 2. Delete indirect dependencies: Attributes
-            DELETE A FROM dbo.wholesaler_offering_attributes AS A
-            JOIN OfferingsToDelete AS O ON O.offering_id = A.offering_id;
-
-            -- 3. Delete direct dependencies: Offerings
-            DELETE FROM dbo.wholesaler_item_offerings
-            WHERE wholesaler_id = @${supplierIdParam};
-
-            -- 4. Delete direct dependencies: Category Assignments
-            DELETE FROM dbo.wholesaler_categories
-            WHERE wholesaler_id = @${supplierIdParam};
-
-            -- 5. Finally, delete the master Supplier record.
-            DELETE FROM dbo.wholesalers
-            WHERE wholesaler_id = @${supplierIdParam};
-        `;
-        await transaction.request()
-            .input(supplierIdParam, id)
-            .query(cascadeDeleteQuery);
-    } else {
-        log.debug(`(delete) Executing NON-CASCADE delete for Supplier ID: ${id}`);
-        // This will fail with a foreign key constraint violation if dependencies exist.
-        await transaction.request()
-            .input(supplierIdParam, id)
-            .query(`
-                DELETE FROM dbo.wholesalers
-                WHERE wholesaler_id = @${supplierIdParam};
-            `);
-    }
-    
-    log.info(`(delete) Delete operation for Supplier ID: ${id} completed successfully.`);
-
-    // Step 3: Return the data of the now-deleted resource.
-    return deletedSupplierData;
+  // 3) Return the data of the now-deleted resource.
+  return { deleted: deletedSupplierData, stats };
 }
+
+export async function deleteProductCategory(
+  id: number,
+  cascade: boolean,
+  transaction: Transaction,
+): Promise<{ deleted: DeletedProductCategoryData; stats: Record<string, number> }> {
+  assertDefined(id, `id must be defined for deleteProductCategory`);
+  log.info(`(delete) Preparing to delete ProductCategory ID: ${id} with cascade=${cascade}`);
+
+  const categoryIdParam = "categoryId";
+
+  // 1) Read product category first (existence check + data for return)
+  const selectResult = await transaction
+    .request()
+    .input(categoryIdParam, id)
+    .query<DeletedProductCategoryData>(`
+      SELECT category_id, name
+      FROM dbo.product_categories
+      WHERE category_id = @${categoryIdParam};
+    `);
+
+  if (selectResult.recordset.length === 0) {
+    throw new Error(`Product Category with ID ${id} not found.`);
+  }
+  const deletedCategoryData = selectResult.recordset[0];
+  log.debug(`(delete) Found product category to delete: "${deletedCategoryData.name}" (ID: ${id})`);
+
+  let stats: Record<string, number> = {};
+
+  // 2) Execute delete path
+  if (cascade) {
+    log.debug(`(delete) Executing CASCADE delete (manual) for ProductCategory ID: ${id}`);
+
+    // One batch, deterministic ordering, returns per-step row counts for logging.
+    const cascadeDeleteQuery = `
+      SET XACT_ABORT ON;
+      SET NOCOUNT ON;
+
+      -- We need offerings for this category to remove indirect dependents (links, attributes).
+      IF OBJECT_ID('tempdb..#OfferingsToDelete') IS NOT NULL DROP TABLE #OfferingsToDelete;
+      CREATE TABLE #OfferingsToDelete (offering_id INT NOT NULL PRIMARY KEY);
+
+      -- Stabilize the set while we delete dependents (protects from concurrent inserts)
+      INSERT INTO #OfferingsToDelete (offering_id)
+      SELECT o.offering_id
+      FROM dbo.wholesaler_item_offerings AS o WITH (UPDLOCK, HOLDLOCK)
+      WHERE o.category_id = @${categoryIdParam};
+
+      DECLARE
+        @deletedLinks                INT = 0,
+        @deletedAttributes           INT = 0,
+        @deletedOfferings            INT = 0,
+        @deletedProductDefinitions   INT = 0,
+        @deletedWholesalerCategories INT = 0,
+        @deletedProductCategories    INT = 0;
+
+      -- 1) Delete indirect dependencies: links for offerings in this category
+      DELETE L
+      FROM dbo.wholesaler_offering_links AS L
+      JOIN #OfferingsToDelete AS O ON O.offering_id = L.offering_id;
+      SET @deletedLinks = @@ROWCOUNT;
+
+      -- 2) Delete indirect dependencies: attributes for offerings in this category
+      DELETE A
+      FROM dbo.wholesaler_offering_attributes AS A
+      JOIN #OfferingsToDelete AS O ON O.offering_id = A.offering_id;
+      SET @deletedAttributes = @@ROWCOUNT;
+
+      -- 3) Delete direct dependencies: offerings in this category
+      DELETE O
+      FROM dbo.wholesaler_item_offerings AS O
+      WHERE O.category_id = @${categoryIdParam};
+      SET @deletedOfferings = @@ROWCOUNT;
+
+      -- 4) Delete direct dependencies: product definitions in this category
+      DELETE P
+      FROM dbo.product_definitions AS P
+      WHERE P.category_id = @${categoryIdParam};
+      SET @deletedProductDefinitions = @@ROWCOUNT;
+
+      -- 5) Delete direct dependencies: wholesaler-category assignments for this category
+      DELETE C
+      FROM dbo.wholesaler_categories AS C
+      WHERE C.category_id = @${categoryIdParam};
+      SET @deletedWholesalerCategories = @@ROWCOUNT;
+
+      -- 6) Finally, delete the product category itself
+      DELETE PC
+      FROM dbo.product_categories AS PC
+      WHERE PC.category_id = @${categoryIdParam};
+      SET @deletedProductCategories = @@ROWCOUNT;
+
+      -- Return deletion stats for logging
+      SELECT
+        @deletedLinks                AS deletedLinks,
+        @deletedAttributes           AS deletedAttributes,
+        @deletedOfferings            AS deletedOfferings,
+        @deletedProductDefinitions   AS deletedProductDefinitions,
+        @deletedWholesalerCategories AS deletedWholesalerCategories,
+        @deletedProductCategories    AS deletedProductCategories;
+    `;
+
+    const res = await transaction.request().input(categoryIdParam, id).query(cascadeDeleteQuery);
+
+    if (res?.recordset?.[0]) {
+      stats = res.recordset[0];
+      // "total" = sum of children (not including the master row)
+      stats.total =
+        (stats.deletedLinks ?? 0) +
+        (stats.deletedAttributes ?? 0) +
+        (stats.deletedOfferings ?? 0) +
+        (stats.deletedProductDefinitions ?? 0) +
+        (stats.deletedWholesalerCategories ?? 0);
+    } else {
+      stats = {
+        total: 0,
+        deletedLinks: 0,
+        deletedAttributes: 0,
+        deletedOfferings: 0,
+        deletedProductDefinitions: 0,
+        deletedWholesalerCategories: 0,
+        deletedProductCategories: 0,
+      };
+    }
+
+    log.debug(
+      `(delete) Cascade stats for ProductCategory ${id}: ` +
+        `links=${stats.deletedLinks}, attrs=${stats.deletedAttributes}, ` +
+        `offerings=${stats.deletedOfferings}, pdefs=${stats.deletedProductDefinitions}, ` +
+        `whCat=${stats.deletedWholesalerCategories}, categories=${stats.deletedProductCategories}`,
+    );
+  } else {
+    log.debug(`(delete) Executing NON-CASCADE delete for ProductCategory ID: ${id}`);
+    try {
+      const res = await transaction
+        .request()
+        .input(categoryIdParam, id)
+        .query(`
+          DELETE FROM dbo.product_categories
+          WHERE category_id = @${categoryIdParam};
+        `);
+
+      const affected = Array.isArray(res.rowsAffected)
+        ? res.rowsAffected.reduce((a, b) => a + b, 0)
+        : (res.rowsAffected ?? 0);
+
+      log.debug(`(delete) Non-cascade delete affected rows: ${affected}`);
+    } catch (err: any) {
+      // Likely FK violations (offerings, product definitions, or wholesaler-category rows)
+      if (err && (err.number === 547 || err.code === "EREQUEST")) {
+        throw new Error(
+          `Cannot delete ProductCategory ID ${id} without cascade: dependent rows exist (offerings, product definitions, or wholesaler-category assignments).`,
+        );
+      }
+      throw err;
+    }
+  }
+
+  log.info(`(delete) Delete operation for ProductCategory ID: ${id} completed successfully.`);
+
+  // 3) Return the data of the now-deleted resource + stats
+  return { deleted: deletedCategoryData, stats };
+}
+

@@ -3,13 +3,13 @@
 
   import { goto } from "$app/navigation";
   import { log } from "$lib/utils/logger";
-  import { addNotification } from "$lib/stores/notifications";
-  import { requestConfirmation } from "$lib/stores/confirmation";
   import { ApiClient } from "$lib/api/client/ApiClient";
   import type { ID, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
   import { page } from "$app/stores";
   import type { ProductCategory } from "$lib/domain/domainTypes";
   import { categoryLoadingState, getCategoryApi } from "$lib/api/client/category";
+    import { stringsToNumbers } from "$lib/utils/typeConversions";
+    import { cascadeDelte } from "$lib/api/client/cascadeDelete";
 
   // === PROPS ====================================================================================
 
@@ -98,41 +98,20 @@
     log.info(`Deleting categories`, { ids });
     let dataChanged = false;
 
-    for (const id of ids) {
-      const numericId = Number(id);
-      const result = await categoryApi.deleteCategory(numericId, false);
-      log.debug(`categoryApi.deleteCategory returned:`, result);
+    const idsAsNumber = stringsToNumbers(ids);
+    dataChanged = await cascadeDelte(
+      idsAsNumber,
+      categoryApi.deleteCategory,
+      {
+        domainObjectName: "Product Category",
+        hardDepInfo: "Has hard dependencies. Delete?",
+        softDepInfo: "Has soft dependencies. Delete?",
+      },
+      allowForceCascadingDelte,
+    );
 
-      if (result.success) {
-        addNotification(`Category "${result.data.deleted_resource.name}" deleted.`, "success");
-        dataChanged = true;
-      } else if ("cascade_available" in result && result.cascade_available || allowForceCascadingDelte) {
-        log.debug(`categoryApi.deleteCategory was not successful but cascade_available`);
-        const dependencies = (result.dependencies as string[]).join(", ");
-        const confirmed = await requestConfirmation(
-          `Category has dependencies: ${dependencies}. Delete with all related data?`,
-          "Confirm Cascade Delete",
-        );
-
-        if (confirmed.confirmed) {
-          const cascadeResult = await categoryApi.deleteCategory(numericId, true);
-          if (cascadeResult.success) {
-            addNotification("Category and related data deleted.", "success");
-            dataChanged = true;
-          }
-        }
-      } else {
-        log.debug(`categoryApi.deleteCategory was not successful but cascade_available`);
-        addNotification(
-          `Could not delete category (ID: ${id}).\nError: ${result.error_code} - ${result.message}\nDependencies: ${JSON.stringify(result.dependencies)}`,
-          "error",
-        );
-      }
-    }
-
-    // TODO: Stay on page, just reload categories!!! See OfferingDetailAttributes -> Delete category.
     if (dataChanged) {
-      goto("/categories", { invalidateAll: true });
+      resolvedCategories = await categoryApi.loadCategories();
     }
   }
 

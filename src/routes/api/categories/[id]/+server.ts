@@ -16,8 +16,9 @@ import { checkProductCategoryMasterDependencies } from "$lib/dataModel/dependenc
 import type { ProductCategory } from "$lib/domain/domainTypes";
 import { v4 as uuidv4 } from "uuid";
 
-import type { ApiErrorResponse, ApiSuccessResponse } from "$lib/api/api.types";
+import type { ApiErrorResponse, ApiSuccessResponse, DeleteRequest } from "$lib/api/api.types";
 import type { DeleteCategoryConflictResponse, DeleteCategorySuccessResponse } from "$lib/api/app/appSpecificTypes";
+import { deleteProductCategory } from "$lib/dataModel/deletes";
 
 /**
  * GET /api/categories/[id]
@@ -129,105 +130,78 @@ export const PUT: RequestHandler = async ({ params, request }) => {
  * DELETE /api/categories/[id]
  * @description Deletes a category master data record with careful dependency checking.
  */
-export const DELETE: RequestHandler = async ({ params, url }): Promise<Response> => {
+export const DELETE: RequestHandler = async ({ params, request, url }): Promise<Response> => {
   log.infoHeader("DELETE /api/categories/[id]");
   const operationId = uuidv4();
   const id = parseInt(params.id ?? "", 10);
-  log.info(`[${operationId}] DELETE /categories/${id}: FN_START`);
+  log.info(`[${operationId}] DELETE /categories/${id}: FN_START`, { params, request, url });
 
-  if (isNaN(id) || id <= 0) {
-    const errRes: ApiErrorResponse = {
-      success: false,
-      message: "Invalid category ID.",
-      status_code: 400,
-      meta: { timestamp: new Date().toISOString() },
-    };
-    return json(errRes, { status: 400 });
-  }
+  const body: DeleteRequest<ProductCategory> = await request.json();
+  const cascade = body.cascade || false;
+  const forceCascade = body.forceCascade || false;
 
   try {
-    const cascade = url.searchParams.get("cascade") === "true";
-    const { hard, soft } = await checkProductCategoryMasterDependencies(id);
-    log.info(`Product categrory has dependent objects:`, { hard, soft });
-
-    // Rule 1: Hard dependencies (e.g., offerings) always block deletion.
-    if (hard.length > 0) {
-      const conflictResponse: DeleteCategoryConflictResponse = {
+    if (isNaN(id) || id <= 0) {
+      const errRes: ApiErrorResponse = {
         success: false,
-        message: "Cannot delete category: It is still in use by other entities (e.g., offerings).",
-        status_code: 409,
-        error_code: "DEPENDENCY_CONFLICT",
-        dependencies: { hard, soft },
-        cascade_available: false,
+        message: "Invalid category ID.",
+        status_code: 400,
         meta: { timestamp: new Date().toISOString() },
       };
-      log.warn(`[${operationId}] FN_FAILURE: Deletion blocked by hard dependencies.`, { dependencies: hard });
-      return json(conflictResponse, { status: 409 });
+      return json(errRes, { status: 400 });
     }
 
-    // Rule 2: Soft dependencies (e.g., assignments) block deletion unless cascade is requested.
-    if (soft.length > 0 && !cascade) {
-      const conflictResponse: DeleteCategoryConflictResponse = {
-        success: false,
-        message: "Category has active supplier assignments. Use cascade to remove them.",
-        status_code: 409,
-        error_code: "DEPENDENCY_CONFLICT",
-        dependencies: {hard, soft},
-        cascade_available: true,
-        meta: { timestamp: new Date().toISOString() },
-      };
-      log.warn(`[${operationId}] FN_FAILURE: Deletion blocked by soft dependencies, cascade not requested.`, { dependencies: soft });
-      return json(conflictResponse, { status: 409 });
-    }
-
-    // Proceed with deletion.
     const transaction = db.transaction();
     await transaction.begin();
     log.info(`[${operationId}] Transaction started for category deletion.`);
 
     try {
-      // Step 1: If cascading, remove soft dependencies (assignments).
-      if (cascade && soft.length > 0) {
-        await transaction.request().input("categoryId", id).query("DELETE FROM dbo.wholesaler_categories WHERE category_id = @categoryId");
-        log.info(`[${operationId}] Cascaded deletion of ${soft.length} assignments.`);
+      // === CHECK DEPENDENCIES =====================================================================
+
+      const { hard, soft } = await checkProductCategoryMasterDependencies(id);
+      log.info(`Product categrory has dependent objects:`, { hard, soft });
+
+      let cascade_available = true;
+      if (hard.length > 0) {
+        cascade_available = false;
       }
-
-      // Step 2: Get category details before deleting for the response payload.
-      const categoryDetailsResult = await transaction
-        .request()
-        .input("id", id)
-        .query("SELECT category_id, name FROM dbo.product_categories WHERE category_id = @id");
-
-      if (categoryDetailsResult.recordset.length === 0) {
-        await transaction.rollback();
-        const errRes: ApiErrorResponse = {
+      // If we have soft dependencies without cascade
+      // or we have hard dependencies without forceCascade => Return error code.
+      if ((soft.length > 0 && !cascade) || (hard.length > 0 && !forceCascade)) {
+        const conflictResponse: DeleteCategoryConflictResponse = {
           success: false,
-          message: `Category with ID ${id} not found to delete.`,
-          status_code: 404,
+          message: "Cannot delete category: It is still in use by other entities (e.g., offerings).",
+          status_code: 409,
+          error_code: "DEPENDENCY_CONFLICT",
+          dependencies: { hard, soft },
+          cascade_available,
           meta: { timestamp: new Date().toISOString() },
         };
-        return json(errRes, { status: 404 });
+        log.warn(`[${operationId}] FN_FAILURE: Deletion blocked by hard dependencies.`, { dependencies: hard });
+        return json(conflictResponse, { status: 409 });
       }
-      const categoryDetails = categoryDetailsResult.recordset[0];
 
-      // Step 3: Delete the master data record itself.
-      await transaction.request().input("id", id).query("DELETE FROM dbo.product_categories WHERE category_id = @id");
+      // === DELETE =================================================================================
 
+      const deletedInfo = await deleteProductCategory(id, cascade || forceCascade, transaction);
       await transaction.commit();
       log.info(`[${operationId}] Transaction committed.`);
 
+      // === RETURN RESPONSE ========================================================================
+
       const response: DeleteCategorySuccessResponse = {
         success: true,
-        message: `Category "${categoryDetails.name}" deleted successfully.`,
+        message: `Category "${deletedInfo.deleted.name}" deleted successfully.`,
         data: {
-          deleted_resource: { category_id: categoryDetails.category_id, name: categoryDetails.name },
-          cascade_performed: cascade,
-          dependencies_cleared: soft.length,
+          deleted_resource: deletedInfo.deleted,
+          cascade_performed: cascade || forceCascade,
+          dependencies_cleared: deletedInfo.stats.total,
         },
         meta: { timestamp: new Date().toISOString() },
       };
       log.info(`[${operationId}] FN_SUCCESS: Category deleted.`, { responseData: response.data });
       return json(response);
+
     } catch (err) {
       await transaction.rollback();
       log.error(`[${operationId}] FN_EXCEPTION: Transaction failed, rolling back.`, { error: err });

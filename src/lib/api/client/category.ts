@@ -126,12 +126,13 @@ export function getCategoryApi(client: ApiClient) {
     /**
      * Deletes a category with dependency checking.
      */
-    async deleteCategory(categoryId: number, cascade = false): Promise<DeleteCategoryApiResponse> {
+    async deleteCategory(categoryId: number, cascade = false, forceCascade = false): Promise<DeleteCategoryApiResponse> {
       const operationId = `deleteCategory-${categoryId}`;
       categoryLoadingManager.start(operationId);
       try {
-        const url = `/api/categories/${categoryId}${cascade ? "?cascade=true" : ""}`;
-        return await client.apiFetchUnion<DeleteCategoryApiResponse>(url, { method: "DELETE" }, { context: operationId });
+        const url = `/api/categories/${categoryId}`;
+        const body = createPostBody({ cascade, forceCascade });
+        return await client.apiFetchUnion<DeleteCategoryApiResponse>(url, { method: "DELETE", body }, { context: operationId });
       } finally {
         categoryLoadingManager.finish(operationId);
       }

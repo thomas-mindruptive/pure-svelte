@@ -254,42 +254,57 @@ export const DELETE: RequestHandler = async ({ params, request }) => {
       return json(errRes, { status: 400 });
     }
 
-    // NOTE: We regard all dependencies as "soft" because the supplier is an aggregate root.
-    // If cascade => Delete all dependencies even without "forceCascade".
-    const dependencies = await checkWholesalerDependencies(id);
-    if (dependencies.length > 0 && !cascade) {
-      const conflictResponse: DeleteConflictResponse<string[]> = {
-        success: false,
-        message: "Cannot delete supplier: dependencies exist.",
-        status_code: 409,
-        error_code: "DEPENDENCY_CONFLICT",
-        dependencies: { soft: dependencies, hard: [] },
-        cascade_available: true,
-        meta: { timestamp: new Date().toISOString() },
-      };
-      log.warn(`[${operationId}] FN_FAILURE: Deletion blocked by dependencies.`, { dependencies });
-      return json(conflictResponse, { status: 409 });
-    }
-
     const transaction = db.transaction();
+    await transaction.begin();
 
     try {
-      await transaction.begin();
+      // === CHECK DEPENDENCIES =====================================================================
 
-      const deletedSupplier = await deleteSupplier(id, cascade || forceCascade, transaction);
+      const { hard, soft } = await checkWholesalerDependencies(id);
+      let cascade_available = true;
+      if (hard.length > 0) {
+        cascade_available = false;
+      }
+      // If we have soft dependencies without cascade
+      // or we have hard dependencies without forceCascade => Return error code.
+      if ((soft.length > 0 && !cascade) || (hard.length > 0 && !forceCascade)) {
+        const conflictResponse: DeleteConflictResponse<string[]> = {
+          success: false,
+          message: "Cannot delete supplier: dependencies exist.",
+          status_code: 409,
+          error_code: "DEPENDENCY_CONFLICT",
+          dependencies: { soft, hard },
+          cascade_available,
+          meta: { timestamp: new Date().toISOString() },
+        };
+        log.warn(`[${operationId}] FN_FAILURE: Deletion blocked by dependencies.`, { hard, soft });
+        return json(conflictResponse, { status: 409 });
+      }
+
+      // === DELETE =================================================================================
+
+      // We correctly check for hard and soft dependencies above => It is safe to "cascade || forceCascade".
+      const deletedSupplierStats = await deleteSupplier(id, cascade || forceCascade, transaction);
+      await transaction.commit();
+      log.info(`[${operationId}] Transaction committed.`);
+      
+      // === RETURN RESPONSE ========================================================================
 
       const response: DeleteSupplierSuccessResponse = {
         success: true,
-        message: `Supplier "${deletedSupplier.name}" deleted successfully.`,
+        message: `Supplier "${deletedSupplierStats.deleted.name}" deleted successfully.`,
         data: {
-          deleted_resource: deletedSupplier,
-          cascade_performed: cascade,
-          dependencies_cleared: dependencies.length,
+          deleted_resource: deletedSupplierStats.deleted,
+          cascade_performed: cascade || forceCascade,
+          dependencies_cleared: deletedSupplierStats.stats.total,
         },
         meta: { timestamp: new Date().toISOString() },
       };
-      log.info(`[${operationId}] FN_SUCCESS: Supplier deleted.`, { deletedId: deletedSupplier.wholesaler_id, cascade, forceCascade });
-
+      log.info(`[${operationId}] FN_SUCCESS: Supplier deleted.`, {
+        deletedId: deletedSupplierStats.deleted.wholesaler_id,
+        cascade,
+        forceCascade,
+      });
       return json(response);
     } catch (err) {
       await transaction.rollback();

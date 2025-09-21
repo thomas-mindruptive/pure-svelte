@@ -45,7 +45,7 @@ export async function cascadeDelte<TDomainClass>(
         `\n${JSON.stringify(initialResult.dependencies)}`;
 
       // Path "cascade_available"  ------------------------------------------------------------------------------------
-      if (!allowForceCascadingDelte) {
+      if (initialResult.cascade_available) {
         log.debug(`Initial delete unsucessful but cascade_available. Now trying cascade.`, initialResult);
         const confirmed = await requestConfirmation(confirmMessage, "Confirm Cascade Delete");
 
@@ -66,7 +66,7 @@ export async function cascadeDelte<TDomainClass>(
         }
       }
       // Path "NO cascade_available" but allowForceCascadingDelte ---------------------------------------------------
-      else {
+      else if (allowForceCascadingDelte) {
         log.debug(`Initial delete unsucessful and NO cascade_available. Now trying force cascade.`, initialResult);
         // If cascade_available is false (this usually means we have hard dependencies)
         // => User must confirm with extra layer of confirmation: Checkbox "Are you sure to force cascading delte?"
@@ -92,9 +92,10 @@ export async function cascadeDelte<TDomainClass>(
           log.debug(`Dialog not confirmed or no forceCascade`);
           addNotification(`Could not delete ${info.domainObjectName} because cascade was not confirmed.`, "error", 5000);
         }
+      } else {
+        throw new Error(`Invalid state: initialResult.cascade_available or allowForceCascadingDelte must be true.`);
       }
-    }
-    else {
+    } else {
       addNotification(`Could not delete ${info.domainObjectName}. No "cascade_available" and/or no "force cascade`, "error", 5000);
     }
   }

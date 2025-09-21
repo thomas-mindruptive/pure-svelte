@@ -1,20 +1,11 @@
 <!-- SupplierListPage.svelte -->
 <script lang="ts">
-  // --- Component & Type Imports ---
-  // The SupplierGrid is the primary UI component for displaying the data.
   import SupplierGrid from "$lib/components/domain/suppliers/SupplierGrid.svelte";
-  // We need the supplierLoadingState to show loading for on-page actions like 'delete'.
   import { supplierLoadingState, getSupplierApi } from "$lib/api/client/supplier";
   import type { Wholesaler } from "$lib/domain/domainTypes";
-
-  // --- SvelteKit & Utility Imports ---
-  // `goto` is used for programmatic navigation (e.g., after clicking a row).
   import { goto } from "$app/navigation";
-  // The application's standard logger.
   import { log } from "$lib/utils/logger";
-  // UI feedback helpers for success/error messages and confirmation dialogs.
-  import { addNotification } from "$lib/stores/notifications";
-  import { requestConfirmation } from "$lib/stores/confirmation";
+
 
   // --- API & Strategy Imports ---
   // The ApiClient is the foundation for making SSR-safe fetch requests.
@@ -22,6 +13,8 @@
   // Types for the strategy pattern used by the generic DataGrid component.
   import type { ID, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
   import { page } from "$app/stores";
+    import { stringsToNumbers } from "$lib/utils/typeConversions";
+    import { cascadeDelte } from "$lib/api/client/cascadeDelete";
 
   // === PROPS ====================================================================================
 
@@ -31,15 +24,14 @@
 
   // === STATE ====================================================================================
 
-  // These top-level `let` variables are made reactive by Svelte 5.
-  // They will hold the resolved state of the promise.
+
   let resolvedSuppliers = $state<Wholesaler[]>([]);
   let isLoading = $state(true); // The component always starts in a loading state.
-  // A structured object to hold a clean, UI-friendly error if the promise rejects.
   let loadingOrValidationError = $state<{
     message: string;
     status: number;
   } | null>(null);
+  const allowForceCascadingDelte = $state(true);
 
   // === LOAD =====================================================================================
 
@@ -117,34 +109,17 @@
     log.info(`(SupplierListPage) Deleting suppliers`, { ids });
     let dataChanged = false;
 
-    for (const id of ids) {
-      const numericId = Number(id);
-      const result = await supplierApi.deleteSupplier(numericId, false);
-
-      if (result.success) {
-        addNotification(`Supplier "${result.data.deleted_resource.name}" deleted.`, "success");
-        dataChanged = true;
-      } else if ("cascade_available" in result && result.cascade_available) {
-        const dependencies = (result.dependencies as string[]).join(", ");
-        const confirmed = await requestConfirmation(
-          `Supplier has dependencies: ${dependencies}. Delete with all related data?`,
-          "Confirm Cascade Delete",
-        );
-
-        if (confirmed.confirmed) {
-          const cascadeResult = await supplierApi.deleteSupplier(numericId, true);
-          if (cascadeResult.success) {
-            addNotification("Supplier and related data deleted.", "success");
-            dataChanged = true;
-          }
-        }
-      } else {
-        addNotification(
-          `Could not delete supplier (ID: ${id}). Error: ${result.error_code} - ${result.message}, Dependencies: ${JSON.stringify(result.dependencies)}`,
-          "error",
-        );
-      }
-    }
+    const idsAsNumber = stringsToNumbers(ids);
+    dataChanged = await cascadeDelte(
+      idsAsNumber,
+      supplierApi.deleteSupplier,
+      {
+        domainObjectName: "Supplier",
+        hardDepInfo: "Supplier has hard dependencies. Delete?",
+        softDepInfo: "Supplier has soft dependencies. Delete?",
+      },
+      allowForceCascadingDelte,
+    );
 
     if (dataChanged) {
       // Reload and change state.

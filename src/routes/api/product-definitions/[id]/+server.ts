@@ -158,10 +158,10 @@ export const DELETE: RequestHandler = async ({ request, params }) => {
   const operationId = uuidv4();
   const id = parseInt(params.id ?? "", 10);
   log.infoHeader(`DELETE /product-definitions/${id}`);
-  log.debug(`Reuest, params:`,{request, params});
+  log.debug(`Reuest, params:`, { request, params });
 
   const body: DeleteRequest<ProductDefinition> = await request.json();
-  // Only used if soft dependencies: const cascade = body.cascade;
+  const cascade = body.cascade;
   const forceCascade = body.forceCascade || false;
 
   if (isNaN(id) || id <= 0) {
@@ -179,47 +179,45 @@ export const DELETE: RequestHandler = async ({ request, params }) => {
   await transaction.begin();
 
   try {
-    const dependencies = await checkProductDefinitionDependencies(id);
+    // === CHECK DEPENDENCIES =====================================================================
 
-    // Hard dependency check: Offerings must not exist if forceCascade == false.
-    if (dependencies.hard.length > 0 && !forceCascade) {
+    const { hard, soft } = await checkProductDefinitionDependencies(id);
+    let cascade_available = true;
+    if (hard.length > 0) {
+      cascade_available = false;
+    }
+
+    // If we have soft dependencies without cascade
+    // or we have hard dependencies without forceCascade => Return error code.
+    if ((soft.length > 0 && !cascade) || (hard.length > 0 && !forceCascade)) {
       const conflictResponse: DeleteConflictResponse<string[]> = {
         success: false,
-        message: "Cannot delete product definition: It is referenced by existing offerings.",
+        message: "Cannot delete product definition: It is referenced by dependent objects.",
         status_code: 409,
         error_code: "DEPENDENCY_CONFLICT",
-        dependencies: { hard: dependencies.hard, soft: dependencies.soft },
-        cascade_available: false, // Cascade is NOT allowed for this hard link.
+        dependencies: { hard, soft },
+        cascade_available,
         meta: { timestamp: new Date().toISOString() },
       };
       return json(conflictResponse, { status: 409 });
     }
 
-    const details = await deleteProductDefinition(id, forceCascade, transaction);
+    // === DELETE =================================================================================
 
+    // We correctly check for hard and soft dependencies above => It is safe to "cascade || forceCascade".
+    const deleteInfo = await deleteProductDefinition(id, cascade || forceCascade, transaction);
+    await transaction.commit();
+    log.info(`[${operationId}] Transaction committed.`);
 
-    // OLD -------------------------------------------------------------------------
-    // // Get details before deletion for the response payload
-    // const detailsResult = await db
-    //   .request()
-    //   .input("id", id)
-    //   .query("SELECT product_def_id, title FROM dbo.product_definitions WHERE product_def_id = @id");
-
-    // if (detailsResult.recordset.length === 0) {
-    //   throw error(404, `Product definition with ID ${id} not found.`);
-    // }
-    // const details = detailsResult.recordset[0];
-
-    // // Delete product def.
-    // await db.request().input("id", id).query("DELETE FROM dbo.product_definitions WHERE product_def_id = @id");
+    // === RETURN RESPONSE ========================================================================
 
     const response: DeleteSuccessResponse<Pick<ProductDefinition, "product_def_id" | "title">> = {
       success: true,
-      message: `Product definition "${details.title}" deleted successfully.`,
+      message: `Product definition "${deleteInfo.deleted.title}" deleted successfully.`,
       data: {
-        deleted_resource: details,
+        deleted_resource: deleteInfo.deleted,
         cascade_performed: false,
-        dependencies_cleared: 0,
+        dependencies_cleared: deleteInfo.stats.total,
       },
       meta: { timestamp: new Date().toISOString() },
     };
@@ -232,9 +230,6 @@ export const DELETE: RequestHandler = async ({ request, params }) => {
     const { status, message } = mssqlErrorMapper.mapToHttpError(err);
     log.error(`[${operationId}] FN_EXCEPTION: Unhandled error during DELETE.`, { error: err });
     await transaction.rollback();
-
     throw error(status, message);
-  } finally {
-    await transaction.commit();
-  }
+  } 
 };

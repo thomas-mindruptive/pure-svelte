@@ -144,14 +144,15 @@ export function getSupplierApi(client: ApiClient) {
     /**
      * Deletes a supplier.
      */
-    async deleteSupplier(supplierId: number, cascade = false): Promise<DeleteSupplierApiResponse> {
+    async deleteSupplier(supplierId: number, cascade = false, forceCascade = false): Promise<DeleteSupplierApiResponse> {
       const operationId = `deleteSupplier-${supplierId}`;
       supplierLoadingOperations.start(operationId);
       try {
-        const url = `/api/suppliers/${supplierId}${cascade ? '?cascade=true' : ''}`;
+        const url = `/api/suppliers/${supplierId}`;
+        const body = createPostBody({cascade, forceCascade});
         return await client.apiFetchUnion<DeleteSupplierApiResponse>(
           url,
-          { method: 'DELETE' },
+          { method: 'DELETE', body },
           { context: operationId }
         );
       } finally {

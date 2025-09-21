@@ -14,7 +14,14 @@ import { mssqlErrorMapper } from "$lib/backendQueries/mssqlErrorMapper";
 import { checkProductDefinitionDependencies } from "$lib/dataModel/dependencyChecks";
 import type { ProductDefinition } from "$lib/domain/domainTypes";
 import { v4 as uuidv4 } from "uuid";
-import type { ApiErrorResponse, ApiSuccessResponse, DeleteConflictResponse, DeleteSuccessResponse } from "$lib/api/api.types";
+import type {
+  ApiErrorResponse,
+  ApiSuccessResponse,
+  DeleteConflictResponse,
+  DeleteRequest,
+  DeleteSuccessResponse,
+} from "$lib/api/api.types";
+import { deleteProductDefinition } from "$lib/dataModel/deletes";
 
 /**
  * GET /api/product-definitions/[id]
@@ -147,10 +154,15 @@ export const PUT: RequestHandler = async ({ params, request }) => {
  * DELETE /api/product-definitions/[id]
  * @description Deletes a product definition after checking for hard dependencies.
  */
-export const DELETE: RequestHandler = async ({ params }) => {
+export const DELETE: RequestHandler = async ({ request, params }) => {
   const operationId = uuidv4();
   const id = parseInt(params.id ?? "", 10);
-  log.info(`[${operationId}] DELETE /product-definitions/${id}: FN_START`);
+  log.infoHeader(`DELETE /product-definitions/${id}`);
+  log.debug(`Reuest, params:`,{request, params});
+
+  const body: DeleteRequest<ProductDefinition> = await request.json();
+  // Only used if soft dependencies: const cascade = body.cascade;
+  const forceCascade = body.forceCascade || false;
 
   if (isNaN(id) || id <= 0) {
     const errRes: ApiErrorResponse = {
@@ -163,36 +175,43 @@ export const DELETE: RequestHandler = async ({ params }) => {
     return json(errRes, { status: 400 });
   }
 
+  const transaction = db.transaction();
+  await transaction.begin();
+
   try {
     const dependencies = await checkProductDefinitionDependencies(id);
 
-    // Hard dependency check: Offerings must not exist.
-    if (dependencies.hard.length > 0) {
+    // Hard dependency check: Offerings must not exist if forceCascade == false.
+    if (dependencies.hard.length > 0 && !forceCascade) {
       const conflictResponse: DeleteConflictResponse<string[]> = {
         success: false,
         message: "Cannot delete product definition: It is referenced by existing offerings.",
         status_code: 409,
         error_code: "DEPENDENCY_CONFLICT",
-        dependencies: {hard: dependencies.hard, soft: dependencies.soft},
+        dependencies: { hard: dependencies.hard, soft: dependencies.soft },
         cascade_available: false, // Cascade is NOT allowed for this hard link.
         meta: { timestamp: new Date().toISOString() },
       };
       return json(conflictResponse, { status: 409 });
     }
 
-    // Get details before deletion for the response payload
-    const detailsResult = await db
-      .request()
-      .input("id", id)
-      .query("SELECT product_def_id, title FROM dbo.product_definitions WHERE product_def_id = @id");
+    const details = await deleteProductDefinition(id, forceCascade, transaction);
 
-    if (detailsResult.recordset.length === 0) {
-      throw error(404, `Product definition with ID ${id} not found.`);
-    }
-    const details = detailsResult.recordset[0];
 
-    // Perform the deletion
-    await db.request().input("id", id).query("DELETE FROM dbo.product_definitions WHERE product_def_id = @id");
+    // OLD -------------------------------------------------------------------------
+    // // Get details before deletion for the response payload
+    // const detailsResult = await db
+    //   .request()
+    //   .input("id", id)
+    //   .query("SELECT product_def_id, title FROM dbo.product_definitions WHERE product_def_id = @id");
+
+    // if (detailsResult.recordset.length === 0) {
+    //   throw error(404, `Product definition with ID ${id} not found.`);
+    // }
+    // const details = detailsResult.recordset[0];
+
+    // // Delete product def.
+    // await db.request().input("id", id).query("DELETE FROM dbo.product_definitions WHERE product_def_id = @id");
 
     const response: DeleteSuccessResponse<Pick<ProductDefinition, "product_def_id" | "title">> = {
       success: true,
@@ -212,6 +231,10 @@ export const DELETE: RequestHandler = async ({ params }) => {
     }
     const { status, message } = mssqlErrorMapper.mapToHttpError(err);
     log.error(`[${operationId}] FN_EXCEPTION: Unhandled error during DELETE.`, { error: err });
+    await transaction.rollback();
+
     throw error(status, message);
+  } finally {
+    await transaction.commit();
   }
 };

@@ -22,10 +22,12 @@ import type {
   ApiErrorResponse,
   ApiSuccessResponse,
   DeleteConflictResponse,
-  DeleteSuccessResponse,
+  DeleteRequest,
   QueryRequest,
   QuerySuccessResponse,
 } from "$lib/api/api.types";
+import { deleteSupplier } from "$lib/dataModel/deletes";
+import type { DeleteSupplierSuccessResponse } from "$lib/api/app/appSpecificTypes";
 
 /**
  * GET /api/suppliers/[id] - Get a single, complete supplier record.
@@ -229,11 +231,15 @@ export const PUT: RequestHandler = async ({ params, request }) => {
 /**
  * DELETE /api/suppliers/[id] - Delete a supplier with dependency checks.
  */
-export const DELETE: RequestHandler = async ({ params, url }) => {
+export const DELETE: RequestHandler = async ({ params, request }) => {
   log.infoHeader("DELETE /api/suppliers/[id]");
   const operationId = uuidv4();
   const id = parseInt(params.id ?? "", 10);
-  log.info(`[${operationId}] DELETE /suppliers/${id}: FN_START`);
+  const body: DeleteRequest<Wholesaler> = await request.json();
+  log.info(`[${operationId}] DELETE /suppliers/${id}: FN_START`, { params, request, body });
+
+  const cascade = body.cascade || false;
+  const forceCascade = body.forceCascade || false;
 
   try {
     if (isNaN(id) || id <= 0) {
@@ -248,9 +254,8 @@ export const DELETE: RequestHandler = async ({ params, url }) => {
       return json(errRes, { status: 400 });
     }
 
-    const cascade = url.searchParams.get("cascade") === "true";
-    log.info(`[${operationId}] Parsed parameters`, { id, cascade });
-
+    // NOTE: We regard all dependencies as "soft" because the supplier is an aggregate root.
+    // If cascade => Delete all dependencies even without "forceCascade".
     const dependencies = await checkWholesalerDependencies(id);
     if (dependencies.length > 0 && !cascade) {
       const conflictResponse: DeleteConflictResponse<string[]> = {
@@ -267,67 +272,24 @@ export const DELETE: RequestHandler = async ({ params, url }) => {
     }
 
     const transaction = db.transaction();
-    await transaction.begin();
-    log.info(`[${operationId}] Transaction started.`);
+
     try {
-      if (cascade && dependencies.length > 0) {
-        log.info(`[${operationId}] Performing cascade delete.`);
-        await transaction
-          .request()
-          .input("supplierId", id)
-          .query(
-            "DELETE FROM dbo.wholesaler_offering_attributes WHERE offering_id IN (SELECT offering_id FROM dbo.wholesaler_item_offerings WHERE wholesaler_id = @supplierId)",
-          );
-        await transaction
-          .request()
-          .input("supplierId", id)
-          .query(
-            "DELETE FROM dbo.wholesaler_offering_links WHERE offering_id IN (SELECT offering_id FROM dbo.wholesaler_item_offerings WHERE wholesaler_id = @supplierId)",
-          );
-        await transaction
-          .request()
-          .input("supplierId", id)
-          .query("DELETE FROM dbo.wholesaler_item_offerings WHERE wholesaler_id = @supplierId");
-        await transaction
-          .request()
-          .input("supplierId", id)
-          .query("DELETE FROM dbo.wholesaler_categories WHERE wholesaler_id = @supplierId");
-      }
+      await transaction.begin();
 
-      const result = await transaction
-        .request()
-        .input("id", id)
-        .query("DELETE FROM dbo.wholesalers OUTPUT DELETED.wholesaler_id, DELETED.name WHERE wholesaler_id = @id");
-      await transaction.commit();
-      log.info(`[${operationId}] Transaction committed.`);
+      const deletedSupplier = await deleteSupplier(id, cascade || forceCascade, transaction);
 
-      if (result.recordset.length === 0) {
-        const errRes: ApiErrorResponse = {
-          success: false,
-          message: `Supplier with ID ${id} not found to delete.`,
-          status_code: 404,
-          error_code: "NOT_FOUND",
-          meta: { timestamp: new Date().toISOString() },
-        };
-        log.warn(`[${operationId}] FN_FAILURE: Supplier not found during delete.`);
-        return json(errRes, { status: 404 });
-      }
-
-      type DeletedSupplierData = Pick<Wholesaler, "wholesaler_id" | "name">;
-      type DeleteSupplierSuccessResponse = DeleteSuccessResponse<DeletedSupplierData>;
-
-      const deleted = result.recordset[0];
       const response: DeleteSupplierSuccessResponse = {
         success: true,
-        message: `Supplier "${deleted.name}" deleted successfully.`,
+        message: `Supplier "${deletedSupplier.name}" deleted successfully.`,
         data: {
-          deleted_resource: { wholesaler_id: deleted.wholesaler_id, name: deleted.name },
+          deleted_resource: deletedSupplier,
           cascade_performed: cascade,
           dependencies_cleared: dependencies.length,
         },
         meta: { timestamp: new Date().toISOString() },
       };
-      log.info(`[${operationId}] FN_SUCCESS: Supplier deleted.`, { deletedId: deleted.wholesaler_id, cascade });
+      log.info(`[${operationId}] FN_SUCCESS: Supplier deleted.`, { deletedId: deletedSupplier.wholesaler_id, cascade, forceCascade });
+
       return json(response);
     } catch (err) {
       await transaction.rollback();

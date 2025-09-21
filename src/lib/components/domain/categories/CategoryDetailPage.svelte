@@ -201,6 +201,7 @@
       allowForceCascadingDelte,
     );
 
+    // OLD: -----------------------------------
     // for (const id of ids) {
     //   const productDefId = Number(id);
     //   if (isNaN(productDefId)) {

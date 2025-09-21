@@ -27,6 +27,8 @@
   import { getProductDefinitionApi } from "$lib/api/client/productDefinition";
   import CategoryProductDefsGrid from "./CategoryProductDefsGrid.svelte";
   import CategoryForm from "./CategoryForm.svelte";
+  import { cascadeDelte } from "$lib/api/client/cascadeDelete";
+  import { stringsToNumbers } from "$lib/utils/typeConversions";
 
   // === PROPS ====================================================================================
 
@@ -186,6 +188,15 @@
     }
 
     let dataChanged = false;
+
+    // Our ids mus be numbers or number converted to string! => See CategoryGrid.getId!
+    const idsAsNumber = stringsToNumbers(ids);
+    dataChanged = await cascadeDelte(idsAsNumber, productDefApi.deleteProductDefinition, {
+      domainObjectName: "",
+      hardDepInfo: "",
+      softDepInfo: "",
+    });
+
     for (const id of ids) {
       const productDefId = Number(id);
       if (isNaN(productDefId)) {
@@ -198,7 +209,7 @@
         log.debug(`Delte successful`);
         addNotification(`Product definition delted.`, "success");
         dataChanged = true;
-      } else if ((initialResult.cascade_available) || allowForceCascadingDelte) {
+      } else if (initialResult.cascade_available || allowForceCascadingDelte) {
         log.debug(`Delete not successful but cascade_available`, { initialResult, allowForceCascadingDelte });
         const offeringCount = (initialResult.dependencies as any)?.offering_count ?? 0;
         const confirmed = await requestConfirmation(

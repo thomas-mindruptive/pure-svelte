@@ -3,7 +3,7 @@ import { addNotification } from "$lib/stores/notifications";
 import { log } from "$lib/utils/logger";
 import type { DeleteApiResponse, DeleteConflictResponse } from "../api.types";
 
-export type ID = string | number;
+export type ID = number;
 
 export type DeleteApiFunction<TDomainClass> = (
   id: ID,

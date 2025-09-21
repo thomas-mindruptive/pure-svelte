@@ -1,25 +1,24 @@
-export function stringsToNumbers(strings: string[]): number[] {
-  const result: number[] = [];
+export function stringsToNumbers(elem: (string | number)[]): number[] {
+  return elem.map((item, index) => {
+    
+    // Wenn es bereits eine Zahl ist, direkt zurückgeben
+    if (typeof item === 'number') {
+      if (isNaN(item) || !isFinite(item)) {
+        throw new Error(`Invalid number at index ${index}: ${item}`);
+      }
+      return item;
+    }
   
-  for (let i = 0; i < strings.length; i++) {
-    const str = strings[i].trim();
-    
-    if (str === '') {
-      throw new Error(`Empty string at index ${i} cannot be converted to number`);
+    // String-Behandlung
+    const trimmed = item.trim();
+    if (trimmed === '') {
+      throw new Error(`Empty string at index ${index} cannot be converted to number`);
+    }
+    const num = Number(trimmed);
+    if (isNaN(num) || !isFinite(num)) {
+      throw new Error(`Invalid number format at index ${index}: "${item}"`);
     }
     
-    const num = Number(str);
-    
-    if (isNaN(num)) {
-      throw new Error(`Invalid number format at index ${i}: "${strings[i]}"`);
-    }
-    
-    if (!isFinite(num)) {
-      throw new Error(`Number out of range at index ${i}: "${strings[i]}"`);
-    }
-    
-    result.push(num);
-  }
-  
-  return result;
+    return num;
+  });
 }

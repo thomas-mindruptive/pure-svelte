@@ -114,7 +114,7 @@ async function _handleDeletionConflict<TDeletedResource>(
  * @param allowForceCascadingDelete Set to true if the UI should allow forcing deletion of hard dependencies.
  * @returns A promise that resolves to true if any data was changed on the server.
  */
-export async function cascadeDelte<TDeletedResource>(
+export async function cascadeDelete<TDeletedResource>(
   ids: ID[],
   delFunc: DeleteApiFunction<TDeletedResource>,
   info: DeletionDialogInfo,

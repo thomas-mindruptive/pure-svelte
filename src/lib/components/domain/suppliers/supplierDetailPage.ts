@@ -4,7 +4,6 @@ import { log } from '$lib/utils/logger';
 import { error, type LoadEvent } from '@sveltejs/kit';
 import { getSupplierApi } from '$lib/api/client/supplier';
 import { ApiClient } from '$lib/api/client/ApiClient';
-// NEW: Import the asynchronous data type
 import type { SupplierDetailPage_LoadDataAsync } from './supplierDetailPage.types';
 
 /**

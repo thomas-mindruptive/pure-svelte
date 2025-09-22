@@ -3,7 +3,6 @@
   import { goto } from "$app/navigation";
   import { log } from "$lib/utils/logger";
   import { addNotification } from "$lib/stores/notifications";
-  import { requestConfirmation } from "$lib/stores/confirmation";
 
   // Component Imports
   import "$lib/components/styles/detail-page-layout.css";
@@ -27,6 +26,8 @@
     type SupplierDetailPage_LoadDataAsync,
   } from "$lib/components/domain/suppliers/supplierDetailPage.types";
   import { assertDefined } from "$lib/utils/assertions";
+  import { cascadeDelte } from "$lib/api/client/cascadeDelete";
+  import { stringsToNumbers } from "$lib/utils/typeConversions";
 
   // === PROPS ====================================================================================
 
@@ -38,6 +39,7 @@
   let isLoading = $state(true);
   let loadingError = $state<{ message: string; status?: number } | null>(null);
   const isCreateMode = $derived(!resolvedData?.supplier);
+  const allowForceCascadingDelte = $state(true);
 
   // === LOAD =====================================================================================
 
@@ -205,64 +207,86 @@
     }
   }
 
+  async function handleCategoryDelete(ids: ID[]): Promise<void> {
+    log.info(`(SupplierListPage) Deleting suppliers`, { ids });
+    let dataChanged = false;
+
+    const idsAsNumber = stringsToNumbers(ids);
+    dataChanged = await cascadeDelte(
+      idsAsNumber,
+      supplierApi.removeCategoryFromSupplier,
+      {
+        domainObjectName: "Category",
+        hardDepInfo: "Category has hard dependencies. Delete?",
+        softDepInfo: "Category has soft dependencies. Delete?",
+      },
+      allowForceCascadingDelte,
+    );
+
+    if (dataChanged) {
+      // Reload and change state.
+      reloadCategories();
+    }
+  }
+
   /**
    * Executes the deletion process for category assignments.
    */
-  async function handleCategoryDelete(ids: ID[]): Promise<void> {
-    if (!resolvedData?.supplier) {
-      const msg = "Cannot delete catagory in create mode or when supplier not yet loaded.";
-      addNotification(msg, "error");
-      throw new Error(msg);
-    }
+  // async function handleCategoryDelete_old(ids: ID[]): Promise<void> {
+  //   if (!resolvedData?.supplier) {
+  //     const msg = "Cannot delete catagory in create mode or when supplier not yet loaded.";
+  //     addNotification(msg, "error");
+  //     throw new Error(msg);
+  //   }
 
-    // The logic for this function remains complex and is unchanged.
-    // It correctly uses the client-side API.
-    let dataChanged = false;
-    for (const id of ids) {
-      const [supplierIdStr, categoryIdStr] = String(id).split("-");
-      const supplierId = Number(supplierIdStr);
-      const categoryId = Number(categoryIdStr);
-      if (isNaN(supplierId) || isNaN(categoryId)) continue;
+  //   // The logic for this function remains complex and is unchanged.
+  //   // It correctly uses the client-side API.
+  //   let dataChanged = false;
+  //   for (const id of ids) {
+  //     const [supplierIdStr, categoryIdStr] = String(id).split("-");
+  //     const supplierId = Number(supplierIdStr);
+  //     const categoryId = Number(categoryIdStr);
+  //     if (isNaN(supplierId) || isNaN(categoryId)) continue;
 
-      const initialResult = await supplierApi.removeCategoryFromSupplier({
-        supplierId,
-        categoryId,
-        cascade: false,
-      });
+  //     const initialResult = await supplierApi.removeCategoryFromSupplier({
+  //       supplierId,
+  //       categoryId,
+  //       cascade: false,
+  //     });
 
-      if (initialResult.success) {
-        addNotification(`Category assignment removed.`, "success");
-        dataChanged = true;
-      } else if ("cascade_available" in initialResult && initialResult.cascade_available) {
-        const offeringCount = (initialResult.dependencies as any)?.offering_count ?? 0;
-        const confirmed = await requestConfirmation(
-          `This category has ${offeringCount} offerings for this supplier. Remove the assignment and all these offerings?`,
-          "Confirm Cascade Delete",
-        );
-        if (confirmed.confirmed) {
-          const cascadeResult = await supplierApi.removeCategoryFromSupplier({
-            supplierId,
-            categoryId,
-            cascade: true,
-          });
-          if (cascadeResult.success) {
-            addNotification("Category assignment and its offerings removed.", "success");
-            dataChanged = true;
-          } else {
-            addNotification(cascadeResult.message || "Failed to remove assignment.", "error");
-          }
-        }
-      } else {
-        addNotification(initialResult.message || "Could not remove assignment.", "error");
-      }
-    }
+  //     if (initialResult.success) {
+  //       addNotification(`Category assignment removed.`, "success");
+  //       dataChanged = true;
+  //     } else if ("cascade_available" in initialResult && initialResult.cascade_available) {
+  //       const offeringCount = (initialResult.dependencies as any)?.offering_count ?? 0;
+  //       const confirmed = await requestConfirmation(
+  //         `This category has ${offeringCount} offerings for this supplier. Remove the assignment and all these offerings?`,
+  //         "Confirm Cascade Delete",
+  //       );
+  //       if (confirmed.confirmed) {
+  //         const cascadeResult = await supplierApi.removeCategoryFromSupplier({
+  //           supplierId,
+  //           categoryId,
+  //           cascade: true,
+  //         });
+  //         if (cascadeResult.success) {
+  //           addNotification("Category assignment and its offerings removed.", "success");
+  //           dataChanged = true;
+  //         } else {
+  //           addNotification(cascadeResult.message || "Failed to remove assignment.", "error");
+  //         }
+  //       }
+  //     } else {
+  //       addNotification(initialResult.message || "Could not remove assignment.", "error");
+  //     }
+  //   }
 
-    if (dataChanged) {
-      goto(`/suppliers/${resolvedData.supplier.wholesaler_id}`, {
-        invalidateAll: true,
-      });
-    }
-  }
+  //   if (dataChanged) {
+  //     goto(`/suppliers/${resolvedData.supplier.wholesaler_id}`, {
+  //       invalidateAll: true,
+  //     });
+  //   }
+  // }
 
   /**
    * Navigates to the next hierarchy level (offerings for a category).

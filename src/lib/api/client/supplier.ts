@@ -7,24 +7,27 @@
  * context-aware ApiClient instance.
  */
 
-import { log } from '$lib/utils/logger';
-import { ComparisonOperator, LogicalOperator, type QueryPayload } from '$lib/backendQueries/queryGrammar';
-import type { Wholesaler, WholesalerCategoryWithCount, ProductCategory, WholesalerCategory, WholesalerCategory_Category } from '$lib/domain/domainTypes';
+import { log } from "$lib/utils/logger";
+import { ComparisonOperator, LogicalOperator, type QueryPayload } from "$lib/backendQueries/queryGrammar";
+import type {
+  Wholesaler,
+  WholesalerCategoryWithCount,
+  ProductCategory,
+  WholesalerCategory,
+  WholesalerCategory_Category,
+} from "$lib/domain/domainTypes";
 
-import type { ApiClient } from './ApiClient';
-import { createPostBody, createQueryBody, getErrorMessage } from './common';
+import type { ApiClient } from "./ApiClient";
+import { createPostBody, createQueryBody, getErrorMessage } from "./common";
 import type {
   PredefinedQueryRequest,
   QueryResponseData,
   AssignmentRequest,
   RemoveAssignmentRequest,
-  AssignmentSuccessData
-} from '$lib/api/api.types';
-import type {
-  DeleteSupplierApiResponse,
-  RemoveCategoryApiResponse
-} from '$lib/api/app/appSpecificTypes';
-import { LoadingState } from './loadingState';
+  AssignmentSuccessData,
+} from "$lib/api/api.types";
+import type { DeleteSupplierApiResponse, RemoveCategoryApiResponse } from "$lib/api/app/appSpecificTypes";
+import { LoadingState } from "./loadingState";
 //import delay from '$lib/utils/delay';
 
 // Loading state managers remain global as they are a client-side concern.
@@ -36,9 +39,9 @@ export const supplierLoadingOperations = supplierLoadingManager;
  * The default query payload used when fetching a list of suppliers.
  */
 export const DEFAULT_SUPPLIER_QUERY: QueryPayload<Wholesaler> = {
-  select: ['wholesaler_id', 'name', 'region', 'status', 'dropship', 'website', 'created_at'],
-  orderBy: [{ key: 'name', direction: 'asc' }],
-  limit: 100
+  select: ["wholesaler_id", "name", "region", "status", "dropship", "website", "created_at"],
+  orderBy: [{ key: "name", direction: "asc" }],
+  limit: 100,
 };
 
 /**
@@ -48,21 +51,20 @@ export const DEFAULT_SUPPLIER_QUERY: QueryPayload<Wholesaler> = {
  */
 export function getSupplierApi(client: ApiClient) {
   const api = {
-
     // ===== SUPPLIER MASTER-DATA CRUD =====
 
     /**
      * Loads a list of suppliers.
      */
     async loadSuppliers(query: Partial<QueryPayload<Wholesaler>> = {}): Promise<Wholesaler[]> {
-      const operationId = 'loadSuppliers';
+      const operationId = "loadSuppliers";
       supplierLoadingOperations.start(operationId);
       try {
         const fullQuery: QueryPayload<Wholesaler> = { ...DEFAULT_SUPPLIER_QUERY, ...query };
         const responseData = await client.apiFetch<QueryResponseData<Wholesaler>>(
-          '/api/suppliers',
-          { method: 'POST', body: createQueryBody(fullQuery) },
-          { context: operationId }
+          "/api/suppliers",
+          { method: "POST", body: createQueryBody(fullQuery) },
+          { context: operationId },
         );
         log.info(`loadSuppliers: successful.`, responseData);
 
@@ -87,8 +89,8 @@ export function getSupplierApi(client: ApiClient) {
       try {
         const responseData = await client.apiFetch<{ supplier: Wholesaler }>(
           `/api/suppliers/${supplierId}`,
-          { method: 'GET' },
-          { context: operationId }
+          { method: "GET" },
+          { context: operationId },
         );
         return responseData.supplier;
       } catch (err) {
@@ -102,14 +104,14 @@ export function getSupplierApi(client: ApiClient) {
     /**
      * Creates a new supplier.
      */
-    async createSupplier(supplierData: Partial<Omit<Wholesaler, 'wholesaler_id'>>): Promise<Wholesaler> {
-      const operationId = 'createSupplier';
+    async createSupplier(supplierData: Partial<Omit<Wholesaler, "wholesaler_id">>): Promise<Wholesaler> {
+      const operationId = "createSupplier";
       supplierLoadingOperations.start(operationId);
       try {
         const responseData = await client.apiFetch<{ supplier: Wholesaler }>(
-          '/api/suppliers/new',
-          { method: 'POST', body: createPostBody(supplierData) },
-          { context: operationId }
+          "/api/suppliers/new",
+          { method: "POST", body: createPostBody(supplierData) },
+          { context: operationId },
         );
         return responseData.supplier;
       } catch (err) {
@@ -129,8 +131,8 @@ export function getSupplierApi(client: ApiClient) {
       try {
         const responseData = await client.apiFetch<{ supplier: Wholesaler }>(
           `/api/suppliers/${supplierId}`,
-          { method: 'PUT', body: createPostBody(updates) },
-          { context: operationId }
+          { method: "PUT", body: createPostBody(updates) },
+          { context: operationId },
         );
         return responseData.supplier;
       } catch (err) {
@@ -149,12 +151,8 @@ export function getSupplierApi(client: ApiClient) {
       supplierLoadingOperations.start(operationId);
       try {
         const url = `/api/suppliers/${supplierId}`;
-        const body = createPostBody({cascade, forceCascade});
-        return await client.apiFetchUnion<DeleteSupplierApiResponse>(
-          url,
-          { method: 'DELETE', body },
-          { context: operationId }
-        );
+        const body = createPostBody({ cascade, forceCascade });
+        return await client.apiFetchUnion<DeleteSupplierApiResponse>(url, { method: "DELETE", body }, { context: operationId });
       } finally {
         supplierLoadingOperations.finish(operationId);
       }
@@ -170,20 +168,20 @@ export function getSupplierApi(client: ApiClient) {
       supplierLoadingOperations.start(operationId);
       try {
         const request: PredefinedQueryRequest = {
-          namedQuery: 'supplier_categories',
+          namedQuery: "supplier_categories",
           payload: {
-            select: ['w.wholesaler_id', 'wc.category_id', 'pc.name AS category_name', 'wc.comment', 'wc.link'],
+            select: ["w.wholesaler_id", "wc.category_id", "pc.name AS category_name", "wc.comment", "wc.link"],
             where: {
-              whereCondOp: LogicalOperator.AND, conditions: [
-                { key: 'w.wholesaler_id', whereCondOp: ComparisonOperator.EQUALS, val: supplierId }]
+              whereCondOp: LogicalOperator.AND,
+              conditions: [{ key: "w.wholesaler_id", whereCondOp: ComparisonOperator.EQUALS, val: supplierId }],
             },
-            orderBy: [{ key: 'pc.name', direction: 'asc' }]
-          }
+            orderBy: [{ key: "pc.name", direction: "asc" }],
+          },
         };
         const responseData = await client.apiFetch<QueryResponseData<WholesalerCategoryWithCount>>(
-          '/api/query',
-          { method: 'POST', body: createPostBody(request) },
-          { context: operationId }
+          "/api/query",
+          { method: "POST", body: createPostBody(request) },
+          { context: operationId },
         );
         return responseData.results as WholesalerCategoryWithCount[];
       } catch (err) {
@@ -202,25 +200,26 @@ export function getSupplierApi(client: ApiClient) {
       supplierLoadingOperations.start(operationId);
       try {
         const request: PredefinedQueryRequest = {
-          namedQuery: 'supplier_category->category',
+          namedQuery: "supplier_category->category",
           payload: {
-            select: ['wc.wholesaler_id', 'wc.category_id', 'pc.name AS category_name', 'wc.comment', 'wc.link'],
+            select: ["wc.wholesaler_id", "wc.category_id", "pc.name AS category_name", "wc.comment", "wc.link"],
             where: {
-              whereCondOp: LogicalOperator.AND, conditions: [
-                { key: 'wc.wholesaler_id', whereCondOp: ComparisonOperator.EQUALS, val: supplierId },
-                { key: 'wc.category_id', whereCondOp: ComparisonOperator.EQUALS, val: categoryId }
-              ]
+              whereCondOp: LogicalOperator.AND,
+              conditions: [
+                { key: "wc.wholesaler_id", whereCondOp: ComparisonOperator.EQUALS, val: supplierId },
+                { key: "wc.category_id", whereCondOp: ComparisonOperator.EQUALS, val: categoryId },
+              ],
             },
-            orderBy: [{ key: 'pc.name', direction: 'asc' }]
-          }
+            orderBy: [{ key: "pc.name", direction: "asc" }],
+          },
         };
         const responseData = await client.apiFetch<QueryResponseData<WholesalerCategory_Category>>(
-          '/api/query',
-          { method: 'POST', body: createPostBody(request) },
-          { context: operationId }
+          "/api/query",
+          { method: "POST", body: createPostBody(request) },
+          { context: operationId },
         );
         if (responseData.results?.length > 1) {
-          throw new Error('loadCategoryAssignmentForSupplier: Only one supplier <-> category assignment expectd.');
+          throw new Error("loadCategoryAssignmentForSupplier: Only one supplier <-> category assignment expectd.");
         } else if (responseData.results?.length === 1) {
           return responseData.results[0] as WholesalerCategory_Category;
         } else {
@@ -234,22 +233,21 @@ export function getSupplierApi(client: ApiClient) {
       }
     },
 
-
     /**
      * Loads all available categories from master data.
      */
     async loadAvailableCategories(): Promise<ProductCategory[]> {
-      const operationId = 'loadAvailableCategories';
+      const operationId = "loadAvailableCategories";
       supplierLoadingOperations.start(operationId);
       try {
         const query: QueryPayload<ProductCategory> = {
-          select: ['category_id', 'name', 'description'],
-          orderBy: [{ key: 'name', direction: 'asc' }]
+          select: ["category_id", "name", "description"],
+          orderBy: [{ key: "name", direction: "asc" }],
         };
         const responseData = await client.apiFetch<QueryResponseData<ProductCategory>>(
-          '/api/categories',
-          { method: 'POST', body: createQueryBody(query) },
-          { context: operationId }
+          "/api/categories",
+          { method: "POST", body: createQueryBody(query) },
+          { context: operationId },
         );
         return responseData.results as ProductCategory[];
       } catch (err) {
@@ -269,11 +267,11 @@ export function getSupplierApi(client: ApiClient) {
       try {
         const [allCategories, assignedCategories] = await Promise.all([
           api.loadAvailableCategories(),
-          api.loadCategoriesForSupplier(supplierId)
+          api.loadCategoriesForSupplier(supplierId),
         ]);
 
-        const assignedIds = new Set(assignedCategories.map(c => c.category_id));
-        const availableCategories = allCategories.filter(cat => !assignedIds.has(cat.category_id));
+        const assignedIds = new Set(assignedCategories.map((c) => c.category_id));
+        const availableCategories = allCategories.filter((cat) => !assignedIds.has(cat.category_id));
 
         log.info(`[${operationId}] Found ${availableCategories.length} available categories for supplier ${supplierId}`);
         return availableCategories;
@@ -288,19 +286,22 @@ export function getSupplierApi(client: ApiClient) {
     /**
      * Assigns a category to a supplier.
      */
-    async assignCategoryToSupplier(supplierId: number, category: Omit<WholesalerCategory, "wholesaler_id">): Promise<AssignmentSuccessData<WholesalerCategory>> {
-      const operationId = 'assignCategoryToSupplier';
+    async assignCategoryToSupplier(
+      supplierId: number,
+      category: Omit<WholesalerCategory, "wholesaler_id">,
+    ): Promise<AssignmentSuccessData<WholesalerCategory>> {
+      const operationId = "assignCategoryToSupplier";
       supplierLoadingOperations.start(operationId);
       try {
         const requestBody: AssignmentRequest<Wholesaler, ProductCategory, Omit<WholesalerCategory, "wholesaler_id">> = {
           parent1Id: supplierId,
           parent2Id: category.category_id,
-          data: category
+          data: category,
         };
         const response = await client.apiFetch<AssignmentSuccessData<WholesalerCategory>>(
-          '/api/supplier-categories',
-          { method: 'POST', body: createPostBody(requestBody) },
-          { context: operationId }
+          "/api/supplier-categories",
+          { method: "POST", body: createPostBody(requestBody) },
+          { context: operationId },
         );
         return response;
       } catch (err) {
@@ -314,24 +315,29 @@ export function getSupplierApi(client: ApiClient) {
     /**
      * Removes a category assignment from a supplier.
      */
-    async removeCategoryFromSupplier(removalData: { supplierId: number; categoryId: number; cascade?: boolean; }): Promise<RemoveCategoryApiResponse> {
-      const operationId = 'removeCategoryFromSupplier';
+    async removeCategoryFromSupplier(removalData: {
+      supplierId: number;
+      categoryId: number;
+      cascade: false;
+      forceCascade: false;
+    }): Promise<RemoveCategoryApiResponse> {
+      const operationId = "removeCategoryFromSupplier";
       supplierLoadingOperations.start(operationId);
       try {
         const requestBody: RemoveAssignmentRequest<Wholesaler, ProductCategory> = {
           parent1Id: removalData.supplierId,
           parent2Id: removalData.categoryId,
-          cascade: removalData.cascade || false
+          cascade: removalData.cascade || false,
         };
         return await client.apiFetchUnion<RemoveCategoryApiResponse>(
-          '/api/supplier-categories',
-          { method: 'DELETE', body: createPostBody(requestBody) },
-          { context: operationId }
+          "/api/supplier-categories",
+          { method: "DELETE", body: createPostBody(requestBody) },
+          { context: operationId },
         );
       } finally {
         supplierLoadingOperations.finish(operationId);
       }
-    }
+    },
   };
   return api;
 }

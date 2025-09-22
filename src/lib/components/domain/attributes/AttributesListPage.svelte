@@ -7,7 +7,7 @@
   import { ApiClient } from "$lib/api/client/ApiClient";
   import type { ID, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
   import { page } from "$app/stores";
-  import { cascadeDelte } from "$lib/api/client/cascadeDelete";
+  import { cascadeDelte } from "$lib/api/client/cascadeDelte";
   import { stringsToNumbers } from "$lib/utils/typeConversions";
 
   // === PROPS ====================================================================================

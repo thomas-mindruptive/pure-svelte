@@ -382,6 +382,7 @@ export function getOfferingApi(client: ApiClient) {
       offeringId: number,
       attributeId: number,
       cascade = false,
+      forceCascade = false
     ): Promise<DeleteApiResponse<{ offering_id: number; attribute_id: number; attribute_name: string }, string[]>> {
       const operationId = `deleteOfferingAttribute-${offeringId}-${attributeId}`;
       offeringLoadingManager.start(operationId);
@@ -390,6 +391,7 @@ export function getOfferingApi(client: ApiClient) {
           parent1Id: offeringId,
           parent2Id: attributeId,
           cascade,
+          forceCascade
         };
         return await client.apiFetchUnion<
           DeleteApiResponse<

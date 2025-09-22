@@ -14,7 +14,7 @@
   import type { ID, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
   import { page } from "$app/stores";
     import { stringsToNumbers } from "$lib/utils/typeConversions";
-    import { cascadeDelte } from "$lib/api/client/cascadeDelete";
+    import { cascadeDelte } from "$lib/api/client/cascadeDelte";
 
   // === PROPS ====================================================================================
 

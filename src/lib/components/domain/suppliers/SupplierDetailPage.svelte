@@ -26,7 +26,7 @@
     type SupplierDetailPage_LoadDataAsync,
   } from "$lib/components/domain/suppliers/supplierDetailPage.types";
   import { assertDefined } from "$lib/utils/assertions";
-  import { cascadeDelte } from "$lib/api/client/cascadeDelete";
+  import { cascadeDeleteAssignments, type CompositeID } from "$lib/api/client/cascadeDelte";
   import { stringsToNumbers } from "$lib/utils/typeConversions";
 
   // === PROPS ====================================================================================
@@ -212,8 +212,12 @@
     let dataChanged = false;
 
     const idsAsNumber = stringsToNumbers(ids);
-    dataChanged = await cascadeDelte(
-      idsAsNumber,
+    const compositeIds: CompositeID[] = idsAsNumber.map((id) => ({
+      parent1Id: resolvedData!.supplier!.wholesaler_id,
+      parent2Id: id,
+    }));
+    dataChanged = await cascadeDeleteAssignments(
+      compositeIds,
       supplierApi.removeCategoryFromSupplier,
       {
         domainObjectName: "Category",

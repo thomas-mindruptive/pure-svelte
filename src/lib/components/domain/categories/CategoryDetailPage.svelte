@@ -26,7 +26,7 @@
   import { getProductDefinitionApi } from "$lib/api/client/productDefinition";
   import CategoryProductDefsGrid from "./CategoryProductDefsGrid.svelte";
   import CategoryForm from "./CategoryForm.svelte";
-  import { cascadeDelte } from "$lib/api/client/cascadeDelete";
+  import { cascadeDelte } from "$lib/api/client/cascadeDelte";
   import { stringsToNumbers } from "$lib/utils/typeConversions";
 
   // === PROPS ====================================================================================

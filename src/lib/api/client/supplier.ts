@@ -315,19 +315,20 @@ export function getSupplierApi(client: ApiClient) {
     /**
      * Removes a category assignment from a supplier.
      */
-    async removeCategoryFromSupplier(removalData: {
-      supplierId: number;
-      categoryId: number;
-      cascade: false;
-      forceCascade: false;
-    }): Promise<RemoveCategoryApiResponse> {
+    async removeCategoryFromSupplier(
+      supplierId: number,
+      categoryId: number,
+      cascade: boolean = false,
+      forceCascade: boolean = false,
+    ): Promise<RemoveCategoryApiResponse> {
       const operationId = "removeCategoryFromSupplier";
       supplierLoadingOperations.start(operationId);
       try {
         const requestBody: RemoveAssignmentRequest<Wholesaler, ProductCategory> = {
-          parent1Id: removalData.supplierId,
-          parent2Id: removalData.categoryId,
-          cascade: removalData.cascade || false,
+          parent1Id: supplierId,
+          parent2Id: categoryId,
+          cascade:cascade || false,
+          forceCascade:forceCascade || false,
         };
         return await client.apiFetchUnion<RemoveCategoryApiResponse>(
           "/api/supplier-categories",

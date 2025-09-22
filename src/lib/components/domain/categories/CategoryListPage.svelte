@@ -9,7 +9,7 @@
   import type { ProductCategory } from "$lib/domain/domainTypes";
   import { categoryLoadingState, getCategoryApi } from "$lib/api/client/category";
     import { stringsToNumbers } from "$lib/utils/typeConversions";
-    import { cascadeDelte } from "$lib/api/client/cascadeDelete";
+    import { cascadeDelte } from "$lib/api/client/cascadeDelte";
 
   // === PROPS ====================================================================================
 

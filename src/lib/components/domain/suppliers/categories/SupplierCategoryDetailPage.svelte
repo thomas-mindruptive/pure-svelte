@@ -25,7 +25,7 @@
   } from "./supplierCategoryDetailPage.types";
   import { getOfferingApi } from "$lib/api/client/offering";
   import { assertDefined } from "$lib/utils/assertions";
-    import { cascadeDelte } from "$lib/api/client/cascadeDelete";
+    import { cascadeDelte } from "$lib/api/client/cascadeDelte";
     import { stringsToNumbers } from "$lib/utils/typeConversions";
 
   // ========================================================================

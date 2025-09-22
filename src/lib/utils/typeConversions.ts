@@ -4,7 +4,7 @@ export function stringsToNumbers(elem: (string | number)[]): number[] {
     // Already number
     if (typeof item === 'number') {
       if (isNaN(item) || !isFinite(item)) {
-        throw new Error(`Invalid number at index ${index}: ${item}`);
+        throw new Error(`stringsToNumbers: Invalid number at index ${index}: ${item}`);
       }
       return item;
     }
@@ -12,11 +12,11 @@ export function stringsToNumbers(elem: (string | number)[]): number[] {
     // String
     const trimmed = item.trim();
     if (trimmed === '') {
-      throw new Error(`Empty string at index ${index} cannot be converted to number`);
+      throw new Error(`stringsToNumbers: Empty string at index ${index} cannot be converted to number`);
     }
     const num = Number(trimmed);
     if (isNaN(num) || !isFinite(num)) {
-      throw new Error(`Invalid number format at index ${index}: "${item}"`);
+      throw new Error(`stringsToNumbers: Invalid number format at index ${index}: "${item}"`);
     }
     
     return num;

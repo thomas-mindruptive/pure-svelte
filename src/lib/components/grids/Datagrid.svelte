@@ -26,7 +26,7 @@
   export type DataGridProps = {
     rows: any[];
     columns: ColumnDef<any>[];
-    getId: (row: any) => ID;
+    getId: (row: any) => number;
     selection?: "none" | "single" | "multiple";
     canDelete?: (row: any) => boolean;
     loading?: boolean;

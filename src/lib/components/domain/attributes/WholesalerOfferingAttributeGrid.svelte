@@ -7,7 +7,7 @@
   // WholesalerOfferingAttribute data. Now accepts strategy props for consistency.
 
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
-  import type { DeleteStrategy, RowActionStrategy, ColumnDef, ID } from "$lib/components/grids/Datagrid.types";
+  import type { DeleteStrategy, RowActionStrategy, ColumnDef } from "$lib/components/grids/Datagrid.types";
   import type { WholesalerOfferingAttribute_Attribute } from "$lib/domain/domainTypes";
 
   // ===== COMPONENT PROPS =====
@@ -59,7 +59,7 @@
     },
   ];
 
-  const getId = (attribute: WholesalerOfferingAttribute_Attribute): ID => `${attribute.offering_id}-${attribute.attribute_id}`;
+  const getId = (attribute: WholesalerOfferingAttribute_Attribute) => attribute.attribute_id;
 </script>
 
 <Datagrid

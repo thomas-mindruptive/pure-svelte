@@ -1,6 +1,6 @@
 <script lang="ts">
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
-  import type { DeleteStrategy, RowActionStrategy, ID, ColumnDefDirect } from "$lib/components/grids/Datagrid.types";
+  import type { DeleteStrategy, RowActionStrategy, ColumnDefDirect } from "$lib/components/grids/Datagrid.types";
 
   import type { ProductCategory } from "$lib/domain/domainTypes";
 
@@ -24,7 +24,7 @@
   ];
 
   // Composite key for categories (wholesaler_id + category_id)
-  const getId = (r: ProductCategory): ID => `${r.category_id}`;
+  const getId = (r: ProductCategory): number => r.category_id;
 </script>
 
 <!--- TEMPLATE ----------------------------------------------------------------------------------->

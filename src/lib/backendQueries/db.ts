@@ -2,8 +2,6 @@ import sql from 'mssql';
 import { error } from '@sveltejs/kit';
 
 // 1. Konfiguration der Datenbankverbindung
-// WICHTIG: Später sollten Sie diese sensiblen Daten in eine .env-Datei auslagern!
-// Für den Moment schreiben wir sie direkt hier rein.
 const dbConfig = {
   user: 'sa',      
   password: 'ichBinAdmin@123',  
@@ -13,6 +11,11 @@ const dbConfig = {
     // Diese Option ist für die lokale Entwicklung mit selbst-signierten Zertifikaten wichtig.
     // Für eine Produktionsumgebung mit einem validen SSL-Zertifikat setzen Sie dies auf `false`.
     trustServerCertificate: true
+  },
+  pool: {
+    max: 20, // Maximum number of connections in the pool (default is 10)
+    min: 0,  // Minimum number of connections to keep open
+    idleTimeoutMillis: 30000 // How long a connection can be idle before being released
   }
 };
 

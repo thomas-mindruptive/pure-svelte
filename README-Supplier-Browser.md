@@ -335,6 +335,15 @@ Server-side API endpoints do **not yet** use Zod for validating incoming request
 ### Frontend Architecture: Domain-Driven Structure & Page Delegation
 The frontend follows a **Domain-Driven file structure** combined with a **Page Delegation Pattern**. The core principle is **Co-Location**: All files related to a specific business domain are located in a single directory (`src/lib/domain/suppliers/`).
 
+### Client-side deletion helpers 
+To handle different deletion scenarios in a type-safe manner, the generic `cascadeDelete` helper has been refactored into two specialized functions:
+
+*   **`cascadeDelete`**: Used for deleting **master data entities** (Suppliers, Categories, Offerings, Attributes). It takes an array of simple `ID`s and a `DeleteApiFunction` like `supplierApi.deleteSupplier`.
+
+*   **`cascadeDeleteAssignments`**: Used exclusively for deleting **n:m assignments** (e.g., removing a category from a supplier). It takes an array of composite IDs (e.g., `{ parent1Id, parent2Id }`) and a `RemoveAssignmentApiFunction`.
+
+Both helpers now correctly support the full dependency-checking workflow, including the `forceCascade` option, by calling a shared internal function that manages the user confirmation dialogs. This makes the UI component code cleaner, more predictable, and strictly typed.
+
 - A SvelteKit **Route** (`src/routes/...`) acts as a simple "delegator". Its only job is to load data and render the corresponding page module from `src/lib/domain/...`.
 
 ### Frontend Form Architecture: The "Dumb Shell / Smart Parent" Pattern

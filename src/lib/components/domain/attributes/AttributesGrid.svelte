@@ -1,6 +1,6 @@
 <script lang="ts">
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
-  import type { DeleteStrategy, RowActionStrategy, ID, ColumnDefDirect } from "$lib/components/grids/Datagrid.types";
+  import type { DeleteStrategy, RowActionStrategy, ColumnDefDirect } from "$lib/components/grids/Datagrid.types";
   import type { Attribute } from "$lib/domain/domainTypes";
 
   // === PROPS ====================================================================================
@@ -24,7 +24,7 @@
 
   // === ID EXTRACTOR =============================================================================
 
-  const getId = (r: Attribute): ID => r.attribute_id;
+  const getId = (r: Attribute) => r.attribute_id;
 </script>
 
 <!--- TEMPLATE ----------------------------------------------------------------------------------->

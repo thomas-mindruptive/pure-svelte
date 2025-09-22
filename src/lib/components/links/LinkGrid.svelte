@@ -12,7 +12,6 @@
     DeleteStrategy,
     RowActionStrategy,
     ColumnDef,
-    ID,
   } from "../grids/Datagrid.types";
 
   // ===== COMPONENT PROPS  =====
@@ -66,7 +65,7 @@
 
   // ===== ID EXTRACTION (Unchanged) =====
 
-  const getId = (link: WholesalerOfferingLink): ID => link.link_id;
+  const getId = (link: WholesalerOfferingLink) => link.link_id;
 </script>
 
 <Datagrid

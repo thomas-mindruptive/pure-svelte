@@ -1,6 +1,6 @@
 <script lang="ts">
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
-  import type { DeleteStrategy, RowActionStrategy, ID, ColumnDefDirect } from "$lib/components/grids/Datagrid.types";
+  import type { DeleteStrategy, RowActionStrategy, ColumnDefDirect } from "$lib/components/grids/Datagrid.types";
 
   import type { ProductDefinition } from "$lib/domain/domainTypes";
 
@@ -23,7 +23,7 @@
     { key: "description", header: "description", sortable: true, width: "1fr" },
   ];
 
-  const getId = (r: ProductDefinition): ID => `${r.product_def_id}`;
+  const getId = (r: ProductDefinition) => r.product_def_id;
 </script>
 
 <!--- TEMPLATE ----------------------------------------------------------------------------------->

@@ -1,7 +1,7 @@
 <script lang="ts">
   // Thin wrapper around Datagrid for wholesalers
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
-  import type { DeleteStrategy, RowActionStrategy, ColumnDef, ID } from "$lib/components/grids/Datagrid.types";
+  import type { DeleteStrategy, RowActionStrategy, ColumnDef } from "$lib/components/grids/Datagrid.types";
   import type { Wholesaler } from "$lib/domain/domainTypes";
 
   // === PROPS ====================================================================================
@@ -33,7 +33,7 @@
     { key: "country", header: "Country", accessor: null },
   ];
 
-  const getId = (r: Wholesaler): ID => r.wholesaler_id;
+  const getId = (r: Wholesaler) => r.wholesaler_id;
 </script>
 
 <Datagrid

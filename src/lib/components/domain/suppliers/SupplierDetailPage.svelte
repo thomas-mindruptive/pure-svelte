@@ -208,7 +208,7 @@
   }
 
   async function handleCategoryDelete(ids: ID[]): Promise<void> {
-    log.info(`(SupplierListPage) Deleting suppliers`, { ids });
+    log.info(`Deleting categories`, { ids });
     let dataChanged = false;
 
     const idsAsNumber = stringsToNumbers(ids);

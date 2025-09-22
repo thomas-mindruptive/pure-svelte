@@ -7,7 +7,6 @@
     RowActionStrategy,
     ColumnDefWithAccessor,
     ColumnDefDirect,
-    ID,
     ColumnDef,
   } from "$lib/components/grids/Datagrid.types";
 
@@ -46,7 +45,7 @@
   });
 
   // Composite key for categories (wholesaler_id + category_id)
-  const getId = (r: WholesalerCategory_Category): ID => `${r.wholesaler_id}-${r.category_id}`;
+  const getId = (r: WholesalerCategory_Category) => r.category_id;
 </script>
 
 <Datagrid

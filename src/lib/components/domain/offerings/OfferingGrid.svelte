@@ -8,7 +8,7 @@
   // strategy objects, making it a pure presentation component consistent with other grids.
 
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
-  import type { DeleteStrategy, RowActionStrategy, ColumnDef, ID } from "$lib/components/grids/Datagrid.types";
+  import type { DeleteStrategy, RowActionStrategy, ColumnDef } from "$lib/components/grids/Datagrid.types";
   import type { WholesalerItemOffering_ProductDef_Category_Supplier } from "$lib/domain/domainTypes";
 
   // === PROPS  ===================================================================================
@@ -71,7 +71,7 @@
     },
   ];
 
-  const getId = (offering: WholesalerItemOffering_ProductDef_Category_Supplier): ID => offering.offering_id;
+  const getId = (offering: WholesalerItemOffering_ProductDef_Category_Supplier) => offering.offering_id;
 </script>
 
 <Datagrid

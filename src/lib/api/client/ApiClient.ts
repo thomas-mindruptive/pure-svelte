@@ -44,7 +44,7 @@ export class ApiClient {
 		const timeoutId = setTimeout(() => controller.abort(), timeout);
 
 		try {
-			log.info(`API Request: ${context}-${url}`, { url, method: init.method || 'GET' });
+			log.info(`API Request: ${context}-${url}`, { url, init, options });
 
 			const response = await this.fetcher(url, {
 				...init,

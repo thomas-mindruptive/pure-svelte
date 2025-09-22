@@ -26,7 +26,7 @@
     type SupplierDetailPage_LoadData,
     type SupplierDetailPage_LoadDataAsync,
   } from "$lib/components/domain/suppliers/supplierDetailPage.types";
-  import { assertDefined } from "$lib/utils/validation/assertions";
+  import { assertDefined } from "$lib/utils/assertions";
 
   // === PROPS ====================================================================================
 

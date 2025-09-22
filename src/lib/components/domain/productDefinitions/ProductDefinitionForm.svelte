@@ -13,7 +13,7 @@
     ChangedCallback,
     ValidateResult,
   } from "$lib/components/forms/forms.types";
-  import { assertDefined } from "$lib/utils/validation/assertions";
+  import { assertDefined } from "$lib/utils/assertions";
   import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
 
   import "$lib/components/styles/form.css";

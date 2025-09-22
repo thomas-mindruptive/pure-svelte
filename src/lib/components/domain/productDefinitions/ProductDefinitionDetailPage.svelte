@@ -22,7 +22,7 @@
     type ProductDefinitionDetailPage_LoadData,
     type ProductDefinitionDetailPage_LoadDataAsync,
   } from "./productDefinitionDetailPage.types";
-  import { assertDefined } from "$lib/utils/validation/assertions";
+  import { assertDefined } from "$lib/utils/assertions";
   import { getProductDefinitionApi } from "$lib/api/client/productDefinition";
     import { page } from "$app/state";
 

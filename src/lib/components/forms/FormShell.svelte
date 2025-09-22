@@ -14,7 +14,7 @@
   import { log } from "$lib/utils/logger";
   import * as pathUtils from "$lib/utils/pathUtils";
   import type { NonEmptyPath, PathValue } from "$lib/utils/pathUtils";
-  import { assertDefined } from "$lib/utils/validation/assertions";
+  import { assertDefined } from "$lib/utils/assertions";
 
   // Types
   import type {

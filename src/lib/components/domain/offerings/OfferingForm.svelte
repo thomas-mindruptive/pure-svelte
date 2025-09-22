@@ -20,7 +20,7 @@
   } from "$lib/components/forms/forms.types";
   import { type OfferingDetail_LoadData, OfferingDetail_LoadDataSchema } from "$lib/components/domain/offerings/offeringDetail.types";
   import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
-  import { assertDefined } from "$lib/utils/validation/assertions";
+  import { assertDefined } from "$lib/utils/assertions";
   import { getOfferingApi } from "$lib/api/client/offering";
 
   // ===== INTERNAL TYPES =====

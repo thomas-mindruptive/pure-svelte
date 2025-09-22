@@ -17,7 +17,7 @@
     type OfferingDetailLinks_LoadDataAsync,
   } from "./offeringDetail.types";
   import { log } from "$lib/utils/logger";
-  import { assertDefined } from "$lib/utils/validation/assertions";
+  import { assertDefined } from "$lib/utils/assertions";
 
   // === PROPS ====================================================================================
 

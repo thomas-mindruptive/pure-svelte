@@ -1,6 +1,6 @@
 // in lib/dataModel/cascadingDeletes.ts (oder umbenannt in z.B. `lib/dataModel/productDefinition.ts`)
 
-import { assertDefined } from "$lib/utils/validation/assertions";
+import { assertDefined } from "$lib/utils/assertions";
 import { log } from "$lib/utils/logger";
 import type { Transaction } from "mssql";
 import type { ProductCategory, ProductDefinition, Wholesaler } from "$lib/domain/domainTypes";

@@ -18,7 +18,7 @@
     ValidateResult,
   } from "$lib/components/forms/forms.types";
   import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
-  import { assertDefined } from "$lib/utils/validation/assertions";
+  import { assertDefined } from "$lib/utils/assertions";
 
   type ValidationErrors = Record<string, string[]>;
 

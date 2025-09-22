@@ -17,7 +17,7 @@
 
   // Schemas
 
-  import { assertDefined } from "$lib/utils/validation/assertions";
+  import { assertDefined } from "$lib/utils/assertions";
   import {
     type CategoryDetailPage_LoadDataAsync,
     type CategoryDetailPage_LoadData,

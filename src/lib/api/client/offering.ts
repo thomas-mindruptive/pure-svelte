@@ -33,7 +33,7 @@ import type {
   DeleteRequest,
 } from "$lib/api/api.types";
 import { LoadingState } from "./loadingState";
-import { assertDefined } from "$lib/utils/validation/assertions";
+import { assertDefined } from "$lib/utils/assertions";
 import type { DeleteOfferingApiResponse } from "../app/appSpecificTypes";
 const offeringLoadingManager = new LoadingState();
 export const offeringLoadingState = offeringLoadingManager.isLoadingStore;

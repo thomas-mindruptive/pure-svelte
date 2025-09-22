@@ -13,7 +13,7 @@
     OfferingDetailAttributes_LoadData,
     OfferingDetailLinks_LoadData,
   } from "$lib/components/domain/offerings/offeringDetail.types";
-  import { assertDefined } from "$lib/utils/validation/assertions";
+  import { assertDefined } from "$lib/utils/assertions";
   import { goto } from "$app/navigation";
   import { coerceErrorMessage } from "$lib/utils/errorUtils";
   import { parseUrlSegments } from "$lib/utils/url";

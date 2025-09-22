@@ -7,8 +7,8 @@
  */
 
 
-import { get, has } from "../pathUtils";
-import type { WithDefinedPaths, NonEmptyPath } from "../pathUtils.types";
+import { get, has } from "./pathUtils";
+import type { WithDefinedPaths, NonEmptyPath } from "./pathUtils.types";
 
 // -----------------------------------------------------------------------------
 // ASSERTION GUARD (THROWS)

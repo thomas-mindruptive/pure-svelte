@@ -89,6 +89,7 @@ export type RemoveAssignmentRequest<TParent1, TParent2> = {
 export type DeleteRequest<T> = {
     id: T[IdField<T>];
     cascade?: boolean;
+    forceCascade?: boolean;
 };
 ```
 
@@ -184,19 +185,36 @@ POST /api/supplier-categories
 }
 ```
 
-#### Deletion Patterns for Relationships vs. Master Data
+### Centralized Deletion Logic: `dataModel/deletes.ts`
+
+To ensure consistency, robustness, and transaction safety, all complex deletion logic is centralized in server-side helper functions within `lib/dataModel/deletes.ts`.
+
+-   **Pattern:** Each master data entity (e.g., `ProductDefinition`, `Supplier`) has a corresponding `delete...` function (e.g., `deleteProductDefinition`).
+-   **Parameters:** These functions accept the `id` of the entity to delete, a `cascade: boolean` flag, and an active database `Transaction` object.
+-   **Responsibility:** The function is solely responsible for executing the correct SQL `DELETE` statements. If `cascade` is true, it performs a multi-statement, CTE-based batch delete to remove all dependent records in the correct order. If `cascade` is false, it attempts to delete only the master record.
+-   **Transaction Control:** These helpers do **not** commit or roll back the transaction. This responsibility remains with the calling API endpoint, making the helpers reusable and testable.
+-   **Return Value:** On success, the function queries and returns the data of the resource that was just deleted, enabling the API to build a rich `DeleteSuccessResponse`.
+
+### Deletion Patterns for Relationships vs. Master Data
 
 To ensure API consistency, deletion operations adhere to one of three distinct patterns based on the type of resource being deleted.
 
 | Deletion Type | Endpoint | Method | Body Content | Purpose |
 | :--- | :--- | :--- | :--- | :--- |
-| **Master Data** | `/api/[entity]/[id]` | `DELETE` | *None*. `cascade` flag is a URL query parameter (`?cascade=true`). | Deletes a top-level entity. The ID in the URL is the source of truth. |
+| **Master Data** | `/api/[entity]/[id]` | `DELETE` | `DeleteRequest<T>` containing `id`, `cascade`, and `forceCascade` flags. | Deletes a top-level entity. The ID in the URL is used for routing, while the body carries the full request payload for consistency. |
 | **n:m Assignment** | `/api/[parent]-[child]` | `DELETE` | `RemoveAssignmentRequest` | Removes a link between two entities. Requires both IDs to identify the unique relationship. |
 | **1:n Child** | `/api/[parent]-[child]` | `DELETE` | `DeleteRequest<{id}>` | Deletes a child entity that has its own unique ID. Follows the standard `DeleteRequest` pattern. |
 
-### API Client Composition
+### Deletion Pattern: Centralized, Multi-Stage Optimistic Delete
 
-The architecture promotes the creation of specific, composable API client functions. A prime example is the new `categoryApi.loadSuppliersForCategory()` function. It fulfills the specific UI requirement of finding all suppliers for a category by intelligently reusing the existing, powerful `supplier_categories` named query on the `/api/query` endpoint. This demonstrates how the backend's flexible query capabilities can be leveraged to create clean, purposeful functions on the client without requiring new backend endpoints for every view.
+The client implements a highly robust **Optimistic Delete** pattern managed by a centralized `cascadeDelete` helper function. This provides a safe and context-aware user experience by clearly distinguishing between soft and hard dependencies.
+
+**Workflow:**
+1.  **Step 1 (API Call):** The client calls the generic `cascadeDelete` helper, which sends a **non-cascading** `DELETE` request.
+2.  **Step 2 (Conflict Path):** If the server responds with `409 Conflict`, it returns a structured `dependencies` object: `{ hard: string[], soft: string[] }`.
+3.  **Step 3 (Context-Aware Confirmation):**
+    *   If only **soft** dependencies exist, the UI displays a specific confirmation dialog detailing the consequences. If confirmed, the client sends a second `DELETE` request with `cascade=true`.
+    *   If **hard** dependencies exist (`cascade_available: false`), the UI displays a more urgent dialog. This dialog requires the user to check an additional "force cascade" box to confirm they understand the destructive nature of the action. Only then is a second `DELETE` request sent with both `cascade=true` and `forceCascade=true`.
 
 ---
 
@@ -262,7 +280,7 @@ To support this business rule and enable a reusable `OfferingForm`, the system n
     *   **Action:** The `load` function calls the new `categoryApi.loadSuppliersForCategory()` function to fetch **all** `Wholesalers` assigned to the `ProductCategory` of the current `ProductDefinition`.
     *   **UI:** The `OfferingForm` renders a dropdown list of these suppliers.
 
-This corrected approach simplifies the client-side API, aligns perfectly with the business requirements, and removes complex, misuse-prone queries. The flexibility is now correctly placed in the data model and handled by a context-aware UI.
+This corrected approach simplifies the client-side API, aligns perfectly with the business requirements, and removes complex, misuse-prone queries. The flexibility is now correctly placed in the data model and handled by a context-aware UI. This architectural decision was successfully enforced in the data layer by **removing the restrictive `UNIQUE INDEX`** from the `dbo.wholesaler_item_offerings` table, which previously prevented the creation of multiple offerings for the same product in direct conflict with this business rule.
 
 ### Future Architectural Enhancements
 
@@ -314,16 +332,6 @@ Zod is the single source of truth for the **shape** of data on the frontend. It 
 #### Current Status on the Server-Side
 Server-side API endpoints do **not yet** use Zod for validating incoming request bodies. They rely on the custom-built `validateDomainEntity` function from `domainValidator.ts`. Migrating the server-side validation to Zod is a potential future architectural improvement.
 
-### Request Pattern Architecture
-
-#### Deletion Pattern: Optimistic Delete with Two-Step Confirmation
-The client implements an **"Optimistic Delete"** pattern to provide a safe and informative user experience.
-
-**Workflow:**
-1.  **Step 1 (API Call):** The client sends a **non-cascading** `DELETE` request.
-2.  **Step 2 (Conflict Path):** If the server responds with `409 Conflict` and `cascade_available: true`, it signals that dependencies exist.
-3.  **Step 3 (Consequence-Aware Confirmation):** The UI displays a **second, specific dialog** detailing the consequences. If the user confirms, the client sends a second `DELETE` request with `cascade=true`.
-
 ### Frontend Architecture: Domain-Driven Structure & Page Delegation
 The frontend follows a **Domain-Driven file structure** combined with a **Page Delegation Pattern**. The core principle is **Co-Location**: All files related to a specific business domain are located in a single directory (`src/lib/domain/suppliers/`).
 
@@ -337,6 +345,15 @@ To create reusable yet fully type-safe forms, the project uses this robust patte
 
 #### The "Smart" Parent: `SupplierForm.svelte`
 - A specific component that knows everything about a `Wholesaler`. It provides the domain-specific `validate` and `submit` functions to the `FormShell`.
+
+#### Validation Strategy: Hybrid HTML5 with CSS Pseudo-classes
+The form architecture has been updated to leverage the browser's native HTML5 validation engine for a more performant and accessible user experience, while retaining the ability to implement complex business logic.
+
+*   **Standard Rules in HTML:** All standard validations (`required`, `minlength`, `pattern`, `type="number"`, etc.) are defined directly as attributes on the `<input>` and `<select>` elements.
+*   **Styling via Pure CSS:** Visual feedback for invalid fields is handled exclusively by the CSS `:invalid` pseudo-class. This eliminates JavaScript-driven class manipulation for styling.
+*   **"Smart Parent" for Business Logic:** The "Smart Parent" component (e.g., `SupplierForm`) provides a `validate` function that is responsible **only** for complex business rules that HTML cannot express (e.g., cross-field validation). This function returns a simple `errors` object.
+*   **"Dumb Shell" as Orchestrator:** The `FormShell` intelligently orchestrates the process. It calls the parent's `validate` function, uses the browser's `setCustomValidity()` API to inject the custom errors into the form's state, and then relies on `checkValidity()` and `reportValidity()` for the final validation result and UI feedback.
+*   **Validation on Mount:** The `FormShell` now performs an initial validation immediately after mounting to provide instant feedback on pre-filled "edit" forms.
 
 ### Case Study: Context-Aware Reusable Forms (`OfferingForm`)
 The `OfferingForm` is a prime example of the "Smart Parent / Dumb Shell" pattern applied to a complex, reusable component. It is designed to be used from two different navigation contexts: creating an offering for a specific supplier, or creating an offering for a specific product.

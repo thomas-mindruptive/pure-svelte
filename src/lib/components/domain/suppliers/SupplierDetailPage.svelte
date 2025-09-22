@@ -26,7 +26,7 @@
     type SupplierDetailPage_LoadDataAsync,
   } from "$lib/components/domain/suppliers/supplierDetailPage.types";
   import { assertDefined } from "$lib/utils/assertions";
-  import { cascadeDeleteAssignments, type CompositeID } from "$lib/api/client/cascadeDelte";
+  import { cascadeDeleteAssignments, type CompositeID } from "$lib/api/client/cascadeDelete";
   import { stringsToNumbers } from "$lib/utils/typeConversions";
 
   // === PROPS ====================================================================================

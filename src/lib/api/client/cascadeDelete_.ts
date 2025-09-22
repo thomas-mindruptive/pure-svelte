@@ -11,7 +11,7 @@ export type DeleteApiFunction<TDomainClass> = (
   forceCascade: boolean,
 ) => Promise<DeleteApiResponse<TDomainClass, string[]>>;
 
-export async function cascadeDelte<TDomainClass>(
+export async function cascadeDelete<TDomainClass>(
   ids: ID[],
   delFunc: DeleteApiFunction<TDomainClass>,
   info: { domainObjectName: string; softDepInfo: string; hardDepInfo: string },

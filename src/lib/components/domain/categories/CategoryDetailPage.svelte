@@ -26,7 +26,7 @@
   import { getProductDefinitionApi } from "$lib/api/client/productDefinition";
   import CategoryProductDefsGrid from "./CategoryProductDefsGrid.svelte";
   import CategoryForm from "./CategoryForm.svelte";
-  import { cascadeDelte } from "$lib/api/client/cascadeDelte";
+  import { cascadeDelete } from "$lib/api/client/cascadeDelete";
   import { stringsToNumbers } from "$lib/utils/typeConversions";
 
   // === PROPS ====================================================================================
@@ -190,7 +190,7 @@
 
     // Our ids mus be numbers or number converted to string! => See CategoryGrid.getId!
     const idsAsNumber = stringsToNumbers(ids);
-    dataChanged = await cascadeDelte(
+    dataChanged = await cascadeDelete(
       idsAsNumber,
       productDefApi.deleteProductDefinition,
       {

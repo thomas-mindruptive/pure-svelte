@@ -25,7 +25,7 @@
   } from "./supplierCategoryDetailPage.types";
   import { getOfferingApi } from "$lib/api/client/offering";
   import { assertDefined } from "$lib/utils/assertions";
-    import { cascadeDelte } from "$lib/api/client/cascadeDelte";
+    import { cascadeDelete } from "$lib/api/client/cascadeDelete";
     import { stringsToNumbers } from "$lib/utils/typeConversions";
 
   // ========================================================================
@@ -127,7 +127,7 @@
     let dataChanged = false;
     const idsAsNumber = stringsToNumbers(ids);
 
-    dataChanged = await cascadeDelte(
+    dataChanged = await cascadeDelete(
       idsAsNumber,
       offeringApi.deleteOffering,
       {

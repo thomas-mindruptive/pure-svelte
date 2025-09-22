@@ -9,7 +9,7 @@
   import type { ProductCategory } from "$lib/domain/domainTypes";
   import { categoryLoadingState, getCategoryApi } from "$lib/api/client/category";
     import { stringsToNumbers } from "$lib/utils/typeConversions";
-    import { cascadeDelte } from "$lib/api/client/cascadeDelte";
+    import { cascadeDelete } from "$lib/api/client/cascadeDelete";
 
   // === PROPS ====================================================================================
 
@@ -99,7 +99,7 @@
     let dataChanged = false;
 
     const idsAsNumber = stringsToNumbers(ids);
-    dataChanged = await cascadeDelte(
+    dataChanged = await cascadeDelete(
       idsAsNumber,
       categoryApi.deleteCategory,
       {

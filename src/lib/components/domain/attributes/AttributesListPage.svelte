@@ -7,7 +7,7 @@
   import { ApiClient } from "$lib/api/client/ApiClient";
   import type { ID, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
   import { page } from "$app/stores";
-  import { cascadeDelte } from "$lib/api/client/cascadeDelte";
+  import { cascadeDelete } from "$lib/api/client/cascadeDelete";
   import { stringsToNumbers } from "$lib/utils/typeConversions";
 
   // === PROPS ====================================================================================
@@ -73,7 +73,7 @@
     let dataChanged = false;
     const idsAsNumber = stringsToNumbers(ids);
 
-    dataChanged = await cascadeDelte(
+    dataChanged = await cascadeDelete(
       idsAsNumber,
       attributeApi.deleteAttribute,
       {

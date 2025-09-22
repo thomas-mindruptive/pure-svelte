@@ -5,7 +5,6 @@
   // ========================================================================
 
   import { log } from "$lib/utils/logger";
-  import { addNotification } from "$lib/stores/notifications";
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
 
@@ -15,7 +14,7 @@
   import OfferingGrid from "$lib/components/domain/offerings/OfferingGrid.svelte";
 
   // API & Type Imports
-  import { categoryLoadingState } from "$lib/api/client/category";
+  import { categoryLoadingState, getCategoryApi } from "$lib/api/client/category";
   import type { WholesalerItemOffering_ProductDef_Category_Supplier } from "$lib/domain/domainTypes";
   import { ApiClient } from "$lib/api/client/ApiClient";
   import type { ID, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
@@ -25,6 +24,9 @@
     type SupplierCategoryDetailPage_LoadDataAsync,
   } from "./supplierCategoryDetailPage.types";
   import { getOfferingApi } from "$lib/api/client/offering";
+  import { assertDefined } from "$lib/utils/assertions";
+    import { cascadeDelte } from "$lib/api/client/cascadeDelete";
+    import { stringsToNumbers } from "$lib/utils/typeConversions";
 
   // ========================================================================
   // PROPS
@@ -38,12 +40,21 @@
   const { data }: CategoryDetailPageProps = $props();
 
   // ========================================================================
+  // API
+  // ========================================================================
+
+  const client = new ApiClient(fetch);
+  const categoryApi = getCategoryApi(client);
+  const offeringApi = getOfferingApi(client);
+
+  // ========================================================================
   // STATE & DATA PROCESSING
   // ========================================================================
 
   let resolvedData = $state<SupplierCategoryDetailPage_LoadData | null>(null);
   let isLoading = $state(true);
   let loadingError = $state<{ message: string; status?: number } | null>(null);
+  const allowForceCascadingDelte = $state(true);
 
   // This `$effect` hook resolves the promises passed in the `data` prop.
   $effect(() => {
@@ -93,6 +104,15 @@
   // FUNCTIONS & EVENT HANDLERS
   // ========================================================================
 
+  async function reloadOfferings() {
+    assertDefined(resolvedData, "reloadOfferings needs resolvedData", ["assignmentDetails"]);
+    const { wholesaler_id, category_id } = resolvedData.assignmentDetails;
+    log.info(`Re-fetching offerings for supplier ${wholesaler_id}, category ${category_id}`);
+    const updatedOfferings = await categoryApi.loadOfferingsForSupplierCategory(wholesaler_id, category_id);
+    resolvedData.offerings = updatedOfferings;
+    log.info("Local state for offerings updated.");
+  }
+
   function handleOfferingCreate(): void {
     log.info(`(CategoryDetailPage) Navigating to create new offering page.`);
     goto(`${page.url.pathname}/offerings/new`);
@@ -104,27 +124,22 @@
   }
 
   async function handleOfferingDelete(ids: ID[]): Promise<void> {
-    log.info(`(CategoryDetailPage) Deleting offerings`, { ids });
     let dataChanged = false;
+    const idsAsNumber = stringsToNumbers(ids);
 
-    const client = new ApiClient(fetch);
-    const offeringApi = getOfferingApi(client);
+    dataChanged = await cascadeDelte(
+      idsAsNumber,
+      offeringApi.deleteOffering,
+      {
+        domainObjectName: "Offering",
+        softDepInfo: "This will also delete all assigned attributes and links.",
+        hardDepInfo: "",
+      },
+      allowForceCascadingDelte,
+    );
 
-    for (const id of ids) {
-      const numericId = Number(id);
-      const result = await offeringApi.deleteOffering(numericId);
-
-      if (result.success) {
-        addNotification(`Offering (ID: ${numericId}) deleted successfully.`, "success");
-        dataChanged = true;
-      } else {
-        addNotification(`Failed to delete offering (ID: ${numericId}).`, "error");
-      }
-    }
-
-    // TODO: Reload instead of goto!
     if (dataChanged) {
-      await goto(page.url.href, { invalidateAll: true });
+      await reloadOfferings();
     }
   }
 

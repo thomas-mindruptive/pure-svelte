@@ -2,7 +2,7 @@
 <script lang="ts">
   import { log } from "$lib/utils/logger";
   import { addNotification } from "$lib/stores/notifications";
-  import AttributeGrid from "$lib/components/domain/attributes/AttributeGrid.svelte";
+  import AttributeGrid from "$lib/components/domain/attributes/WholesalerOfferingAttributeGrid.svelte";
   import { getOfferingApi, offeringLoadingState } from "$lib/api/client/offering";
   import type { WholesalerOfferingAttribute_Attribute } from "$lib/domain/domainTypes";
 

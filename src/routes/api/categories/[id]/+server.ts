@@ -16,8 +16,8 @@ import { checkProductCategoryMasterDependencies } from "$lib/dataModel/dependenc
 import type { ProductCategory } from "$lib/domain/domainTypes";
 import { v4 as uuidv4 } from "uuid";
 
-import type { ApiErrorResponse, ApiSuccessResponse, DeleteRequest } from "$lib/api/api.types";
-import type { DeleteCategoryConflictResponse, DeleteCategorySuccessResponse } from "$lib/api/app/appSpecificTypes";
+import type { ApiErrorResponse, ApiSuccessResponse, DeleteConflictResponse, DeleteRequest } from "$lib/api/api.types";
+import type { DeleteCategorySuccessResponse } from "$lib/api/app/appSpecificTypes";
 import { deleteProductCategory } from "$lib/dataModel/deletes";
 
 /**
@@ -168,7 +168,7 @@ export const DELETE: RequestHandler = async ({ params, request, url }): Promise<
       // If we have soft dependencies without cascade
       // or we have hard dependencies without forceCascade => Return error code.
       if ((soft.length > 0 && !cascade) || (hard.length > 0 && !forceCascade)) {
-        const conflictResponse: DeleteCategoryConflictResponse = {
+        const conflictResponse: DeleteConflictResponse<string[]> = {
           success: false,
           message: "Cannot delete category: It is still in use by other entities (e.g., offerings).",
           status_code: 409,

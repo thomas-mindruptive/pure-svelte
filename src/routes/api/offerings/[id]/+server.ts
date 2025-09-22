@@ -15,11 +15,12 @@ import type {
   ApiErrorResponse,
   ApiSuccessResponse,
   DeleteConflictResponse,
-  DeleteRequest,
-  DeleteSuccessResponse,
+  DeleteRequest
 } from "$lib/api/api.types";
 import { validateOffering } from "$lib/server/validation/domainValidator";
 import { checkOfferingDependencies } from "$lib/dataModel/dependencyChecks";
+import type { DeleteOfferingSuccessResponse } from "$lib/api/app/appSpecificTypes";
+import { deleteOffering } from "$lib/dataModel/deletes";
 
 /**
  * GET /api/offerings/[id]
@@ -191,135 +192,90 @@ export const PUT: RequestHandler = async ({ request }) => {
 };
 
 /**
- * DELETE /api/category-offerings
- * @description Deletes an offering with dependency checks.
+ * DELETE /api/offerings/[id]
+ * @description Deletes an offering master data record, strictly following the established
+ * architectural pattern for dependency checking and cascading.
  */
-export const DELETE: RequestHandler = async ({ request }) => {
+export const DELETE: RequestHandler = async ({ params, request }): Promise<Response> => {
+  log.infoHeader("DELETE /api/offerings/[id]");
   const operationId = uuidv4();
-  log.infoHeader(`DELETE /api/offerings/[id] - ${operationId}`);
+  const id = parseInt(params.id ?? "", 10);
+  log.info(`[${operationId}] DELETE /offerings/${id}: FN_START`);
 
   try {
-    const body: DeleteRequest<WholesalerItemOffering> = await request.json();
-    const { id: offering_id, cascade = false } = body;
-    log.debug(`[${operationId}] Parsed request body`, { offering_id, cascade });
-
-    if (!offering_id) {
+    if (isNaN(id) || id <= 0) {
       const errRes: ApiErrorResponse = {
         success: false,
-        message: "offering_id is required.",
+        message: "Invalid offering ID.",
         status_code: 400,
-        error_code: "BAD_REQUEST",
         meta: { timestamp: new Date().toISOString() },
       };
-      log.warn(`[${operationId}] FN_FAILURE: Validation failed - missing offering_id.`);
       return json(errRes, { status: 400 });
     }
 
-    const dependencies = await checkOfferingDependencies(offering_id);
-    if (dependencies.length > 0 && !cascade) {
-      const conflictResponse: DeleteConflictResponse<string[]> = {
-        success: false,
-        message: "Cannot delete offering: dependencies exist.",
-        status_code: 409,
-        error_code: "DEPENDENCY_CONFLICT",
-        dependencies: {soft: dependencies, hard: []},
-        cascade_available: true,
-        meta: { timestamp: new Date().toISOString() },
-      };
-      log.warn(`[${operationId}] FN_FAILURE: Deletion blocked by dependencies.`, { dependencies });
-      return json(conflictResponse, { status: 409 });
-    }
+    const body: DeleteRequest<WholesalerItemOffering> = await request.json();
+    const cascade = body.cascade || false;
+    const forceCascade = body.forceCascade || false; 
+    log.debug(`[${operationId}] Parsed request body`, { id, cascade, forceCascade });
 
     const transaction = db.transaction();
     await transaction.begin();
-    log.info(`[${operationId}] Transaction started.`);
+    log.info(`[${operationId}] Transaction started for offering deletion.`);
 
     try {
-      if (cascade && dependencies.length > 0) {
-        log.info(`[${operationId}] Performing cascade delete.`);
 
-        // Delete offering attributes
-        await transaction
-          .request()
-          .input("offeringId", offering_id)
-          .query("DELETE FROM dbo.wholesaler_offering_attributes WHERE offering_id = @offeringId");
+      // === CHECK DEPENDENCIES =====================================================================
 
-        // Delete offering links
-        await transaction
-          .request()
-          .input("offeringId", offering_id)
-          .query("DELETE FROM dbo.wholesaler_offering_links WHERE offering_id = @offeringId");
-      }
+      const { hard, soft } = await checkOfferingDependencies(id);
+      log.info(`Offering has dependent objects:`, { hard, soft });
 
-      // Get offering details before deletion
-      const offeringResult = await transaction.request().input("offering_id", offering_id).query(`
-                    SELECT wio.offering_id, pd.title as product_def_title,
-                           w.name as supplier_name, pc.name as category_name
-                    FROM dbo.wholesaler_item_offerings wio
-                    LEFT JOIN dbo.product_definitions pd ON wio.product_def_id = pd.product_def_id
-                    LEFT JOIN dbo.wholesalers w ON wio.wholesaler_id = w.wholesaler_id
-                    LEFT JOIN dbo.product_categories pc ON wio.category_id = pc.category_id
-                    WHERE wio.offering_id = @offering_id
-                `);
-
-      if (offeringResult.recordset.length === 0) {
+      if ((soft.length > 0 && !cascade) || (hard.length > 0 && !forceCascade)) {
         await transaction.rollback();
-        const errRes: ApiErrorResponse = {
+        const conflictResponse: DeleteConflictResponse<string[]> = {
           success: false,
-          message: `Offering with ID ${offering_id} not found to delete.`,
-          status_code: 404,
-          error_code: "NOT_FOUND",
+          message: "Cannot delete offering: It is still in use by other entities.",
+          status_code: 409,
+          error_code: "DEPENDENCY_CONFLICT",
+          dependencies: { hard, soft },
+          cascade_available: hard.length === 0,
           meta: { timestamp: new Date().toISOString() },
         };
-        log.warn(`[${operationId}] FN_FAILURE: Offering not found during delete.`);
-        return json(errRes, { status: 404 });
+        log.warn(`[${operationId}] FN_FAILURE: Deletion blocked by dependencies.`, { dependencies: { hard, soft } });
+        return json(conflictResponse, { status: 409 });
       }
 
-      const offeringDetails = offeringResult.recordset[0];
+      // === DELETE =================================================================================
 
-      // Delete the offering
-      await transaction
-        .request()
-        .input("offering_id", offering_id)
-        .query("DELETE FROM dbo.wholesaler_item_offerings WHERE offering_id = @offering_id");
-
+      const deletedInfo = await deleteOffering(id, cascade || forceCascade, transaction);
       await transaction.commit();
       log.info(`[${operationId}] Transaction committed.`);
 
-      const response: DeleteSuccessResponse<{
-        offering_id: number;
-        product_def_title: string;
-        supplier_name: string;
-        category_name: string;
-      }> = {
+      // === RETURN RESPONSE ========================================================================
+
+      const response: DeleteOfferingSuccessResponse = {
         success: true,
-        message: `Offering "${offeringDetails.product_def_title}" deleted successfully from category "${offeringDetails.category_name}".`,
+        message: `Offering (ID: ${deletedInfo.deleted.offering_id}) deleted successfully.`,
         data: {
-          deleted_resource: {
-            offering_id: offeringDetails.offering_id,
-            product_def_title: offeringDetails.product_def_title || "Unknown Product",
-            supplier_name: offeringDetails.supplier_name || "Unknown Supplier",
-            category_name: offeringDetails.category_name || "Unknown Category",
-          },
-          cascade_performed: cascade,
-          dependencies_cleared: dependencies.length,
+          deleted_resource: deletedInfo.deleted,
+          cascade_performed: cascade || forceCascade,
+          dependencies_cleared: deletedInfo.stats.total,
         },
         meta: { timestamp: new Date().toISOString() },
       };
-
-      log.info(`[${operationId}] FN_SUCCESS: Offering deleted.`, {
-        deletedId: offeringDetails.offering_id,
-        cascade,
-      });
+      log.info(`[${operationId}] FN_SUCCESS: Offering deleted.`, { responseData: response.data });
       return json(response);
+
     } catch (err) {
       await transaction.rollback();
-      log.error(`[${operationId}] FN_EXCEPTION: Transaction failed and was rolled back.`, { error: err });
+      log.error(`[${operationId}] FN_EXCEPTION: Transaction failed, rolling back.`, { error: err });
       throw err;
     }
   } catch (err: unknown) {
+    if ((err as { status?: number })?.status === 404) {
+      throw err;
+    }
     const { status, message } = mssqlErrorMapper.mapToHttpError(err);
-    log.error(`[${operationId}] FN_EXCEPTION: Unhandled error.`, { error: err });
+    log.error(`[${operationId}] FN_EXCEPTION: Unhandled error during DELETE.`, { error: err });
     throw error(status, message);
   }
 };

@@ -3,14 +3,13 @@
 import { assertDefined } from "$lib/utils/assertions";
 import { log } from "$lib/utils/logger";
 import type { Transaction } from "mssql";
-import type { ProductCategory, ProductDefinition, Wholesaler } from "$lib/domain/domainTypes";
+import type {DeletedAttributeData, DeletedCategoryData, DeletedOfferingData, DeletedProductDefinitonData, DeletedSupplierData} from  "$lib/api/app/appSpecificTypes";
 
 /**
  * The shapes of the data returned after a successful deletion.
  */
-export type DeletedProductDefinitionData = Pick<ProductDefinition, "product_def_id" | "title">;
-export type DeletedSupplierData = Pick<Wholesaler, "wholesaler_id" | "name">;
-export type DeletedProductCategoryData = Pick<ProductCategory, "category_id" | "name">;
+
+
 
 /**
  * Deletes a Product Definition, with an option to cascade and delete all its dependencies.
@@ -28,7 +27,7 @@ export async function deleteProductDefinition(
   id: number,
   cascade: boolean,
   transaction: Transaction,
-): Promise<{ deleted: DeletedProductDefinitionData; stats: Record<string, number> }> {
+): Promise<{ deleted: DeletedProductDefinitonData; stats: Record<string, number> }> {
   assertDefined(id, `id must be defined for deleteProductDefinition`);
   log.info(`(delete) Preparing to delete ProductDefinition ID: ${id} with cascade=${cascade}`);
 
@@ -38,7 +37,7 @@ export async function deleteProductDefinition(
   const selectResult = await transaction
     .request()
     .input(productDefIdParam, id)
-    .query<DeletedProductDefinitionData>(`
+    .query<DeletedProductDefinitonData>(`
       SELECT product_def_id, title
       FROM dbo.product_definitions
       WHERE product_def_id = @${productDefIdParam};
@@ -319,7 +318,7 @@ export async function deleteProductCategory(
   id: number,
   cascade: boolean,
   transaction: Transaction,
-): Promise<{ deleted: DeletedProductCategoryData; stats: Record<string, number> }> {
+): Promise<{ deleted: DeletedCategoryData; stats: Record<string, number> }> {
   assertDefined(id, `id must be defined for deleteProductCategory`);
   log.info(`(delete) Preparing to delete ProductCategory ID: ${id} with cascade=${cascade}`);
 
@@ -329,7 +328,7 @@ export async function deleteProductCategory(
   const selectResult = await transaction
     .request()
     .input(categoryIdParam, id)
-    .query<DeletedProductCategoryData>(`
+    .query<DeletedCategoryData>(`
       SELECT category_id, name
       FROM dbo.product_categories
       WHERE category_id = @${categoryIdParam};
@@ -478,3 +477,223 @@ export async function deleteProductCategory(
   return { deleted: deletedCategoryData, stats };
 }
 
+/**
+ * Deletes a WholesalerItemOffering, with an option to cascade and delete all its dependencies.
+ * This includes offering links and attributes.
+ *
+ * @param id The ID of the WholesalerItemOffering to delete.
+ * @param cascade If true, performs a cascade delete of all dependent links and attributes.
+ * @param transaction The active MSSQL transaction object.
+ * @returns A promise that resolves with the data of the deleted offering.
+ * @throws An error if the offering with the given ID is not found.
+ */
+export async function deleteOffering(
+  id: number,
+  cascade: boolean,
+  transaction: Transaction,
+): Promise<{ deleted: DeletedOfferingData; stats: Record<string, number> }> {
+  assertDefined(id, `id must be defined for deleteOffering`);
+  log.info(`(delete) Preparing to delete Offering ID: ${id} with cascade=${cascade}`);
+
+  const offeringIdParam = "offeringId";
+
+  // 1) Read offering first (existence check + data for return)
+  const selectResult = await transaction
+    .request()
+    .input(offeringIdParam, id)
+    .query<DeletedOfferingData>(`
+      SELECT offering_id
+      FROM dbo.wholesaler_item_offerings
+      WHERE offering_id = @${offeringIdParam};
+    `);
+
+  if (selectResult.recordset.length === 0) {
+    throw new Error(`Offering with ID ${id} not found.`);
+  }
+  const deletedOfferingData = selectResult.recordset[0];
+  log.debug(`(delete) Found offering to delete (ID: ${id})`);
+
+  let stats: Record<string, number> = {};
+
+  // 2) Execute delete path
+  if (cascade) {
+    log.debug(`(delete) Executing CASCADE delete for Offering ID: ${id}`);
+
+    const cascadeDeleteQuery = `
+      SET XACT_ABORT ON;
+      SET NOCOUNT ON;
+
+      DECLARE
+        @deletedLinks       INT = 0,
+        @deletedAttributes  INT = 0,
+        @deletedOfferings   INT = 0;
+
+      -- 1) Delete dependencies: links
+      DELETE FROM dbo.wholesaler_offering_links
+      WHERE offering_id = @${offeringIdParam};
+      SET @deletedLinks = @@ROWCOUNT;
+
+      -- 2) Delete dependencies: attributes
+      DELETE FROM dbo.wholesaler_offering_attributes
+      WHERE offering_id = @${offeringIdParam};
+      SET @deletedAttributes = @@ROWCOUNT;
+
+      -- 3) Finally, delete the offering itself
+      DELETE FROM dbo.wholesaler_item_offerings
+      WHERE offering_id = @${offeringIdParam};
+      SET @deletedOfferings = @@ROWCOUNT;
+
+      -- Return deletion stats
+      SELECT
+        @deletedLinks      AS deletedLinks,
+        @deletedAttributes AS deletedAttributes,
+        @deletedOfferings  AS deletedOfferings;
+    `;
+
+    const res = await transaction.request().input(offeringIdParam, id).query(cascadeDeleteQuery);
+
+    if (res?.recordset?.[0]) {
+      stats = res.recordset[0];
+      stats.total = (stats.deletedLinks ?? 0) + (stats.deletedAttributes ?? 0);
+    } else {
+      stats = { total: 0, deletedLinks: 0, deletedAttributes: 0, deletedOfferings: 0 };
+    }
+
+    log.debug(
+      `(delete) Cascade stats for Offering ${id}: ` +
+        `links=${stats.deletedLinks}, attrs=${stats.deletedAttributes}, offerings=${stats.deletedOfferings}`,
+    );
+  } else {
+    log.debug(`(delete) Executing NON-CASCADE delete for Offering ID: ${id}`);
+    try {
+      const res = await transaction
+        .request()
+        .input(offeringIdParam, id)
+        .query(`
+          DELETE FROM dbo.wholesaler_item_offerings
+          WHERE offering_id = @${offeringIdParam};
+        `);
+
+      const affected = Array.isArray(res.rowsAffected)
+        ? res.rowsAffected.reduce((a, b) => a + b, 0)
+        : (res.rowsAffected ?? 0);
+      log.debug(`(delete) Non-cascade delete affected rows: ${affected}`);
+    } catch (err: any) {
+      if (err && (err.number === 547 || err.code === "EREQUEST")) {
+        throw new Error(
+          `Cannot delete Offering ID ${id} without cascade: dependent rows exist (links or attributes).`,
+        );
+      }
+      throw err;
+    }
+  }
+
+  log.info(`(delete) Delete operation for Offering ID: ${id} completed successfully.`);
+
+  // 3) Return the data of the now-deleted resource + stats
+  return { deleted: deletedOfferingData, stats };
+}
+
+/**
+ * Deletes an Attribute, with an option to cascade and delete all its assignments.
+ *
+ * @param id The ID of the Attribute to delete.
+ * @param cascade If true, performs a cascade delete of all dependent offering assignments.
+ * @param transaction The active MSSQL transaction object.
+ * @returns A promise that resolves with the data of the deleted attribute.
+ * @throws An error if the attribute with the given ID is not found.
+ */
+export async function deleteAttribute(
+  id: number,
+  cascade: boolean,
+  transaction: Transaction,
+): Promise<{ deleted: DeletedAttributeData; stats: Record<string, number> }> {
+  assertDefined(id, `id must be defined for deleteAttribute`);
+  log.info(`(delete) Preparing to delete Attribute ID: ${id} with cascade=${cascade}`);
+
+  const attributeIdParam = "attributeId";
+
+  // 1) Read attribute first (existence check + data for return)
+  const selectResult = await transaction
+    .request()
+    .input(attributeIdParam, id)
+    .query<DeletedAttributeData>(`
+      SELECT attribute_id, name
+      FROM dbo.attributes
+      WHERE attribute_id = @${attributeIdParam};
+    `);
+
+  if (selectResult.recordset.length === 0) {
+    throw new Error(`Attribute with ID ${id} not found.`);
+  }
+  const deletedAttributeData = selectResult.recordset[0];
+  log.debug(`(delete) Found attribute to delete: "${deletedAttributeData.name}" (ID: ${id})`);
+
+  let stats: Record<string, number> = {};
+
+  // 2) Execute delete path
+  if (cascade) {
+    log.debug(`(delete) Executing CASCADE delete for Attribute ID: ${id}`);
+
+    const cascadeDeleteQuery = `
+      SET XACT_ABORT ON;
+      SET NOCOUNT ON;
+
+      DECLARE
+        @deletedAssignments INT = 0,
+        @deletedAttributes  INT = 0;
+
+      -- 1) Delete dependencies: offering assignments
+      DELETE FROM dbo.wholesaler_offering_attributes
+      WHERE attribute_id = @${attributeIdParam};
+      SET @deletedAssignments = @@ROWCOUNT;
+
+      -- 2) Finally, delete the attribute itself
+      DELETE FROM dbo.attributes
+      WHERE attribute_id = @${attributeIdParam};
+      SET @deletedAttributes = @@ROWCOUNT;
+
+      -- Return deletion stats
+      SELECT
+        @deletedAssignments AS deletedAssignments,
+        @deletedAttributes  AS deletedAttributes;
+    `;
+
+    const res = await transaction.request().input(attributeIdParam, id).query(cascadeDeleteQuery);
+
+    if (res?.recordset?.[0]) {
+      stats = res.recordset[0];
+      stats.total = (stats.deletedAssignments ?? 0);
+    } else {
+      stats = { total: 0, deletedAssignments: 0, deletedAttributes: 0 };
+    }
+
+    log.debug(
+      `(delete) Cascade stats for Attribute ${id}: ` +
+        `assignments=${stats.deletedAssignments}, attributes=${stats.deletedAttributes}`,
+    );
+  } else {
+    log.debug(`(delete) Executing NON-CASCADE delete for Attribute ID: ${id}`);
+    try {
+      await transaction
+        .request()
+        .input(attributeIdParam, id)
+        .query(`
+          DELETE FROM dbo.attributes
+          WHERE attribute_id = @${attributeIdParam};
+        `);
+    } catch (err: any) {
+      if (err && (err.number === 547 || err.code === "EREQUEST")) {
+        throw new Error(
+          `Cannot delete Attribute ID ${id} without cascade: it is assigned to one or more offerings.`,
+        );
+      }
+      throw err;
+    }
+  }
+
+  log.info(`(delete) Delete operation for Attribute ID: ${id} completed successfully.`);
+
+  // 3) Return the data of the now-deleted resource + stats
+  return { deleted: deletedAttributeData, stats };
+}

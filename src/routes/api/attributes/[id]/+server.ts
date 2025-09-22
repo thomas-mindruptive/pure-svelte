@@ -10,11 +10,9 @@ import { json, error, type RequestHandler } from "@sveltejs/kit";
 import { db } from "$lib/backendQueries/db";
 import { log } from "$lib/utils/logger";
 import { buildQuery, executeQuery } from "$lib/backendQueries/queryBuilder";
-//import { supplierQueryConfig } from '$lib/backendQueries/queryConfig';
 import { supplierQueryConfig } from "$lib/backendQueries/queryConfig";
 import { validateAttribute } from "$lib/server/validation/domainValidator";
 import { mssqlErrorMapper } from "$lib/backendQueries/mssqlErrorMapper";
-//import { LogicalOperator, ComparisonOperator, type QueryPayload, type WhereCondition } from '$lib/backendQueries/queryGrammar';
 import { type WhereCondition, ComparisonOperator, type QueryPayload, LogicalOperator } from "$lib/backendQueries/queryGrammar";
 import type { Attribute } from "$lib/domain/domainTypes";
 import { v4 as uuidv4 } from "uuid";
@@ -23,30 +21,14 @@ import type {
   ApiErrorResponse,
   ApiSuccessResponse,
   DeleteConflictResponse,
+  DeleteRequest,
   DeleteSuccessResponse,
   QueryRequest,
   QuerySuccessResponse,
 } from "$lib/api/api.types";
-
-/**
- * Check attribute dependencies (offering-attribute assignments)
- */
-async function checkAttributeDependencies(attributeId: number): Promise<string[]> {
-  const dependencies: string[] = [];
-
-  // Check offering attribute assignments
-  const assignmentsCheck = await db.request().input("attributeId", attributeId).query(`
-            SELECT COUNT(*) as count 
-            FROM dbo.wholesaler_offering_attributes 
-            WHERE attribute_id = @attributeId
-        `);
-
-  if (assignmentsCheck.recordset[0].count > 0) {
-    dependencies.push(`${assignmentsCheck.recordset[0].count} offering attribute assignments`);
-  }
-
-  return dependencies;
-}
+import type { DeletedAttributeData } from "$lib/api/app/appSpecificTypes";
+import { deleteAttribute } from "$lib/dataModel/deletes";
+import { checkAttributeDependencies } from "$lib/dataModel/dependencyChecks";
 
 /**
  * GET /api/attributes/[id] - Get a single attribute record
@@ -246,7 +228,7 @@ export const PUT: RequestHandler = async ({ params, request }) => {
 /**
  * DELETE /api/attributes/[id] - Delete attribute with dependency checks
  */
-export const DELETE: RequestHandler = async ({ params, url }) => {
+export const DELETE: RequestHandler = async ({ params, request }) => {
   log.infoHeader("DELETE /api/attributes/[id]");
   const operationId = uuidv4();
   const id = parseInt(params.id ?? "", 10);
@@ -258,100 +240,70 @@ export const DELETE: RequestHandler = async ({ params, url }) => {
         success: false,
         message: "Invalid attribute ID.",
         status_code: 400,
-        error_code: "BAD_REQUEST",
         meta: { timestamp: new Date().toISOString() },
       };
-      log.warn(`[${operationId}] FN_FAILURE: Invalid ID provided.`, { id: params.id });
       return json(errRes, { status: 400 });
     }
 
-    const cascade = url.searchParams.get("cascade") === "true";
-    log.info(`[${operationId}] Parsed parameters`, { id, cascade });
-
-    const dependencies = await checkAttributeDependencies(id);
-    if (dependencies.length > 0 && !cascade) {
-      const conflictResponse: DeleteConflictResponse<string[]> = {
-        success: false,
-        message: "Cannot delete attribute: dependencies exist.",
-        status_code: 409,
-        error_code: "DEPENDENCY_CONFLICT",
-        dependencies: { soft: dependencies, hard: [] },
-        cascade_available: true,
-        meta: { timestamp: new Date().toISOString() },
-      };
-      log.warn(`[${operationId}] FN_FAILURE: Deletion blocked by dependencies.`, { dependencies });
-      return json(conflictResponse, { status: 409 });
-    }
+    const body: DeleteRequest<Attribute> = await request.json();
+    const cascade = body.cascade || false;
+    const forceCascade = body.forceCascade || false;
+    log.debug(`[${operationId}] Parsed request body`, { id, cascade, forceCascade });
 
     const transaction = db.transaction();
     await transaction.begin();
-    log.info(`[${operationId}] Transaction started.`);
+    log.info(`[${operationId}] Transaction started for attribute deletion.`);
 
     try {
-      if (cascade && dependencies.length > 0) {
-        log.info(`[${operationId}] Performing cascade delete.`);
+      // === CHECK DEPENDENCIES =====================================================================
+      const { hard, soft } = await checkAttributeDependencies(id);
+      log.info(`Attribute has dependent objects:`, { hard, soft });
 
-        // Delete offering-attribute assignments
-        await transaction
-          .request()
-          .input("attributeId", id)
-          .query("DELETE FROM dbo.wholesaler_offering_attributes WHERE attribute_id = @attributeId");
-      }
-
-      // Get attribute details before deletion
-      const attributeResult = await transaction
-        .request()
-        .input("id", id)
-        .query("SELECT attribute_id, name FROM dbo.attributes WHERE attribute_id = @id");
-
-      if (attributeResult.recordset.length === 0) {
+      if ((soft.length > 0 && !cascade) || (hard.length > 0 && !forceCascade)) {
         await transaction.rollback();
-        const errRes: ApiErrorResponse = {
+        const conflictResponse: DeleteConflictResponse<string[]> = {
           success: false,
-          message: `Attribute with ID ${id} not found to delete.`,
-          status_code: 404,
-          error_code: "NOT_FOUND",
+          message: "Cannot delete attribute: It is currently assigned to offerings.",
+          status_code: 409,
+          error_code: "DEPENDENCY_CONFLICT",
+          dependencies: { hard, soft },
+          cascade_available: hard.length === 0,
           meta: { timestamp: new Date().toISOString() },
         };
-        log.warn(`[${operationId}] FN_FAILURE: Attribute not found during delete.`);
-        return json(errRes, { status: 404 });
+        log.warn(`[${operationId}] FN_FAILURE: Deletion blocked by dependencies.`, { dependencies: { hard, soft } });
+        return json(conflictResponse, { status: 409 });
       }
 
-      const attributeDetails = attributeResult.recordset[0];
-
-      // Delete the attribute
-      await transaction.request().input("id", id).query("DELETE FROM dbo.attributes WHERE attribute_id = @id");
-
+      // === DELETE =================================================================================
+      const deletedInfo = await deleteAttribute(id, cascade || forceCascade, transaction);
       await transaction.commit();
       log.info(`[${operationId}] Transaction committed.`);
 
-      const response: DeleteSuccessResponse<{ attribute_id: number; name: string }> = {
+      // === RETURN RESPONSE ========================================================================
+      const response: DeleteSuccessResponse<DeletedAttributeData> = {
         success: true,
-        message: `Attribute "${attributeDetails.name}" deleted successfully.`,
+        message: `Attribute "${deletedInfo.deleted.name}" deleted successfully.`,
         data: {
-          deleted_resource: {
-            attribute_id: attributeDetails.attribute_id,
-            name: attributeDetails.name,
-          },
-          cascade_performed: cascade,
-          dependencies_cleared: dependencies.length,
+          deleted_resource: deletedInfo.deleted,
+          cascade_performed: cascade || forceCascade,
+          dependencies_cleared: deletedInfo.stats.total,
         },
         meta: { timestamp: new Date().toISOString() },
       };
-
-      log.info(`[${operationId}] FN_SUCCESS: Attribute deleted.`, {
-        deletedId: attributeDetails.attribute_id,
-        cascade,
-      });
+      log.info(`[${operationId}] FN_SUCCESS: Attribute deleted.`, { responseData: response.data });
       return json(response);
+
     } catch (err) {
       await transaction.rollback();
-      log.error(`[${operationId}] FN_EXCEPTION: Transaction failed and was rolled back.`, { error: err });
+      log.error(`[${operationId}] FN_EXCEPTION: Transaction failed, rolling back.`, { error: err });
       throw err;
     }
   } catch (err: unknown) {
+    if ((err as { status?: number })?.status === 404) {
+      throw err;
+    }
     const { status, message } = mssqlErrorMapper.mapToHttpError(err);
-    log.error(`[${operationId}] FN_EXCEPTION: Unhandled error.`, { error: err });
+    log.error(`[${operationId}] FN_EXCEPTION: Unhandled error during DELETE.`, { error: err });
     throw error(status, message);
   }
 };

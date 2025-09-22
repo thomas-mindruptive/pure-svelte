@@ -34,7 +34,6 @@ EXCLUDE_PATTERNS = [
     "tmp",
     "tools",
     "node_modules",
-    "lib/server",
     ".git",
     ".venv",
     ".vscode",

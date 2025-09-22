@@ -6,20 +6,22 @@
  * This provides a clear contract of "what you get" for each API operation.
  */
 
-import type { 
-    Wholesaler, 
-    WholesalerCategory_Category, 
-    ProductCategory, 
-    WholesalerItemOffering 
-} from '$lib/domain/domainTypes';
-import type { DeleteSuccessResponse, DeleteConflictResponse, ApiErrorResponse } from '../api.types';
+import type {
+  Wholesaler,
+  WholesalerCategory_Category,
+  ProductCategory,
+  WholesalerItemOffering,
+  ProductDefinition,
+  Attribute,
+} from "$lib/domain/domainTypes";
+import type { DeleteSuccessResponse, DeleteConflictResponse, ApiErrorResponse } from "../api.types";
 
 // =================================================================
 // OPERATION: deleteSupplier
 // =================================================================
 
 /** The shape of the `deleted_resource` payload on successful supplier deletion. */
-type DeletedSupplierData = Pick<Wholesaler, 'wholesaler_id' | 'name'>;
+export type DeletedSupplierData = Pick<Wholesaler, "wholesaler_id" | "name">;
 
 /** The exact success response for deleting a supplier. */
 export type DeleteSupplierSuccessResponse = DeleteSuccessResponse<DeletedSupplierData>;
@@ -31,18 +33,14 @@ type SupplierDependencies = string[];
 export type DeleteSupplierConflictResponse = DeleteConflictResponse<SupplierDependencies>;
 
 /** The complete, explicit response union for the `deleteSupplier` operation. */
-export type DeleteSupplierApiResponse = 
-  | DeleteSupplierSuccessResponse 
-  | DeleteSupplierConflictResponse
-  | ApiErrorResponse;
-
+export type DeleteSupplierApiResponse = DeleteSupplierSuccessResponse | DeleteSupplierConflictResponse | ApiErrorResponse;
 
 // =================================================================
 // OPERATION: removeCategoryFromSupplier
 // =================================================================
 
 /** The shape of the `deleted_resource` payload on successful category assignment removal. */
-type DeletedSupplierCategoryData = Pick<WholesalerCategory_Category, 'wholesaler_id' | 'category_id' | 'category_name'>;
+type DeletedSupplierCategoryData = Pick<WholesalerCategory_Category, "wholesaler_id" | "category_id" | "category_name">;
 
 /** The exact success response for removing a category assignment. */
 export type RemoveCategorySuccessResponse = DeleteSuccessResponse<DeletedSupplierCategoryData>;
@@ -51,56 +49,64 @@ export type RemoveCategorySuccessResponse = DeleteSuccessResponse<DeletedSupplie
 //type SupplierCategoryDependencies = { offering_count: number };
 
 /** The exact conflict response for removing a category assignment. */
-export type RemoveCategoryConflictResponse = DeleteConflictResponse<{hard: string[], soft: string[]}>;
+export type RemoveCategoryConflictResponse = DeleteConflictResponse<{ hard: string[]; soft: string[] }>;
 
 /** The complete, explicit response union for the `removeCategoryFromSupplier` operation. */
-export type RemoveCategoryApiResponse = 
-  | RemoveCategorySuccessResponse
-  | RemoveCategoryConflictResponse
-  | ApiErrorResponse;
-
+export type RemoveCategoryApiResponse = RemoveCategorySuccessResponse | RemoveCategoryConflictResponse | ApiErrorResponse;
 
 // =================================================================
 // OPERATION: deleteCategory
 // =================================================================
 
 /** The shape of the `deleted_resource` payload on successful category deletion. */
-type DeletedCategoryData = Pick<ProductCategory, 'category_id' | 'name'>;
+export type DeletedCategoryData = Pick<ProductCategory, "category_id" | "name">;
 
 /** The exact success response for deleting a category. */
 export type DeleteCategorySuccessResponse = DeleteSuccessResponse<DeletedCategoryData>;
 
-/** The dependency structure for a category deletion conflict. */
-type CategoryDependencies = string[];
-
 /** The exact conflict response for deleting a category. */
-export type DeleteCategoryConflictResponse = DeleteConflictResponse<CategoryDependencies>;
+export type DeleteCategoryConflictResponse = DeleteConflictResponse<string[]>;
 
 /** The complete, explicit response union for the `deleteCategory` operation. */
-export type DeleteCategoryApiResponse = 
-  | DeleteCategorySuccessResponse
-  | DeleteCategoryConflictResponse
-  | ApiErrorResponse;
+export type DeleteCategoryApiResponse = DeleteCategorySuccessResponse | DeleteCategoryConflictResponse | ApiErrorResponse;
 
+// =================================================================
+// OPERATION: deleteProductDefiniton
+// =================================================================
+
+/** The shape of the `deleted_resource` payload on successful supplier deletion. */
+export type DeletedProductDefinitonData = Pick<ProductDefinition, "product_def_id" | "title">;
+
+/** The exact success response for deleting a supplier. */
+export type DeletedProductDefinitonSuccessResponse = DeleteSuccessResponse<DeletedProductDefinitonData>;
 
 // =================================================================
 // OPERATION: deleteOffering
 // =================================================================
 
 /** The shape of the `deleted_resource` payload on successful offering deletion. */
-type DeletedOfferingData = Pick<WholesalerItemOffering, 'offering_id'>;
+export type DeletedOfferingData = Pick<WholesalerItemOffering, "offering_id">;
 
 /** The exact success response for deleting an offering. */
 export type DeleteOfferingSuccessResponse = DeleteSuccessResponse<DeletedOfferingData>;
 
 /** The dependency structure for an offering deletion conflict. */
-type OfferingDependencies = string[];
+export type OfferingDependencies = string[];
 
 /** The exact conflict response for deleting an offering. */
 export type DeleteOfferingConflictResponse = DeleteConflictResponse<OfferingDependencies>;
 
 /** The complete, explicit response union for the `deleteOffering` operation. */
-export type DeleteOfferingApiResponse =
-  | DeleteOfferingSuccessResponse
-  | DeleteOfferingConflictResponse
-  | ApiErrorResponse;
+export type DeleteOfferingApiResponse = DeleteOfferingSuccessResponse | DeleteOfferingConflictResponse | ApiErrorResponse;
+
+// =================================================================
+// OPERATION: deleteAttribute
+// =================================================================
+
+/** The shape of the `deleted_resource` payload on successful offering deletion. */
+export type DeletedAttributeData = Pick<Attribute, "attribute_id" | "name">;
+
+/** The exact success response for deleting an offering. */
+export type DeleteAttributeSuccessResponse = DeleteSuccessResponse<DeletedAttributeData>;
+
+

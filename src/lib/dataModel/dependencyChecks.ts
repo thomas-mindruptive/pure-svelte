@@ -174,7 +174,7 @@ export async function checkProductDefinitionDependencies(productDefId: number): 
 /**
  * Check offering dependencies (attributes and links)
  */
-export async function checkOfferingDependencies(offeringId: number): Promise<string[]> {
+export async function checkOfferingDependencies(offeringId: number): Promise<{ hard: string[]; soft: string[]}> {
     const dependencies: string[] = [];
 
     // Check offering attributes
@@ -203,5 +203,32 @@ export async function checkOfferingDependencies(offeringId: number): Promise<str
         dependencies.push(`${linksCheck.recordset[0].count} offering links`);
     }
 
-    return dependencies;
+    // Offerings do not have hard dependencies that would prevent a cascade.
+    return { hard: [], soft: dependencies };
+}
+
+/**
+ * Checks for dependencies on an Attribute.
+ * This is used before deleting an attributes record.
+ * @param attributeId The ID of the attribute to check.
+ * @returns An object containing lists of hard and soft dependencies.
+ */
+export async function checkAttributeDependencies(attributeId: number): Promise<{ hard: string[]; soft: string[] }> {
+    const softDependencies: string[] = [];
+    log.info(`(dependencyChecks) Checking dependencies for attributeId: ${attributeId}`);
+
+    // Soft Dependency: Assignments to offerings (dbo.wholesaler_offering_attributes)
+    const assignmentsCheck = await db.request()
+        .input('attributeId', attributeId)
+        .query`
+            SELECT COUNT(*) as count 
+            FROM dbo.wholesaler_offering_attributes 
+            WHERE attribute_id = @attributeId
+        `;
+    if (assignmentsCheck.recordset[0].count > 0) {
+        softDependencies.push(`${assignmentsCheck.recordset[0].count} offering assignments`);
+    }
+
+    // Attributes, as master data, do not have hard dependencies that would prevent a cascade.
+    return { hard: [], soft: softDependencies };
 }

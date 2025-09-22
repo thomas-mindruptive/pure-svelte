@@ -18,7 +18,7 @@ import type { Attribute } from "$lib/domain/domainTypes";
 
 import type { ApiClient } from "./ApiClient";
 import { createPostBody, createQueryBody, getErrorMessage } from "./common";
-import type { DeleteApiResponse, QueryResponseData } from "$lib/api/api.types";
+import type { DeleteApiResponse, DeleteRequest, QueryResponseData } from "$lib/api/api.types";
 import { LoadingState } from "./loadingState";
 
 const attributeLoadingManager = new LoadingState();
@@ -128,24 +128,34 @@ export function getAttributeApi(client: ApiClient) {
       }
     },
 
-    /**
+ /**
      * Deletes an attribute.
      */
     async deleteAttribute(
       attributeId: number,
       cascade = false,
+      forceCascade = false,
     ): Promise<DeleteApiResponse<{ attribute_id: number; name: string }, string[]>> {
       const operationId = `deleteAttribute-${attributeId}`;
       attributeLoadingOperations.start(operationId);
       try {
-        const url = `/api/attributes/${attributeId}${cascade ? "?cascade=true" : ""}`;
+        const url = `/api/attributes/${attributeId}`;
+        
+        // The API expects the flags in the request body, consistent with the DeleteRequest<T> pattern.
+        const deleteRequest: DeleteRequest<Attribute> = {
+            id: attributeId,
+            cascade,
+            forceCascade
+        };
+        const body = createPostBody(deleteRequest);
+
         return await client.apiFetchUnion<DeleteApiResponse<{ attribute_id: number; name: string }, string[]>>(
           url,
-          { method: "DELETE" },
+          { method: "DELETE", body },
           { context: operationId },
         );
       } catch (err) {
-        log.error(`[${operationId}] Failed.`, { attributeId, cascade, error: getErrorMessage(err) });
+        log.error(`[${operationId}] Failed.`, { attributeId, cascade, forceCascade, error: getErrorMessage(err) });
         throw err;
       } finally {
         attributeLoadingOperations.finish(operationId);

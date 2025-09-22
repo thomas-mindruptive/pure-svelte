@@ -4,7 +4,6 @@
   import { goto } from "$app/navigation";
   import { log } from "$lib/utils/logger";
   import { addNotification } from "$lib/stores/notifications";
-  import { requestConfirmation } from "$lib/stores/confirmation";
   import { ApiClient } from "$lib/api/client/ApiClient";
   import { getOfferingApi, offeringLoadingState } from "$lib/api/client/offering";
   import type { ID, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
@@ -25,6 +24,8 @@
   import { assertDefined } from "$lib/utils/assertions";
   import { getProductDefinitionApi } from "$lib/api/client/productDefinition";
     import { page } from "$app/state";
+    import { cascadeDelte } from "$lib/api/client/cascadeDelete";
+    import { stringsToNumbers } from "$lib/utils/typeConversions";
 
   // === PROPS ====================================================================================
   
@@ -35,6 +36,7 @@
   let resolvedData = $state<ProductDefinitionDetailPage_LoadData | null>(null);
   let isLoading = $state(true);
   let loadingError = $state<{ message: string; status?: number } | null>(null);
+  const allowForceCascadingDelte = $state(true);
   
   // === LOAD DATA ================================================================================
 
@@ -122,35 +124,18 @@
 
   async function handleOfferingDelete(ids: ID[]): Promise<void> {
     let dataChanged = false;
-    for (const id of ids) {
-      const numericId = Number(id);
+    const idsAsNumber = stringsToNumbers(ids);
 
-      const result = await offeringApi.deleteOffering(numericId);
-
-      if (result.success) {
-        addNotification(`Offering (ID: ${id}) deleted successfully.`, "success");
-        dataChanged = true;
-      } else if (result.error_code === "DEPENDENCY_CONFLICT" && result.cascade_available) {
-        const dialogResult = await requestConfirmation(
-          `This offering has dependencies.\n${JSON.stringify(result.dependencies)}\nDelete the offering AND all its related data?`,
-          "Confirm Cascade Delete",
-          [{name: "aaa", description: "aaa description"}, {name: "bbb", description: "bbb description"}]
-        );
-        
-        log.debug(`Confirm result: `, dialogResult);
-        if (dialogResult.confirmed) {
-          const cascadeResult = await offeringApi.deleteOffering(numericId, true);
-          if (cascadeResult.success) {
-            addNotification("Offering and all its data removed.", "success");
-            dataChanged = true;
-          } else {
-            addNotification(cascadeResult.message || "Did not remove offering.", "error");
-          }
-        }
-      } else {
-        addNotification(result.message || `Could not delete offering (ID: ${id}).`, "error");
-      }
-    }
+    dataChanged = await cascadeDelte(
+      idsAsNumber,
+      offeringApi.deleteOffering,
+      {
+        domainObjectName: "Offering",
+        softDepInfo: "This will also delete all assigned attributes and links.",
+        hardDepInfo: "", // Offerings do not have hard dependencies
+      },
+      allowForceCascadingDelte,
+    );
 
     if (dataChanged) {
       await reloadOfferings();

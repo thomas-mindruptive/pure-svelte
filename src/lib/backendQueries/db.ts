@@ -1,40 +1,54 @@
-import sql from 'mssql';
+import sql, { type ConnectionPool } from 'mssql';
 import { error } from '@sveltejs/kit';
+import { dev } from '$app/environment';
 
-// 1. Konfiguration der Datenbankverbindung
+// Extend the globalThis type to inform TypeScript about our custom property.
+declare global {
+  // We allow it to be undefined initially.
+  var _dbConnectionPool: Promise<ConnectionPool> | undefined;
+}
+
 const dbConfig = {
-  user: 'sa',      
-  password: 'ichBinAdmin@123',  
-  server: 'localhost',                  
-  database: 'pureenergyworks',       
+  user: 'sa',
+  password: 'ichBinAdmin@123',
+  server: 'localhost',
+  database: 'pureenergyworks',
   options: {
-    // Diese Option ist für die lokale Entwicklung mit selbst-signierten Zertifikaten wichtig.
-    // Für eine Produktionsumgebung mit einem validen SSL-Zertifikat setzen Sie dies auf `false`.
     trustServerCertificate: true
   },
   pool: {
-    max: 20, // Maximum number of connections in the pool (default is 10)
-    min: 0,  // Minimum number of connections to keep open
-    idleTimeoutMillis: 30000 // How long a connection can be idle before being released
+    max: 20,
+    min: 0,
+    idleTimeoutMillis: 15000
   }
 };
 
-// 2. Erstellen einer Funktion, um die Verbindung herzustellen und zu verwalten
-async function connectToDb() {
-  try {
-    console.log("Versuche, eine Verbindung zum MSSQL-Server herzustellen...");
-    const pool = await sql.connect(dbConfig);
-    console.log("✅ Erfolgreich mit MSSQL verbunden!");
+/**
+ * Creates and returns a single connection pool promise.
+ */
+function createConnectionPool(): Promise<ConnectionPool> {
+  console.log("Attempting to create a new MSSQL connection pool...");
+  return sql.connect(dbConfig).then(pool => {
+    console.log("✅ Successfully connected to MSSQL!");
     return pool;
-  } catch (err) {
-    console.error("❌ Datenbankverbindung fehlgeschlagen:", err);
-    // Wenn die DB-Verbindung beim Start fehlschlägt, ist die App nutzlos.
-    // Wir werfen einen fatalen Fehler, der den Serverstart abbricht.
-    throw error(500, "Konnte keine Verbindung zur Datenbank herstellen.");
-  }
+  }).catch(err => {
+    console.error("❌ Database connection failed:", err);
+    throw error(500, "Could not connect to the database.");
+  });
 }
 
-// 3. Verbindung herstellen und den Connection Pool exportieren
-// Wir verwenden 'await' auf der obersten Ebene, was in modernen JS-Modulen möglich ist.
-// Das bedeutet, dass jeder, der dieses Modul importiert, wartet, bis die Verbindung steht.
-export const db = await connectToDb();
+// In development, we store the connection promise on the global object to
+// prevent it from being re-created on every HMR update.
+if (dev && !globalThis._dbConnectionPool) {
+  globalThis._dbConnectionPool = createConnectionPool();
+}
+
+// This is the core logic:
+// - In production, it creates the pool.
+// - In development, it reuses the pool from the global object if it exists,
+//   or creates it if it doesn't.
+const poolPromise = globalThis._dbConnectionPool ?? createConnectionPool();
+
+// We await the promise here so that any module importing 'db'
+// gets the resolved ConnectionPool instance directly.
+export const db = await poolPromise;

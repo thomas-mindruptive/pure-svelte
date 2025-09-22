@@ -127,8 +127,28 @@ export const productCategoriesHierarchyConfig: HierarchyTree = {
   }),
 };
 
+/**
+ * Defines the navigation hierarchy for global Attributes master data.
+ */
+// prettier-ignore
+export const attributesHierarchyConfig: HierarchyTree = {
+  name: "attributes",
+  rootItem: createHierarchyNode({
+    // LEVEL 0 (List) - The visible root of the hierarchy
+    item: { key: "attributes", type: "list", href: "/attributes", label: "Attributes" },
+    children: [
+      createHierarchyNode({
+        // LEVEL 1 (Object) - Hidden node representing a single selected attribute
+        item: { key: "attribute", type: "object", href: "/attributes/[attributeId]", label: "Attribute", display: false, urlParamName: "attributeId" },
+        // This is the end of this navigation branch, so no children are needed.
+        children: []
+      }),
+    ],
+  }),
+};
+
 // ================================================================================================
-// MAIN EXPORT FUNCTIONS (Unchanged)
+// MAIN EXPORT FUNCTIONS
 // ================================================================================================
 
 /**
@@ -136,7 +156,7 @@ export const productCategoriesHierarchyConfig: HierarchyTree = {
  * This is the main entry point for getting hierarchy definitions.
  */
 export function getAppHierarchies(): Hierarchy {
-  return [supplierHierarchyConfig, productCategoriesHierarchyConfig];
+  return [supplierHierarchyConfig, productCategoriesHierarchyConfig, attributesHierarchyConfig];
 }
 
 /**

@@ -52,12 +52,14 @@ async function _handleDeletionConflict<TDeletedResource>(
   allowForceCascadingDelete: boolean,
   onConfirmCascade: (forceCascade: boolean) => Promise<DeleteApiResponse<TDeletedResource, string[]>>,
 ): Promise<boolean> {
-  const softDepInfo = info.softDepInfo ? `\n${info.softDepInfo}` : "";
-  const hardDepInfo = info.hardDepInfo ? `\n${info.hardDepInfo}` : "";
+  const softDepInfo = info.softDepInfo && conflictResponse.dependencies.soft.length ? `\n${info.softDepInfo}` : "";
+  const hardDepInfo = info.hardDepInfo && conflictResponse.dependencies.hard.length > 0 ? `\n${info.hardDepInfo}` : "";
   const dependencyCount = conflictResponse.dependencies.hard.length + conflictResponse.dependencies.soft.length;
   const confirmMessage =
     `${info.domainObjectName} has ${dependencyCount} dependencies.${softDepInfo}${hardDepInfo}` +
-    `\nDependencies: ${JSON.stringify(conflictResponse.dependencies)}`;
+    `\nDependencies:\n` +
+    `hard: ${JSON.stringify(conflictResponse.dependencies.hard, null, 2)}\n` +
+    `soft: ${JSON.stringify(conflictResponse.dependencies.soft, null, 2)}`;
 
   // --- Path 1: Soft dependencies, cascade is available ---
   if (conflictResponse.cascade_available) {
@@ -166,18 +168,14 @@ export async function cascadeDeleteAssignments<TDeletedResource>(
 
   for (const idPair of compositeIds) {
     // Initial call is always non-cascading.
-    const initialResult = await removeFunc(idPair.parent1Id, idPair.parent2Id, false, false );
+    const initialResult = await removeFunc(idPair.parent1Id, idPair.parent2Id, false, false);
 
     if (initialResult.success) {
       addNotification(`${info.domainObjectName} assignment removed successfully.`, "success");
       dataChanged = true;
-    }
-  
-    else if (isDeleteConflict(initialResult)) {
-      const confirmedAndDeleted = await _handleDeletionConflict(initialResult, 
-        info, 
-        allowForceCascadingDelete, 
-        (forceCascade) =>  removeFunc(idPair.parent1Id, idPair.parent2Id, true, forceCascade),
+    } else if (isDeleteConflict(initialResult)) {
+      const confirmedAndDeleted = await _handleDeletionConflict(initialResult, info, allowForceCascadingDelete, (forceCascade) =>
+        removeFunc(idPair.parent1Id, idPair.parent2Id, true, forceCascade),
       );
       if (confirmedAndDeleted) {
         dataChanged = true;

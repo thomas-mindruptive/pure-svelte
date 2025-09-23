@@ -20,6 +20,8 @@
     type OfferingDetailAttributes_LoadDataAsync,
   } from "$lib/components/domain/offerings/offeringDetail.types";
   import { assertDefined } from "$lib/utils/assertions";
+  import { stringsToNumbers } from "$lib/utils/typeConversions";
+  import { cascadeDeleteAssignments, type CompositeID } from "$lib/api/client/cascadeDelete";
 
   // === PROPS ==================================================================================
 
@@ -29,6 +31,7 @@
 
   // Empfängt das Objekt mit den Promises aus der `load`-Funktion.
   let { data }: OfferDetailAttributesPageProps = $props();
+  let allowForceCascadingDelte = $state(true);
 
   // === STATE ==================================================================================
 
@@ -68,7 +71,7 @@
         const validationResult = OfferingDetailAttributes_LoadDataSchema.safeParse(dataToValidate);
 
         if (validationResult.success) {
-          log.debug(`Validation successful`, {offering, assignedAttributes, availableAttributes, availableProducts, availableSuppliers});
+          log.debug(`Validation successful`, { offering, assignedAttributes, availableAttributes, availableProducts, availableSuppliers });
         } else {
           log.error("Zod validation failed", validationResult.error.issues);
           throw new Error(
@@ -134,22 +137,50 @@
       ids,
     });
     let dataChanged = false;
-    for (const id of ids) {
-      const parsed = offeringApi.parseAttributeCompositeId(String(id));
-      if (!parsed) continue;
-      const { offeringId, attributeId } = parsed;
-      const result = await offeringApi.deleteOfferingAttribute(offeringId, attributeId);
-      if (result.success) {
-        addNotification(`Attribute assignment deleted.`, "success");
-        dataChanged = true;
-      } else {
-        addNotification(`Could not delete attribute assignment.`, "error");
-      }
-    }
+
+    const idsAsNumber = stringsToNumbers(ids);
+    const compositeIds: CompositeID[] = idsAsNumber.map((id) => ({
+      parent1Id: resolvedData!.offering!.offering_id,
+      parent2Id: id,
+    }));
+    dataChanged = await cascadeDeleteAssignments(
+      compositeIds,
+      offeringApi.deleteOfferingAttribute,
+      {
+        domainObjectName: "Offering",
+        hardDepInfo: "Offering has hard dependencies. Delete?",
+        softDepInfo: "Offering has soft dependencies. Delete?",
+      },
+      allowForceCascadingDelte,
+    );
+
     if (dataChanged) {
       reloadAttributes();
     }
   }
+
+  // async function handleAttributeDelete_old(ids: ID[]): Promise<void> {
+  //   assertDefined(ids, "OfferingDetailAttributesPage.handleAttributeDelete");
+  //   log.info(`Deleting attribute assignments`, {
+  //     ids,
+  //   });
+  //   let dataChanged = false;
+  //   for (const id of ids) {
+  //     const parsed = offeringApi.parseAttributeCompositeId(String(id));
+  //     if (!parsed) continue;
+  //     const { offeringId, attributeId } = parsed;
+  //     const result = await offeringApi.deleteOfferingAttribute(offeringId, attributeId);
+  //     if (result.success) {
+  //       addNotification(`Attribute assignment deleted.`, "success");
+  //       dataChanged = true;
+  //     } else {
+  //       addNotification(`Could not delete attribute assignment.`, "error");
+  //     }
+  //   }
+  //   if (dataChanged) {
+  //     reloadAttributes();
+  //   }
+  // }
 
   function handleAttributeSelect(attribute: WholesalerOfferingAttribute_Attribute) {
     assertDefined(attribute, "OfferingDetailAttributesPage.handleAttributeSelect");

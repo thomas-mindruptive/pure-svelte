@@ -274,10 +274,12 @@ export function getOfferingApi(client: ApiClient) {
           { method: "POST", body: createQueryBody(payload) },
           { context: operationId },
         );
-        
-        log.info(`(offeringApi) Found ${responseData.results.length} available attributes for offering ${offeringId}.`, responseData.results);
-        return responseData.results as Attribute[];
 
+        log.info(
+          `(offeringApi) Found ${responseData.results.length} available attributes for offering ${offeringId}.`,
+          responseData.results,
+        );
+        return responseData.results as Attribute[];
       } catch (err) {
         log.error(`[${operationId}] Failed to get available attributes.`, {
           offeringId,
@@ -301,7 +303,7 @@ export function getOfferingApi(client: ApiClient) {
           api.loadOfferingAttributes(offeringId),
         ]);
 
-        log.debug(`Loaded attributes for offering`, {offeringId, allAttributes, assignedAttributes});
+        log.debug(`Loaded attributes for offering`, { offeringId, allAttributes, assignedAttributes });
 
         const assignedIds = new Set(assignedAttributes.map((a) => a.attribute_id));
         const availableAttributes = allAttributes.filter((attr) => !assignedIds.has(attr.attribute_id));
@@ -382,7 +384,7 @@ export function getOfferingApi(client: ApiClient) {
       offeringId: number,
       attributeId: number,
       cascade = false,
-      forceCascade = false
+      forceCascade = false,
     ): Promise<DeleteApiResponse<{ offering_id: number; attribute_id: number; attribute_name: string }, string[]>> {
       const operationId = `deleteOfferingAttribute-${offeringId}-${attributeId}`;
       offeringLoadingManager.start(operationId);
@@ -391,7 +393,7 @@ export function getOfferingApi(client: ApiClient) {
           parent1Id: offeringId,
           parent2Id: attributeId,
           cascade,
-          forceCascade
+          forceCascade,
         };
         return await client.apiFetchUnion<
           DeleteApiResponse<
@@ -599,41 +601,7 @@ export function getOfferingApi(client: ApiClient) {
     },
 
     // ===== UTILITY FUNCTIONS =====
-
-    /**
-     * Creates a composite ID for attribute grid operations.
-     * This is used by the DataGrid component for row identification.
-     */
-    createAttributeCompositeId: (offeringId: number, attributeId: number): string => {
-      return `${offeringId}-${attributeId}`;
-    },
-
-    /**
-     * Parses a composite ID back to offering and attribute IDs.
-     * This is used when processing grid selection events.
-     */
-    parseAttributeCompositeId: (compositeId: string): { offeringId: number; attributeId: number } | null => {
-      try {
-        const [offeringIdStr, attributeIdStr] = compositeId.split("-");
-        const offeringId = Number(offeringIdStr);
-        const attributeId = Number(attributeIdStr);
-
-        if (isNaN(offeringId) || isNaN(attributeId)) {
-          log.warn("Failed to parse attribute composite ID: invalid numbers", {
-            compositeId,
-          });
-          return null;
-        }
-
-        return { offeringId, attributeId };
-      } catch (error) {
-        log.error("Failed to parse attribute composite ID", {
-          compositeId,
-          error: getErrorMessage(error),
-        });
-        return null;
-      }
-    },
   };
+
   return api;
 }

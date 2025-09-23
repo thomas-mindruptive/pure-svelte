@@ -268,7 +268,7 @@ export const PUT: RequestHandler = async ({ request }) => {
  */
 export const DELETE: RequestHandler = async ({ request }) => {
   const operationId = uuidv4();
-  log.info(`[${operationId}] DELETE /offering-attributes: FN_START`);
+  log.infoHeader(`DELETE /offering-attributes: FN_START - [${operationId}] `);
 
   try {
     const body = (await request.json()) as RemoveAssignmentRequest<WholesalerItemOffering, Attribute>;

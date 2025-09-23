@@ -130,9 +130,9 @@
       idsAsNumber,
       offeringApi.deleteOffering,
       {
-        domainObjectName: "Offering",
-        softDepInfo: "This will also delete all assigned attributes and links.",
-        hardDepInfo: "", // Offerings do not have hard dependencies
+        domainObjectName: "Product Definition",
+        softDepInfo: "Product Definition has soft dependencies.",
+        hardDepInfo: "Product Definition has har dependencies.", 
       },
       allowForceCascadingDelte,
     );

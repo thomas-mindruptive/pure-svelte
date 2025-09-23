@@ -194,9 +194,9 @@
       idsAsNumber,
       productDefApi.deleteProductDefinition,
       {
-        domainObjectName: "",
-        hardDepInfo: "",
-        softDepInfo: "",
+        domainObjectName: "Product Category",
+        hardDepInfo: "Product Category has hard dependencies.",
+        softDepInfo: "Product Category has soft dependencies.",
       },
       allowForceCascadingDelte,
     );

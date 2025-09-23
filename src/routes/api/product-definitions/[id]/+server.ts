@@ -181,7 +181,7 @@ export const DELETE: RequestHandler = async ({ request, params }) => {
   try {
     // === CHECK DEPENDENCIES =====================================================================
 
-    const { hard, soft } = await checkProductDefinitionDependencies(id);
+    const { hard, soft } = await checkProductDefinitionDependencies(id, transaction);
     let cascade_available = true;
     if (hard.length > 0) {
       cascade_available = false;

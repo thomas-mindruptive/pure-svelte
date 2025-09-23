@@ -158,7 +158,7 @@ export const DELETE: RequestHandler = async ({ params, request, url }): Promise<
     try {
       // === CHECK DEPENDENCIES =====================================================================
 
-      const { hard, soft } = await checkProductCategoryMasterDependencies(id);
+      const { hard, soft } = await checkProductCategoryMasterDependencies(id, transaction);
       log.info(`Product categrory has dependent objects:`, { hard, soft });
 
       let cascade_available = true;

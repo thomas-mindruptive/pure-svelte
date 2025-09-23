@@ -226,7 +226,7 @@ export const DELETE: RequestHandler = async ({ params, request }): Promise<Respo
 
       // === CHECK DEPENDENCIES =====================================================================
 
-      const { hard, soft } = await checkOfferingDependencies(id);
+      const { hard, soft } = await checkOfferingDependencies(id, transaction);
       log.info(`Offering has dependent objects:`, { hard, soft });
 
       if ((soft.length > 0 && !cascade) || (hard.length > 0 && !forceCascade)) {

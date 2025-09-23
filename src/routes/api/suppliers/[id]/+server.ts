@@ -260,7 +260,7 @@ export const DELETE: RequestHandler = async ({ params, request }) => {
     try {
       // === CHECK DEPENDENCIES =====================================================================
 
-      const { hard, soft } = await checkWholesalerDependencies(id);
+      const { hard, soft } = await checkWholesalerDependencies(id, transaction);
       let cascade_available = true;
       if (hard.length > 0) {
         cascade_available = false;

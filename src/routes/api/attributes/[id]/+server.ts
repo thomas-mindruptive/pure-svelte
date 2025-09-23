@@ -256,7 +256,7 @@ export const DELETE: RequestHandler = async ({ params, request }) => {
 
     try {
       // === CHECK DEPENDENCIES =====================================================================
-      const { hard, soft } = await checkAttributeDependencies(id);
+      const { hard, soft } = await checkAttributeDependencies(id, transaction);
       log.info(`Attribute has dependent objects:`, { hard, soft });
 
       if ((soft.length > 0 && !cascade) || (hard.length > 0 && !forceCascade)) {

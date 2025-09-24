@@ -17,7 +17,6 @@
   import { goto } from "$app/navigation";
   import { coerceErrorMessage } from "$lib/utils/errorUtils";
   import { parseUrlSegments } from "$lib/utils/url";
-  import { page } from "$app/stores";
 
   // ===== PROPS =====
 
@@ -45,10 +44,13 @@
     assertDefined(p, "OfferingFormDetailWrapper.handleFormSubmitted");
     log.info(`Form submitted successfully`, p);
     addNotification("Offering updated successfully.", "success");
+    log.debug(`initialLoadedData:`, initialLoadedData);
     if (isCreateMode) {
       // Defensive: Ensure ids.
       if (p.data.offering_id && p.data.wholesaler_id && p.data.category_id && p.data.product_def_id) {
-        const urlSegments = parseUrlSegments($page.url.pathname);
+        // DO NOT USE page.url.pathName. svelte5/svelte kit does not pass it on to nested components!!!
+        const urlSegments = parseUrlSegments(initialLoadedData.urlPathName);
+        log.debug(`urlSegments:`, urlSegments);
         const parentPathUrlSegments = urlSegments.slice(0, urlSegments.length - 1);
         const newUrl = `/${parentPathUrlSegments.join("/")}/${p.data.offering_id}`;
         await goto(newUrl, { invalidateAll: true });
@@ -57,7 +59,7 @@
           newOfferingId: p.data.offering_id,
           supplierId: p.data.wholesaler_id,
           categoryId: p.data.category_id,
-          productDefId: p.data.product_def_id
+          productDefId: p.data.product_def_id,
         });
         addNotification("Could not redirect to edit page.", "error");
       }

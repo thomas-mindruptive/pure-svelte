@@ -13,6 +13,7 @@ import z from "zod";
 
 // prettier-ignore
 export const OfferingDetail_LoadDataSchema = z.object({
+    urlPathName: z.string(),                                                                     // Mandatory! Passed on to nested components. 
     supplierId: z.number().int().positive().optional().nullable(),                           // Needed for the "create" in route context "/suppliers"
     categoryId: z.number().int().positive().optional().nullable(),                           // Needed for the "create" mode in both route contexts
     productDefId: z.number().int().positive().optional().nullable(),                         // Needed for the "create" in route context "/categories"

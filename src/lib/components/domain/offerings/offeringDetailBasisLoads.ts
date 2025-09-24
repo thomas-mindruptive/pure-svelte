@@ -21,7 +21,7 @@ export function loadOfferingDetailBasisData({
   params,
   fetch: fetchLoad,
 }: Pick<LoadEvent, "url" | "params" | "fetch">): OfferingDetail_LoadDataAsync {
-  log.info("Load called with params:", {url, params});
+  log.info("Load called with params:", { url, params });
 
   let offeringId: number | null = Number(params.offeringId);
   let categoryId: number | null = Number(params.categoryId);
@@ -55,10 +55,10 @@ export function loadOfferingDetailBasisData({
   if (isNaN(supplierId)) {
     supplierId = null;
   }
-    if (isNaN(categoryId)) {
+  if (isNaN(categoryId)) {
     categoryId = null;
   }
-    if (isNaN(productDefId)) {
+  if (isNaN(productDefId)) {
     productDefId = null;
   }
 
@@ -90,7 +90,7 @@ export function loadOfferingDetailBasisData({
     //  Load all product defs for category because multiple offerings for same product def may exist, e.g. with different sizes.
     availableProducts = categoryApi.loadProductDefsForCategory(categoryId);
   } else {
-    //  Load suppliers with the CORRECT category asigned. 
+    //  Load suppliers with the CORRECT category asigned.
     // Note: Multiple offerings for the same supplier may exist, e.g. with different size.
     availableSuppliers = categoryApi.loadSuppliersForCategory(categoryId);
   }
@@ -101,6 +101,7 @@ export function loadOfferingDetailBasisData({
     // --- CREATE MODE -----
     log.info(`Kicking off promises for CREATE mode: offeringId: ${offeringId}, categoryId: ${categoryId}, supplierId: ${supplierId}`);
     const asyncLoadData: OfferingDetail_LoadDataAsync = {
+      urlPathName: url.pathname,
       supplierId,
       categoryId,
       productDefId,
@@ -116,6 +117,7 @@ export function loadOfferingDetailBasisData({
     // --- EDIT MODE -----
     log.info(`Kicking off promises for EDIT mode: offeringId: ${offeringId}, categoryId: ${categoryId}, supplierId: ${supplierId}`);
     const asyncLoadData: OfferingDetail_LoadDataAsync = {
+      urlPathName: url.pathname,
       supplierId,
       categoryId,
       productDefId,

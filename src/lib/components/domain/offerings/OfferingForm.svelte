@@ -311,7 +311,7 @@
     <!--- FIELDS --------------------------------------------------------------------------------->
     {#snippet fields({ getS, set, markTouched })}
       <div class="form-body">
-        <div class="form-grid">
+        <div class="form-row-grid">
           <!-- "product defs" combo -------------------------------------------------------------->
           <div class="form-group span-2">
             <!--- Create mode and suppliers route => render "productdefs" combo --->

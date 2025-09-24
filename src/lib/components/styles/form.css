@@ -42,9 +42,9 @@
   background: inherit;
 }
 
-.form-grid {
+.form-row-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
   gap: 1rem;
   margin-bottom: 0.5rem;
 }
@@ -140,7 +140,7 @@
 /* --- Responsive Design for LAYOUT ------------------------------------------------------------ */
 
 @media (max-width: 768px) {
-  .form-grid {
+  .form-row-grid {
     grid-template-columns: 1fr;
   }
 

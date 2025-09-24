@@ -169,11 +169,12 @@
 
     {#snippet fields({ getS, set, errors, markTouched })}
       <div class="form-body">
-        <div class="form-grid">
-          <div class="form-group span-2">
-            <!-- --------------------------------------------------------------------------------
+        
+        <div class="form-row-grid">
+          <!-- --------------------------------------------------------------------------------
             -- Name 
             ---------------------------------------------------------------------------------- -->
+          <div class="form-group span-1">
             <label for="supplier-name">Supplier Name *</label>
             <input
               id="supplier-name"
@@ -210,24 +211,6 @@
             {/if}
           </div>
           <!-- --------------------------------------------------------------------------------
-            -- Status 
-            ---------------------------------------------------------------------------------- -->
-          <div class="form-group">
-            <label for="supplier-status">Status *</label>
-            <textarea
-              id="supplier-status"
-              name="status"
-              value={getS("status") ?? ""}
-              class:invalid={errors.status}
-              oninput={(e) => set(["status"], (e.currentTarget as HTMLTextAreaElement).value)}
-              onblur={() => markTouched("status")}
-              required
-            ></textarea>
-            {#if errors.status}
-              <div class="error-text">{errors.status[0]}</div>
-            {/if}
-          </div>
-          <!-- --------------------------------------------------------------------------------
             -- Country 
             ---------------------------------------------------------------------------------- -->
           <div class="form-group">
@@ -254,6 +237,26 @@
             {/if}
           </div>
           <!-- --------------------------------------------------------------------------------
+            -- Status 
+            ---------------------------------------------------------------------------------- -->
+          <div class="form-group span-2">
+            <label for="supplier-status">Status *</label>
+            <textarea
+              id="supplier-status"
+              name="status"
+              value={getS("status") ?? ""}
+              class:invalid={errors.status}
+              oninput={(e) => set(["status"], (e.currentTarget as HTMLTextAreaElement).value)}
+              onblur={() => markTouched("status")}
+              required
+            ></textarea>
+            {#if errors.status}
+              <div class="error-text">{errors.status[0]}</div>
+            {/if}
+          </div>
+        </div>
+        <div class="form-row-grid">
+          <!-- --------------------------------------------------------------------------------
             -- Dropship 
             ---------------------------------------------------------------------------------- -->
           <div class="form-group">
@@ -268,12 +271,10 @@
               Offers Dropshipping
             </label>
           </div>
-        </div>
-        <!-- --------------------------------------------------------------------------------
+          <!-- --------------------------------------------------------------------------------
             -- email 
             ---------------------------------------------------------------------------------- -->
-        <div class="form-grid">
-          <div class="form-group span-2">
+          <div class="form-group span-1">
             <label for="supplier-email">Email Address</label>
             <input
               id="supplier-email"
@@ -292,7 +293,7 @@
           <!-- --------------------------------------------------------------------------------
             -- Website 
             ---------------------------------------------------------------------------------- -->
-          <div class="form-group span-2">
+          <div class="form-group span-1">
             <label for="supplier-website">Website</label>
             <input
               id="supplier-website"
@@ -308,12 +309,12 @@
               <div class="error-text">{errors.website[0]}</div>
             {/if}
           </div>
-        </div>
-        <!-- --------------------------------------------------------------------------------
+
+          <!-- --------------------------------------------------------------------------------
             -- Notes 
             ---------------------------------------------------------------------------------- -->
-        <div class="form-grid">
-          <div class="form-group span-4">
+
+          <div class="form-group span-2">
             <label for="supplier-notes">Business Notes</label>
             <textarea
               id="supplier-notes"

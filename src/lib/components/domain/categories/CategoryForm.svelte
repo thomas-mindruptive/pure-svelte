@@ -149,7 +149,7 @@
 
     {#snippet fields({ getS, set, errors, markTouched })}
       <div class="form-body">
-        <div class="form-grid">
+        <div class="form-row-grid">
           <div class="form-group span-2">
             <label for="cat-name">Category Name *</label>
             <input

@@ -144,7 +144,7 @@
 
     {#snippet fields({ getS, set, errors, markTouched })}
       <div class="form-body">
-        <div class="form-grid">
+        <div class="form-row-grid">
           <div class="form-group span-4">
             <label for="pd-title">Title *</label>
             <input

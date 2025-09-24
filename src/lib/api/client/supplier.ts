@@ -39,7 +39,7 @@ export const supplierLoadingOperations = supplierLoadingManager;
  * The default query payload used when fetching a list of suppliers.
  */
 export const DEFAULT_SUPPLIER_QUERY: QueryPayload<Wholesaler> = {
-  select: ["wholesaler_id", "name", "region", "status", "dropship", "website", "created_at"],
+  select: ["wholesaler_id", "name", "country", "region", "price_range", "relevance", "status", "dropship", "website", "created_at", "email"],
   orderBy: [{ key: "name", direction: "asc" }],
   limit: 100,
 };

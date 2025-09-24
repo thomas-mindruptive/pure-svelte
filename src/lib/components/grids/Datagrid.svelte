@@ -180,12 +180,9 @@
           throw new Error(`Column accessor for ${colName} is not a function`);
         }
         const val = col.accessor!(row);
-        // log.debug(
-        //   `safeAccessor: Cell accessor for ${colName} returned: ${val}`,
-        // );
         if (undefined === val) {
-          log.info(`safeAccessor: Cell accessor for ${colName} returned undefined`);
-          return `${colInfo} (accessor) undefined`;
+          log.debug(`safeAccessor: Cell accessor for ${colName} returned undefined`);
+          return `<not set>`;
         }
         return val;
       } else {
@@ -196,7 +193,7 @@
         // );
         if (undefined === val) {
           log.detdebug(`safeAccessor: Cell accessor for ${colName} returned undefined`);
-          return `${colInfo} (direct) undefined`;
+          return `<not set>`;
         }
         return val;
       }

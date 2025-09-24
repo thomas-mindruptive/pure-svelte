@@ -6,19 +6,14 @@
 
   // === PROPS ====================================================================================
 
-  export type SupplierGridProps =  {
+  export type SupplierGridProps = {
     rows: Wholesaler[];
     loading?: boolean;
     deleteStrategy: DeleteStrategy<Wholesaler>;
     rowActionStrategy?: RowActionStrategy<Wholesaler>;
-  }
+  };
 
-  const {
-    rows,
-    loading = false,
-    deleteStrategy,
-    rowActionStrategy,
-  }: SupplierGridProps = $props();
+  const { rows, loading = false, deleteStrategy, rowActionStrategy }: SupplierGridProps = $props();
 
   // === COLUMNS ==================================================================================
 
@@ -31,6 +26,9 @@
     },
     { key: "email", header: "Email", accessor: null },
     { key: "country", header: "Country", accessor: null },
+    { key: "relevance", header: "Relevance", accessor: null },
+    { key: "price_range", header: "Price Range", accessor: null },
+    { key: "status", header: "Status", accessor: null },
   ];
 
   const getId = (r: Wholesaler) => r.wholesaler_id;

@@ -214,20 +214,15 @@
             ---------------------------------------------------------------------------------- -->
           <div class="form-group">
             <label for="supplier-status">Status *</label>
-            <select
+            <textarea
               id="supplier-status"
               name="status"
               value={getS("status") ?? ""}
               class:invalid={errors.status}
-              onchange={(e) => set(["status"], (e.currentTarget as HTMLSelectElement).value)}
+              oninput={(e) => set(["status"], (e.currentTarget as HTMLTextAreaElement).value)}
               onblur={() => markTouched("status")}
               required
-            >
-              <option value="">Select status…</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-              <option value="new">New</option>
-            </select>
+            ></textarea>
             {#if errors.status}
               <div class="error-text">{errors.status[0]}</div>
             {/if}

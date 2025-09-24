@@ -1,34 +1,56 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 // ===== LEVEL =====
-export const LevelSchema = z.enum(['wholesalers', 'categories', 'offerings', 'attributes', 'links']);
+export const LevelSchema = z.enum(["wholesalers", "categories", "offerings", "attributes", "links"]);
 
 // ===== WHOLESALER (dbo.wholesalers) =====
+
+export const WholesalerPriceRangeSchema = z.enum([
+  "very expensive",
+  "expensive",
+  "medium",
+  "cheap",
+  "very cheap",
+]);
+
+export const WholesalerRelevanceSchema = z.enum([
+  "lowest",
+  "low",
+  "medium",
+  "high",
+  "highest",
+]);
+
+export type WholesalerPriceRange = z.infer<typeof WholesalerPriceRangeSchema>;
+export type WholesalerRelevance = z.infer<typeof WholesalerRelevanceSchema>;
+
 export const WholesalerSchema = z.object({
   wholesaler_id: z.number().int().positive(),
   name: z.string().max(200),
   country: z.string().max(200).nullable().optional(),
   region: z.string().max(200).nullable().optional(),
   b2b_notes: z.string().max(1000).nullable().optional(),
-  status: z.string().max(100).nullable().optional(),
+  status: z.string().max(200).nullable().optional(),
   dropship: z.boolean().nullable().optional().default(false),
   website: z.string().url().max(2048).nullable().optional(),
   email: z.string().email().max(200).nullable().optional(),
-  created_at: z.string().optional()
+  price_range: WholesalerPriceRangeSchema.nullable().optional(),
+  relevance: WholesalerRelevanceSchema.nullable().optional(),
+  created_at: z.string().optional(),
 });
 
 // ===== PRODUCT CATEGORY (dbo.product_categories) =====
 export const ProductCategorySchema = z.object({
   category_id: z.number().int().positive(),
   name: z.string().max(200),
-  description: z.string().max(500).nullable().optional()
+  description: z.string().max(500).nullable().optional(),
 });
 
 // ===== ATTRIBUTE (dbo.attributes) =====
 export const AttributeSchema = z.object({
   attribute_id: z.number().int().positive(),
   name: z.string().max(200),
-  description: z.string().max(500).nullable().optional()
+  description: z.string().max(500).nullable().optional(),
 });
 
 // ===== PRODUCT DEFINITION (dbo.product_definitions) =====
@@ -39,7 +61,7 @@ export const ProductDefinitionSchema = z.object({
   description: z.string().max(1000).nullable().optional(),
   material_id: z.number().int().positive().nullable().optional(),
   form_id: z.number().int().positive().nullable().optional(),
-  created_at: z.string().optional()
+  created_at: z.string().optional(),
 });
 
 // ===== WHOLESALER CATEGORY (dbo.wholesaler_categories) =====
@@ -48,18 +70,18 @@ export const WholesalerCategorySchema = z.object({
   category_id: z.number().int().positive(),
   comment: z.string().max(1000).nullable().optional(),
   link: z.string().url().max(2048).nullable().optional(),
-  created_at: z.string().optional()
+  created_at: z.string().optional(),
 });
 
 // ===== WHOLESALER CATEGORY including joins (dbo.wholesaler_categories) =====
 export const WholesalerCategory_CategorySchema = WholesalerCategorySchema.extend({
   category_name: z.string(),
-  category_description: z.string().nullable().optional()
+  category_description: z.string().nullable().optional(),
 });
 
 // ===== EXTENDED TYPES FOR MOCK DATA =====
 export const WholesalerCategoryWithCountSchema = WholesalerCategory_CategorySchema.extend({
-  offering_count: z.number().int().nonnegative().optional()
+  offering_count: z.number().int().nonnegative().optional(),
 });
 
 // ===== WHOLESALER ITEM OFFERING (dbo.wholesaler_item_offerings) =====
@@ -73,7 +95,7 @@ export const WholesalerItemOfferingSchema = z.object({
   price: z.number().multipleOf(0.01).nullable().optional(), // precision [18,2]
   currency: z.string().length(3).nullable().optional(),
   comment: z.string().max(1000).nullable().optional(),
-  created_at: z.string().optional()
+  created_at: z.string().optional(),
 });
 
 // ===== WHOLESALER ITEM OFFERING including join to product_def  =====
@@ -97,32 +119,32 @@ export const WholesalerOfferingLinkSchema = z.object({
   offering_id: z.number().int().positive(),
   url: z.string().url().max(2048),
   notes: z.string().max(500).nullable().optional(),
-  created_at: z.string().optional()
+  created_at: z.string().optional(),
 });
 
 // ===== WHOLESALER OFFERING ATTRIBUTE (dbo.wholesaler_offering_attributes) =====
 export const WholesalerOfferingAttributeSchema = z.object({
   offering_id: z.number().int().positive(),
   attribute_id: z.number().int().positive(),
-  value: z.string().max(200).nullable().optional()
+  value: z.string().max(200).nullable().optional(),
 });
 
 // ===== WHOLESALER OFFERING ATTRIBUTE including joins (dbo.wholesaler_offering_attributes) =====
 export const WholesalerOfferingAttribute_AttributeSchema = WholesalerOfferingAttributeSchema.extend({
   attribute_name: z.string().optional(),
-  attribute_description: z.string().nullable().optional()
+  attribute_description: z.string().nullable().optional(),
 });
 
 // ===== MATERIAL (dbo.materials) =====
 export const MaterialSchema = z.object({
   material_id: z.number().int().positive(),
-  name: z.string().max(100)
+  name: z.string().max(100),
 });
 
 // ===== FORM (dbo.forms) =====
 export const FormSchema = z.object({
   form_id: z.number().int().positive(),
-  name: z.string().max(100)
+  name: z.string().max(100),
 });
 
 // ===== TYPE EXPORTS =====

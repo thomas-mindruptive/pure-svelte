@@ -31,16 +31,9 @@
     onSubmitError?: SubmitErrorCallback;
     onCancelled?: CancelledCallback;
     onChanged?: ChangedCallback;
-  }
+  };
 
-  const {
-    initial,
-    disabled = false,
-    onSubmitted,
-    onSubmitError,
-    onCancelled,
-    onChanged,
-  }:SupplierFormProps = $props();
+  const { initial, disabled = false, onSubmitted, onSubmitError, onCancelled, onChanged }: SupplierFormProps = $props();
 
   type SupplierFormData = Partial<Wholesaler>;
 
@@ -135,9 +128,7 @@
   }
 </script>
 
-<ValidationWrapper
-  {errors}
->
+<ValidationWrapper {errors}>
   <FormShell
     entity="Wholesaler"
     initial={initial as SupplierFormData}
@@ -149,6 +140,10 @@
     onCancelled={handleCancelled}
     onChanged={handleChanged}
   >
+    <!-- ==========================================================================================
+      -- Header  
+      ========================================================================================== -->
+
     {#snippet header({ data, dirty })}
       {@const wholesaler = data as SupplierFormData}
       <div class="form-header">
@@ -168,16 +163,24 @@
       </div>
     {/snippet}
 
+    <!-- ==========================================================================================
+      -- Fields 
+      ========================================================================================== -->
+
     {#snippet fields({ getS, set, errors, markTouched })}
       <div class="form-body">
         <div class="form-grid">
           <div class="form-group span-2">
-            <label for="wh-name">Supplier Name *</label>
+            <!-- --------------------------------------------------------------------------------
+            -- Name 
+            ---------------------------------------------------------------------------------- -->
+            <label for="supplier-name">Supplier Name *</label>
             <input
-              id="wh-name"
+              id="supplier-name"
+              name="name"
               type="text"
               value={getS("name") ?? ""}
-              class:error={errors.name}
+              class:invalid={errors.name}
               placeholder="Enter supplier name"
               oninput={(e) => set(["name"], (e.currentTarget as HTMLInputElement).value)}
               onblur={() => markTouched("name")}
@@ -187,13 +190,17 @@
               <div class="error-text">{errors.name[0]}</div>
             {/if}
           </div>
+          <!-- --------------------------------------------------------------------------------
+            -- Region 
+            ---------------------------------------------------------------------------------- -->
           <div class="form-group">
-            <label for="wh-region">Region</label>
+            <label for="supplier-region">Region</label>
             <input
-              id="wh-region"
+              id="supplier-region"
+              name="region"
               type="text"
               value={getS("region") ?? ""}
-              class:error={errors.region}
+              class:invalid={errors.region}
               placeholder="e.g. Europe, Asia"
               oninput={(e) => set(["region"], (e.currentTarget as HTMLInputElement).value)}
               onblur={() => markTouched("region")}
@@ -202,12 +209,16 @@
               <div class="error-text">{errors.region[0]}</div>
             {/if}
           </div>
+          <!-- --------------------------------------------------------------------------------
+            -- Status 
+            ---------------------------------------------------------------------------------- -->
           <div class="form-group">
-            <label for="wh-status">Status *</label>
+            <label for="supplier-status">Status *</label>
             <select
-              id="wh-status"
+              id="supplier-status"
+              name="status"
               value={getS("status") ?? ""}
-              class:error={errors.status}
+              class:invalid={errors.status}
               onchange={(e) => set(["status"], (e.currentTarget as HTMLSelectElement).value)}
               onblur={() => markTouched("status")}
               required
@@ -221,12 +232,16 @@
               <div class="error-text">{errors.status[0]}</div>
             {/if}
           </div>
+          <!-- --------------------------------------------------------------------------------
+            -- Country 
+            ---------------------------------------------------------------------------------- -->
           <div class="form-group">
-            <label for="wh-country">Country *</label>
+            <label for="supplier-country">Country *</label>
             <select
-              id="wh-country"
+              id="supplier-country"
+              name="country"
               value={getS("country") ?? ""}
-              class:error={errors.country}
+              class:invalid={errors.country}
               onchange={(e) => set(["country"], (e.currentTarget as HTMLSelectElement).value)}
               onblur={() => markTouched("country")}
               required
@@ -243,10 +258,14 @@
               <div class="error-text">{errors.country[0]}</div>
             {/if}
           </div>
+          <!-- --------------------------------------------------------------------------------
+            -- Dropship 
+            ---------------------------------------------------------------------------------- -->
           <div class="form-group">
-            <label for="wh-dropship">
+            <label for="supplier-dropship">
               <input
-                id="wh-dropship"
+                id="supplier-dropship"
+                name="dropship"
                 type="checkbox"
                 checked={!!getS("dropship")}
                 onchange={(e) => set(["dropship"], (e.currentTarget as HTMLInputElement).checked)}
@@ -255,14 +274,18 @@
             </label>
           </div>
         </div>
+        <!-- --------------------------------------------------------------------------------
+            -- email 
+            ---------------------------------------------------------------------------------- -->
         <div class="form-grid">
           <div class="form-group span-2">
-            <label for="wh-email">Email Address</label>
+            <label for="supplier-email">Email Address</label>
             <input
-              id="wh-email"
+              id="supplier-email"
+              name="email"
               type="email"
               value={getS("email") ?? ""}
-              class:error={errors.email}
+              class:invalid={errors.email}
               placeholder="contact@supplier.com"
               oninput={(e) => set(["email"], (e.currentTarget as HTMLInputElement).value)}
               onblur={() => markTouched("email")}
@@ -271,23 +294,35 @@
               <div class="error-text">{errors.email[0]}</div>
             {/if}
           </div>
+          <!-- --------------------------------------------------------------------------------
+            -- Website 
+            ---------------------------------------------------------------------------------- -->
           <div class="form-group span-2">
-            <label for="wh-website">Website</label>
+            <label for="supplier-website">Website</label>
             <input
-              id="wh-website"
+              id="supplier-website"
+              name="website"
               type="url"
               value={getS("website") ?? ""}
+              class:invalid={errors.website}
               placeholder="https://www.supplier.com"
               oninput={(e) => set(["website"], (e.currentTarget as HTMLInputElement).value)}
               onblur={() => markTouched("website")}
             />
+            {#if errors.website}
+              <div class="error-text">{errors.website[0]}</div>
+            {/if}
           </div>
         </div>
+        <!-- --------------------------------------------------------------------------------
+            -- Notes 
+            ---------------------------------------------------------------------------------- -->
         <div class="form-grid">
           <div class="form-group span-4">
-            <label for="wh-notes">Business Notes</label>
+            <label for="supplier-notes">Business Notes</label>
             <textarea
-              id="wh-notes"
+              id="supplier-notes"
+              name="b2b_notes"
               rows="4"
               placeholder="Additional notes..."
               value={getS("b2b_notes") ?? ""}
@@ -301,6 +336,10 @@
       </div>
     {/snippet}
 
+    <!-- ==========================================================================================
+      -- Actions 
+      ========================================================================================== -->
+
     {#snippet actions({ submitAction, cancel, submitting, dirty })}
       <div class="form-actions">
         <button
@@ -311,7 +350,6 @@
         >
           Cancel
         </button>
-        <!-- KORREKTUR: type="submit" und kein onclick -->
         <button
           class="primary-button"
           type="submit"

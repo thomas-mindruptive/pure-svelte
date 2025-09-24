@@ -239,7 +239,7 @@
     <!-- Section 1: Details form -->
     <div class="form-section">
       <CategoryForm
-        isCreateMode
+        isCreateMode={isCreateMode}
         initial={resolvedData.category}
         disabled={$categoryLoadingState}
         onSubmitted={handleFormSubmitted}

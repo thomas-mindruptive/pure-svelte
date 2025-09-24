@@ -10,10 +10,9 @@
 import { json, error, type RequestHandler } from "@sveltejs/kit";
 import { db } from "$lib/backendQueries/db";
 import { log } from "$lib/utils/logger";
-import { validateProductCategory } from "$lib/server/validation/domainValidator";
 import { mssqlErrorMapper } from "$lib/backendQueries/mssqlErrorMapper";
 import { checkProductCategoryMasterDependencies } from "$lib/dataModel/dependencyChecks";
-import type { ProductCategory } from "$lib/domain/domainTypes";
+import { ProductCategorySchema, validateEntity, type ProductCategory } from "$lib/domain/domainTypes";
 import { v4 as uuidv4 } from "uuid";
 
 import type { ApiErrorResponse, ApiSuccessResponse, DeleteConflictResponse, DeleteRequest } from "$lib/api/api.types";
@@ -81,7 +80,7 @@ export const PUT: RequestHandler = async ({ params, request }) => {
     }
 
     const requestData = await request.json();
-    const validation = validateProductCategory({ ...requestData, category_id: id }, { mode: "update" });
+    const validation = validateEntity(ProductCategorySchema, { ...requestData, category_id: id });
 
     if (!validation.isValid) {
       const errRes: ApiErrorResponse = {
@@ -94,7 +93,7 @@ export const PUT: RequestHandler = async ({ params, request }) => {
       return json(errRes, { status: 400 });
     }
 
-    const { name, description } = validation.sanitized as Partial<ProductCategory>;
+    const { name, description } = validation.sanitized;
     const result = await db
       .request()
       .input("id", id)

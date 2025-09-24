@@ -31,6 +31,9 @@ EXTENSIONS = {
 }
 
 EXCLUDE_PATTERNS = [
+    "lib/api",
+    "lib/coponents",
+    "(browser)",
     "tmp",
     "tools",
     "node_modules",

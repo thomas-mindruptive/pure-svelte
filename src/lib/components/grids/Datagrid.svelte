@@ -172,7 +172,7 @@
   function safeAccessor(row: any, col: ColumnDef<any>): any {
     try {
       const colName = String(col.key);
-      let colInfo = `col name: ${colName}`;
+      // Not needed currently: let colInfo = `col name: ${colName}`;
 
       // Use custom accessor function if provided, otherwise direct property access
       if (col.accessor) {

@@ -10,9 +10,8 @@
 import { json, error, type RequestHandler } from '@sveltejs/kit';
 import { db } from '$lib/backendQueries/db';
 import { log } from '$lib/utils/logger';
-import { validateProductCategory } from '$lib/server/validation/domainValidator';
 import { mssqlErrorMapper } from '$lib/backendQueries/mssqlErrorMapper';
-import type { ProductCategory } from '$lib/domain/domainTypes';
+import { ProductCategoryForCreateSchema, validateEntity, type ProductCategory } from '$lib/domain/domainTypes';
 import { v4 as uuidv4 } from 'uuid';
 
 import type {
@@ -35,7 +34,7 @@ export const POST: RequestHandler = async ({ request }) => {
         log.info(`[${operationId}] Parsed request body`, { fields: Object.keys(requestData) });
 
         // 2. Validate the incoming data in 'create' mode.
-        const validation = validateProductCategory(requestData, { mode: 'create' });
+        const validation = validateEntity(ProductCategoryForCreateSchema, requestData);
         if (!validation.isValid) {
             const errRes: ApiErrorResponse = {
                 success: false,
@@ -50,7 +49,7 @@ export const POST: RequestHandler = async ({ request }) => {
         }
 
         // 3. Use the sanitized data from the validator for the database operation.
-        const { name, description } = validation.sanitized as Partial<ProductCategory>;
+        const { name, description } = validation.sanitized;
 
         // 4. Execute the INSERT query and use 'OUTPUT INSERTED.*' to get the new record back.
         const result = await db

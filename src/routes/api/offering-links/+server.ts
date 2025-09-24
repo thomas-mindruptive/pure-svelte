@@ -11,9 +11,8 @@
 import { json, error, type RequestHandler } from '@sveltejs/kit';
 import { db } from '$lib/backendQueries/db';
 import { log } from '$lib/utils/logger';
-import { validateOfferingLink } from '$lib/server/validation/domainValidator';
 import { mssqlErrorMapper } from '$lib/backendQueries/mssqlErrorMapper';
-import type { WholesalerItemOffering, WholesalerOfferingLink } from '$lib/domain/domainTypes';
+import { validateEntity, WholesalerOfferingLinkForCreateSchema, type WholesalerItemOffering, type WholesalerOfferingLink } from '$lib/domain/domainTypes';
 import { v4 as uuidv4 } from 'uuid';
 
 import type {
@@ -71,7 +70,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
 
         // 2. Validate the incoming data in 'create' mode.
-        const validation = validateOfferingLink(linkData, { mode: 'create' });
+        const validation = validateEntity(WholesalerOfferingLinkForCreateSchema, linkData);
         if (!validation.isValid) {
             const errRes: ApiErrorResponse = {
                 success: false,
@@ -181,7 +180,7 @@ export const PUT: RequestHandler = async ({ request }) => {
             return json(errRes, { status: 400 });
         }
 
-        const validation = validateOfferingLink({ ...requestData, link_id }, { mode: 'update' });
+        const validation = validateEntity(WholesalerOfferingLinkForCreateSchema, { ...requestData, link_id });
         if (!validation.isValid) {
             const errRes: ApiErrorResponse = {
                 success: false,
@@ -195,7 +194,7 @@ export const PUT: RequestHandler = async ({ request }) => {
             return json(errRes, { status: 400 });
         }
 
-        const { offering_id, url, notes } = validation.sanitized as Partial<WholesalerOfferingLink>;
+        const { offering_id, url, notes } = validation.sanitized;
 
         // Check if link exists and get current context
         const existsCheck = await db.request()

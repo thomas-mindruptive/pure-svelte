@@ -9,9 +9,8 @@
 import { json, error, type RequestHandler } from '@sveltejs/kit';
 import { db } from '$lib/backendQueries/db';
 import { log } from '$lib/utils/logger';
-import { validateProductDefinition } from '$lib/server/validation/domainValidator';
 import { mssqlErrorMapper } from '$lib/backendQueries/mssqlErrorMapper';
-import type { ProductDefinition } from '$lib/domain/domainTypes';
+import { ProductDefinitionForCreateSchema, validateEntity, type ProductDefinition } from '$lib/domain/domainTypes';
 import { v4 as uuidv4 } from 'uuid';
 import type { ApiErrorResponse, ApiSuccessResponse } from '$lib/api/api.types';
 
@@ -30,7 +29,7 @@ export const POST: RequestHandler = async ({ request }) => {
 		log.info(`[${operationId}] Parsed request body`, { fields: Object.keys(requestData) });
 
 		// 2. Validate the incoming data in 'create' mode using the central validator.
-		const validation = validateProductDefinition(requestData, { mode: 'create' });
+		const validation = validateEntity(ProductDefinitionForCreateSchema, requestData);
 		if (!validation.isValid) {
 			const errRes: ApiErrorResponse = {
 				success: false,

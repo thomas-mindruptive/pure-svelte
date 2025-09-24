@@ -11,11 +11,10 @@ import { db } from "$lib/backendQueries/db";
 import { log } from "$lib/utils/logger";
 import { buildQuery, executeQuery } from "$lib/backendQueries/queryBuilder";
 import { supplierQueryConfig } from "$lib/backendQueries/queryConfig";
-import { validateWholesaler } from "$lib/server/validation/domainValidator";
 import { mssqlErrorMapper } from "$lib/backendQueries/mssqlErrorMapper";
 import { checkWholesalerDependencies } from "$lib/dataModel/dependencyChecks";
 import { LogicalOperator, ComparisonOperator, type QueryPayload, type WhereCondition } from "$lib/backendQueries/queryGrammar";
-import type { Wholesaler } from "$lib/domain/domainTypes";
+import { validateEntity, WholesalerSchema, type Wholesaler } from "$lib/domain/domainTypes";
 import { v4 as uuidv4 } from "uuid";
 
 import type {
@@ -172,7 +171,9 @@ export const PUT: RequestHandler = async ({ params, request }) => {
     const requestData = await request.json();
     log.info(`[${operationId}] Parsed request body`, { fields: Object.keys(requestData) });
 
-    const validation = validateWholesaler({ ...requestData, wholesaler_id: id }, { mode: "update" });
+    //const validation = validateWholesaler({ ...requestData, wholesaler_id: id }, { mode: "update" });
+    const validation = validateEntity(WholesalerSchema, { ...requestData, wholesaler_id: id });
+
     if (!validation.isValid) {
       const errRes: ApiErrorResponse = {
         success: false,

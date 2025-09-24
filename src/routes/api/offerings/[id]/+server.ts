@@ -9,7 +9,7 @@ import { json, error, type RequestHandler } from "@sveltejs/kit";
 import { db } from "$lib/backendQueries/db";
 import { log } from "$lib/utils/logger";
 import { mssqlErrorMapper } from "$lib/backendQueries/mssqlErrorMapper";
-import type { WholesalerItemOffering, WholesalerItemOffering_ProductDef_Category_Supplier } from "$lib/domain/domainTypes";
+import { validateEntity, WholesalerItemOfferingSchema, type WholesalerItemOffering, type WholesalerItemOffering_ProductDef_Category_Supplier } from "$lib/domain/domainTypes";
 import { v4 as uuidv4 } from "uuid";
 import type {
   ApiErrorResponse,
@@ -17,7 +17,6 @@ import type {
   DeleteConflictResponse,
   DeleteRequest
 } from "$lib/api/api.types";
-import { validateOffering } from "$lib/server/validation/domainValidator";
 import { checkOfferingDependencies } from "$lib/dataModel/dependencyChecks";
 import type { DeleteOfferingSuccessResponse } from "$lib/api/app/appSpecificTypes";
 import { deleteOffering } from "$lib/dataModel/deletes";
@@ -106,7 +105,7 @@ export const PUT: RequestHandler = async ({ request }) => {
       return json(errRes, { status: 400 });
     }
 
-    const validation = validateOffering(requestData, { mode: "update" });
+    const validation = validateEntity(WholesalerItemOfferingSchema, requestData);
     if (!validation.isValid) {
       const errRes: ApiErrorResponse = {
         success: false,

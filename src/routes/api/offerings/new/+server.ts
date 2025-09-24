@@ -12,12 +12,11 @@ import { log } from '$lib/utils/logger';
 import { buildQuery, executeQuery } from '$lib/backendQueries/queryBuilder';
 import { supplierQueryConfig } from '$lib/backendQueries/queryConfig';
 import { mssqlErrorMapper } from '$lib/backendQueries/mssqlErrorMapper';
-import type { WholesalerItemOffering, WholesalerItemOffering_ProductDef_Category_Supplier } from '$lib/domain/domainTypes';
+import { validateEntity, WholesalerItemOfferingForCreateSchema, type WholesalerItemOffering, type WholesalerItemOffering_ProductDef_Category_Supplier } from '$lib/domain/domainTypes';
 import type { ApiErrorResponse, ApiSuccessResponse } from '$lib/api/api.types';
 import { v4 as uuidv4 } from 'uuid';
 import type { QueryPayload } from '$lib/backendQueries/queryGrammar';
 import { db } from '$lib/backendQueries/db';
-import { validateOffering } from '$lib/server/validation/domainValidator';
 
 
 /**
@@ -33,12 +32,11 @@ export const POST: RequestHandler = async ({ request }) => {
     log.info(`Begin DB transaction`);
     await transaction.begin();
 
-    // 1. Expect the request body to be CreateChildRequest.
-    const offering = (await request.json()) as Omit<WholesalerItemOffering, "offering_id">;
+    const offering = await request.json();
     log.info(`[${operationId}] Parsed request body`, { fields: Object.keys(offering) });
 
     // 2. Validate the incoming data in 'create' mode.
-    const validation = validateOffering(offering, { mode: "create" });
+    const validation = validateEntity (WholesalerItemOfferingForCreateSchema, offering);
     if (!validation.isValid) {
       const errRes: ApiErrorResponse = {
         success: false,

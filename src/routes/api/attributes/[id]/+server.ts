@@ -11,10 +11,9 @@ import { db } from "$lib/backendQueries/db";
 import { log } from "$lib/utils/logger";
 import { buildQuery, executeQuery } from "$lib/backendQueries/queryBuilder";
 import { supplierQueryConfig } from "$lib/backendQueries/queryConfig";
-import { validateAttribute } from "$lib/server/validation/domainValidator";
 import { mssqlErrorMapper } from "$lib/backendQueries/mssqlErrorMapper";
 import { type WhereCondition, ComparisonOperator, type QueryPayload, LogicalOperator } from "$lib/backendQueries/queryGrammar";
-import type { Attribute } from "$lib/domain/domainTypes";
+import { AttributeSchema, validateEntity, type Attribute } from "$lib/domain/domainTypes";
 import { v4 as uuidv4 } from "uuid";
 
 import type {
@@ -174,7 +173,7 @@ export const PUT: RequestHandler = async ({ params, request }) => {
     const requestData = await request.json();
     log.info(`[${operationId}] Parsed request body`, { fields: Object.keys(requestData) });
 
-    const validation = validateAttribute({ ...requestData, attribute_id: id }, { mode: "update" });
+    const validation = validateEntity(AttributeSchema, { ...requestData, attribute_id: id });
     if (!validation.isValid) {
       const errRes: ApiErrorResponse = {
         success: false,
@@ -188,7 +187,7 @@ export const PUT: RequestHandler = async ({ params, request }) => {
       return json(errRes, { status: 400 });
     }
 
-    const { name, description } = validation.sanitized as Partial<Attribute>;
+    const { name, description } = validation.sanitized;
 
     const result = await db.request().input("id", id).input("name", name).input("description", description).query(`
                 UPDATE dbo.attributes 

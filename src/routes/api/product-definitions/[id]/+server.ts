@@ -9,10 +9,9 @@
 import { json, error, type RequestHandler } from "@sveltejs/kit";
 import { db } from "$lib/backendQueries/db";
 import { log } from "$lib/utils/logger";
-import { validateProductDefinition } from "$lib/server/validation/domainValidator";
 import { mssqlErrorMapper } from "$lib/backendQueries/mssqlErrorMapper";
 import { checkProductDefinitionDependencies } from "$lib/dataModel/dependencyChecks";
-import type { ProductDefinition } from "$lib/domain/domainTypes";
+import { ProductDefinitionSchema, validateEntity, type ProductDefinition } from "$lib/domain/domainTypes";
 import { v4 as uuidv4 } from "uuid";
 import type {
   ApiErrorResponse,
@@ -66,10 +65,10 @@ export const GET: RequestHandler = async ({ params }) => {
  */
 export const PUT: RequestHandler = async ({ params, request }) => {
   const operationId = uuidv4();
-  const id = parseInt(params.id ?? "", 10);
-  log.info(`[${operationId}] PUT /product-definitions/${id}: FN_START`);
+  const product_def_id = parseInt(params.id ?? "", 10);
+  log.info(`[${operationId}] PUT /product-definitions/${product_def_id}: FN_START`);
 
-  if (isNaN(id) || id <= 0) {
+  if (isNaN(product_def_id) || product_def_id <= 0) {
     const errRes: ApiErrorResponse = {
       success: false,
       message: "Invalid product definition ID.",
@@ -82,7 +81,7 @@ export const PUT: RequestHandler = async ({ params, request }) => {
 
   try {
     const requestData = await request.json();
-    const validation = validateProductDefinition(requestData, { mode: "update" });
+    const validation = validateEntity(ProductDefinitionSchema, {... requestData, product_def_id});
 
     if (!validation.isValid) {
       const errRes: ApiErrorResponse = {
@@ -97,6 +96,8 @@ export const PUT: RequestHandler = async ({ params, request }) => {
     }
 
     const { sanitized } = validation;
+    // DO NOT update product_def_id!
+    delete (sanitized as any).product_def_id;
     const fieldsToUpdate = Object.keys(sanitized);
 
     if (fieldsToUpdate.length === 0) {
@@ -110,7 +111,6 @@ export const PUT: RequestHandler = async ({ params, request }) => {
       return json(errRes, { status: 400 });
     }
 
-    log.info(`[${operationId}] Validated fields for dynamic update:`, fieldsToUpdate);
 
     // Dynamically build the SET clause for the SQL query
     const setClauses = fieldsToUpdate.map((field) => `${field} = @${field}`);
@@ -122,7 +122,7 @@ export const PUT: RequestHandler = async ({ params, request }) => {
         `;
 
     // Prepare the database request with dynamic inputs
-    const dbRequest = db.request().input("id", id);
+    const dbRequest = db.request().input("id", product_def_id);
     for (const field of fieldsToUpdate) {
       dbRequest.input(field, (sanitized as Record<string, unknown>)[field]);
     }
@@ -130,7 +130,7 @@ export const PUT: RequestHandler = async ({ params, request }) => {
     const result = await dbRequest.query(sqlQuery);
 
     if (result.recordset.length === 0) {
-      throw error(404, `Product definition with ID ${id} not found.`);
+      throw error(404, `Product definition with ID ${product_def_id} not found.`);
     }
 
     const response: ApiSuccessResponse<{ productDefinition: ProductDefinition }> = {

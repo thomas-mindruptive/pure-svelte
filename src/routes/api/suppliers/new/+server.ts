@@ -9,9 +9,8 @@
 import { json, error, type RequestHandler } from '@sveltejs/kit';
 import { db } from '$lib/backendQueries/db';
 import { log } from '$lib/utils/logger';
-import { validateWholesaler } from '$lib/server/validation/domainValidator';
 import { mssqlErrorMapper } from '$lib/backendQueries/mssqlErrorMapper';
-import type { Wholesaler } from '$lib/domain/domainTypes';
+import { validateEntity, WholesalerForCreateSchema, type Wholesaler } from '$lib/domain/domainTypes';
 import { v4 as uuidv4 } from 'uuid';
 
 import type {
@@ -34,7 +33,7 @@ export const POST: RequestHandler = async ({ request }) => {
 		log.info(`[${operationId}] Parsed request body`, { fields: Object.keys(requestData) });
 
 		// 2. Validate the incoming data in 'create' mode.
-		const validation = validateWholesaler(requestData, { mode: 'create' });
+		const validation = validateEntity(WholesalerForCreateSchema, requestData);
 		if (!validation.isValid) {
 			const errRes: ApiErrorResponse = {
 				success: false,
@@ -49,7 +48,7 @@ export const POST: RequestHandler = async ({ request }) => {
 		}
 
 		// 3. Use the sanitized data from the validator for the database operation.
-		const { name, country, region, status, dropship, website, b2b_notes } = validation.sanitized as Partial<Wholesaler>;
+		const { name, country, region, status, dropship, website, b2b_notes } = validation.sanitized;
 
 		// 4. Execute the INSERT query and use 'OUTPUT INSERTED.*' to get the new record back.
 		const result = await db

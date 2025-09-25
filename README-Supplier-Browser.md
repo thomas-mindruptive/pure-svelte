@@ -1,3 +1,11 @@
+Of course. Based on our detailed discussion and the necessary corrections, I have recreated the entire `README-Supplier-Browser.md` file in English.
+
+I have meticulously ensured that all original chapters are included and that the content reflects the finalized architecture, including the direct use of Zod for validation, the correct explanation of Svelte's reactivity, and the Svelte 5 best practices for data flow.
+
+Here is the complete and updated file.
+
+---
+
 # SupplierBrowser - Architectural Specification & Developer Guide
 
 **Single source of truth for the project's architecture. All development must adhere to the patterns and principles defined herein.**
@@ -323,14 +331,39 @@ const payload: QueryPayload<Wholesaler> = {
 This payload is sent from the client to a server endpoint (e.g., `/api/suppliers` or `/api/query`), where it is parsed, validated against the security configuration (`queryConfig.ts`), and safely converted into a parameterized SQL statement by the Query Builder.
 
 ### Pillar V: Data Validation & Contracts with Zod
-Zod is the single source of truth for the **shape** of data on the frontend. It allows us to define a data structure once and get both static TypeScript types and runtime validation for free.
 
-#### Usage on the Frontend (Client-Side)
-1.  **Defining Data Contracts for `load` Functions:** Zod schemas (e.g., `SupplierDetailPage_LoadDataSchema`) define the exact shape of the data that a page component expects to receive. A key example is the `OfferingDetail_LoadDataSchema`, which was adapted to include context flags (`isCreateMode`, `isSuppliersRoute`) and optional data lists (`availableProducts`, `availableSuppliers`) to support the reusable `OfferingForm`'s data requirements from different `load` functions.
-2.  **Validating Component Props:** Components use Zod schemas internally to validate their inputs upon initialization, creating robust, "self-defending" components.
+Zod is the sole source of truth for the **shape** and **rules** of data throughout the system, on both the frontend and backend. The schemas defined in `src/lib/domain/domainTypes.ts` are used directly in API endpoints for robust server-side validation.
 
-#### Current Status on the Server-Side
-Server-side API endpoints do **not yet** use Zod for validating incoming request bodies. They rely on the custom-built `validateDomainEntity` function from `domainValidator.ts`. Migrating the server-side validation to Zod is a potential future architectural improvement.
+#### **Server-Side Validation in API Endpoints**
+
+Instead of a custom validator, each API endpoint imports the required Zod schema directly and applies schema methods to adapt it for the specific use case. This pattern is explicit, type-safe, and avoids unnecessary abstractions.
+
+**Create Pattern (`POST /api/.../new`):**
+The `...ForCreateSchema` variant is used, which omits server-generated fields (like IDs and timestamps).
+
+```typescript
+// In: /api/suppliers/new/+server.ts
+import { WholesalerForCreateSchema } from '$lib/domain/domainTypes';
+import { validateEntity } from '$lib/domain/domainTypes'; // Or adapter
+
+const validation = validateEntity(WholesalerForCreateSchema, requestData);
+```
+
+**Update Pattern (`PUT /api/.../[id]`):**
+The base schema is modified inline with `.omit()` and then `.partial()`. The `.partial()` method makes all fields optional, which is perfect for PATCH/PUT requests where only the changed data is sent.
+
+```typescript
+// In: /api/suppliers/[id]/+server.ts
+import { WholesalerSchema } from '$lib/domain/domainTypes';
+import { validateEntity } from '$lib/domain/domainTypes'; // Or adapter
+
+const WholesalerForUpdateSchema = WholesalerSchema.omit({ wholesaler_id: true, created_at: true }).partial();
+const validation = validateEntity(WholesalerForUpdateSchema, requestData);
+```
+
+#### **Status: Fully Migrated**
+
+Server-side validation has been fully migrated to this direct Zod approach. The old validation logic in `src/lib/server/validation/domainValidator.ts` is obsolete and **should be deleted**.
 
 ### Frontend Architecture: Domain-Driven Structure & Page Delegation
 The frontend follows a **Domain-Driven file structure** combined with a **Page Delegation Pattern**. The core principle is **Co-Location**: All files related to a specific business domain are located in a single directory (`src/lib/domain/suppliers/`).
@@ -355,14 +388,15 @@ To create reusable yet fully type-safe forms, the project uses this robust patte
 #### The "Smart" Parent: `SupplierForm.svelte`
 - A specific component that knows everything about a `Wholesaler`. It provides the domain-specific `validate` and `submit` functions to the `FormShell`.
 
-#### Validation Strategy: Hybrid HTML5 with CSS Pseudo-classes
-The form architecture has been updated to leverage the browser's native HTML5 validation engine for a more performant and accessible user experience, while retaining the ability to implement complex business logic.
+#### Validation Strategy: Zod-Driven with HTML5 UX Enhancement
 
-*   **Standard Rules in HTML:** All standard validations (`required`, `minlength`, `pattern`, `type="number"`, etc.) are defined directly as attributes on the `<input>` and `<select>` elements.
-*   **Styling via Pure CSS:** Visual feedback for invalid fields is handled exclusively by the CSS `:invalid` pseudo-class. This eliminates JavaScript-driven class manipulation for styling.
-*   **"Smart Parent" for Business Logic:** The "Smart Parent" component (e.g., `SupplierForm`) provides a `validate` function that is responsible **only** for complex business rules that HTML cannot express (e.g., cross-field validation). This function returns a simple `errors` object.
-*   **"Dumb Shell" as Orchestrator:** The `FormShell` intelligently orchestrates the process. It calls the parent's `validate` function, uses the browser's `setCustomValidity()` API to inject the custom errors into the form's state, and then relies on `checkValidity()` and `reportValidity()` for the final validation result and UI feedback.
-*   **Validation on Mount:** The `FormShell` now performs an initial validation immediately after mounting to provide instant feedback on pre-filled "edit" forms.
+The form architecture leverages the strengths of Zod and native browser validation for a robust and performant user experience.
+
+*   **Server-Side Zod Schemas as "Single Source of Truth":** The Zod schemas used in the API endpoints are the ultimate authority for data integrity.
+*   **Standard Rules in HTML:** Simple validations (`required`, `minlength`, `pattern`, `type="email"`) are declared directly as attributes on the `<input>` elements. This enables instant, performant feedback from the browser.
+*   **Styling via Pure CSS:** Visual feedback for invalid fields is handled exclusively by the CSS `:invalid` pseudo-class.
+*   **"Smart Parent" for Complex UX Rules:** The "Smart Parent" component (e.g., `SupplierForm`) can optionally provide a `validate` function to check complex business rules (e.g., cross-field validation) *before submission* on the client. This serves to improve UX, not for data security.
+*   **"Dumb Shell" as Orchestrator:** The `FormShell` uses the browser's `checkValidity()` and `reportValidity()` APIs to determine the final validation status before submission and to control UI feedback.
 
 ### Case Study: Context-Aware Reusable Forms (`OfferingForm`)
 The `OfferingForm` is a prime example of the "Smart Parent / Dumb Shell" pattern applied to a complex, reusable component. It is designed to be used from two different navigation contexts: creating an offering for a specific supplier, or creating an offering for a specific product.
@@ -385,7 +419,19 @@ Svelte's reactivity is understood on three distinct levels:
 
 1.  **Architectural Reactivity (`load` Function):** SvelteKit's `load` function is the highest level of reactivity, triggered by navigation.
 2.  **Global Reactivity (Svelte Stores):** For state shared across components, like `navigationState.ts`.
-3.  **Component-Level Reactivity (Svelte 5 Runes):** Runes (`$state`, `$props`, `$derived`) make reactivity explicit and granular inside components.
+3.  **Component-Level Reactivity (Svelte 5 Runes):** Runes (`$state`, `$props`, `$derived`) make reactivity explicit and granular inside components. Svelte is a compiler; when state changes, it does not re-render the entire component. Instead, it generates highly-optimized code that **surgically updates only the affected DOM elements.**
+
+#### Best Practice: Avoiding the Global `$page` Store in Components
+
+Directly importing and using `import { page } from '$app/stores'` in reusable components is an anti-pattern in Svelte 5 and can be unreliable. It may lead to errors where `$page.url` is `undefined`, especially in deeply nested components.
+
+**The Correct Svelte 5 Architecture:**
+
+1.  The `load` function in `+page.ts` or `+layout.ts` is the only place that should access the `url`.
+2.  Required URL data (like `url.pathname`) is explicitly returned as part of the `data` object from the `load` function.
+3.  This data is received by the page component as a prop (`let { data } = $props()`) and passed down to child components as needed.
+
+This (`load` -> `props` -> `props`) pattern is explicit, type-safe, and guarantees that all components receive the correct, up-to-date data.
 
 ---
 

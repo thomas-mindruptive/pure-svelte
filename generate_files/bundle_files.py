@@ -31,8 +31,8 @@ EXTENSIONS = {
 }
 
 EXCLUDE_PATTERNS = [
-    "lib/api",
-    "lib/coponents",
+    "src/routes/api",
+    "lib/backendQueries",
     "(browser)",
     "tmp",
     "tools",
@@ -311,3 +311,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

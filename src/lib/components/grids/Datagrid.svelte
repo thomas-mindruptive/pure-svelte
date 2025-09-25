@@ -1,4 +1,7 @@
-<script lang="ts">
+<script
+  lang="ts"
+  generics="T"
+>
   // DataGrid (Svelte 5 + Runes)
   //
   // MAIN PURPOSE:
@@ -17,23 +20,39 @@
   import { requestConfirmation } from "$lib/stores/confirmation";
   import { fade } from "svelte/transition";
   import "$lib/components/styles/grid.css";
-  import type { ID, ColumnDef, DeleteStrategy, RowActionStrategy, DryRunResult, ConfirmResult } from "./Datagrid.types";
+  import type { ID, ColumnDef, DeleteStrategy, RowActionStrategy, DryRunResult, ConfirmResult, ApiLoadFunc } from "./Datagrid.types";
 
   import "$lib/components/styles/loadingIndicator.css";
+  import type { SortDescriptor } from "$lib/backendQueries/queryGrammar";
+  import { assertDefined } from "$lib/utils/assertions";
+  import { addNotification } from "$lib/stores/notifications";
+  import type { AllQualifiedColumns } from "$lib/backendQueries/queryConfig.types";
 
   // ===== PROP TYPES =====
 
-  export type DataGridProps = {
-    rows: any[];
-    columns: ColumnDef<any>[];
-    getId: (row: any) => number;
-    selection?: "none" | "single" | "multiple";
-    canDelete?: (row: any) => boolean;
-    loading?: boolean;
-    deleteStrategy: DeleteStrategy<any>;
-    rowActionStrategy?: RowActionStrategy<any> | undefined | null;
+  export type DataGridProps<T> = {
+    // ID and entity name
     gridId?: string;
     entity?: string;
+
+    // Parent defines initial data and loading status.
+    loading?: boolean;
+    rows: any[];
+
+    // Data API if grid should load its own data, e.g. for sorting.
+    apiLoadFunc?: ApiLoadFunc<T>;
+
+    // Columns and row ids.
+    columns: ColumnDef<any>[];
+    getId: (row: any) => number;
+
+    // Select and delte indicator
+    selection?: "none" | "single" | "multiple";
+    canDelete?: (row: any) => boolean;
+
+    // Row strategies
+    deleteStrategy: DeleteStrategy<any>;
+    rowActionStrategy?: RowActionStrategy<any> | undefined | null;
 
     toolbar?: Snippet<[ToolbarSnippetProps]>;
     cell?: Snippet<[CellSnippetProps]>;
@@ -70,10 +89,14 @@
   // ===== COMPONENT PROPS =====
 
   const {
+    // Metadata
+    gridId = "grid", // Unique identifier for this grid instance
+    entity = "item", // Human-readable entity name for messages
+
     // Core data
-    rows = [] as any[], // Array of data objects to display
-    columns = [] as ColumnDef<any>[], // Column definitions for table structure
-    getId, // Function to extract unique ID from each row
+    rows = [] as any[],
+    columns = [] as ColumnDef<any>[],
+    getId,
 
     // Selection behavior
     selection = "multiple" as "none" | "single" | "multiple", // Row selection mode
@@ -82,13 +105,9 @@
     // State
     loading = false, // Whether grid is in loading state
 
-    // Strategies (Dependency Injection pattern)
-    deleteStrategy, // Required: handles delete operations
-    rowActionStrategy, // Optional: handles row interactions
-
-    // Metadata
-    gridId = "grid", // Unique identifier for this grid instance
-    entity = "item", // Human-readable entity name for messages
+    // Strategies
+    deleteStrategy,
+    rowActionStrategy,
 
     // Customization snippets (all optional)
     toolbar, // Custom toolbar content
@@ -96,15 +115,18 @@
     rowActions, // Custom row action buttons
     empty, // Custom empty state
     meta, // Additional metadata display
-  }: DataGridProps = $props();
+  }: DataGridProps<T> = $props();
 
-  // ===== LOCAL STATE (Svelte 5 Runes) =====
+  // ===== LOCAL STATE =====
 
   // Track which rows are currently being deleted (for loading indicators)
   const deletingObjectIds = $state<Set<ID>>(new Set());
 
   // Track which rows are currently selected (for bulk operations)
   const selectedIds = $state<Set<ID>>(new Set());
+
+  // Sorting
+  const sortState: SortDescriptor<T>[] = $state([]);
 
   // ===== UTILITY FUNCTIONS =====
 
@@ -444,6 +466,33 @@
         "handleRowDoubleClick failed",
       );
     }
+  }
+
+  // ===== SORTING LOGIC =====
+
+  /**
+   * Handles a click on a sortable column header.
+   * It calculates the next logical sort state and calls the `onSort` callback.
+   * This component does NOT sort the data itself.
+   * @param key The key of the column header that was clicked.
+   */
+  function handleSortRequest(key: AllQualifiedColumns) {
+    assertDefined(key, "key");
+    let descriptor = sortState.find((descriptor) => descriptor.key === key);
+    if (!descriptor) {
+      descriptor = { key, direction: "asc" };
+      sortState.push(descriptor);
+      log.detdebug(`Adding new descriptor to sortState:${JSON.stringify(sortState)}`);
+      // throw new Error(`Cannot find sort descriptor for column ${key}`);
+    } else {
+      if ("asc" === descriptor.direction) {
+        descriptor.direction = "desc";
+      } else if ("desc" === descriptor.direction) {
+        descriptor.direction = "asc";
+      }
+    }
+    log.debug(`Sorting - sortState: ${JSON.stringify(sortState)}`);
+    addNotification(`TODO: Implement - ${JSON.stringify(sortState)}`, "info");
   }
 
   // ===== DELETE ORCHESTRATION =====
@@ -796,7 +845,30 @@
               aria-sort={col.sortable ? "none" : undefined}
               title={col.sortable ? `Click to sort by ${col.header}` : undefined}
             >
-              {col.header}
+              {#if col.sortable}
+                <!-- Sortable header is a button for accessibility -->
+                <button
+                  class="pc-grid__sort-btn"
+                  onclick={() => handleSortRequest(String(col.key) as AllQualifiedColumns)}
+                >
+                  <span>{col.header}</span>
+                  <!-- Sort indicator icon -->
+                  {#if sortState}
+                    {@const descriptorForCol = sortState.find((descriptor) => descriptor.key === col.key)}
+                    {#if descriptorForCol}
+                      <span
+                        class="pc-grid__sort-indicator"
+                        aria-hidden="true"
+                      >
+                        {#if descriptorForCol.direction === "asc"}▲{:else}▼{/if}
+                      </span>
+                    {/if}
+                  {/if}
+                </button>
+              {:else}
+                <!-- Non-sortable header remains plain text -->
+                {col.header}
+              {/if}
             </th>
           {/each}
 

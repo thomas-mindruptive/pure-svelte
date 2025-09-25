@@ -5,7 +5,7 @@ import { type LoadEvent } from '@sveltejs/kit';
 
 // Import the new dependencies
 import { ApiClient } from '$lib/api/client/ApiClient';
-import { DEFAULT_SUPPLIER_QUERY, getSupplierApi } from '$lib/api/client/supplier';
+import { getSupplierApi } from '$lib/api/client/supplier';
 
 /**
  * Loads the data required for the Supplier List Page.
@@ -26,10 +26,7 @@ export function load({ fetch }: LoadEvent) {
   const supplierApi = getSupplierApi(client);
 
   // 3. Call the API method. The call is now clean and doesn't need `fetch`.
-  const suppliers = supplierApi.loadSuppliers({
-    ...DEFAULT_SUPPLIER_QUERY,
-    orderBy: [{ key: 'name', direction: 'asc' }],
-  });
+  const suppliers = supplierApi.loadSuppliers();
 
   // ⚠️ Return the promise. Target component must handle it!
   return {suppliers};

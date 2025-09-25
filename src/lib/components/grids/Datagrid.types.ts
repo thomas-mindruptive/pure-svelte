@@ -1,4 +1,8 @@
-// Wenn accessor vorhanden: key kann beliebig sein (da accessor die Logik übernimmt)
+import type { WhereConditionGroup, SortDescriptor } from "$lib/backendQueries/queryGrammar";
+
+// ===== COLUMNS ==================================================================================
+
+// If an accessor is present: key can be anything (as accessor handles the logic)
 export type ColumnDefWithAccessor<T> = {
   key: keyof T;
   header: string;
@@ -8,18 +12,20 @@ export type ColumnDefWithAccessor<T> = {
   class?: string;
 };
 
-// Wenn kein accessor: key muss gültiges Property sein
+// If no accessor: key must be a valid property name
 export type ColumnDefDirect<T> = {
-  key: keyof T; // NUR gültige Property-Namen
+  key: keyof T; // ONLY valid property names
   header: string;
-  accessor?: never; // kein accessor erlaubt
+  accessor?: never; // no accessor allowed
   sortable?: boolean;
   width?: string;
   class?: string;
 };
 
-// Union: entweder direct access ODER accessor
+// Union: either direct access OR accessor
 export type ColumnDef<T> = ColumnDefWithAccessor<T> | ColumnDefDirect<T>;
+
+// ===== DELETE ===================================================================================
 
 // Result from a delete dry-run - provides impact analysis before actual deletion
 export type DryRunResult = {
@@ -47,6 +53,8 @@ export type ConfirmResult = {
   reason?: string; // Why confirmation failed (for logging)
 };
 
+// ===== ROW STRATEGIES ===========================================================================
+
 // Strategy pattern for handling row interactions
 export type RowActionStrategy<T = unknown> = {
   click?: (row: T) => void; // Primary click action (usually navigation)
@@ -60,3 +68,12 @@ export type DeleteStrategy<T = unknown> = {
   confirm?: (ctx: ConfirmContext<T>) => Promise<ConfirmResult>; // Optional: custom confirmation dialog
   execute: (ids: ID[], options?: Record<string, unknown>) => Promise<void>; // Required: perform the actual deletion
 };
+
+// ===== DATA API =================================================================================
+
+/**
+ * Loads the data for the DataGrid.
+ */
+export type ApiLoadFunc<T> = (where: WhereConditionGroup<T> | null, sort: SortDescriptor<T>[] | null) => Promise<T[]>;
+
+

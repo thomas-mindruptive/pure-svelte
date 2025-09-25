@@ -8,7 +8,7 @@
  */
 
 import { log } from "$lib/utils/logger";
-import { ComparisonOperator, LogicalOperator, type QueryPayload } from "$lib/backendQueries/queryGrammar";
+import { ComparisonOperator, LogicalOperator, type QueryPayload, type SortDescriptor, type WhereConditionGroup } from "$lib/backendQueries/queryGrammar";
 import type {
   Wholesaler,
   WholesalerCategoryWithCount,
@@ -40,8 +40,7 @@ export const supplierLoadingOperations = supplierLoadingManager;
  */
 export const DEFAULT_SUPPLIER_QUERY: QueryPayload<Wholesaler> = {
   select: ["wholesaler_id", "name", "country", "region", "price_range", "relevance", "status", "dropship", "website", "created_at", "email"],
-  orderBy: [{ key: "name", direction: "asc" }],
-  limit: 100,
+  orderBy: [{ key: "name", direction: "asc" }]
 };
 
 /**
@@ -67,10 +66,6 @@ export function getSupplierApi(client: ApiClient) {
           { context: operationId },
         );
         log.info(`loadSuppliers: successful.`, responseData);
-
-        //DEBUG!!!
-        //await delay(2000);
-
         return responseData.results as Wholesaler[];
       } catch (err) {
         log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
@@ -78,6 +73,18 @@ export function getSupplierApi(client: ApiClient) {
       } finally {
         supplierLoadingOperations.finish(operationId);
       }
+    },
+
+    /**
+     * Loads suppliers based on "where" and "sort".
+     * @param where 
+     * @param sort 
+     * @returns 
+     */
+    async loadSuppliers_(where: WhereConditionGroup<Wholesaler>, sort: SortDescriptor<Wholesaler>): Promise<Wholesaler[]> {
+      const queryPartial = {where, sort};
+      const res = api.loadSuppliers(queryPartial);
+      return res;
     },
 
     /**
@@ -265,6 +272,7 @@ export function getSupplierApi(client: ApiClient) {
       const operationId = `loadAvailableCategoriesForSupplier-${supplierId}`;
       supplierLoadingOperations.start(operationId);
       try {
+        // TODO: Change to antijoin.
         const [allCategories, assignedCategories] = await Promise.all([
           api.loadAvailableCategories(),
           api.loadCategoriesForSupplier(supplierId),

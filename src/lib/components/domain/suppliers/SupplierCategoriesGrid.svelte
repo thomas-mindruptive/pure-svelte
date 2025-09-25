@@ -57,6 +57,7 @@
   entity="category"
   {deleteStrategy}
   {rowActionStrategy}
+  maxBodyHeight="350px"
 />
 
 <!--

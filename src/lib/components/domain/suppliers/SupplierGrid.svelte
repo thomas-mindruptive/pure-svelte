@@ -1,3 +1,5 @@
+<!-- SupplierGrid.svelte -->
+
 <script lang="ts">
   // Thin wrapper around Datagrid for wholesalers
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
@@ -46,6 +48,7 @@
   {deleteStrategy}
   {rowActionStrategy}
   {apiLoadFunc}
+  maxBodyHeight="550px"
 />
 
 <!--

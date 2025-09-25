@@ -119,7 +119,6 @@
     grid-template-columns: 320px 1fr;
     height: 100vh;
     width: 100vw;
-    overflow: hidden;
   }
   .sidebar {
     background: var(--pc-grid-header-bg, #f8fafc);
@@ -130,7 +129,6 @@
   .main-content {
     display: grid;
     grid-template-rows: auto 1fr;
-    overflow: hidden;
     background: #f8fafc;
   }
   .main-header {
@@ -142,6 +140,9 @@
     border-bottom: 1px solid var(--pc-grid-border, #e2e8f0);
     background-color: white;
     min-height: 54px;
+    position: sticky; 
+    top: 0; 
+    z-index: 10;
   }
   .breadcrumbs-wrapper {
     flex-grow: 0;
@@ -150,7 +151,6 @@
   }
 
   .browser-layout-page-content-wrapper {
-    overflow-y: auto;
     padding: 1.5rem;
   }
 </style>

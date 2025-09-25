@@ -35,6 +35,9 @@
     gridId?: string;
     entity?: string;
 
+    // Layout
+    maxBodyHeight?: string | undefined;
+
     // Parent defines initial data and loading status.
     loading?: boolean;
     rows: any[];
@@ -93,6 +96,8 @@
     gridId = "grid", // Unique identifier for this grid instance
     entity = "item", // Human-readable entity name for messages
 
+    maxBodyHeight,
+
     // Core data
     rows = [] as any[],
     columns = [] as ColumnDef<any>[],
@@ -105,6 +110,7 @@
     // State
     loading = false, // Whether grid is in loading state
 
+    // API
     apiLoadFunc,
 
     // Strategies
@@ -788,7 +794,9 @@
   Uses .pc-grid classes from global grid.css for consistent styling
   The pc-grid--comfortable variant provides adequate padding for data-heavy grids
 -->
-<div class="pc-grid pc-grid--comfortable">
+<div class="pc-grid pc-grid--comfortable pc-grid--scroll-body"
+     style={maxBodyHeight ? `--pc-grid-body-max-height:${maxBodyHeight};` : ""}
+>
   <!-- 
     TOOLBAR SECTION
     Contains selection controls, bulk actions, and custom toolbar content

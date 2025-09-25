@@ -37,8 +37,7 @@
   --pc-grid-accent: var(--color-primary);
 
   /* Typography & metrics */
-  --pc-grid-font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI,
-    Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  --pc-grid-font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
   --pc-grid-font-size: 0.925rem;
   --pc-grid-line-height: 1.5;
 
@@ -49,7 +48,7 @@
   --pc-grid-radius: 12px;
 
   /* Effects */
-  --pc-grid-shadow: 0 1px 2px rgba(0, 0, 0, .05), 0 1px 1px rgba(0, 0, 0, .04);
+  --pc-grid-shadow: 0 1px 2px rgba(0, 0, 0, 0.05), 0 1px 1px rgba(0, 0, 0, 0.04);
 
   /* Misc */
   --pc-grid-checkbox-accent: var(--pc-grid-accent);
@@ -74,7 +73,7 @@
     /* slate-900/950 */
     --pc-grid-row-selected: #0b3a4b;
     /* sky-900-ish */
-    --pc-grid-shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 1px 1px rgba(0, 0, 0, .3);
+    --pc-grid-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 1px rgba(0, 0, 0, 0.3);
   }
 }
 
@@ -284,41 +283,40 @@
 /* ----------------------------- Sorting ------------------------------------*/
 
 .pc-grid__th--sortable {
-    padding: 0; /* Remove padding to allow button to fill the space */
-  }
+  padding: 0; /* Remove padding to allow button to fill the space */
+}
 
-  .pc-grid__sort-btn {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    width: 100%;
-    height: 100%;
-    padding: calc(var(--pc-grid-cell-py) + 2px) var(--pc-grid-cell-px);
-    background: none;
-    border: none;
-    font: inherit;
-    color: inherit;
-    font-weight: 600; /* Match original th font-weight */
-    cursor: pointer;
-    text-align: left;
-    white-space: nowrap;
-  }
+.pc-grid__sort-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  height: 100%;
+  padding: calc(var(--pc-grid-cell-py) + 2px) var(--pc-grid-cell-px);
+  background: none;
+  border: none;
+  font: inherit;
+  color: inherit;
+  font-weight: 600; /* Match original th font-weight */
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+}
 
-  .pc-grid__sort-btn:hover {
-    background: var(--pc-grid-row-hover);
-  }
+.pc-grid__sort-btn:hover {
+  background: var(--pc-grid-row-hover);
+}
 
-  .pc-grid__sort-indicator {
-    font-size: 0.8em;
-    opacity: 0.7;
-    transition: opacity 0.2s;
-  }
-  
-  .pc-grid__sort-btn:hover .pc-grid__sort-indicator {
-    opacity: 1;
-  }
+.pc-grid__sort-indicator {
+  font-size: 0.8em;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
 
-  
+.pc-grid__sort-btn:hover .pc-grid__sort-indicator {
+  opacity: 1;
+}
+
 /* ----------------------------- Utilities --------------------------------- */
 /* Visually hidden but accessible text */
 .pc-grid .visually-hidden {
@@ -333,6 +331,18 @@
   border: 0;
 }
 
+.pc-grid--scroll-body .pc-grid__scroller {
+ /* 
+  * NOTE: We set the variable through the rendering 
+  * <div
+  *   class="pc-grid pc-grid--comfortable pc-grid--scroll-body"
+  *   style={maxBodyHeight ? `--pc-grid-body-max-height:${maxBodyHeight};` : ""}
+  * > 
+  */
+  max-height: var(--pc-grid-body-max-height, 60vh);
+  overflow: auto;
+}
+
 /* Soft scroll container for wide tables */
 .pc-grid__scroller {
   overflow: auto;
@@ -342,8 +352,8 @@
 /* Optional subtle top/bottom scroll shadows inside the scroller */
 .pc-grid__scroller:is(.has-shadow) {
   box-shadow:
-    inset 0 8px 8px -8px rgba(0, 0, 0, .08),
-    inset 0 -8px 8px -8px rgba(0, 0, 0, .08);
+    inset 0 8px 8px -8px rgba(0, 0, 0, 0.08),
+    inset 0 -8px 8px -8px rgba(0, 0, 0, 0.08);
 }
 
 /* ----------------------------- Spinner ----------------------------------- */

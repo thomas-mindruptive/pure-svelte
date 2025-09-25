@@ -1,11 +1,3 @@
-Of course. Based on our detailed discussion and the necessary corrections, I have recreated the entire `README-Supplier-Browser.md` file in English.
-
-I have meticulously ensured that all original chapters are included and that the content reflects the finalized architecture, including the direct use of Zod for validation, the correct explanation of Svelte's reactivity, and the Svelte 5 best practices for data flow.
-
-Here is the complete and updated file.
-
----
-
 # SupplierBrowser - Architectural Specification & Developer Guide
 
 **Single source of truth for the project's architecture. All development must adhere to the patterns and principles defined herein.**
@@ -51,6 +43,8 @@ The application's logic is built around a clear, five-level data model. Understa
 - **Entity**: `dbo.wholesaler_offering_links`
 - **Purpose**: Links that belong to specific offerings.
 - **API Pattern**: `/api/offering-links` CREATE/UPDATE/DELETE with `CreateChildRequest`.
+
+The API patterns mentioned above, such as `AssignmentRequest` and `CreateChildRequest`, utilize a set of universal, type-safe structures. These are defined in detail in the **Generic Type System - FINALIZED ARCHITECTURE** chapter.
 
 ### The User Experience: A SvelteKit-Powered Application
 
@@ -271,12 +265,11 @@ The client implements a highly robust **Optimistic Delete** pattern managed by a
 
 ## Architectural Decisions & Ongoing Work
 
-### **FINALIZED:** Architectural Decision: Loading Entities for New Offerings
+### Architectural Decision: Loading Entities for New Offerings
 
-A core business rule is that a supplier can have **multiple, distinct offerings for the same product definition** (e.g., to represent different sizes, colors, or conditions). The initial architectural assumption of using a SQL `LEFT JOIN` / `IS NULL` (anti-join) to find "available" products was therefore **incorrect**, as it would filter out a product as soon as the first offering was created, preventing the creation of variants.
+A core business rule is that a supplier can have **multiple, distinct offerings for the same product definition** (e.g., to represent different sizes, colors, or conditions). To support this rule, the system follows a context-aware loading pattern for creating new offerings. A simple SQL anti-join (`LEFT JOIN` / `IS NULL`) to find "available" products would be logically incorrect, as it would filter out a product as soon as the first offering was created, preventing the creation of variants.
 
-**The Corrected and Final Architectural Solution:**
-To support this business rule and enable a reusable `OfferingForm`, the system now follows a context-aware loading pattern. Instead of using a logically flawed anti-join, the UI's `load` function fetches the complete list of valid parent entities depending on the user's navigation context.
+The architectural solution is a context-aware loading pattern implemented in the UI's `load` function, which fetches the complete list of valid parent entities depending on the user's navigation context.
 
 1.  **Supplier Context (`/suppliers/.../offerings/new`):**
     *   When a user creates an offering for a specific supplier, the UI must present a choice of all possible products.
@@ -285,10 +278,10 @@ To support this business rule and enable a reusable `OfferingForm`, the system n
 
 2.  **Product Context (`/categories/.../productdefinitions/.../offerings/new`):**
     *   When a user creates an offering for a specific product, the UI must present a choice of all possible suppliers.
-    *   **Action:** The `load` function calls the new `categoryApi.loadSuppliersForCategory()` function to fetch **all** `Wholesalers` assigned to the `ProductCategory` of the current `ProductDefinition`.
+    *   **Action:** The `load` function calls the `categoryApi.loadSuppliersForCategory()` function to fetch **all** `Wholesalers` assigned to the `ProductCategory` of the current `ProductDefinition`.
     *   **UI:** The `OfferingForm` renders a dropdown list of these suppliers.
 
-This corrected approach simplifies the client-side API, aligns perfectly with the business requirements, and removes complex, misuse-prone queries. The flexibility is now correctly placed in the data model and handled by a context-aware UI. This architectural decision was successfully enforced in the data layer by **removing the restrictive `UNIQUE INDEX`** from the `dbo.wholesaler_item_offerings` table, which previously prevented the creation of multiple offerings for the same product in direct conflict with this business rule.
+This approach simplifies the client-side API, aligns perfectly with the business requirements, and removes complex, misuse-prone queries. This architecture is supported in the data layer by the absence of a restrictive `UNIQUE INDEX` on the `dbo.wholesaler_item_offerings` table, which allows for the creation of multiple offerings for the same product.
 
 ### Future Architectural Enhancements
 
@@ -314,6 +307,7 @@ The project is built on six pillars of type safety that work together to ensure 
 The architecture relies on a well-defined, type-safe object structure called `QueryPayload` to describe database queries. This approach ensures that all query definitions are declarative, serializable, and can be easily validated.
 
 **Example `QueryPayload`:**
+
 ```typescript
 const payload: QueryPayload<Wholesaler> = {
   from: { table: 'dbo.wholesalers', alias: 'w' },
@@ -361,9 +355,9 @@ const WholesalerForUpdateSchema = WholesalerSchema.omit({ wholesaler_id: true, c
 const validation = validateEntity(WholesalerForUpdateSchema, requestData);
 ```
 
-#### **Status: Fully Migrated**
+#### **Implementation Status**
 
-Server-side validation has been fully migrated to this direct Zod approach. The old validation logic in `src/lib/server/validation/domainValidator.ts` is obsolete and **should be deleted**.
+Server-side validation is implemented using this direct Zod approach. Note: Any previous validation logic, such as that found in `src/lib/server/validation/domainValidator.ts`, is now obsolete.
 
 ### Frontend Architecture: Domain-Driven Structure & Page Delegation
 The frontend follows a **Domain-Driven file structure** combined with a **Page Delegation Pattern**. The core principle is **Co-Location**: All files related to a specific business domain are located in a single directory (`src/lib/domain/suppliers/`).
@@ -407,6 +401,27 @@ The `OfferingForm` is a prime example of the "Smart Parent / Dumb Shell" pattern
 - **Contextual Submission Logic:** The `submitOffering` function contains the final piece of intelligence. In "Create" mode, it correctly assembles the final data payload for the API by combining the fixed context IDs with the IDs selected by the user in the dropdown.
 
 This pattern makes the `OfferingForm` highly reusable and decouples it from the specific routes, while keeping all context-specific logic clearly organized within the component itself.
+
+### Pillar VII: Enhanced Datagrid Component
+
+The generic `Datagrid.svelte` component has been enhanced to be more autonomous and feature-rich, simplifying its usage in list pages across the application.
+
+#### Autonomous Sorting
+
+The Datagrid now manages its own sorting state and data loading lifecycle. This is achieved through a new architectural pattern where the responsibility for sorting is moved into the component itself.
+
+-   **`apiLoadFunc` Prop:** A parent component (e.g., `SupplierListPage.svelte`) can now pass an `apiLoadFunc` property to the Datagrid. This function serves as a callback that the Datagrid can invoke whenever a new data state is required.
+-   **Internal State Management:** The Datagrid maintains its own internal `sortState`, which is an array of `SortDescriptor` objects to support multi-column sorting. When a user clicks a column header, the Datagrid updates this internal state.
+-   **Data-Driven Reloading:** After updating its `sortState`, the Datagrid calls the provided `apiLoadFunc` with the new sort descriptors. This is where the seamless integration with the **Query Grammar** happens: the parent-provided function is responsible for translating the `SortDescriptor[]` array into the `orderBy` clause of a `QueryPayload` object and executing the API call. The Datagrid then updates its internal `rows` with the new, sorted data from the server.
+-   **Simplified Parent Components:** This new architecture drastically simplifies the parent list pages. They are now only responsible for providing the initial data set and the `apiLoadFunc` callback. All subsequent sorting-related state management and data fetching is encapsulated within the Datagrid.
+
+#### Scrollable Body with Sticky Header
+
+To improve the user experience with long lists of data, the Datagrid now supports a scrollable body with a fixed (sticky) header and toolbar.
+
+-   **Activation:** This behavior is enabled by adding the `.pc-grid--scroll-body` CSS modifier class to the Datagrid's root element.
+-   **Dynamic Height Control:** The height of the scrollable area is controlled via a `maxBodyHeight` prop, which sets a `--pc-grid-body-max-height` CSS variable. This allows parent components to flexibly define the grid's dimensions (e.g., `maxBodyHeight="75vh"`).
+-   **Implementation:** The component's internal structure uses a CSS Flexbox layout. The toolbar and table header (`<thead>`) have a fixed size (`flex-shrink: 0`), while the table body container (`.pc-grid__scroller`) is configured to grow and fill the remaining available space (`flex-grow: 1`) and manage its own vertical scrollbar. The `<thead>` uses `position: sticky` to remain visible within this scrollable container.
 
 ### Frontend Navigation Architecture: Context Conservation
 The application employs a **"Context Conservation"** pattern to create an intuitive hierarchical browsing experience. The system remembers the deepest path the user has explored and reflects this state consistently across the `HierarchySidebar` and `Breadcrumb` components, only pruning the path when the user explicitly changes context on a higher level.

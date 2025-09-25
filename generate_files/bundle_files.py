@@ -32,8 +32,11 @@ EXTENSIONS = {
 
 EXCLUDE_PATTERNS = [
     "src/routes/api",
-    "lib/backendQueries",
-    "(browser)",
+    "src/routes/(browser)/attributes",
+    "src/routes/(browser)/categories",
+    "src/routes/(browser)/suppliers",
+    "src/lib/backendQueries",
+    "src/lib/api",
     "tmp",
     "tools",
     "node_modules",

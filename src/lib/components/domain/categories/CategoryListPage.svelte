@@ -134,7 +134,7 @@
 
 <!--- TEMPLATE ----------------------------------------------------------------------------------->
 
-<div class="page-content-wrapper">
+<div class="list-page-content-wrapper">
   <h1>Categories</h1>
   <p>Select a category to view their details and manage their products.</p>
 

@@ -110,7 +110,7 @@
 
 <!--- TEMPLATE ----------------------------------------------------------------------------------->
 
-<div class="page-content-wrapper">
+<div class="list-page-content-wrapper">
   <h1>Attributes</h1>
   <p>Manage the master list of attributes that can be assigned to product offerings.</p>
 

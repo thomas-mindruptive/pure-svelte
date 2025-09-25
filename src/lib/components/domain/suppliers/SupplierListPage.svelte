@@ -147,7 +147,7 @@
 
 <!----- TEMPLATE ----->
 
-<div class="page-content-wrapper">
+<div class="list-page-content-wrapper">
   <h1>Suppliers</h1>
   <p>Select a supplier to view their details and manage their product categories.</p>
 

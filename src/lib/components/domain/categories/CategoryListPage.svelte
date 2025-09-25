@@ -8,8 +8,9 @@
   import { page } from "$app/stores";
   import type { ProductCategory } from "$lib/domain/domainTypes";
   import { categoryLoadingState, getCategoryApi } from "$lib/api/client/category";
-    import { stringsToNumbers } from "$lib/utils/typeConversions";
-    import { cascadeDelete } from "$lib/api/client/cascadeDelete";
+  import { stringsToNumbers } from "$lib/utils/typeConversions";
+  import { cascadeDelete } from "$lib/api/client/cascadeDelete";
+  import "$lib/components/styles/list-page-layout.css";
 
   // === PROPS ====================================================================================
 
@@ -159,25 +160,11 @@
         loading={isLoading || $categoryLoadingState}
         {deleteStrategy}
         {rowActionStrategy}
+        apiLoadFunc={categoryApi.loadCategoriesWithWhereAndOrder}
       />
     </div>
   {/if}
 </div>
 
 <style>
-  /* These styles define the layout for this specific page component. */
-  .page-content-wrapper {
-    padding: 1.5rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    height: 100%;
-  }
-  h1 {
-    margin: 0;
-  }
-  p {
-    margin: 0;
-    color: var(--color-muted);
-  }
 </style>

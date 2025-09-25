@@ -1,7 +1,7 @@
 <script lang="ts">
   // Thin wrapper around Datagrid for wholesalers
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
-  import type { DeleteStrategy, RowActionStrategy, ColumnDef } from "$lib/components/grids/Datagrid.types";
+  import type { DeleteStrategy, RowActionStrategy, ColumnDef, ApiLoadFunc } from "$lib/components/grids/Datagrid.types";
   import type { Wholesaler } from "$lib/domain/domainTypes";
 
   // === PROPS ====================================================================================
@@ -11,9 +11,10 @@
     loading?: boolean;
     deleteStrategy: DeleteStrategy<Wholesaler>;
     rowActionStrategy?: RowActionStrategy<Wholesaler>;
+    apiLoadFunc?: ApiLoadFunc<Wholesaler>;
   };
 
-  const { rows, loading = false, deleteStrategy, rowActionStrategy }: SupplierGridProps = $props();
+  const { rows, loading = false, deleteStrategy, rowActionStrategy, apiLoadFunc }: SupplierGridProps = $props();
 
   // === COLUMNS ==================================================================================
 
@@ -23,12 +24,13 @@
       key: "dropship",
       header: "Dropship",
       accessor: (r) => (r.dropship ? "Yes" : "No"),
+      sortable: true,
     },
-    { key: "email", header: "Email", accessor: null },
-    { key: "country", header: "Country", accessor: null },
-    { key: "relevance", header: "Relevance", accessor: null },
-    { key: "price_range", header: "Price Range", accessor: null },
-    { key: "status", header: "Status", accessor: null },
+    { key: "email", header: "Email", accessor: null, sortable: true },
+    { key: "country", header: "Country", accessor: null, sortable: true },
+    { key: "relevance", header: "Relevance", accessor: null, sortable: true },
+    { key: "price_range", header: "Price Range", accessor: null, sortable: true },
+    { key: "status", header: "Status", accessor: null, sortable: true },
   ];
 
   const getId = (r: Wholesaler) => r.wholesaler_id;
@@ -43,6 +45,7 @@
   entity="wholesaler"
   {deleteStrategy}
   {rowActionStrategy}
+  {apiLoadFunc}
 />
 
 <!--

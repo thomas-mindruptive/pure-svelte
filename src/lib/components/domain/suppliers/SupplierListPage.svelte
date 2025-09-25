@@ -6,15 +6,18 @@
   import { goto } from "$app/navigation";
   import { log } from "$lib/utils/logger";
 
+  import "$lib/components/styles/list-page-layout.css";
 
   // --- API & Strategy Imports ---
   // The ApiClient is the foundation for making SSR-safe fetch requests.
   import { ApiClient } from "$lib/api/client/ApiClient";
+
   // Types for the strategy pattern used by the generic DataGrid component.
   import type { ID, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
   import { page } from "$app/stores";
-    import { stringsToNumbers } from "$lib/utils/typeConversions";
-    import { cascadeDelete } from "$lib/api/client/cascadeDelete";
+  
+  import { stringsToNumbers } from "$lib/utils/typeConversions";
+  import { cascadeDelete } from "$lib/api/client/cascadeDelete";
 
   // === PROPS ====================================================================================
 
@@ -23,7 +26,6 @@
   let { data }: { data: { suppliers: Promise<Wholesaler[]> } } = $props();
 
   // === STATE ====================================================================================
-
 
   let resolvedSuppliers = $state<Wholesaler[]>([]);
   let isLoading = $state(true); // The component always starts in a loading state.
@@ -173,25 +175,11 @@
         loading={isLoading || $supplierLoadingState}
         {deleteStrategy}
         {rowActionStrategy}
+        apiLoadFunc={supplierApi.loadSuppliersWithWhereAndOrder}
       />
     </div>
   {/if}
 </div>
 
 <style>
-  /* These styles define the layout for this specific page component. */
-  .page-content-wrapper {
-    padding: 1.5rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    height: 100%;
-  }
-  h1 {
-    margin: 0;
-  }
-  p {
-    margin: 0;
-    color: var(--color-muted);
-  }
 </style>

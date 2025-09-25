@@ -1,6 +1,6 @@
 <script lang="ts">
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
-  import type { DeleteStrategy, RowActionStrategy, ColumnDefDirect } from "$lib/components/grids/Datagrid.types";
+  import type { DeleteStrategy, RowActionStrategy, ColumnDefDirect, ApiLoadFunc } from "$lib/components/grids/Datagrid.types";
 
   import type { ProductCategory } from "$lib/domain/domainTypes";
 
@@ -11,14 +11,15 @@
     loading?: boolean;
     deleteStrategy: DeleteStrategy<ProductCategory>;
     rowActionStrategy?: RowActionStrategy<ProductCategory>;
+    apiLoadFunc?: ApiLoadFunc<ProductCategory>;
   };
 
-  const { rows = [], loading = false, deleteStrategy, rowActionStrategy }: CategoryGridProps = $props();
+  const { rows = [], loading = false, deleteStrategy, rowActionStrategy, apiLoadFunc }: CategoryGridProps = $props();
 
   // === COLUMNS ====================================================================================
 
   const columns: ColumnDefDirect<ProductCategory>[] = [
-    { key: "name", header: "Name", sortable: false, width: "2fr" },
+    { key: "name", header: "Name", sortable: true, width: "2fr" },
     { key: "category_id", header: "id", sortable: true, width: "3fr" },
     { key: "description", header: "description", sortable: true, width: "1fr" },
   ];
@@ -38,6 +39,7 @@
   entity="category"
   {deleteStrategy}
   {rowActionStrategy}
+  {apiLoadFunc}
 />
 
 <!--

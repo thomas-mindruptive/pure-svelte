@@ -7,7 +7,7 @@
  */
 
 import { log } from "$lib/utils/logger";
-import { ComparisonOperator, type QueryPayload } from "$lib/backendQueries/queryGrammar";
+import { ComparisonOperator, type QueryPayload, type SortDescriptor, type WhereConditionGroup } from "$lib/backendQueries/queryGrammar";
 import type {
   ProductCategory,
   ProductDefinition,
@@ -30,7 +30,7 @@ export type OfferingWithDetails = WholesalerItemOffering_ProductDef_Category_Sup
  * @returns An object with all category and category-composition API methods.
  */
 export function getCategoryApi(client: ApiClient) {
-  return {
+  const api =  {
     // ===== CATEGORY MASTER-DATA CRUD =====
 
     /**
@@ -58,6 +58,27 @@ export function getCategoryApi(client: ApiClient) {
       } finally {
         categoryLoadingManager.finish(operationId);
       }
+    },
+
+    /**
+     * Loads suppliers based on "where" and "orderBy".
+     * @param where
+     * @param orderBy
+     * @returns
+     */
+    async loadCategoriesWithWhereAndOrder(
+      where: WhereConditionGroup<ProductCategory> | null,
+      orderBy: SortDescriptor<ProductCategory>[] | null,
+    ): Promise<ProductCategory[]> {
+      const queryPartial: Partial<QueryPayload<ProductCategory>> = {};
+      if (where) {
+        queryPartial.where = where;
+      }
+      if (orderBy) {
+        queryPartial.orderBy = orderBy;
+      }
+      const res = api.loadCategories(queryPartial);
+      return res;
     },
 
     /**
@@ -271,4 +292,6 @@ export function getCategoryApi(client: ApiClient) {
       }
     },
   };
+
+  return api;
 }

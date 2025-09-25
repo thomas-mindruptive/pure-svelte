@@ -106,7 +106,7 @@
       {/if}
     </header>
 
-    <div class="page-content-wrapper">
+    <div class="browser-layout-page-content-wrapper">
       {@render children()}
     </div>
   </main>
@@ -149,7 +149,7 @@
     flex-shrink: 1;
   }
 
-  .page-content-wrapper {
+  .browser-layout-page-content-wrapper {
     overflow-y: auto;
     padding: 1.5rem;
   }

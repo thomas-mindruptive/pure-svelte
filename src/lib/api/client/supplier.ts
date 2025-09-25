@@ -8,7 +8,13 @@
  */
 
 import { log } from "$lib/utils/logger";
-import { ComparisonOperator, LogicalOperator, type QueryPayload, type SortDescriptor, type WhereConditionGroup } from "$lib/backendQueries/queryGrammar";
+import {
+  ComparisonOperator,
+  LogicalOperator,
+  type QueryPayload,
+  type SortDescriptor,
+  type WhereConditionGroup,
+} from "$lib/backendQueries/queryGrammar";
 import type {
   Wholesaler,
   WholesalerCategoryWithCount,
@@ -39,8 +45,20 @@ export const supplierLoadingOperations = supplierLoadingManager;
  * The default query payload used when fetching a list of suppliers.
  */
 export const DEFAULT_SUPPLIER_QUERY: QueryPayload<Wholesaler> = {
-  select: ["wholesaler_id", "name", "country", "region", "price_range", "relevance", "status", "dropship", "website", "created_at", "email"],
-  orderBy: [{ key: "name", direction: "asc" }]
+  select: [
+    "wholesaler_id",
+    "name",
+    "country",
+    "region",
+    "price_range",
+    "relevance",
+    "status",
+    "dropship",
+    "website",
+    "created_at",
+    "email",
+  ],
+  orderBy: [{ key: "name", direction: "asc" }],
 };
 
 /**
@@ -76,13 +94,19 @@ export function getSupplierApi(client: ApiClient) {
     },
 
     /**
-     * Loads suppliers based on "where" and "sort".
-     * @param where 
-     * @param sort 
-     * @returns 
+     * Loads suppliers based on "where" and "orderBy".
+     * @param where
+     * @param orderBy
+     * @returns
      */
-    async loadSuppliers_(where: WhereConditionGroup<Wholesaler>, sort: SortDescriptor<Wholesaler>): Promise<Wholesaler[]> {
-      const queryPartial = {where, sort};
+    async loadSuppliersWithWhereAndOrder(where: WhereConditionGroup<Wholesaler> | null, orderBy: SortDescriptor<Wholesaler>[] | null): Promise<Wholesaler[]> {
+      const queryPartial: Partial<QueryPayload<Wholesaler>> = {};
+      if (where) {
+        queryPartial.where = where;
+      }
+      if (orderBy) {
+        queryPartial.orderBy = orderBy;
+      }
       const res = api.loadSuppliers(queryPartial);
       return res;
     },
@@ -335,8 +359,8 @@ export function getSupplierApi(client: ApiClient) {
         const requestBody: RemoveAssignmentRequest<Wholesaler, ProductCategory> = {
           parent1Id: supplierId,
           parent2Id: categoryId,
-          cascade:cascade || false,
-          forceCascade:forceCascade || false,
+          cascade: cascade || false,
+          forceCascade: forceCascade || false,
         };
         return await client.apiFetchUnion<RemoveCategoryApiResponse>(
           "/api/supplier-categories",

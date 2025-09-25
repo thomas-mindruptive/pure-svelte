@@ -40,7 +40,7 @@
     rows: any[];
 
     // Data API if grid should load its own data, e.g. for sorting.
-    apiLoadFunc?: ApiLoadFunc<T>;
+    apiLoadFunc?: ApiLoadFunc<T> | undefined;
 
     // Columns and row ids.
     columns: ColumnDef<any>[];
@@ -105,6 +105,8 @@
     // State
     loading = false, // Whether grid is in loading state
 
+    apiLoadFunc,
+
     // Strategies
     deleteStrategy,
     rowActionStrategy,
@@ -126,7 +128,14 @@
   const selectedIds = $state<Set<ID>>(new Set());
 
   // Sorting
-  const sortState: SortDescriptor<T>[] = $state([]);
+  let sortState = $state<SortDescriptor<T>[]>([]);
+  let internalRows = $state<T[]>(rows);
+  let isSorting = $state(false); // Loading indicator for sorting operation
+
+  // We need to use the internal rows, because we trigger data loading after sort.
+  $effect(() => {
+    internalRows = rows;
+  });
 
   // ===== UTILITY FUNCTIONS =====
 
@@ -476,23 +485,46 @@
    * This component does NOT sort the data itself.
    * @param key The key of the column header that was clicked.
    */
-  function handleSortRequest(key: AllQualifiedColumns) {
+  async function handleSortRequest(key: AllQualifiedColumns) {
     assertDefined(key, "key");
-    let descriptor = sortState.find((descriptor) => descriptor.key === key);
-    if (!descriptor) {
-      descriptor = { key, direction: "asc" };
-      sortState.push(descriptor);
-      log.detdebug(`Adding new descriptor to sortState:${JSON.stringify(sortState)}`);
-      // throw new Error(`Cannot find sort descriptor for column ${key}`);
-    } else {
-      if ("asc" === descriptor.direction) {
-        descriptor.direction = "desc";
-      } else if ("desc" === descriptor.direction) {
-        descriptor.direction = "asc";
+
+    isSorting = true;
+
+    try {
+      let descriptor = sortState.find((descriptor) => descriptor.key === key);
+      if (!descriptor) {
+        descriptor = { key, direction: "asc" };
+        sortState.push(descriptor);
+        log.detdebug(`Adding new descriptor to sortState:${JSON.stringify(sortState)}`);
+        // throw new Error(`Cannot find sort descriptor for column ${key}`);
+      } else {
+        if ("asc" === descriptor.direction) {
+          descriptor.direction = "desc";
+        } else if ("desc" === descriptor.direction) {
+          // Cycle from 'desc' back to removing the sort descriptor
+          const index = sortState.findIndex((d) => d.key === key);
+          if (index > -1) {
+            sortState.splice(index, 1);
+          }
+        } else {
+          throw new Error(`Invalid sort direction in current sort descriptor: ${JSON.stringify(descriptor)}`);
+        }
       }
+      //await delay(1000);
+      log.debug(`Sorting - Calling apiLoadFunc - sortState: ${JSON.stringify(sortState)}`);
+
+      if (!apiLoadFunc) {
+        const msg = `Missing apiLoadFunc for ${JSON.stringify(descriptor)}`;
+        addNotification(msg, "info");
+        log.warn(msg);
+      } else {
+        const sortedRows = await apiLoadFunc(null, sortState);
+        internalRows = sortedRows;
+        addNotification(`Succesfully sorted - ${JSON.stringify(sortState)}`, "success");
+      }
+    } finally {
+      isSorting = false;
     }
-    log.debug(`Sorting - sortState: ${JSON.stringify(sortState)}`);
-    addNotification(`TODO: Implement - ${JSON.stringify(sortState)}`, "info");
   }
 
   // ===== DELETE ORCHESTRATION =====
@@ -784,25 +816,39 @@
       <!-- Bulk delete button - disabled when nothing selected or delete not available -->
       <button
         class="pc-grid__btn"
-        disabled={selectedIds.size === 0 || loading || !deleteStrategy || typeof deleteStrategy.execute !== "function"}
+        disabled={selectedIds.size === 0 || loading || isSorting || !deleteStrategy || typeof deleteStrategy.execute !== "function"}
         onclick={() => deleteSelected()}
         aria-busy={Array.from(selectedIds).some((id: ID) => isDeleting(id))}
         title={selectedIds.size === 0
           ? `Select ${entity}s to delete`
           : `Delete ${selectedIds.size} selected ${entity}${selectedIds.size > 1 ? "s" : ""}`}
       >
-        <!-- Loading spinner when any selected items are being deleted -->
-        {#if Array.from(selectedIds).some((id: ID) => isDeleting(id))}
-          <span
-            class="pc-grid__spinner"
-            aria-hidden="true"
-          ></span>
-        {/if}
         Delete selected ({selectedIds.size})
       </button>
 
+      <!-- Clear all sortings -->
+      <button
+        class="pc-grid__btn"
+        disabled={sortState.length === 0 || loading || isSorting}
+        onclick={() => {
+          log.debug(`Clearing all sortings: ${JSON.stringify(sortState)}`)
+          sortState = [];
+        }}
+        title={`Clear all sortings: ${JSON.stringify(sortState)}`}
+      >
+        Clear all sortings ({sortState.length})
+      </button>
+
+      <!-- Loading spinner when any selected items are being deleted -->
+      {#if Array.from(selectedIds).some((id: ID) => isDeleting(id))}
+        <span
+          class="pc-grid__spinner"
+          aria-hidden="true"
+        ></span>
+      {/if}
+
       <!-- General loading spinner for entire data grid -->
-      {#if loading}
+      {#if loading || isSorting}
         <div
           class="loader-wrapper"
           transition:fade={{ duration: 150, delay: 200 }}
@@ -839,6 +885,7 @@
 
           <!-- Data column headers - generated from column definitions -->
           {#each columns as col}
+            {@const descriptorForCol = sortState.find((descriptor) => descriptor.key === col.key)}
             <th
               style={"width:" + (col.width ?? "auto")}
               class={col.class}
@@ -853,16 +900,13 @@
                 >
                   <span>{col.header}</span>
                   <!-- Sort indicator icon -->
-                  {#if sortState}
-                    {@const descriptorForCol = sortState.find((descriptor) => descriptor.key === col.key)}
-                    {#if descriptorForCol}
-                      <span
-                        class="pc-grid__sort-indicator"
-                        aria-hidden="true"
-                      >
-                        {#if descriptorForCol.direction === "asc"}▲{:else}▼{/if}
-                      </span>
-                    {/if}
+                  {#if descriptorForCol}
+                    <span
+                      class="pc-grid__sort-indicator"
+                      aria-hidden="true"
+                    >
+                      {#if descriptorForCol.direction === "asc"}▲{:else}▼{/if}
+                    </span>
                   {/if}
                 </button>
               {:else}
@@ -907,7 +951,7 @@
         {:else}
           <!-- DATA ROWS - one row per data object -->
 
-          {#each rows as row, i (keyForRow(row, i))}
+          {#each internalRows as row, i (keyForRow(row, i))}
             <tr
               data-deleting={rowIsDeleting(row) ? "true" : undefined}
               aria-selected={rowIsSelected(row) ? "true" : undefined}

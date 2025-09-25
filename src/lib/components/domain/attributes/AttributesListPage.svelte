@@ -9,6 +9,7 @@
   import { page } from "$app/stores";
   import { cascadeDelete } from "$lib/api/client/cascadeDelete";
   import { stringsToNumbers } from "$lib/utils/typeConversions";
+  import "$lib/components/styles/list-page-layout.css";
 
   // === PROPS ====================================================================================
 
@@ -137,18 +138,4 @@
 </div>
 
 <style>
-  .page-content-wrapper {
-    padding: 1.5rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    height: 100%;
-  }
-  h1 {
-    margin: 0;
-  }
-  p {
-    margin: 0;
-    color: var(--color-muted);
-  }
 </style>

@@ -25,18 +25,37 @@ Note: [Large file] was read before the conversation was summarized,
 but the contents are too large to include.
 ```
 
-This reveals a critical architectural constraint: AI systems operate within fixed memory limits for each conversation. Large documentation files—comprehensive READMEs, architectural guides, detailed comments—exceed these limits and get summarized or excluded entirely.
+This reveals different approaches to how AI systems access codebases, each with distinct limitations:
+
+**Traditional Bundle Upload Approaches:**
+- User uploads entire project as zip/bundle
+- **Small projects (< context window)**: AI knows all files completely—works perfectly in theory
+- **But even in these ideal scenarios, the probabilistic nature strikes again**: Even when AI has complete access to all code, it still struggles with pattern misapplication, context-specific nuances, and confident-but-incorrect implementations. This reveals that the context window limitation is just one layer of the problem—the underlying probabilistic reasoning creates reliability issues even in "perfect" information scenarios.
+- **Large projects (> context window)**: Context overflow, files get summarized or excluded
+- Most established, production codebases exceed context window limits
+
+**Claude Code's Search-Based Approach:**
+- AI starts with **zero knowledge** of your codebase
+- Files enter context **on-demand only** through:
+  - Explicit `Read` tool calls for specific files
+  - `Grep` searches that return matching content
+  - `Glob` pattern matching for file discovery
+- **Advantage**: Can work with codebases far larger than context windows
+- **Limitation**: May miss important relationships between files never loaded simultaneously
+
+This search-based approach is essentially a **solution** to the context window problem of large projects. However, it creates its own challenges. The AI can efficiently locate specific patterns across an entire codebase—functioning like sophisticated global search—but struggles to maintain comprehensive architectural understanding.
 
 The process creates a destructive cycle:
 
-1. **Memory saturation**: Comprehensive documentation consumes available context space
-2. **Automatic summarization**: Critical implementation details are compressed or lost
-3. **Knowledge degradation**: The AI loses access to architectural patterns it previously read
-4. **Defensive re-reading**: Unable to assess what information it has lost, the AI re-reads files
-5. **Resource exhaustion**: Re-reading consumes conversation capacity without recovering lost details
-6. **Sustained confidence**: Throughout this degradation, the AI maintains the same confidence level
+1. **Initial Search Success**: AI efficiently locates relevant files and patterns through search tools
+2. **Selective Loading**: Only immediately relevant content enters working memory
+3. **Memory saturation**: Even selected documentation can exceed context limits
+4. **Knowledge degradation**: AI loses access to architectural patterns it previously found
+5. **Defensive re-searching**: Unable to assess what information was lost, AI re-searches same patterns
+6. **Resource exhaustion**: Re-searching consumes conversation capacity without recovering lost context
+7. **Sustained confidence**: Throughout this degradation, AI maintains the same confidence level
 
-This creates a counterintuitive situation: the more thoroughly you document your architecture, the less effectively AI systems can utilize that documentation.
+This creates a counterintuitive situation: AI systems can excel at finding relevant code through sophisticated search, but struggle to maintain comprehensive understanding once they've found it. The more thoroughly you document your architecture, the less effectively AI systems can retain that documentation in working memory.
 
 ## The Documentation Paradox
 

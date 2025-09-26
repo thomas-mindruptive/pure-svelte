@@ -539,10 +539,6 @@ const WholesalerForUpdateSchema = WholesalerSchema.omit({ wholesaler_id: true, c
 const validation = validateEntity(WholesalerForUpdateSchema, requestData);
 ```
 
-#### **Implementation Status**
-
-Server-side validation is implemented using this direct Zod approach. Note: Any previous validation logic, such as that found in `src/lib/server/validation/domainValidator.ts`, is now obsolete.
-
 ### Frontend Architecture: Domain-Driven Structure & Page Delegation
 The frontend follows a **Domain-Driven file structure** combined with a **Page Delegation Pattern**. The core principle is **Co-Location**: All files related to a specific business domain are located in a single directory (`src/lib/domain/suppliers/`).
 

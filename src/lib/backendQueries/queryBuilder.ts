@@ -15,7 +15,7 @@ import type { QueryPayload, WhereCondition, WhereConditionGroup, JoinClause, Sor
 import { isJoinColCondition, isWhereCondition, isWhereConditionGroup } from '$lib/backendQueries/queryGrammar';
 import type { QueryConfig } from '$lib/backendQueries/queryConfig';
 import type { Transaction } from 'mssql';
-import { aliasedTablesConfig } from '$lib/backendQueries/queryConfig.types';
+import { AliasedTableRegistry, validateJoinSelectColumns } from '$lib/backendQueries/tableRegistry';
 
 // --- TYPE DEFINITIONS for internal use ---
 
@@ -111,6 +111,11 @@ export function buildQuery<T>(
 	const { select, joins, where, orderBy, limit, offset } = payload;
 	let realJoins = joins || [];
 
+	// --- 0. Validate SELECT columns against Table Registry schemas ---
+	if (select && Array.isArray(select)) {
+		validateJoinSelectColumns(select as string[]);
+	}
+
 	const ctx: BuildContext = {
 		parameters: {},
 		paramIndex: 0,
@@ -143,7 +148,7 @@ export function buildQuery<T>(
 
 		// --- NESTED VALIDATION STEPS FOR THE FROM CLAUSE ---
 		// Fetch the entire configuration for the given alias from our single source of truth.
-		const aliasConfig = aliasedTablesConfig[alias as keyof typeof aliasedTablesConfig];
+		const aliasConfig = AliasedTableRegistry[alias as keyof typeof AliasedTableRegistry];
 
 		// SECURITY CHECK 1: The alias must be explicitly registered in `aliasedTablesConfig`.
 		// This prevents any arbitrary strings from being used as aliases.
@@ -168,7 +173,7 @@ export function buildQuery<T>(
 		if (!alias) throw new Error("All JOINs must have an alias for consistency and security.");
 
 		// Perform the same validation checks for each JOIN's alias and table.
-		const aliasConfig = aliasedTablesConfig[alias as keyof typeof aliasedTablesConfig];
+		const aliasConfig = AliasedTableRegistry[alias as keyof typeof AliasedTableRegistry];
 		if (!aliasConfig) throw new Error(`JOIN alias '${alias}' is not a registered alias.`);
 		if (aliasConfig.tableName !== table) throw new Error(`JOIN alias '${alias}' is for table '${aliasConfig.tableName}', not '${table}'.`);
 

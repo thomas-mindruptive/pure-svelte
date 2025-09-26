@@ -7,11 +7,10 @@
  */
 
 import { ComparisonOperator, JoinType, LogicalOperator, type JoinClause, type QueryPayload } from "$lib/backendQueries/queryGrammar";
-import type { BaseTableConfig, PredefinedQueryConfig, ValidFromClause } from "./queryConfig.types";
+import type { ValidFromClause } from "./tableRegistry";
 
 export interface QueryConfig {
-  allowedTables: BaseTableConfig & PredefinedQueryConfig;
-  joinConfigurations?: {
+  joinConfigurations: {
     [viewName: string]: {
       from: ValidFromClause;
       joins: JoinClause[];
@@ -23,85 +22,6 @@ export interface QueryConfig {
 // --- The Configuration Object ---
 
 export const supplierQueryConfig: QueryConfig = {
-  allowedTables: {
-    // Validated against BaseTableConfig and the original domain/types.ts
-    "dbo.wholesalers": ["wholesaler_id", "name", "region", "status", "dropship", "created_at", "website", "b2b_notes"],
-    "dbo.product_categories": ["category_id", "name", "description"],
-    "dbo.wholesaler_categories": ["wholesaler_id", "category_id", "comment", "link", "created_at"],
-    "dbo.wholesaler_item_offerings": [
-      "offering_id",
-      "wholesaler_id",
-      "category_id",
-      "product_def_id",
-      "size",
-      "dimensions",
-      "price",
-      "currency",
-      "comment",
-      "created_at",
-    ],
-    "dbo.wholesaler_offering_attributes": ["offering_id", "attribute_id", "value"],
-    "dbo.wholesaler_offering_links": ["link_id", "offering_id", "url", "notes", "created_at"],
-    "dbo.product_definitions": ["product_def_id", "title", "description", "category_id"],
-    "dbo.attributes": ["attribute_id", "name", "description"],
-    "dbo.orders": ["order_id", "order_date", "order_number", "status", "total_amount", "currency", "notes", "created_at"],
-    "dbo.order_items": ["order_item_id", "order_id", "offering_id", "quantity", "unit_price", "line_total", "item_notes", "created_at"],
-
-    // Validate columns for join configurations below. Validated against typos through "PredefinedQueryConfig"
-    supplier_categories: [
-      "w.wholesaler_id",
-      "w.name AS supplier_name",
-      "wc.wholesaler_id",
-      "wc.category_id",
-      "pc.category_id",
-      "pc.name",
-      "pc.name AS category_name",
-      "pc.description AS category_description",
-      "wc.comment",
-      "wc.link",
-    ],
-    category_offerings: [
-      "pc.category_id",
-      "pc.name AS category_name",
-      "pc.description AS category_description",
-      "wio.category_id",
-      "wio.offering_id",
-      "wio.price",
-      "wio.created_at",
-      "wio.wholesaler_id",
-    ],
-    offering_attributes: [
-      "wio.offering_id",
-      "wio.price",
-      "wio.category_id",
-      "woa.attribute_id",
-      "woa.value",
-      "woa.offering_id",
-      "a.name",
-      "a.attribute_id",
-    ],
-    offering_links: [
-      "wio.offering_id",
-      "wio.price",
-      "wio.category_id",
-      "wol.offering_id",
-      "wol.created_at",
-      "wol.link_id",
-      "wol.url",
-      "wol.notes",
-    ],
-    product_definition_offerings: [
-      "wio.offering_id",
-      "wio.price",
-      "wio.currency",
-      "wio.comment",
-      "wio.product_def_id",
-      "pd.title AS product_def_title",
-      "pc.name AS category_name",
-      "w.name AS supplier_name", // The required supplier name for the grid
-    ],
-    order_order_items: []
-  },
   joinConfigurations: {
     supplier_categories: {
       from: { table: "dbo.wholesalers", alias: "w" },

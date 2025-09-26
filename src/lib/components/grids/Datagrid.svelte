@@ -26,7 +26,7 @@
   import type { SortDescriptor } from "$lib/backendQueries/queryGrammar";
   import { assertDefined } from "$lib/utils/assertions";
   import { addNotification } from "$lib/stores/notifications";
-  import type { AllQualifiedColumns } from "$lib/backendQueries/queryConfig.types";
+  import type { AllQualifiedColumns } from "$lib/backendQueries/tableRegistry";
 
   // ===== PROP TYPES =====
 

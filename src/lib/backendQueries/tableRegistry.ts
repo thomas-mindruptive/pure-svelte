@@ -1,11 +1,12 @@
 // src/lib/backendQueries/tableRegistry.ts
 
 /**
- * @file Table Registry - Single Source of Truth für Table-Schema Mapping
- * @description Definiert alle Tabellen mit ihren Zod Schemas, DB-Metadaten und Aliases.
- * Ersetzt die hardcodierten Column-Listen in queryConfig durch schema-basierte Validierung.
+ * @file Table Registry - Single Source of Truth for Table-Schema Mapping
+ * @description Defines all tables with their Zod schemas, DB metadata and aliases.
+ * Replaces hardcoded column lists in queryConfig with schema-based validation.
  */
 
+import { type z } from 'zod';
 import {
   WholesalerSchema,
   ProductCategorySchema,
@@ -16,22 +17,21 @@ import {
   WholesalerCategorySchema,
   WholesalerOfferingAttributeSchema,
   OrderSchema,
-  OrderItemSchema,
-  type z
+  OrderItemSchema
 } from '$lib/domain/domainTypes';
 
 /**
  * Table Definition Interface
  */
 export interface TableDefinition {
-  schema: z.ZodTypeAny;
+  schema: z.ZodObject<any>;
   tableName: string;
   dbSchema: string;
   alias: string;
 }
 
 /**
- * Primäre Table Registry - Lookup über Entity-Namen
+ * Primary Table Registry - Lookup by Entity Names
  */
 export const TableRegistry = {
   "wholesalers": {
@@ -97,13 +97,13 @@ export const TableRegistry = {
 } as const satisfies Record<string, TableDefinition>;
 
 /**
- * Transformation-Funktion: Entity-Registry → DB-Table-Registry
+ * Transformation function: Entity-Registry → DB-Table-Registry
  */
 function createDbSchemaTableRegistry<T extends Record<string, TableDefinition>>(
   tableRegistry: T
 ): Record<string, T[keyof T]> {
   return Object.fromEntries(
-    Object.entries(tableRegistry).map(([entityKey, config]) => [
+    Object.entries(tableRegistry).map(([, config]) => [
       `${config.dbSchema}.${config.tableName}`,
       config
     ])
@@ -111,20 +111,20 @@ function createDbSchemaTableRegistry<T extends Record<string, TableDefinition>>(
 }
 
 /**
- * Abgeleitete Registry - Lookup über vollständige DB-Table-Namen
+ * Derived Registry - Lookup by full DB table names
  */
 export const DbSchemaTableRegistry = createDbSchemaTableRegistry(TableRegistry);
 
 /**
- * Hilfsfunktionen für Schema-Validierung
+ * Helper functions for schema validation
  */
 export function getTableConfig(identifier: string): TableDefinition | null {
-  // Erst Entity-Name versuchen
+  // Try entity name first
   if (identifier in TableRegistry) {
     return TableRegistry[identifier as keyof typeof TableRegistry];
   }
 
-  // Dann vollständigen DB-Table-Namen versuchen
+  // Then try full DB table name
   if (identifier in DbSchemaTableRegistry) {
     return DbSchemaTableRegistry[identifier];
   }
@@ -133,17 +133,18 @@ export function getTableConfig(identifier: string): TableDefinition | null {
 }
 
 /**
- * Validiert SELECT-Columns gegen das Schema
+ * Validates SELECT columns against the schema
  */
 export function validateSelectColumns(identifier: string, selectColumns: string[]): void {
   const tableConfig = getTableConfig(identifier);
 
   if (!tableConfig) {
-    // Keine Validierung für unbekannte Tables
+    // No validation for unknown tables
     return;
   }
 
-  const allowedColumns = Object.keys(tableConfig.schema.shape);
+  // Zod correct API: keyof() returns ZodEnum, .options contains the keys
+  const allowedColumns = tableConfig.schema.keyof().options;
 
   for (const column of selectColumns) {
     // Handle qualified columns (e.g., "w.wholesaler_id")
@@ -154,7 +155,7 @@ export function validateSelectColumns(identifier: string, selectColumns: string[
       cleanColumn = cleanColumn.split(' AS ')[0].trim();
     }
 
-    // Skip wildcard und aggregate functions
+    // Skip wildcard and aggregate functions
     if (cleanColumn === '*' ||
         cleanColumn.startsWith('COUNT(') ||
         cleanColumn.startsWith('SUM(') ||
@@ -174,8 +175,135 @@ export function validateSelectColumns(identifier: string, selectColumns: string[
 }
 
 /**
+ * ===== ALIAS-BASED REGISTRY (Phase 1: Replaces queryConfig.types.ts) =====
+ */
+
+/**
+ * Transformation function: Entity-Registry → Alias-Registry
+ * Creates a lookup object by aliases (w, pc, pd, etc.)
+ */
+function createAliasedTableRegistry<T extends Record<string, TableDefinition>>(
+  tableRegistry: T
+): Record<string, T[keyof T]> {
+  return Object.fromEntries(
+    Object.entries(tableRegistry).map(([, config]) => [
+      config.alias,
+      config
+    ])
+  ) as Record<string, T[keyof T]>;
+}
+
+/**
+ * Alias-based Registry - Lookup by aliases (w, pc, pd, etc.)
+ * Replaces aliasedTablesConfig from queryConfig.types.ts
+ */
+export const AliasedTableRegistry = createAliasedTableRegistry(TableRegistry);
+
+/**
+ * ===== TYPE GENERATION (Replaces queryConfig.types.ts) =====
+ */
+
+/**
+ * Generates AliasToEntityMap from Table Registry
+ * Replaces manual type definition in queryConfig.types.ts
+ */
+export type AliasToEntityMap = {
+  [Alias in keyof typeof AliasedTableRegistry]: z.infer<(typeof AliasedTableRegistry)[Alias]["schema"]>;
+};
+
+/**
+ * Generates ValidFromClause from Table Registry
+ * Replaces manual type definition in queryConfig.types.ts
+ */
+export type ValidFromClause = {
+  [Alias in keyof typeof AliasedTableRegistry]: {
+    table: `${(typeof AliasedTableRegistry)[Alias]["dbSchema"]}.${(typeof AliasedTableRegistry)[Alias]["tableName"]}`;
+    alias: Alias;
+  };
+}[keyof typeof AliasedTableRegistry];
+
+/**
+ * Helper type to extract string keys from Zod schema
+ */
+type ExtractSchemaKeys<T extends z.ZodObject<any>> = Extract<keyof z.infer<T>, string>;
+
+/**
+ * Auto-generated qualified column names from Table Registry schemas
+ */
+export type AllQualifiedColumns = {
+  [K in keyof typeof TableRegistry]: `${(typeof TableRegistry)[K]["alias"]}.${ExtractSchemaKeys<(typeof TableRegistry)[K]["schema"]>}`;
+}[keyof typeof TableRegistry];
+
+/**
+ * Generates aliased column names (alias.column AS name)
+ */
+export type AllAliasedColumns = `${AllQualifiedColumns} AS ${string}`;
+
+/**
+ * ===== ENHANCED VALIDATION FUNCTIONS =====
+ */
+
+/**
+ * Enhanced getTableConfig - Support for aliases
+ */
+export function getTableConfigByAlias(alias: string): TableDefinition | null {
+  // Try alias first
+  if (alias in AliasedTableRegistry) {
+    return AliasedTableRegistry[alias];
+  }
+
+  // Fallback to normal getTableConfig
+  return getTableConfig(alias);
+}
+
+/**
+ * Validates SELECT columns for JOIN queries with multiple aliases
+ */
+export function validateJoinSelectColumns(selectColumns: string[]): void {
+  for (const column of selectColumns) {
+    // Handle qualified columns (e.g., "w.wholesaler_id")
+    if (column.includes('.')) {
+      const [alias, columnName] = column.split('.');
+      let cleanColumn = columnName;
+
+      // Handle AS clauses (e.g., "w.name AS supplier_name")
+      if (cleanColumn.includes(' AS ')) {
+        cleanColumn = cleanColumn.split(' AS ')[0].trim();
+      }
+
+      // Skip wildcard and aggregate functions
+      if (cleanColumn === '*' ||
+          cleanColumn.startsWith('COUNT(') ||
+          cleanColumn.startsWith('SUM(') ||
+          cleanColumn.startsWith('AVG(') ||
+          cleanColumn.startsWith('MAX(') ||
+          cleanColumn.startsWith('MIN(')) {
+        continue;
+      }
+
+      // Validate against Table Registry
+      const tableConfig = getTableConfigByAlias(alias);
+      if (tableConfig) {
+        // Zod correct API: keyof() returns ZodEnum, .options contains the keys
+        const allowedColumns = tableConfig.schema.keyof().options;
+        if (!allowedColumns.includes(cleanColumn)) {
+          throw new Error(
+            `Column '${cleanColumn}' not found in schema for alias '${alias}'. ` +
+            `Available columns: ${allowedColumns.join(', ')}`
+          );
+        }
+      }
+    } else {
+      // Unqualified column - use existing validation
+      validateSelectColumns('unknown', [column]);
+    }
+  }
+}
+
+/**
  * Type Utilities
  */
 export type TableRegistryKeys = keyof typeof TableRegistry;
 export type DbTableNames = keyof typeof DbSchemaTableRegistry;
-export type AllTableIdentifiers = TableRegistryKeys | DbTableNames;
+export type AliasKeys = keyof typeof AliasedTableRegistry;
+export type AllTableIdentifiers = TableRegistryKeys | DbTableNames | AliasKeys;

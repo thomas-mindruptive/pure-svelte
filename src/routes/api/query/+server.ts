@@ -10,6 +10,7 @@ import { json, error, type RequestHandler } from '@sveltejs/kit';
 import { log } from '$lib/utils/logger';
 import { buildQuery, executeQuery } from '$lib/backendQueries/queryBuilder';
 import { supplierQueryConfig } from '$lib/backendQueries/queryConfig';
+import { getTableConfig } from '$lib/backendQueries/tableRegistry';
 import { mssqlErrorMapper } from '$lib/backendQueries/mssqlErrorMapper';
 import type { ApiErrorResponse, QueryRequest, PredefinedQueryRequest, QuerySuccessResponse } from '$lib/api/api.types';
 import { v4 as uuidv4 } from 'uuid';
@@ -87,9 +88,10 @@ export const POST: RequestHandler = async (event) => {
 				return json(errRes, { status: 400 });
 			}
 
-			if (!(fromClause.table in supplierQueryConfig.allowedTables)) {
+			// Security: Check if table is allowed via Table Registry
+			if (!getTableConfig(fromClause.table)) {
 				const errRes: ApiErrorResponse = {
-					success: false, message: `Table '${fromClause}' is not whitelisted for querying.`,
+					success: false, message: `Table '${fromClause.table}' is not whitelisted for querying.`,
 					status_code: 403, error_code: 'FORBIDDEN', meta: { timestamp: new Date().toISOString() }
 				};
 				return json(errRes, { status: 403 });

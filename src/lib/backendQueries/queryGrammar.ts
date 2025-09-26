@@ -1,6 +1,6 @@
 // src/lib/clientAndBack/queryGrammar.ts
 
-import type { AllAliasedColumns, AllQualifiedColumns, ValidFromClause } from "./queryConfig.types";
+import type { AllAliasedColumns, AllQualifiedColumns, ValidFromClause } from "./tableRegistry";
 
 /**
  * @file Query Grammar & Core Structures - FINAL

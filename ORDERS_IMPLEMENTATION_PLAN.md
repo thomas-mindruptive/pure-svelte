@@ -21,10 +21,58 @@ CREATE TABLE dbo.orders (
   order_number NVARCHAR(100) NULL,
   status NVARCHAR(50) NOT NULL
     CHECK (status IN ('pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled')),
+
+  -- Customer Information
+  customer_name NVARCHAR(200) NULL,
+  customer_email NVARCHAR(200) NULL,
+  customer_phone NVARCHAR(50) NULL,
+
+  -- Supplier Information (optional - order can be independent)
+  supplier_id INT NULL,
+  supplier_contact NVARCHAR(200) NULL,
+
+  -- Financial Information
+  subtotal_amount DECIMAL(18,2) NULL,
+  tax_amount DECIMAL(18,2) NULL,
+  shipping_amount DECIMAL(18,2) NULL,
+  discount_amount DECIMAL(18,2) NULL,
   total_amount DECIMAL(18,2) NULL,
   currency CHAR(3) NULL DEFAULT('EUR'),
+
+  -- Shipping Information
+  shipping_address NVARCHAR(500) NULL,
+  shipping_city NVARCHAR(100) NULL,
+  shipping_postal_code NVARCHAR(20) NULL,
+  shipping_country NVARCHAR(100) NULL,
+  shipping_method NVARCHAR(100) NULL,
+  expected_delivery_date DATE NULL,
+  actual_delivery_date DATE NULL,
+
+  -- Payment Information
+  payment_status NVARCHAR(50) NULL
+    CHECK (payment_status IN ('unpaid', 'partial', 'paid', 'refunded', 'cancelled') OR payment_status IS NULL),
+  payment_method NVARCHAR(50) NULL,
+  payment_date DATE NULL,
+  payment_reference NVARCHAR(200) NULL,
+
+  -- Order Processing
+  priority NVARCHAR(20) NULL
+    CHECK (priority IN ('low', 'normal', 'high', 'urgent') OR priority IS NULL)
+    DEFAULT('normal'),
+  assigned_to NVARCHAR(100) NULL, -- Employee or department handling the order
+
+  -- Metadata
   notes NVARCHAR(1000) NULL,
-  created_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME()
+  internal_notes NVARCHAR(1000) NULL, -- Not visible to customer
+  tags NVARCHAR(500) NULL, -- JSON array or comma-separated tags
+  source NVARCHAR(50) NULL, -- 'web', 'phone', 'email', 'api', etc.
+
+  created_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+
+  -- Foreign Keys
+  CONSTRAINT FK_orders_supplier FOREIGN KEY (supplier_id)
+    REFERENCES dbo.wholesalers(wholesaler_id)
 );
 
 ------------------------------------------------------------
@@ -33,24 +81,133 @@ CREATE TABLE dbo.orders (
 CREATE TABLE dbo.order_items (
   order_item_id INT IDENTITY(1,1) PRIMARY KEY,
   order_id INT NOT NULL,
-  offering_id INT NULL, -- Optional FK zu wholesaler_item_offerings
-  quantity INT NOT NULL DEFAULT(1),
-  unit_price DECIMAL(18,2) NOT NULL,
-  line_total DECIMAL(18,2) NULL,
-  item_notes NVARCHAR(500) NULL,
-  created_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
 
+  -- Product Reference (flexible - can link to offerings or be standalone)
+  offering_id INT NULL, -- Optional FK zu wholesaler_item_offerings
+  product_name NVARCHAR(200) NOT NULL, -- Always required, even if offering_id is set
+  product_sku NVARCHAR(100) NULL,
+  product_description NVARCHAR(500) NULL,
+
+  -- Quantity and Pricing
+  quantity INT NOT NULL DEFAULT(1) CHECK (quantity > 0),
+  unit_price DECIMAL(18,2) NOT NULL CHECK (unit_price >= 0),
+  line_total DECIMAL(18,2) NULL, -- Calculated field, can be null and computed
+  discount_amount DECIMAL(18,2) NULL DEFAULT(0) CHECK (discount_amount >= 0),
+  tax_rate DECIMAL(5,4) NULL, -- e.g., 0.1900 for 19%
+  tax_amount DECIMAL(18,2) NULL,
+
+  -- Product Details
+  unit_of_measure NVARCHAR(20) NULL DEFAULT('pcs'), -- 'pcs', 'kg', 'm', 'l', etc.
+  weight DECIMAL(10,3) NULL, -- For shipping calculations
+  dimensions NVARCHAR(100) NULL, -- LxWxH format
+
+  -- Item Status
+  item_status NVARCHAR(50) NULL
+    CHECK (item_status IN ('pending', 'confirmed', 'backordered', 'shipped', 'delivered', 'cancelled', 'returned') OR item_status IS NULL)
+    DEFAULT('pending'),
+  expected_ship_date DATE NULL,
+  actual_ship_date DATE NULL,
+
+  -- References and Notes
+  item_notes NVARCHAR(500) NULL,
+  supplier_item_code NVARCHAR(100) NULL, -- Supplier's internal code
+  manufacturer_part_number NVARCHAR(100) NULL,
+
+  created_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+  updated_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+
+  -- Foreign Keys
   CONSTRAINT FK_order_items_order FOREIGN KEY (order_id)
-    REFERENCES dbo.orders(order_id),
+    REFERENCES dbo.orders(order_id) ON DELETE CASCADE,
   CONSTRAINT FK_order_items_offering FOREIGN KEY (offering_id)
     REFERENCES dbo.wholesaler_item_offerings(offering_id)
 );
 
+------------------------------------------------------------
+-- Order Status History (Track status changes)
+------------------------------------------------------------
+CREATE TABLE dbo.order_status_history (
+  history_id INT IDENTITY(1,1) PRIMARY KEY,
+  order_id INT NOT NULL,
+  old_status NVARCHAR(50) NULL,
+  new_status NVARCHAR(50) NOT NULL,
+  changed_by NVARCHAR(100) NULL, -- User who made the change
+  change_reason NVARCHAR(500) NULL,
+  created_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+
+  CONSTRAINT FK_order_status_history_order FOREIGN KEY (order_id)
+    REFERENCES dbo.orders(order_id) ON DELETE CASCADE
+);
+
+------------------------------------------------------------
+-- Order Documents (Invoices, Receipts, etc.)
+------------------------------------------------------------
+CREATE TABLE dbo.order_documents (
+  document_id INT IDENTITY(1,1) PRIMARY KEY,
+  order_id INT NOT NULL,
+  document_type NVARCHAR(50) NOT NULL
+    CHECK (document_type IN ('invoice', 'receipt', 'shipping_label', 'return_label', 'contract', 'other')),
+  file_name NVARCHAR(255) NOT NULL,
+  file_path NVARCHAR(500) NOT NULL,
+  file_size_bytes BIGINT NULL,
+  mime_type NVARCHAR(100) NULL,
+  description NVARCHAR(500) NULL,
+  uploaded_by NVARCHAR(100) NULL,
+  created_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+
+  CONSTRAINT FK_order_documents_order FOREIGN KEY (order_id)
+    REFERENCES dbo.orders(order_id) ON DELETE CASCADE
+);
+
 -- Performance Indexes
-CREATE INDEX IX_order_items_order ON dbo.order_items(order_id);
-CREATE INDEX IX_order_items_offering ON dbo.order_items(offering_id);
 CREATE INDEX IX_orders_date ON dbo.orders(order_date);
 CREATE INDEX IX_orders_status ON dbo.orders(status);
+CREATE INDEX IX_orders_supplier ON dbo.orders(supplier_id);
+CREATE INDEX IX_orders_customer_email ON dbo.orders(customer_email);
+CREATE INDEX IX_orders_payment_status ON dbo.orders(payment_status);
+CREATE INDEX IX_orders_priority ON dbo.orders(priority);
+CREATE INDEX IX_orders_created_at ON dbo.orders(created_at);
+
+CREATE INDEX IX_order_items_order ON dbo.order_items(order_id);
+CREATE INDEX IX_order_items_offering ON dbo.order_items(offering_id);
+CREATE INDEX IX_order_items_status ON dbo.order_items(item_status);
+CREATE INDEX IX_order_items_sku ON dbo.order_items(product_sku);
+CREATE INDEX IX_order_items_ship_date ON dbo.order_items(expected_ship_date);
+
+CREATE INDEX IX_order_status_history_order ON dbo.order_status_history(order_id);
+CREATE INDEX IX_order_status_history_created ON dbo.order_status_history(created_at);
+
+CREATE INDEX IX_order_documents_order ON dbo.order_documents(order_id);
+CREATE INDEX IX_order_documents_type ON dbo.order_documents(document_type);
+
+-- Computed Column for line_total (optional - can be calculated in application)
+ALTER TABLE dbo.order_items ADD line_total_computed AS
+  (quantity * unit_price - ISNULL(discount_amount, 0)) PERSISTED;
+
+-- Trigger to update updated_at columns
+CREATE TRIGGER TR_orders_updated_at
+ON dbo.orders
+AFTER UPDATE
+AS
+BEGIN
+  SET NOCOUNT ON;
+  UPDATE dbo.orders
+  SET updated_at = SYSUTCDATETIME()
+  FROM inserted
+  WHERE dbo.orders.order_id = inserted.order_id;
+END;
+
+CREATE TRIGGER TR_order_items_updated_at
+ON dbo.order_items
+AFTER UPDATE
+AS
+BEGIN
+  SET NOCOUNT ON;
+  UPDATE dbo.order_items
+  SET updated_at = SYSUTCDATETIME()
+  FROM inserted
+  WHERE dbo.order_items.order_item_id = inserted.order_item_id;
+END;
 ```
 
 ### **2. Zod Schemas (src/lib/domain/domainTypes.ts)**

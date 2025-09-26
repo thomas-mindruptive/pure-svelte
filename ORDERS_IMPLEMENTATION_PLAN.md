@@ -258,17 +258,86 @@ export const OrderItemForCreateSchema = OrderItemSchema.omit({
 }).describe("OrderItemForCreateSchema");
 ```
 
-### **3. Query Config (src/lib/backendQueries/queryConfig.ts)**
+### **3. Schema-basierte Query Validation (src/lib/backendQueries/queryBuilder.ts)**
 
-**orderQueryConfig hinzufügen:**
+**Current System Analysis:**
+- QueryBuilder currently validates aliases and table names via `aliasedTablesConfig`
+- Column validation happens at compile-time through TypeScript's type system
+- `QueryPayload<T>` uses `select: Array<keyof T | AllQualifiedColumns | AllAliasedColumns>`
+- No runtime column validation against schemas currently exists
+- `allowedTables` in queryConfig is only used for table-level permission checking
+
+**Problem:**
+- Duplicate maintenance between Zod schemas and queryConfig column lists
+- No runtime validation that SELECT columns exist in target schema
+- queryConfig.allowedTables hardcodes column names that are already defined in Zod schemas
+
+**Proposed Solution:** Add runtime schema validation to QueryBuilder
+
 ```typescript
-export const orderQueryConfig: QueryConfig = {
-  allowedTables: {
-    "dbo.orders": ["order_id", "order_date", "order_number", "status", "total_amount", "currency", "notes", "created_at"],
-    "dbo.order_items": ["order_item_id", "order_id", "offering_id", "quantity", "unit_price", "line_total", "item_notes", "created_at"]
+// Schema-to-Table Mapping in queryBuilder.ts
+import { AllSchemas } from '$lib/domain/domainTypes';
+import type { TableNameToEntityMap } from '$lib/domain/tableToEntityMap';
+
+const SCHEMA_TABLE_MAP = {
+  "dbo.orders": AllSchemas.orders,
+  "dbo.order_items": AllSchemas.order_items,
+  "dbo.wholesalers": AllSchemas.wholesalers,
+  "dbo.product_categories": AllSchemas.categories,
+  "dbo.product_definitions": AllSchemas.product_definitions,
+  "dbo.wholesaler_item_offerings": AllSchemas.offerings,
+  "dbo.attributes": AllSchemas.attributes,
+  "dbo.wholesaler_offering_links": AllSchemas.links,
+} as const;
+
+// Add runtime column validation function
+function validateSelectColumns(tableName: string, selectColumns: string[]): void {
+  const schema = SCHEMA_TABLE_MAP[tableName as keyof typeof SCHEMA_TABLE_MAP];
+  if (!schema) return; // Skip validation for unknown tables
+
+  const allowedColumns = Object.keys(schema.shape);
+
+  for (const column of selectColumns) {
+    // Handle qualified columns (e.g., "w.wholesaler_id")
+    const cleanColumn = column.includes('.') ? column.split('.')[1] : column;
+
+    // Skip AS clauses (e.g., "w.name AS supplier_name")
+    const baseColumn = cleanColumn.includes(' AS ') ? cleanColumn.split(' AS ')[0].trim() : cleanColumn;
+
+    if (!allowedColumns.includes(baseColumn)) {
+      throw new Error(`Column '${baseColumn}' not found in schema for table '${tableName}'`);
+    }
   }
-};
+}
+
+// Modify buildQuery function to include validation
+export function buildQuery<T>(
+  payload: QueryPayload<T>,
+  config: QueryConfig,
+  namedQuery?: string,
+  fixedFrom?: FromClause
+) {
+  // ... existing logic ...
+
+  // Add schema validation after FROM clause is determined
+  if (fromTableForMetadata && fromTableForMetadata.startsWith('dbo.')) {
+    validateSelectColumns(fromTableForMetadata, select as string[]);
+  }
+
+  // ... rest of function ...
+}
 ```
+
+**Benefits:**
+- Eliminates duplicate column maintenance
+- Runtime validation catches schema mismatches
+- Maintains backward compatibility
+- Single Source of Truth: Zod schemas
+
+**Migration Path:**
+1. Add schema validation to QueryBuilder
+2. Gradually remove hardcoded column lists from queryConfig.allowedTables
+3. Keep queryConfig for table-level permissions and join configurations
 
 ### **4. Dependency Checks (src/lib/dataModel/dependencyChecks.ts)**
 

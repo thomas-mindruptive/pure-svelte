@@ -134,10 +134,10 @@ export const aliasedTablesConfig = {
   },
   ord: {
     tableName: "dbo.orders",
-    columns: ["order_id", "order_date", "order_number", "total_amount", "currency", "notes", "created_at"],
+    columns: ["order_id", "order_date", "order_number", "status", "total_amount", "currency", "notes", "created_at"],
   },
   ori: {
     tableName: "dbo.order_items",
-    columns: ["order_item_id", "order_id", "offering_id", "quantity", " unit_price", "line_total", " item_notes", "created_at"],
+    columns: ["order_item_id", "order_id", "offering_id", "quantity", "unit_price", "line_total", "item_notes", "created_at"],
   },
 } as const;

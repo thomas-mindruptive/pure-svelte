@@ -158,8 +158,11 @@ export function buildQuery<T>(
 
 		// SECURITY CHECK 2: The alias must be used for its designated table.
 		// This crucial check prevents misuse, e.g., a client trying to query `dbo.users` using the valid alias 'w'.
-		if (aliasConfig.tableName !== table) {
-			throw new Error(`Alias '${alias}' is registered for table '${aliasConfig.tableName}', but was incorrectly used for table '${table}'.`);
+		const expectedFullTableName = `${aliasConfig.dbSchema}.${aliasConfig.tableName}`;
+		const expectedTableName = aliasConfig.tableName;
+
+		if (table !== expectedFullTableName && table !== expectedTableName) {
+			throw new Error(`Alias '${alias}' is registered for table '${expectedFullTableName}', but was incorrectly used for table '${table}'.`);
 		}
 
 		// If all checks pass, construct the final FROM clause string for the SQL query.
@@ -175,7 +178,13 @@ export function buildQuery<T>(
 		// Perform the same validation checks for each JOIN's alias and table.
 		const aliasConfig = AliasedTableRegistry[alias as keyof typeof AliasedTableRegistry];
 		if (!aliasConfig) throw new Error(`JOIN alias '${alias}' is not a registered alias.`);
-		if (aliasConfig.tableName !== table) throw new Error(`JOIN alias '${alias}' is for table '${aliasConfig.tableName}', not '${table}'.`);
+
+		const expectedFullTableName = `${aliasConfig.dbSchema}.${aliasConfig.tableName}`;
+		const expectedTableName = aliasConfig.tableName;
+
+		if (table !== expectedFullTableName && table !== expectedTableName) {
+			throw new Error(`JOIN alias '${alias}' is for table '${expectedFullTableName}', not '${table}'.`);
+		}
 
 		const onClause = buildOnClause(on, ctx);
 		return `${type} ${table} ${alias} ON ${onClause}`;

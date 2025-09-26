@@ -335,7 +335,7 @@ This approach simplifies the client-side API, aligns perfectly with the business
 The project is built on six pillars of type safety that work together to ensure correctness from the database to the UI.
 - **Pillar I: Generic API Types:** Universal request/response envelopes in `lib/api/api.types.ts`.
 - **Pillar II: Query Grammar:** A structured object (`QueryPayload`) for defining database queries in a type-safe manner.
-- **Pillar III: Query Config:** A security whitelist for all table, alias, and column access. **Evolution:** Moving from hardcoded column lists to schema-based Table Registry for Single Source of Truth.
+- **Pillar III: Table Registry:** Schema-based security system with automatic type generation. Zod schemas are the single source of truth for table access and column validation.
 - **Pillar IV: Query Builder:** A server-side utility that converts the `QueryPayload` grammar into parameterized SQL.
 - **Pillar V: Data Validation & Contracts with Zod:** A new pillar ensuring runtime data integrity on the frontend.
 - **Pillar VI: Enhanced Component Type Safety:** Key generic components like the `Datagrid` have been improved for stricter type safety.
@@ -365,63 +365,150 @@ This payload is sent from the client to a server endpoint (e.g., `/api/suppliers
 
 Zod is the sole source of truth for the **shape** and **rules** of data throughout the system, on both the frontend and backend. The schemas defined in `src/lib/domain/domainTypes.ts` are used directly in API endpoints for robust server-side validation.
 
-#### Architectural Evolution: Schema-based Table Registry
+#### Implemented: Schema-based Table Registry System
 
-**Current Challenge:** The existing queryConfig system requires duplicate column maintenance - once in Zod schemas and again in hardcoded column lists.
+**Challenge Solved:** The previous queryConfig system required duplicate column maintenance - once in Zod schemas and again in hardcoded column lists.
 
-**Planned Solution:** A new **Table Registry System** that eliminates code duplication:
+**Implemented Solution:** A **Table Registry System** that eliminates code duplication:
 
 ```typescript
-// Planned: src/lib/backendQueries/tableRegistry.ts
+// Implemented: src/lib/backendQueries/tableRegistry.ts
 export interface TableDefinition {
-  schema: z.ZodTypeAny;      // Direct reference to Zod schema
+  schema: z.ZodObject<any>;  // Direct reference to Zod schema
   tableName: string;         // e.g., "orders"
   dbSchema: string;          // e.g., "dbo"
   alias: string;             // e.g., "ord"
 }
 
 export const TableRegistry = {
+  "wholesalers": {
+    schema: WholesalerSchema,
+    tableName: "wholesalers",
+    dbSchema: "dbo",
+    alias: "w"
+  },
   "orders": {
     schema: OrderSchema,      // Single source of truth
     tableName: "orders",
     dbSchema: "dbo",
     alias: "ord"
   },
-  // ... other entities
-} as const;
+  // ... all entities implemented
+} as const satisfies Record<string, TableDefinition>;
 
-// Runtime column validation using schema.shape
-export function validateSelectColumns(identifier: string, selectColumns: string[]): void {
-  const tableConfig = getTableConfig(identifier);
-  if (!tableConfig) return;
+// Automatic type generation from schemas
+type ExtractSchemaKeys<T extends z.ZodObject<any>> = Extract<keyof z.infer<T>, string>;
 
-  const allowedColumns = Object.keys(tableConfig.schema.shape);
-  // Validate columns against schema instead of hardcoded lists
+export type AllQualifiedColumns = {
+  [K in keyof typeof TableRegistry]: `${(typeof TableRegistry)[K]["alias"]}.${ExtractSchemaKeys<(typeof TableRegistry)[K]["schema"]>}`;
+}[keyof typeof TableRegistry];
+
+// Runtime column validation using Zod 4.x API
+export function validateJoinSelectColumns(selectColumns: string[]): void {
+  for (const column of selectColumns) {
+    if (column.includes('.')) {
+      const [alias, columnName] = column.split('.');
+      const tableConfig = getTableConfigByAlias(alias);
+      if (tableConfig) {
+        const allowedColumns = tableConfig.schema.keyof().options;
+        if (!allowedColumns.includes(cleanColumn)) {
+          throw new Error(`Column '${cleanColumn}' not found in schema for alias '${alias}'`);
+        }
+      }
+    }
+  }
 }
 ```
 
-**Benefits:**
-- **Single Source of Truth:** Column definitions only exist in Zod schemas
-- **Runtime Validation:** QueryBuilder validates SELECT columns against schemas
-- **Type Safety:** Compile-time types automatically derived from schemas
-- **JOIN Support:** Complex queries with schema-based column validation
+**Benefits Achieved:**
+- **✅ Single Source of Truth:** Column definitions only exist in Zod schemas
+- **✅ Runtime Validation:** QueryBuilder validates SELECT columns against schemas
+- **✅ Type Safety:** Compile-time types automatically derived from schemas
+- **✅ JOIN Support:** Complex queries with schema-based column validation
+- **✅ Auto-Completion:** Perfect IntelliSense for all qualified columns like "w.name", "pc.category_id"
 
-**Migration Path:**
-1. **Phase 1:** Add Table Registry parallel to existing queryConfig
-2. **Phase 2:** Enhance QueryBuilder with schema-based validation
-3. **Phase 3:** Remove hardcoded column lists from queryConfig
-4. **Phase 4:** Generate type system from Table Registry
+**Migration Completed:**
+1. **✅ Phase 1:** Table Registry implemented with automatic type generation
+2. **✅ Phase 2:** QueryBuilder enhanced with schema-based validation
+3. **✅ Phase 3:** Hardcoded column lists removed from queryConfig
+4. **✅ Phase 4:** Type system fully generated from Table Registry
+5. **✅ Phase 5:** Legacy queryConfig.types.ts removed
 
-#### Current Query Config Pattern (Legacy - To Be Migrated)
-All entities currently require hardcoded column whitelisting:
+#### Current Query Config Pattern (Updated)
+QueryConfig now focuses purely on JOIN configurations, with table security handled by Table Registry:
 
 ```typescript
-// In src/lib/backendQueries/queryConfig.ts
-export const entityQueryConfig: QueryConfig = {
-  allowedTables: {
-    "dbo.entity_table": ["entity_id", "name", "status", "created_at"],
-    // Only whitelisted columns can be queried - DUPLICATE MAINTENANCE
-  }
+// In src/lib/backendQueries/queryConfig.ts - Updated Architecture
+export interface QueryConfig {
+  joinConfigurations: {
+    [viewName: string]: {
+      from: ValidFromClause;
+      joins: JoinClause[];
+      exampleQuery?: QueryPayload<unknown>;
+    };
+  };
+}
+
+export const supplierQueryConfig: QueryConfig = {
+  joinConfigurations: {
+    supplier_categories: {
+      from: { table: "dbo.wholesalers", alias: "w" },
+      joins: [
+        {
+          type: JoinType.INNER,
+          table: "dbo.wholesaler_categories",
+          alias: "wc",
+          on: {
+            joinCondOp: LogicalOperator.AND,
+            conditions: [{ columnA: "w.wholesaler_id", op: ComparisonOperator.EQUALS, columnB: "wc.wholesaler_id" }],
+          },
+        },
+        // ... more joins
+      ],
+    },
+    // ... other JOIN configurations
+  },
+};
+```
+
+**Security is now handled by the Table Registry system - no more hardcoded column lists needed.**
+
+#### Enhanced QueryPayload Type Safety
+
+The `QueryPayload<T>` interface now provides comprehensive type safety for database queries:
+
+```typescript
+// In src/lib/backendQueries/queryGrammar.ts
+export interface QueryPayload<T> {
+  select: Array<keyof T | AllQualifiedColumns | AllAliasedColumns>;
+  from?: ValidFromClause;
+  joins?: JoinClause[];
+  where?: WhereCondition<T> | WhereConditionGroup<T>;
+  orderBy?: SortDescriptor<T>[];
+  limit?: number;
+  offset?: number;
+}
+```
+
+**Key Features:**
+- **✅ Entity Columns:** `keyof T` for simple entity column names like `"name"`, `"status"`
+- **✅ Qualified Columns:** `AllQualifiedColumns` for aliased columns like `"w.name"`, `"pc.category_id"`
+- **✅ Aliased Columns:** `AllAliasedColumns` for AS clauses like `"w.name AS supplier_name"`
+- **✅ Auto-Completion:** Perfect IntelliSense for all valid column combinations
+- **✅ Runtime Validation:** `validateJoinSelectColumns()` ensures query safety
+
+**Example Usage:**
+```typescript
+const payload: QueryPayload<Wholesaler> = {
+  select: [
+    "wholesaler_id",           // keyof Wholesaler
+    "w.name",                  // AllQualifiedColumns
+    "w.status",                // AllQualifiedColumns
+    "pc.name AS category_name" // AllAliasedColumns
+  ],
+  from: { table: "dbo.wholesalers", alias: "w" },
+  joins: [...],
+  where: { key: "w.status", whereCondOp: "=", val: "active" }
 };
 ```
 
@@ -634,10 +721,10 @@ When implementing a new entity (e.g., Orders), follow this comprehensive checkli
 - [ ] Add entity to `AllEntitiesSchema` enum
 - [ ] Update `AllSchemas` mapping object
 
-### 2. Query Configuration
-- [ ] **Current System:** Add table to `src/lib/backendQueries/queryConfig.ts` with hardcoded column whitelists
-- [ ] **Future System:** Add entity to Table Registry with schema reference only
-- [ ] Add any required JOIN configurations for complex queries
+### 2. Table Registry & Query Configuration
+- [ ] **Table Registry:** Add entity to `src/lib/backendQueries/tableRegistry.ts` in the `TableRegistry` object with schema reference, table name, DB schema, and alias
+- [ ] **Security:** Table access is automatically secured through Table Registry - no manual column lists needed
+- [ ] **Query Config:** Add any required JOIN configurations to `queryConfig.ts` for complex queries (optional)
 
 ### 3. API Endpoints (5-endpoint structure)
 - [ ] `POST /api/entity` - List queries with QueryPayload

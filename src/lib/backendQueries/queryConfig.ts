@@ -44,6 +44,8 @@ export const supplierQueryConfig: QueryConfig = {
     "dbo.wholesaler_offering_links": ["link_id", "offering_id", "url", "notes", "created_at"],
     "dbo.product_definitions": ["product_def_id", "title", "description", "category_id"],
     "dbo.attributes": ["attribute_id", "name", "description"],
+    "dbo.orders": ["order_id", "order_date", "order_number", "status", "total_amount", "currency", "notes", "created_at"],
+    "dbo.order_items": ["order_item_id", "order_id", "offering_id", "quantity", "unit_price", "line_total", "item_notes", "created_at"],
 
     // Validate columns for join configurations below. Validated against typos through "PredefinedQueryConfig"
     supplier_categories: [
@@ -98,6 +100,7 @@ export const supplierQueryConfig: QueryConfig = {
       "pc.name AS category_name",
       "w.name AS supplier_name", // The required supplier name for the grid
     ],
+    order_order_items: []
   },
   joinConfigurations: {
     supplier_categories: {

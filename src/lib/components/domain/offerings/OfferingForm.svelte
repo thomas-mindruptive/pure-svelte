@@ -52,15 +52,15 @@
     const result = OfferingDetail_LoadDataSchema.safeParse(initialLoadedData);
     if (!result.success) {
       return {
-        validatedData: null,
+        //validatedData: null,
         errors: result.error.issues,
         isValid: false,
-        initialValidatedOfferingData: null,
-        supplierId: null,
-        categoryId: null,
-        productDefId: null,
-        availableProducts: null,
-        availableSuppliers: null,
+        // initialValidatedOfferingData: null,
+        // supplierId: null,
+        // categoryId: null,
+        // productDefId: null,
+        // availableProducts: null,
+        // availableSuppliers: null,
       };
     }
 

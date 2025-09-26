@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/dev/pureenergyworks/pureenergy-schema/**)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

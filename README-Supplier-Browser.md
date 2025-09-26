@@ -149,10 +149,20 @@ POST /api/suppliers with QueryRequest<Wholesaler>
 
 // Individual operations
 GET    /api/suppliers/[id]      // Read a single entity
+POST   /api/suppliers/[id]      // Flexible single query with QueryPayload (for specific field selection)
 POST   /api/suppliers/new       // Create a new entity
 PUT    /api/suppliers/[id]      // Update an existing entity
 DELETE /api/suppliers/[id]      // Delete an entity
 ```
+
+#### Complete API Pattern for New Entities (Implementation Reference)
+When implementing a new entity, follow this exact 5-endpoint structure:
+- **List queries**: `POST /api/entity` with QueryPayload
+- **Individual read**: `GET /api/entity/[id]` (all fields, simple response)
+- **Flexible individual**: `POST /api/entity/[id]` (custom fields via QueryPayload)
+- **Create**: `POST /api/entity/new` with entity data
+- **Update**: `PUT /api/entity/[id]` with partial updates
+- **Delete**: `DELETE /api/entity/[id]` with cascade/forceCascade flags
 
 ### Relationship Endpoint Pattern: `/api/<parent>-<child>`
 
@@ -196,6 +206,33 @@ To ensure consistency, robustness, and transaction safety, all complex deletion 
 -   **Responsibility:** The function is solely responsible for executing the correct SQL `DELETE` statements. If `cascade` is true, it performs a multi-statement, CTE-based batch delete to remove all dependent records in the correct order. If `cascade` is false, it attempts to delete only the master record.
 -   **Transaction Control:** These helpers do **not** commit or roll back the transaction. This responsibility remains with the calling API endpoint, making the helpers reusable and testable.
 -   **Return Value:** On success, the function queries and returns the data of the resource that was just deleted, enabling the API to build a rich `DeleteSuccessResponse`.
+
+#### TransWrapper Pattern (Critical Implementation Detail)
+**MANDATORY:** All deletion functions and dependency checks MUST use the TransWrapper pattern for transaction safety:
+
+```typescript
+import { TransWrapper } from "$lib/backendQueries/transactionWrapper";
+
+const transWrapper = new TransWrapper(transaction, null);
+transWrapper.begin();
+
+try {
+  // Database operations with transWrapper.request()
+  const result = await transWrapper.request().input("id", id).query(`...`);
+  transWrapper.commit();
+} catch {
+  transWrapper.rollback();
+}
+```
+
+**Reference Examples:**
+- `src/lib/dataModel/dependencyChecks.ts:43` (TransWrapper usage)
+- `src/lib/dataModel/deletes.ts` (All delete functions)
+
+#### Dependency Check Structure
+All dependency check functions must return: `{ hard: string[], soft: string[] }`
+- **Soft dependencies**: Can be deleted with `cascade=true`
+- **Hard dependencies**: Require `forceCascade=true` with additional user confirmation
 
 ### Deletion Patterns for Relationships vs. Master Data
 
@@ -328,6 +365,19 @@ This payload is sent from the client to a server endpoint (e.g., `/api/suppliers
 
 Zod is the sole source of truth for the **shape** and **rules** of data throughout the system, on both the frontend and backend. The schemas defined in `src/lib/domain/domainTypes.ts` are used directly in API endpoints for robust server-side validation.
 
+#### Query Config Pattern (Critical Implementation Detail)
+All entities must be added to the Query Config with proper column whitelisting:
+
+```typescript
+// In src/lib/backendQueries/queryConfig.ts
+export const entityQueryConfig: QueryConfig = {
+  allowedTables: {
+    "dbo.entity_table": ["entity_id", "name", "status", "created_at"],
+    // Only whitelisted columns can be queried
+  }
+};
+```
+
 #### **Server-Side Validation in API Endpoints**
 
 Instead of a custom validator, each API endpoint imports the required Zod schema directly and applies schema methods to adapt it for the specific use case. This pattern is explicit, type-safe, and avoids unnecessary abstractions.
@@ -362,6 +412,19 @@ Server-side validation is implemented using this direct Zod approach. Note: Any 
 ### Frontend Architecture: Domain-Driven Structure & Page Delegation
 The frontend follows a **Domain-Driven file structure** combined with a **Page Delegation Pattern**. The core principle is **Co-Location**: All files related to a specific business domain are located in a single directory (`src/lib/domain/suppliers/`).
 
+#### Page Delegation Pattern (Critical Implementation Detail)
+**MANDATORY structure** for all new entities:
+
+1. **Route `+page.ts`**: Pure delegation → `export { load } from '$lib/components/domain/entity/entityListPage';`
+2. **Route `+page.svelte`**: Pure delegation → `<EntityListPage {data} />`
+3. **Domain `entityListPage.ts`**: Contains actual load logic with `export function load({ fetch })`
+4. **Domain `EntityListPage.svelte`**: Contains UI logic with Promise handling via `$effect`
+
+**Reference Examples:**
+- `src/routes/(browser)/suppliers/+page.ts` (Route delegation)
+- `src/lib/components/domain/suppliers/supplierListPage.ts` (Domain load logic)
+- `src/lib/components/domain/suppliers/SupplierListPage.svelte` (Domain UI component)
+
 ### Client-side deletion helpers 
 To handle different deletion scenarios in a type-safe manner, the generic `cascadeDelete` helper has been refactored into two specialized functions:
 
@@ -381,6 +444,40 @@ To create reusable yet fully type-safe forms, the project uses this robust patte
 
 #### The "Smart" Parent: `SupplierForm.svelte`
 - A specific component that knows everything about a `Wholesaler`. It provides the domain-specific `validate` and `submit` functions to the `FormShell`.
+
+#### Props Validation Pattern (Critical Implementation Detail)
+**MANDATORY** for all form components - client-side Zod validation of loaded data:
+
+```typescript
+// In EntityForm.svelte
+import { EntityLoadDataSchema } from './entityDetail.types';
+
+let { validatedData, errors } = $derived.by(() => {
+  const result = EntityLoadDataSchema.safeParse(initialLoadedData);
+  if (!result.success) {
+    return {
+      validatedData: null,
+      errors: result.error.issues,
+      isValid: false
+    };
+  }
+  return {
+    validatedData: result.data,
+    errors: null,
+    isValid: true
+  };
+});
+```
+
+Forms must validate their received props using Zod schemas, not trust raw data from load functions.
+
+**Reference Example:** `src/lib/components/domain/offerings/OfferingForm.svelte:51`
+
+#### Context-Aware Reusability Pattern
+Forms detect their usage context via boolean flags in props:
+- `isCreateMode`: true for `/new` routes, false for `/edit/[id]`
+- `isEntityRoute`: true when accessed from entity-specific routes
+- Route-specific flags: `isSuppliersRoute`, `isCategoriesRoute`, etc.
 
 #### Validation Strategy: Zod-Driven with HTML5 UX Enhancement
 
@@ -415,6 +512,35 @@ The Datagrid now manages its own sorting state and data loading lifecycle. This 
 -   **Data-Driven Reloading:** After updating its `sortState`, the Datagrid calls the provided `apiLoadFunc` with the new sort descriptors. This is where the seamless integration with the **Query Grammar** happens: the parent-provided function is responsible for translating the `SortDescriptor[]` array into the `orderBy` clause of a `QueryPayload` object and executing the API call. The Datagrid then updates its internal `rows` with the new, sorted data from the server.
 -   **Simplified Parent Components:** This new architecture drastically simplifies the parent list pages. They are now only responsible for providing the initial data set and the `apiLoadFunc` callback. All subsequent sorting-related state management and data fetching is encapsulated within the Datagrid.
 
+#### Implementation Pattern for Datagrid Integration
+**MANDATORY structure** for entity grids:
+
+```typescript
+// EntityGrid.svelte - Thin wrapper
+const columns: ColumnDef<Entity>[] = [
+  { key: "name", header: "Name", sortable: true },
+  // Define all columns with proper typing
+];
+
+const getId = (r: Entity) => r.entity_id;
+```
+
+```svelte
+<Datagrid
+  {rows}
+  {columns}
+  {getId}
+  gridId="entities"
+  entity="entity"
+  {deleteStrategy}
+  {rowActionStrategy}
+  {apiLoadFunc}
+  maxBodyHeight="550px"
+/>
+```
+
+**Reference Example:** `src/lib/components/domain/suppliers/SupplierGrid.svelte`
+
 #### Scrollable Body with Sticky Header
 
 To improve the user experience with long lists of data, the Datagrid now supports a scrollable body with a fixed (sticky) header and toolbar.
@@ -447,6 +573,77 @@ Directly importing and using `import { page } from '$app/stores'` in reusable co
 3.  This data is received by the page component as a prop (`let { data } = $props()`) and passed down to child components as needed.
 
 This (`load` -> `props` -> `props`) pattern is explicit, type-safe, and guarantees that all components receive the correct, up-to-date data.
+
+---
+
+## New Entity Implementation Checklist
+
+When implementing a new entity (e.g., Orders), follow this comprehensive checklist to ensure consistency with existing patterns:
+
+### 1. Database & Domain Layer
+- [ ] Create DDL tables following existing naming conventions (`dbo.entity_name`)
+- [ ] Add Zod schemas to `src/lib/domain/domainTypes.ts`
+- [ ] Include both base schema and `ForCreateSchema` variant
+- [ ] Add entity to `AllEntitiesSchema` enum
+- [ ] Update `AllSchemas` mapping object
+
+### 2. Query Configuration
+- [ ] Add table to `src/lib/backendQueries/queryConfig.ts`
+- [ ] Whitelist all queryable columns
+- [ ] Add any required JOIN configurations
+
+### 3. API Endpoints (5-endpoint structure)
+- [ ] `POST /api/entity` - List queries with QueryPayload
+- [ ] `GET /api/entity/[id]` - Single entity read
+- [ ] `POST /api/entity/[id]` - Flexible single query
+- [ ] `POST /api/entity/new` - Create new entity
+- [ ] `PUT /api/entity/[id]` - Update entity
+- [ ] `DELETE /api/entity/[id]` - Delete with cascade support
+
+### 4. Deletion & Dependencies
+- [ ] Add dependency check function to `src/lib/dataModel/dependencyChecks.ts`
+- [ ] Add deletion function to `src/lib/dataModel/deletes.ts`
+- [ ] Use TransWrapper pattern for all database operations
+- [ ] Return `{ hard: string[], soft: string[] }` from dependency checks
+
+### 5. API Client
+- [ ] Create `entityApi.ts` with all CRUD methods
+- [ ] Implement proper error handling and type safety
+- [ ] Use context-aware fetch for SSR compatibility
+
+### 6. Frontend Routes (Page Delegation Pattern)
+- [ ] `src/routes/(browser)/entity/+page.ts` - Pure delegation
+- [ ] `src/routes/(browser)/entity/+page.svelte` - Pure delegation
+- [ ] `src/routes/(browser)/entity/new/+page.ts` - Form route delegation
+- [ ] `src/routes/(browser)/entity/new/+page.svelte` - Form route delegation
+- [ ] `src/routes/(browser)/entity/[id]/+page.ts` - Edit route delegation
+- [ ] `src/routes/(browser)/entity/[id]/+page.svelte` - Edit route delegation
+
+### 7. Domain Components
+- [ ] `entityListPage.ts` - Load function with proper validation
+- [ ] `EntityListPage.svelte` - UI component with Promise handling
+- [ ] `entityFormPage.ts` - Form load function with context detection
+- [ ] `EntityForm.svelte` - Smart parent form component
+- [ ] `EntityGrid.svelte` - Thin wrapper around Datagrid
+
+### 8. Form Implementation
+- [ ] Implement Props Validation Pattern in load function
+- [ ] Add context-aware reusability with boolean flags
+- [ ] Use "Dumb Shell / Smart Parent" pattern
+- [ ] Implement proper Zod validation strategy
+
+### 9. Grid Implementation
+- [ ] Define proper ColumnDef with types
+- [ ] Implement getId function
+- [ ] Configure apiLoadFunc for autonomous sorting
+- [ ] Set appropriate maxBodyHeight
+
+### 10. Navigation Integration
+- [ ] Update navigation structures if applicable
+- [ ] Add breadcrumb support
+- [ ] Update hierarchy sidebar if relevant
+
+**Reference Implementation:** Use existing Suppliers implementation as the gold standard for all patterns.
 
 ---
 

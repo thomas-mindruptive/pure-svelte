@@ -257,7 +257,7 @@ The client implements a highly robust **Optimistic Delete** pattern managed by a
 
 ---
 
-## Current Implementation Status
+## Endpoint Overview
 
 | Entity/Operation | Endpoint | Generic Type | Server Status | Client Status | Notes |
 | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -335,7 +335,7 @@ This approach simplifies the client-side API, aligns perfectly with the business
 The project is built on six pillars of type safety that work together to ensure correctness from the database to the UI.
 - **Pillar I: Generic API Types:** Universal request/response envelopes in `lib/api/api.types.ts`.
 - **Pillar II: Query Grammar:** A structured object (`QueryPayload`) for defining database queries in a type-safe manner.
-- **Pillar III: Query Config:** A security whitelist for all table, alias, and column access, centered around a single source of truth: the `aliasedTablesConfig` object.
+- **Pillar III: Query Config:** A security whitelist for all table, alias, and column access. **Evolution:** Moving from hardcoded column lists to schema-based Table Registry for Single Source of Truth.
 - **Pillar IV: Query Builder:** A server-side utility that converts the `QueryPayload` grammar into parameterized SQL.
 - **Pillar V: Data Validation & Contracts with Zod:** A new pillar ensuring runtime data integrity on the frontend.
 - **Pillar VI: Enhanced Component Type Safety:** Key generic components like the `Datagrid` have been improved for stricter type safety.
@@ -365,15 +365,62 @@ This payload is sent from the client to a server endpoint (e.g., `/api/suppliers
 
 Zod is the sole source of truth for the **shape** and **rules** of data throughout the system, on both the frontend and backend. The schemas defined in `src/lib/domain/domainTypes.ts` are used directly in API endpoints for robust server-side validation.
 
-#### Query Config Pattern (Critical Implementation Detail)
-All entities must be added to the Query Config with proper column whitelisting:
+#### Architectural Evolution: Schema-based Table Registry
+
+**Current Challenge:** The existing queryConfig system requires duplicate column maintenance - once in Zod schemas and again in hardcoded column lists.
+
+**Planned Solution:** A new **Table Registry System** that eliminates code duplication:
+
+```typescript
+// Planned: src/lib/backendQueries/tableRegistry.ts
+export interface TableDefinition {
+  schema: z.ZodTypeAny;      // Direct reference to Zod schema
+  tableName: string;         // e.g., "orders"
+  dbSchema: string;          // e.g., "dbo"
+  alias: string;             // e.g., "ord"
+}
+
+export const TableRegistry = {
+  "orders": {
+    schema: OrderSchema,      // Single source of truth
+    tableName: "orders",
+    dbSchema: "dbo",
+    alias: "ord"
+  },
+  // ... other entities
+} as const;
+
+// Runtime column validation using schema.shape
+export function validateSelectColumns(identifier: string, selectColumns: string[]): void {
+  const tableConfig = getTableConfig(identifier);
+  if (!tableConfig) return;
+
+  const allowedColumns = Object.keys(tableConfig.schema.shape);
+  // Validate columns against schema instead of hardcoded lists
+}
+```
+
+**Benefits:**
+- **Single Source of Truth:** Column definitions only exist in Zod schemas
+- **Runtime Validation:** QueryBuilder validates SELECT columns against schemas
+- **Type Safety:** Compile-time types automatically derived from schemas
+- **JOIN Support:** Complex queries with schema-based column validation
+
+**Migration Path:**
+1. **Phase 1:** Add Table Registry parallel to existing queryConfig
+2. **Phase 2:** Enhance QueryBuilder with schema-based validation
+3. **Phase 3:** Remove hardcoded column lists from queryConfig
+4. **Phase 4:** Generate type system from Table Registry
+
+#### Current Query Config Pattern (Legacy - To Be Migrated)
+All entities currently require hardcoded column whitelisting:
 
 ```typescript
 // In src/lib/backendQueries/queryConfig.ts
 export const entityQueryConfig: QueryConfig = {
   allowedTables: {
     "dbo.entity_table": ["entity_id", "name", "status", "created_at"],
-    // Only whitelisted columns can be queried
+    // Only whitelisted columns can be queried - DUPLICATE MAINTENANCE
   }
 };
 ```
@@ -588,9 +635,9 @@ When implementing a new entity (e.g., Orders), follow this comprehensive checkli
 - [ ] Update `AllSchemas` mapping object
 
 ### 2. Query Configuration
-- [ ] Add table to `src/lib/backendQueries/queryConfig.ts`
-- [ ] Whitelist all queryable columns
-- [ ] Add any required JOIN configurations
+- [ ] **Current System:** Add table to `src/lib/backendQueries/queryConfig.ts` with hardcoded column whitelists
+- [ ] **Future System:** Add entity to Table Registry with schema reference only
+- [ ] Add any required JOIN configurations for complex queries
 
 ### 3. API Endpoints (5-endpoint structure)
 - [ ] `POST /api/entity` - List queries with QueryPayload

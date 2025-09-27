@@ -310,7 +310,12 @@ export const OrderItemForCreateSchema = OrderItemSchema.omit({
 
 // ===== ORDER ITEM with JOINS  =====
 
-export const OrderItem_ProdDef_Category_Schema = [OrderItemSchema, ProductDefinitionSchema, ProductCategorySchema];
+//export const OrderItem_ProdDef_Category_Schema = [OrderItemSchema, ProductDefinitionSchema, ProductCategorySchema];
+
+export const OrderItem_ProdDef_Category_Schema = OrderItemSchema.extend( {
+  product_def: ProductDefinitionSchema,
+  category: ProductCategorySchema 
+});
 
 // ===== SCHEMAS => TYPES  =====
 

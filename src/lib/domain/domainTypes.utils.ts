@@ -3,32 +3,82 @@ import { log } from "$lib/utils/logger";
 import z from "zod";
 import { WholesalerSchema } from "./domainTypes";
 
+
 /**
-   * Utility: Generate qualified column names from an array of schemas using TableRegistry
-   * @param schemas - Array of Zod schemas
-   * @returns Array of qualified column names like ["ord.order_id", "ori.order_item_id", ...]
-   */
-  export function genQualifiedColumns(schemas: z.ZodObject<any>[]): string[] {
-    const columns: string[] = [];
+ * Utility: Generate qualified column names from an array of schemas using TableRegistry
+ * @param schemas - Array of Zod schemas
+ * @returns Array of qualified column names like ["ord.order_id", "ori.order_item_id", ...]
+ */
+export function genQualifiedColumnsForSchemas(schemas: z.ZodObject<any>[]): string[] {
+  const columns: string[] = [];
 
-    for (const schema of schemas) {
-      // Find matching table config by schema reference
-      const tableEntry = Object.entries(TableRegistry).find(([, config]) => config.schema === schema);
+  for (const schema of schemas) {
+    // Find matching table config by schema reference
+    const tableEntry = Object.entries(TableRegistry).find(([, config]) => config.schema === schema);
 
-      if (!tableEntry) {
-        throw new Error(`Schema not found in TableRegistry: ${schema.description || 'unnamed schema'}`);
-      }
-
-      const [, config] = tableEntry;
-      const alias = config.alias;
-      const schemaKeys = schema.keyof().options;
-
-      // Add all columns with alias prefix
-      columns.push(...schemaKeys.map((key: string) => `${alias}.${key}`));
+    if (!tableEntry) {
+      throw new Error(`Schema not found in TableRegistry: ${schema.description || "unnamed schema"}`);
     }
 
-    return columns;
+    const [, config] = tableEntry;
+    const alias = config.alias;
+    const schemaKeys = schema.keyof().options;
+
+    // Add all columns with alias prefix
+    columns.push(...schemaKeys.map((key: string) => `${alias}.${key}`));
   }
+
+  return columns;
+}
+
+/**
+ * Generate SQL SELECT columns from a Zod schema for JOIN queries.
+ *
+ * This function analyzes a schema and generates the appropriate
+ * column list for SQL queries. Base table fields remain unqualified, while joined
+ * table fields get qualified with their respective aliases.
+ *
+ * Example:
+ * 
+ * const OrderItem_ProDef_Category = OrderItemSchema.extend({
+ *   product_def: ProductDefinitionSchema,
+ *   category: ProductCategorySchema
+ * });
+ *
+ * genQualifiedColumns(OrderItem_Extended)
+ * // Returns: ["order_item_id", "quantity", "pd.product_def_id", "pd.name", "pc.category_id", "pc.name"]
+ * 
+ *
+ * @param schema - Zod schema created with .extend() containing base fields + nested objects
+ * @returns Array of column names: base fields unqualified, joined fields with aliases
+ */
+export function genQualifiedColumns(schema: z.ZodObject<any>): string[] {
+  const columns: string[] = [];
+  const shape = schema.shape;
+
+  for (const [fieldName, zodType] of Object.entries(shape)) {
+    if (zodType instanceof z.ZodObject) {
+      // This is a nested object representing a joined table (e.g., product_def, category)
+      const tableEntry = Object.entries(TableRegistry).find(([, config]) => config.schema === zodType);
+
+      if (tableEntry) {
+        const [, config] = tableEntry;
+        const alias = config.alias;
+        const nestedKeys = zodType.keyof().options;
+
+        // Add qualified columns for joined table: "pd.product_def_id", "pd.name", etc.
+        columns.push(...nestedKeys.map((key: string) => `${alias}.${key}`));
+      }
+    } else {
+      // This is a direct field from the base table - no alias qualification needed
+      // Base table fields remain unqualified in SELECT to maintain consistency
+      columns.push(fieldName);
+    }
+  }
+
+  return columns;
+}
+
 // ===== UTILS =====
 /**
  * ValidationResultFor represents the outcome of validating data
@@ -57,17 +107,17 @@ import { WholesalerSchema } from "./domainTypes";
  *      - `sanitized` is undefined because there is no valid data.
  */
 
-
-export type ValidationResultFor<S extends z.ZodTypeAny> = {
-  isValid: true;
-  errors: Record<string, never>;
-  sanitized: z.output<S>;
-} |
-{
-  isValid: false;
-  errors: Record<string, string[]>;
-  sanitized: undefined;
-};
+export type ValidationResultFor<S extends z.ZodTypeAny> =
+  | {
+      isValid: true;
+      errors: Record<string, never>;
+      sanitized: z.output<S>;
+    }
+  | {
+      isValid: false;
+      errors: Record<string, string[]>;
+      sanitized: undefined;
+    };
 /**
  * Validate any input against a given Zod schema.
  *

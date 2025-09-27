@@ -182,8 +182,6 @@ export function getProductDefinitionApi(client: ApiClient) {
             "pc.name AS category_name",
             "w.name AS supplier_name",
           ],
-          // from: FEHLT!
-          // joins: FEHLEN!
           where: {
             whereCondOp: "AND",
             conditions: [{ key: "wio.product_def_id", whereCondOp: "=", val: productDefId }],

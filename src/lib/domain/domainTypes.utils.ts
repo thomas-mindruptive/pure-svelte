@@ -1,7 +1,6 @@
 import { TableRegistry } from "$lib/backendQueries/tableRegistry";
 import { log } from "$lib/utils/logger";
 import z from "zod";
-import { WholesalerSchema } from "./domainTypes";
 
 
 /**
@@ -68,7 +67,10 @@ export function genQualifiedColumns(schema: z.ZodObject<any>): string[] {
 
         // Add qualified columns for joined table: "pd.product_def_id", "pd.name", etc.
         columns.push(...nestedKeys.map((key: string) => `${alias}.${key}`));
+      } else {
+        throw new Error(`Cannot find tableEntry for ${zodType}`);
       }
+
     } else {
       // This is a direct field from the base table - no alias qualification needed
       // Base table fields remain unqualified in SELECT to maintain consistency
@@ -167,6 +169,6 @@ export function toValidationResult<S extends z.ZodTypeAny>(result: z.ZodSafePars
   };
 }
 // Sample usage
-const validationResult = validateEntity(WholesalerSchema, {});
-const sanitized = validationResult.sanitized;
-void sanitized;
+// const validationResult = validateEntity(WholesalerSchema, {});
+// const sanitized = validationResult.sanitized;
+// void sanitized;

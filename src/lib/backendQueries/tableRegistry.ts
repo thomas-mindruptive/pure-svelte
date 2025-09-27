@@ -313,6 +313,13 @@ export function validateSelectColumns(selectColumns: string[], hasJoins: boolean
 }
 
 /**
+ * Interface for flexible AliasedTableRegistry (for dependency injection)
+ */
+export interface IAliasedTableRegistry {
+  [alias: string]: TableDefinition;
+}
+
+/**
  * Type Utilities
  */
 export type TableRegistryKeys = keyof typeof TableRegistry;

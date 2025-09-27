@@ -137,3 +137,42 @@ The current approach is a pragmatic compromise: it sacrifices reliability for sp
 Whether an assistant begins with a **Complete-Bundle** snapshot or constructs its view through **Vibe Coding**, two fundamentals govern outcomes: **bounded context** and **probabilistic generation**. The first constrains how much detail can be carried forward; the second makes superficially correct code easy to produce and easy to trust. Complete-Bundle offers the best start and still cannot guarantee correct application of project-specific rules. Vibe Coding scales to large codebases but tends toward project-wide pattern search once the window is pressured, trading architectural coherence for fast text matches.
 
 Used deliberately—with static analysis, rigorous review, and realistic scope—assistants remain useful for exploration, explanation, and routine code. Expecting them to handle domain logic, sustained multi-file changes, or security-critical work reliably is where the vibes fade. A future grounded in the hybrid architecture of probabilistic generation checked by deterministic validation may finally overcome these limits, but today's tools require careful, critical application.
+
+#### Further samples
+1. Hard Coupling Without Thinking
+
+  - Error: Hard-coded TableRegistry into the function
+  - Junior Behavior: Just wrote import without considering testability
+  - Correct: Dependency injection from the start
+
+  2. Overengineering Error Handling
+
+  - Error: Complex error arrays instead of simple throw
+  - Junior Behavior: "More code = better" mentality
+  - Correct: KISS - just throw on problems
+
+  3. Inconsistency and Opinion Changes
+
+  - Error: Yesterday: "TableRegistry is perfect!" → Today: "TableRegistry is bad!"
+  - Junior Behavior: No clear architectural vision
+  - Correct: Stick to decisions
+
+  4. Misusing TypeScript Types
+
+  - Error: typeof AliasedTableRegistry instead of interface
+  - Junior Behavior: Using concrete types for flexibility
+  - Correct: Use interfaces for abstraction
+
+  5. Tests as Afterthought
+
+  - Error: Code first, then "oh shit, how do I test this?"
+  - Junior Behavior: Not thinking about testability from the start
+  - Correct: Test-driven design
+
+  6. Sloppy Implementation
+
+  - Error: Forgot test parameters, incomplete refactors
+  - Junior Behavior: Not following through on changes
+  - Correct: Systematically update all places
+
+Argument: "But it works"

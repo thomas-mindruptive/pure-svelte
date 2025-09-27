@@ -180,7 +180,46 @@ export const supplierQueryConfig: QueryConfig = {
         },
       ],
     },
+    "order->order_items->product_def->category": {
+      from: { table: "dbo.orders", alias: "ord" },
+      joins: [
+        {
+          type: JoinType.INNER,
+          table: "dbo.order_items",
+          alias: "ori",
+          on: {
+            joinCondOp: "AND",
+            conditions: [{ columnA: "ord.order_id", op: "=", columnB: "ori.order_id" }],
+          },
+        },
+        {
+          type: JoinType.INNER,
+          table: "dbo.offering",
+          alias: "wio",
+          on: {
+            joinCondOp: "AND",
+            conditions: [{ columnA: "ori.offering_id", op: "=", columnB: "ori.offering_id" }],
+          },
+        },
+        {
+          type: JoinType.INNER,
+          table: "dbo.product_definitions",
+          alias: "pd",
+          on: {
+            joinCondOp: "AND",
+            conditions: [{ columnA: "pd.product_def_id", op: "=", columnB: "wio.product_def_id" }],
+          },
+        },
+        {
+          type: JoinType.INNER,
+          table: "dbo.product_categories",
+          alias: "pc",
+          on: {
+            joinCondOp: LogicalOperator.AND,
+            conditions: [{ columnA: "wio.category_id", op: ComparisonOperator.EQUALS, columnB: "pc.category_id" }],
+          },
+        },
+      ],
+    },
   },
 };
-
-

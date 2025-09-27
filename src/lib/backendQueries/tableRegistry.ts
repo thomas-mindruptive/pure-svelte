@@ -101,13 +101,15 @@ export const TableRegistry = {
  */
 function createDbSchemaTableRegistry<T extends Record<string, TableDefinition>>(
   tableRegistry: T
-): Record<string, T[keyof T]> {
+): {
+  [K in keyof T as `${T[K]["dbSchema"]}.${T[K]["tableName"]}`]: T[K]
+} {
   return Object.fromEntries(
     Object.entries(tableRegistry).map(([, config]) => [
       `${config.dbSchema}.${config.tableName}`,
       config
     ])
-  ) as Record<string, T[keyof T]>;
+  ) as any;
 }
 
 /**
@@ -118,7 +120,7 @@ export const DbSchemaTableRegistry = createDbSchemaTableRegistry(TableRegistry);
 /**
  * Helper functions for schema validation
  */
-export function getTableConfig(identifier: string): TableDefinition | null {
+export function getTableConfig(identifier: DbTableNames): TableDefinition | null {
   // Try entity name first
   if (identifier in TableRegistry) {
     return TableRegistry[identifier as keyof typeof TableRegistry];
@@ -135,8 +137,8 @@ export function getTableConfig(identifier: string): TableDefinition | null {
 /**
  * Validates SELECT columns against the schema
  */
-export function validateSelectColumns(identifier: string, selectColumns: string[]): void {
-  const tableConfig = getTableConfig(identifier);
+export function validateSelectColumns(tableName: DbTableNames, selectColumns: string[]): void {
+  const tableConfig = getTableConfig(tableName);
 
   if (!tableConfig) {
     // No validation for unknown tables
@@ -167,7 +169,7 @@ export function validateSelectColumns(identifier: string, selectColumns: string[
 
     if (!allowedColumns.includes(cleanColumn)) {
       throw new Error(
-        `Column '${cleanColumn}' not found in schema for table '${identifier}'. ` +
+        `Column '${cleanColumn}' not found in schema for table '${tableName}'. ` +
         `Available columns: ${allowedColumns.join(', ')}`
       );
     }
@@ -184,13 +186,15 @@ export function validateSelectColumns(identifier: string, selectColumns: string[
  */
 function createAliasedTableRegistry<T extends Record<string, TableDefinition>>(
   tableRegistry: T
-): Record<string, T[keyof T]> {
+): {
+  [K in keyof T as T[K]["alias"]]: T[K]
+} {
   return Object.fromEntries(
     Object.entries(tableRegistry).map(([, config]) => [
       config.alias,
       config
     ])
-  ) as Record<string, T[keyof T]>;
+  ) as any;
 }
 
 /**
@@ -218,7 +222,7 @@ export type AliasToEntityMap = {
 export type ValidFromClause = {
   [Alias in keyof typeof AliasedTableRegistry]: {
     table: `${(typeof AliasedTableRegistry)[Alias]["dbSchema"]}.${(typeof AliasedTableRegistry)[Alias]["tableName"]}`;
-    alias: Alias;
+    alias: `${(typeof AliasedTableRegistry)[Alias]["alias"]}`; ////Alias;
   };
 }[keyof typeof AliasedTableRegistry];
 
@@ -246,14 +250,12 @@ export type AllAliasedColumns = `${AllQualifiedColumns} AS ${string}`;
 /**
  * Enhanced getTableConfig - Support for aliases
  */
-export function getTableConfigByAlias(alias: string): TableDefinition | null {
+export function getTableConfigByAlias(alias: AliasKeys): TableDefinition | null {
   // Try alias first
   if (alias in AliasedTableRegistry) {
     return AliasedTableRegistry[alias];
   }
-
-  // Fallback to normal getTableConfig
-  return getTableConfig(alias);
+  throw Error(`Cannot find table config by alias: ${alias}`);
 }
 
 /**
@@ -282,7 +284,7 @@ export function validateJoinSelectColumns(selectColumns: string[]): void {
       }
 
       // Validate against Table Registry
-      const tableConfig = getTableConfigByAlias(alias);
+      const tableConfig = getTableConfigByAlias(alias as AliasKeys);
       if (tableConfig) {
         // Zod correct API: keyof() returns ZodEnum, .options contains the keys
         const allowedColumns = tableConfig.schema.keyof().options;
@@ -294,8 +296,11 @@ export function validateJoinSelectColumns(selectColumns: string[]): void {
         }
       }
     } else {
-      // Unqualified column - use existing validation
-      validateSelectColumns('unknown', [column]);
+      // Unqualified column in JOIN query - this is a design error
+      throw new Error(
+        `Unqualified column '${column}' found in JOIN query. ` +
+        `All columns in JOIN queries must be qualified (e.g., 'w.name', 'pc.category_id').`
+      );
     }
   }
 }

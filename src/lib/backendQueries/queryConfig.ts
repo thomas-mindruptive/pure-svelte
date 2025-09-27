@@ -194,7 +194,7 @@ export const supplierQueryConfig: QueryConfig = {
         },
         {
           type: JoinType.INNER,
-          table: "dbo.offering",
+          table: "dbo.wholesaler_item_offerings",
           alias: "wio",
           on: {
             joinCondOp: "AND",
@@ -222,4 +222,4 @@ export const supplierQueryConfig: QueryConfig = {
       ],
     },
   },
-};
+} as const satisfies QueryConfig;

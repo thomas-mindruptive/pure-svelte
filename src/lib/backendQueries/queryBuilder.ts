@@ -180,9 +180,8 @@ export function buildQuery<T>(
 		if (!aliasConfig) throw new Error(`JOIN alias '${alias}' is not a registered alias.`);
 
 		const expectedFullTableName = `${aliasConfig.dbSchema}.${aliasConfig.tableName}`;
-		const expectedTableName = aliasConfig.tableName;
 
-		if (table !== expectedFullTableName && table !== expectedTableName) {
+		if (table !== expectedFullTableName) {
 			throw new Error(`JOIN alias '${alias}' is for table '${expectedFullTableName}', not '${table}'.`);
 		}
 

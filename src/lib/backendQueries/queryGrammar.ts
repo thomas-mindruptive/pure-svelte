@@ -1,6 +1,12 @@
 // src/lib/clientAndBack/queryGrammar.ts
 
-import type { AllAliasedColumns, AllQualifiedColumns, ValidFromClause } from "./tableRegistry";
+import {
+  type AllAliasedColumns,
+  type AllQualifiedColumns,
+  type ValidFromClause,
+  type DbTableNames,
+  type AliasKeys,
+} from "./tableRegistry";
 
 /**
  * @file Query Grammar & Core Structures - FINAL
@@ -42,8 +48,8 @@ export enum JoinType {
 
 export interface JoinClause {
   type: JoinType | `${JoinType}`;
-  table: string;
-  alias?: string;
+  table: DbTableNames;
+  alias: AliasKeys;
   on: JoinConditionGroup; // dieselbe Struktur wie WHERE-Bedingungen
 }
 
@@ -87,7 +93,7 @@ export type InlineWhereCondition<T> = [
 export type InlineWhereConditionGroup<T> = [
   InlineWhereCondition<T>,
   LogicalOperator | `${LogicalOperator}`,
-  InlineWhereCondition<T> | InlineWhereConditionGroup<T>, 
+  InlineWhereCondition<T> | InlineWhereConditionGroup<T>,
 ];
 
 export function isConditionGroup<T>(

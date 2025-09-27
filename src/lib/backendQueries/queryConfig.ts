@@ -6,17 +6,16 @@
  * It is now strictly validated against the UNMODIFIED `domain/types.ts`.
  */
 
-import { ComparisonOperator, JoinType, LogicalOperator, type JoinClause, type QueryPayload } from "$lib/backendQueries/queryGrammar";
-import type { ValidFromClause } from "./tableRegistry";
+import { ComparisonOperator, JoinType, LogicalOperator, type QueryPayload } from "$lib/backendQueries/queryGrammar";
+import { OrderItem_ProdDef_Category_Schema } from "$lib/domain/domainTypes";
+import { genQualifiedColumns } from "$lib/domain/domainTypes.utils";
+
+type Optional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
+
+type QueryConfigEntry = Required<Pick<QueryPayload<any>, "from">> & Optional<QueryPayload<any>, "select">;
 
 export interface QueryConfig {
-  joinConfigurations: {
-    [viewName: string]: {
-      from: ValidFromClause;
-      joins: JoinClause[];
-      exampleQuery?: QueryPayload<unknown>;
-    };
-  };
+  joinConfigurations: { [viewName: string]: QueryConfigEntry };
 }
 
 // --- The Configuration Object ---
@@ -181,6 +180,7 @@ export const supplierQueryConfig: QueryConfig = {
       ],
     },
     "order->order_items->product_def->category": {
+      select: genQualifiedColumns(OrderItem_ProdDef_Category_Schema),
       from: { table: "dbo.orders", alias: "ord" },
       joins: [
         {

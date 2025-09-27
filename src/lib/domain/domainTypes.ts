@@ -1,4 +1,3 @@
-import { log } from "$lib/utils/logger";
 import { z } from "zod";
 
 // ===== ALL ENTITIES =====
@@ -311,9 +310,7 @@ export const OrderItemForCreateSchema = OrderItemSchema.omit({
 
 // ===== ORDER ITEM with JOINS  =====
 
-export const OrderItem_ProductDef_Schema = OrderItemSchema.extend({
-  product_def_title: NameOrTitle,
-});
+export const OrderItem_ProdDef_Category_Schema = [OrderItemSchema, ProductDefinitionSchema, ProductCategorySchema];
 
 // ===== SCHEMAS => TYPES  =====
 
@@ -337,110 +334,7 @@ export type Material = z.infer<typeof MaterialSchema>;
 export type Form = z.infer<typeof FormSchema>;
 export type Order = z.infer<typeof OrderSchema>;
 export type OrderItem = z.infer<typeof OrderItemSchema>;
-export type OrderItem_ProductDef = z.infer<typeof OrderItem_ProductDef_Schema>;
+export type OrderItem_ProdDef_Category = z.infer<typeof OrderItem_ProdDef_Category_Schema>;
 
-// ===== SCHEMA MAP =====
 
-//export const AllSchemas = {
-//   wholesalers: WholesalerSchema,
-//   categories: ProductCategorySchema,
-//   product_definitions: ProductDefinitionSchema,
-//   offerings: WholesalerItemOfferingSchema,
-//   attributes: AttributeSchema,
-//   links: WholesalerOfferingLinkSchema,
-//   orders: OrderSchema,
-//   order_items: OrderItemSchema,
-// } as const satisfies Record<AllEntities, z.ZodTypeAny>;
 
-// ===== UTILS =====
-
-/**
- * ValidationResultFor represents the outcome of validating data
- * against a specific Zod schema.
- *
- * Understanding `z.output<S>`:
- * ---------------------------------------
- * - A Zod schema describes what a valid object should look like.
- * - `z.output<S>` is the exact **TypeScript type of the object you
- *   get back after Zod has successfully checked and cleaned it**.
- * - Think of it as “the final, trustworthy data” after validation.
- *   For example, if the schema says there must be
- *     { id: number; name: string }
- *   then `z.output<S>` is exactly { id: number; name: string }.
- *
- * The type below is a union of two cases:
- * 1. **Success**:
- *      - `isValid` is true.
- *      - `sanitized` contains the cleaned data with the type
- *        guaranteed by the schema (`z.output<S>`).
- *      - `errors` is an empty object.
- * 2. **Failure**:
- *      - `isValid` is false.
- *      - `errors` holds error messages for each field (and optional
- *        global errors).
- *      - `sanitized` is undefined because there is no valid data.
- */
-export type ValidationResultFor<S extends z.ZodTypeAny> =
-  | {
-      isValid: true;
-      errors: Record<string, never>;
-      sanitized: z.output<S>;
-    }
-  | {
-      isValid: false;
-      errors: Record<string, string[]>;
-      sanitized: undefined;
-    };
-
-/**
- * Validate any input against a given Zod schema.
- *
- * @param schema  The Zod schema describing the required shape of the data.
- * @param data    The raw input to check.
- * @returns       A ValidationResultFor<S>:
- *                  - On success: { isValid: true, sanitized: cleaned data }
- *                  - On failure: { isValid: false, errors: detailed messages }
- */
-export function validateEntity<S extends z.ZodTypeAny>(schema: S, data: unknown): ValidationResultFor<S> {
-  const res = schema.safeParse(data);
-  const validationResult = toValidationResult(res);
-  log.debug(`Validated through ${schema.description}`, validationResult);
-  return validationResult;
-}
-
-/**
- * Convert the result of schema.safeParse into our unified ValidationResultFor<S>.
- *
- * - Uses `z.flattenError` (the Zod v4 helper) to collect
- *   both field-specific errors and form-level (“global”) errors.
- */
-export function toValidationResult<S extends z.ZodTypeAny>(result: z.ZodSafeParseResult<z.output<S>>): ValidationResultFor<S> {
-  if (result.success) {
-    return {
-      isValid: true,
-      errors: {} as Record<string, never>,
-      sanitized: result.data,
-    };
-  }
-  const { fieldErrors, formErrors } = z.flattenError(result.error);
-
-  // Ensure we only keep fields that actually have messages
-  const errors: Record<string, string[]> = {};
-  for (const [key, arr] of Object.entries(fieldErrors as Record<string, string[] | undefined>)) {
-    if (arr && arr.length) errors[key] = arr;
-  }
-
-  // Global errors (not tied to a specific field) are stored under "_root"
-  if (formErrors.length) errors._root = formErrors;
-
-  return {
-    isValid: false,
-    errors,
-    sanitized: undefined,
-  };
-}
-
-// Sample usage
-const validationResult = validateEntity(WholesalerSchema, {});
-const sanitized = validationResult.sanitized;
-void sanitized;

@@ -10,7 +10,7 @@ import {
   TableRegistry,
   AliasedTableRegistry,
   getTableConfigByAlias,
-  validateJoinSelectColumns,
+  validateSelectColumns,
   type ValidFromClause
 } from './tableRegistry';
 
@@ -39,32 +39,46 @@ describe('Table Registry - Phase 1: Alias-basierte Types', () => {
     expect(categoryConfig?.alias).toBe('pc');
   });
 
-  it('should validate JOIN select columns correctly', () => {
-    // Valid columns sollten keine Fehler werfen
+  it('should validate select columns correctly based on JOIN presence', () => {
+    // Valid qualified columns in JOIN queries sollten keine Fehler werfen
     expect(() => {
-      validateJoinSelectColumns([
+      validateSelectColumns([
         'w.wholesaler_id',
         'w.name',
         'pc.category_id',
         'pc.name AS category_name'
-      ]);
+      ], true); // hasJoins = true
     }).not.toThrow();
 
-    // Invalid columns sollten Fehler werfen
+    // Valid unqualified columns in single-table queries sollten keine Fehler werfen
     expect(() => {
-      validateJoinSelectColumns(['w.invalid_column']);
+      validateSelectColumns([
+        'wholesaler_id',
+        'name',
+        'status'
+      ], false); // hasJoins = false
+    }).not.toThrow();
+
+    // Invalid qualified columns sollten Fehler werfen
+    expect(() => {
+      validateSelectColumns(['w.invalid_column'], true);
     }).toThrow(/Column 'invalid_column' not found in schema for alias 'w'/);
+
+    // Unqualified columns in JOIN queries sollten Fehler werfen
+    expect(() => {
+      validateSelectColumns(['wholesaler_id'], true);
+    }).toThrow(/Unqualified column 'wholesaler_id' found in JOIN query/);
   });
 
   it('should handle aggregate functions and wildcards', () => {
     // Aggregate functions und wildcards sollten keine Validierung triggern
     expect(() => {
-      validateJoinSelectColumns([
+      validateSelectColumns([
         'w.*',
         'COUNT(w.wholesaler_id)',
         'SUM(wio.price)',
         'w.name AS supplier_name'
-      ]);
+      ], true); // hasJoins = true
     }).not.toThrow();
   });
 

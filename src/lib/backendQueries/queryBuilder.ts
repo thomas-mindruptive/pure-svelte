@@ -15,7 +15,7 @@ import type { QueryPayload, WhereCondition, WhereConditionGroup, JoinClause, Sor
 import { isJoinColCondition, isWhereCondition, isWhereConditionGroup } from '$lib/backendQueries/queryGrammar';
 import type { QueryConfig } from '$lib/backendQueries/queryConfig';
 import type { Transaction } from 'mssql';
-import { AliasedTableRegistry, validateJoinSelectColumns } from '$lib/backendQueries/tableRegistry';
+import { AliasedTableRegistry, validateSelectColumns } from '$lib/backendQueries/tableRegistry';
 
 // --- TYPE DEFINITIONS for internal use ---
 
@@ -109,11 +109,23 @@ export function buildQuery<T>(
 	fixedFrom?: FromClause
 ) {
 	const { select, joins, where, orderBy, limit, offset } = payload;
+
+	// --- 0. Determine if query has JOINs for validation ---
 	let realJoins = joins || [];
 
-	// --- 0. Validate SELECT columns against Table Registry schemas ---
+	// Check if JOINs will be added from namedQuery
+	if (namedQuery && config.joinConfigurations) {
+		const joinConfig = config.joinConfigurations[namedQuery as keyof typeof config.joinConfigurations];
+		if (joinConfig?.joins) {
+			realJoins = [...joinConfig.joins, ...realJoins];
+		}
+	}
+
+	const hasJoins = realJoins.length > 0;
+
+	// --- 1. Validate SELECT columns against Table Registry schemas ---
 	if (select && Array.isArray(select)) {
-		validateJoinSelectColumns(select as string[]);
+		validateSelectColumns(select as string[], hasJoins);
 	}
 
 	const ctx: BuildContext = {
@@ -124,7 +136,7 @@ export function buildQuery<T>(
 	let fromClause = '';
 	let fromTableForMetadata = '';
 
-	// --- 1. Determine and Validate the FROM Clause ---
+	// --- 2. Determine and Validate the FROM Clause ---
 	// This logic implements the hybrid model.
 	if (namedQuery && config.joinConfigurations) {
 		// Case 1: A predefined, trusted JOIN configuration is used. This is the most secure path.
@@ -170,7 +182,7 @@ export function buildQuery<T>(
 		fromTableForMetadata = table;
 	}
 
-	// --- 2. Build JOIN Clauses ---
+	// --- 3. Build JOIN Clauses ---
 	const joinClause = realJoins?.map((join: JoinClause) => {
 		const { type, table, alias, on } = join;
 		if (!alias) throw new Error("All JOINs must have an alias for consistency and security.");
@@ -189,13 +201,13 @@ export function buildQuery<T>(
 		return `${type} ${table} ${alias} ON ${onClause}`;
 	}).join(' ');
 
-	// --- 3. Build Remaining SQL Clauses ---
+	// --- 4. Build Remaining SQL Clauses ---
 	const selectClause = select.join(', ');
 	const whereClause = where ? `WHERE ${buildWhereClause(where, ctx)}` : '';
 	const orderByClause = orderBy ? `ORDER BY ${orderBy.map((s: SortDescriptor<T>) => `${String(s.key)} ${s.direction}`).join(', ')}` : '';
 	const limitClause = (limit && limit > 0) ? `OFFSET ${offset || 0} ROWS FETCH NEXT ${limit} ROWS ONLY` : '';
 
-	// --- 4. Assemble Final Query ---
+	// --- 5. Assemble Final Query ---
 	const sql = `SELECT ${selectClause} FROM ${fromClause} ${joinClause || ''} ${whereClause} ${orderByClause} ${limitClause}`;
 
 	return {

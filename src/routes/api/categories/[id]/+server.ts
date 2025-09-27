@@ -12,7 +12,8 @@ import { db } from "$lib/backendQueries/db";
 import { log } from "$lib/utils/logger";
 import { mssqlErrorMapper } from "$lib/backendQueries/mssqlErrorMapper";
 import { checkProductCategoryMasterDependencies } from "$lib/dataModel/dependencyChecks";
-import { ProductCategorySchema, validateEntity, type ProductCategory } from "$lib/domain/domainTypes";
+import { ProductCategorySchema, type ProductCategory } from "$lib/domain/domainTypes";
+import { validateEntity } from "$lib/domain/domainTypes.utils";
 import { v4 as uuidv4 } from "uuid";
 
 import type { ApiErrorResponse, ApiSuccessResponse, DeleteConflictResponse, DeleteRequest } from "$lib/api/api.types";

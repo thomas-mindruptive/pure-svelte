@@ -14,7 +14,8 @@ import { supplierQueryConfig } from "$lib/backendQueries/queryConfig";
 import { mssqlErrorMapper } from "$lib/backendQueries/mssqlErrorMapper";
 import { checkWholesalerDependencies } from "$lib/dataModel/dependencyChecks";
 import { LogicalOperator, ComparisonOperator, type QueryPayload, type WhereCondition } from "$lib/backendQueries/queryGrammar";
-import { validateEntity, WholesalerSchema, type Wholesaler } from "$lib/domain/domainTypes";
+import { WholesalerSchema, type Wholesaler } from "$lib/domain/domainTypes";
+import { validateEntity } from "$lib/domain/domainTypes.utils";
 import { v4 as uuidv4 } from "uuid";
 
 import type {

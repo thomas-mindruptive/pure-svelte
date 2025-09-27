@@ -11,7 +11,8 @@ import { db } from "$lib/backendQueries/db";
 import { log } from "$lib/utils/logger";
 import { mssqlErrorMapper } from "$lib/backendQueries/mssqlErrorMapper";
 import { checkProductDefinitionDependencies } from "$lib/dataModel/dependencyChecks";
-import { ProductDefinitionSchema, validateEntity, type ProductDefinition } from "$lib/domain/domainTypes";
+import { ProductDefinitionSchema, type ProductDefinition } from "$lib/domain/domainTypes";
+import { validateEntity } from "$lib/domain/domainTypes.utils";
 import { v4 as uuidv4 } from "uuid";
 import type {
   ApiErrorResponse,

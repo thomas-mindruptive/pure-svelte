@@ -137,7 +137,7 @@ export function getTableConfig(identifier: DbTableNames): TableDefinition | null
 /**
  * Validates SELECT columns against the schema
  */
-export function validateSelectColumns(tableName: DbTableNames, selectColumns: string[]): void {
+export function validateSingleTableSelectColumns(tableName: DbTableNames, selectColumns: string[]): void {
   const tableConfig = getTableConfig(tableName);
 
   if (!tableConfig) {
@@ -259,9 +259,11 @@ export function getTableConfigByAlias(alias: AliasKeys): TableDefinition | null 
 }
 
 /**
- * Validates SELECT columns for JOIN queries with multiple aliases
+ * Validates SELECT columns for queries (supports both single-table and JOIN queries)
+ * @param selectColumns - Array of column names to validate
+ * @param hasJoins - Whether the query contains JOINs
  */
-export function validateJoinSelectColumns(selectColumns: string[]): void {
+export function validateSelectColumns(selectColumns: string[], hasJoins: boolean): void {
   for (const column of selectColumns) {
     // Handle qualified columns (e.g., "w.wholesaler_id")
     if (column.includes('.')) {
@@ -296,11 +298,16 @@ export function validateJoinSelectColumns(selectColumns: string[]): void {
         }
       }
     } else {
-      // Unqualified column in JOIN query - this is a design error
-      throw new Error(
-        `Unqualified column '${column}' found in JOIN query. ` +
-        `All columns in JOIN queries must be qualified (e.g., 'w.name', 'pc.category_id').`
-      );
+      // Unqualified column
+      if (hasJoins) {
+        // In JOIN queries, unqualified columns are ambiguous
+        throw new Error(
+          `Unqualified column '${column}' found in JOIN query. ` +
+          `All columns in JOIN queries must be qualified (e.g., 'w.name', 'pc.category_id').`
+        );
+      }
+      // In single-table queries, unqualified columns are fine - skip validation
+      // Let the SQL engine handle validation at runtime
     }
   }
 }

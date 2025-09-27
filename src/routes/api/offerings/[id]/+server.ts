@@ -9,7 +9,8 @@ import { json, error, type RequestHandler } from "@sveltejs/kit";
 import { db } from "$lib/backendQueries/db";
 import { log } from "$lib/utils/logger";
 import { mssqlErrorMapper } from "$lib/backendQueries/mssqlErrorMapper";
-import { validateEntity, WholesalerItemOfferingSchema, type WholesalerItemOffering, type WholesalerItemOffering_ProductDef_Category_Supplier } from "$lib/domain/domainTypes";
+import { WholesalerItemOfferingSchema, type WholesalerItemOffering, type WholesalerItemOffering_ProductDef_Category_Supplier } from "$lib/domain/domainTypes";
+import { validateEntity } from "$lib/domain/domainTypes.utils";
 import { v4 as uuidv4 } from "uuid";
 import type {
   ApiErrorResponse,

@@ -13,7 +13,8 @@ import { buildQuery, executeQuery } from "$lib/backendQueries/queryBuilder";
 import { supplierQueryConfig } from "$lib/backendQueries/queryConfig";
 import { mssqlErrorMapper } from "$lib/backendQueries/mssqlErrorMapper";
 import { type WhereCondition, ComparisonOperator, type QueryPayload, LogicalOperator } from "$lib/backendQueries/queryGrammar";
-import { AttributeSchema, validateEntity, type Attribute } from "$lib/domain/domainTypes";
+import { AttributeSchema, type Attribute } from "$lib/domain/domainTypes";
+import { validateEntity } from "$lib/domain/domainTypes.utils";
 import { v4 as uuidv4 } from "uuid";
 
 import type {

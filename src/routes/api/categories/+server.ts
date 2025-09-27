@@ -43,11 +43,13 @@ export const POST: RequestHandler = async (event) => {
 
         log.info(`[${operationId}] Parsed request body`, {
             clientColumns: clientPayload.select?.length || 0,
-            where: clientPayload.where
+            where: clientPayload.where,
+            clientPayload
         });
 
         // 3. Build and execute the query.
         const { sql, parameters, metadata } = buildQuery(clientPayload, supplierQueryConfig, undefined, { table: 'dbo.product_categories', alias: 'pc' });
+        log.debug(`Built query: `, sql);
         const results = await executeQuery(sql, parameters);
 
         // 4. Format the response using the standard `QuerySuccessResponse` type.

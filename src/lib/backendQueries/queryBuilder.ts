@@ -109,24 +109,7 @@ export function buildQuery<T>(
 	fixedFrom?: FromClause
 ) {
 	const { select, joins, where, orderBy, limit, offset } = payload;
-
-	// --- 0. Determine if query has JOINs for validation ---
 	let realJoins = joins || [];
-
-	// Check if JOINs will be added from namedQuery
-	if (namedQuery && config.joinConfigurations) {
-		const joinConfig = config.joinConfigurations[namedQuery as keyof typeof config.joinConfigurations];
-		if (joinConfig?.joins) {
-			realJoins = [...joinConfig.joins, ...realJoins];
-		}
-	}
-
-	const hasJoins = realJoins.length > 0;
-
-	// --- 1. Validate SELECT columns against Table Registry schemas ---
-	if (select && Array.isArray(select)) {
-		validateSelectColumns(select as string[], hasJoins);
-	}
 
 	const ctx: BuildContext = {
 		parameters: {},
@@ -136,7 +119,7 @@ export function buildQuery<T>(
 	let fromClause = '';
 	let fromTableForMetadata = '';
 
-	// --- 2. Determine and Validate the FROM Clause ---
+	// --- 1. Determine and Validate the FROM Clause ---
 	// This logic implements the hybrid model.
 	if (namedQuery && config.joinConfigurations) {
 		// Case 1: A predefined, trusted JOIN configuration is used. This is the most secure path.
@@ -180,6 +163,12 @@ export function buildQuery<T>(
 		// If all checks pass, construct the final FROM clause string for the SQL query.
 		fromClause = `${table} ${alias}`;
 		fromTableForMetadata = table;
+	}
+
+	// --- 2. Validate SELECT columns against Table Registry schemas ---
+	const hasJoins = realJoins.length > 0;
+	if (select && Array.isArray(select)) {
+		validateSelectColumns(select as string[], hasJoins);
 	}
 
 	// --- 3. Build JOIN Clauses ---

@@ -3,9 +3,13 @@ import { z } from "zod";
 
 // ===== ALL ENTITIES =====
 
-export const AllEntitiesSchema = z
-  .enum(["wholesalers", "categories", "product_definitions", "offerings", "attributes", "links", "orders", "order_items"])
-  .describe("AllEntitiesSchema");
+// export const AllEntitiesSchema = z
+//   .enum(["wholesalers", "categories", "product_definitions", "offerings", "attributes", "links", "orders", "order_items"])
+//   .describe("AllEntitiesSchema");
+
+// ===== GENERAL =====
+
+export const NameOrTitle = z.string().max(200);
 
 // ===== WHOLESALER (dbo.wholesalers) =====
 
@@ -21,7 +25,7 @@ export type WholesalerRelevance = z.infer<typeof WholesalerRelevanceSchema>;
 export const WholesalerSchema = z
   .object({
     wholesaler_id: z.number().int().positive(),
-    name: z.string().max(200),
+    name: NameOrTitle,
     country: z.string().max(200).nullable().optional(),
     region: z.string().max(200).nullable().optional(),
     b2b_notes: z.string().max(1000).nullable().optional(),
@@ -45,10 +49,11 @@ export const WholesalerForCreateSchema = WholesalerSchema.omit({
 }).describe("WholesalerForCreateSchema");
 
 // ===== PRODUCT CATEGORY (dbo.product_categories) =====
+
 export const ProductCategorySchema = z
   .object({
     category_id: z.number().int().positive(),
-    name: z.string().max(200),
+    name: NameOrTitle,
     description: z.string().max(500).nullable().optional(),
   })
   .describe("ProductCategorySchema");
@@ -66,7 +71,7 @@ export const ProductCategoryForCreateSchema = ProductCategorySchema.omit({
 export const AttributeSchema = z
   .object({
     attribute_id: z.number().int().positive(),
-    name: z.string().max(200),
+    name: NameOrTitle,
     description: z.string().max(500).nullable().optional(),
   })
   .describe("AttributeSchema");
@@ -125,7 +130,7 @@ export const WholesalerCategoryForCreateSchema = WholesalerCategorySchema.omit({
 // ===== WHOLESALER CATEGORY including joins (dbo.wholesaler_categories) =====
 
 export const WholesalerCategory_CategorySchema = WholesalerCategorySchema.extend({
-  category_name: z.string(),
+  category_name: NameOrTitle,
   category_description: z.string().nullable().optional(),
 }).describe("WholesalerCategory_CategorySchema");
 
@@ -173,9 +178,9 @@ export const WholesalerItemOffering_ProductDefSchema = WholesalerItemOfferingSch
 export const WholesalerItemOffering_ProductDef_Category_SupplierSchema = WholesalerItemOfferingSchema.extend({
   product_def_title: z.string().optional(),
   product_def_description: z.string().nullable().optional(),
-  category_name: z.string().optional(),
+  category_name: NameOrTitle.optional(),
   category_description: z.string().nullable().optional(),
-  wholesaler_name: z.string().optional(),
+  wholesaler_name: NameOrTitle.optional(),
 }).describe("WholesalerItemOffering_ProductDef_Category_SupplierSchema");
 
 // ===== WHOLESALER OFFERING LINK (dbo.wholesaler_offering_links) =====
@@ -220,7 +225,7 @@ export const WholesalerOfferingAttributeForCreateSchema = WholesalerOfferingAttr
 // ===== WHOLESALER OFFERING ATTRIBUTE including joins (dbo.wholesaler_offering_attributes) =====
 
 export const WholesalerOfferingAttribute_AttributeSchema = WholesalerOfferingAttributeSchema.extend({
-  attribute_name: z.string().optional(),
+  attribute_name: NameOrTitle.optional(),
   attribute_description: z.string().nullable().optional(),
 }).describe("WholesalerOfferingAttribute_AttributeSchema");
 
@@ -229,7 +234,7 @@ export const WholesalerOfferingAttribute_AttributeSchema = WholesalerOfferingAtt
 export const MaterialSchema = z
   .object({
     material_id: z.number().int().positive(),
-    name: z.string().max(100),
+    name: NameOrTitle,
   })
   .describe("MaterialSchema");
 
@@ -246,7 +251,7 @@ export const MaterialForCreateSchema = MaterialSchema.omit({
 export const FormSchema = z
   .object({
     form_id: z.number().int().positive(),
-    name: z.string().max(100),
+    name: NameOrTitle,
   })
   .describe("FormSchema");
 
@@ -304,13 +309,16 @@ export const OrderItemForCreateSchema = OrderItemSchema.omit({
   created_at: true,
 }).describe("OrderItemForCreateSchema");
 
-export type Order = z.infer<typeof OrderSchema>;
-export type OrderItem = z.infer<typeof OrderItemSchema>;
+// ===== ORDER ITEM with JOINS  =====
+
+export const OrderItem_ProductDef_Schema = OrderItemSchema.extend({
+  product_def_title: NameOrTitle,
+});
 
 // ===== SCHEMAS => TYPES  =====
 
-export type AllEntities = z.infer<typeof AllEntitiesSchema>;
-export type AllEntitiesSetType = Set<AllEntities>;
+// export type AllEntities = z.infer<typeof AllEntitiesSchema>;
+// export type AllEntitiesSetType = Set<AllEntities>;
 
 export type Wholesaler = z.infer<typeof WholesalerSchema>;
 export type ProductCategory = z.infer<typeof ProductCategorySchema>;
@@ -327,19 +335,22 @@ export type WholesalerOfferingAttribute = z.infer<typeof WholesalerOfferingAttri
 export type WholesalerOfferingAttribute_Attribute = z.infer<typeof WholesalerOfferingAttribute_AttributeSchema>;
 export type Material = z.infer<typeof MaterialSchema>;
 export type Form = z.infer<typeof FormSchema>;
+export type Order = z.infer<typeof OrderSchema>;
+export type OrderItem = z.infer<typeof OrderItemSchema>;
+export type OrderItem_ProductDef = z.infer<typeof OrderItem_ProductDef_Schema>;
 
 // ===== SCHEMA MAP =====
 
-export const AllSchemas = {
-  wholesalers: WholesalerSchema,
-  categories: ProductCategorySchema,
-  product_definitions: ProductDefinitionSchema,
-  offerings: WholesalerItemOfferingSchema,
-  attributes: AttributeSchema,
-  links: WholesalerOfferingLinkSchema,
-  orders: OrderSchema,
-  order_items: OrderItemSchema,
-} as const satisfies Record<AllEntities, z.ZodTypeAny>;
+//export const AllSchemas = {
+//   wholesalers: WholesalerSchema,
+//   categories: ProductCategorySchema,
+//   product_definitions: ProductDefinitionSchema,
+//   offerings: WholesalerItemOfferingSchema,
+//   attributes: AttributeSchema,
+//   links: WholesalerOfferingLinkSchema,
+//   orders: OrderSchema,
+//   order_items: OrderItemSchema,
+// } as const satisfies Record<AllEntities, z.ZodTypeAny>;
 
 // ===== UTILS =====
 

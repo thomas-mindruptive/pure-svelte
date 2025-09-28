@@ -31,12 +31,6 @@ EXTENSIONS = {
 }
 
 EXCLUDE_PATTERNS = [
-    "src/routes/api",
-    "src/routes/(browser)/attributes",
-    "src/routes/(browser)/categories",
-    "src/routes/(browser)/suppliers",
-    "src/lib/backendQueries",
-    "src/lib/api",
     "tmp",
     "tools",
     "node_modules",
@@ -66,6 +60,11 @@ INCLUDE_PATTERNS: List[str] = [
     # "src/routes/(browser)/*.*",
     # "**"
     # "src/lib/components/domain/offerings/**",
+    "src/lib/domain/**",
+    "src/lib/backendQueries/**",
+    "src/lib/api/client/supplier.ts",
+    "src/lib/utils/recordsetTransformer.ts",
+
 ]  
 
 # =========================

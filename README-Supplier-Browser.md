@@ -332,13 +332,16 @@ This approach simplifies the client-side API, aligns perfectly with the business
 ## Technical Architecture Pillars
 
 ### Type Safety Architecture
-The project is built on six pillars of type safety that work together to ensure correctness from the database to the UI.
+The project is built on nine pillars of type safety that work together to ensure correctness from the database to the UI.
 - **Pillar I: Generic API Types:** Universal request/response envelopes in `lib/api/api.types.ts`.
 - **Pillar II: Query Grammar:** A structured object (`QueryPayload`) for defining database queries in a type-safe manner.
 - **Pillar III: Table Registry:** Schema-based security system with automatic type generation. Zod schemas are the single source of truth for table access and column validation.
 - **Pillar IV: Query Builder:** A server-side utility that converts the `QueryPayload` grammar into parameterized SQL.
 - **Pillar V: Data Validation & Contracts with Zod:** A new pillar ensuring runtime data integrity on the frontend.
 - **Pillar VI: Enhanced Component Type Safety:** Key generic components like the `Datagrid` have been improved for stricter type safety.
+- **Pillar VII: Enhanced Datagrid Component:** Autonomous sorting and scrollable body with sticky headers.
+- **Pillar VIII: Schema-Based Column Generation:** Automatic generation of qualified SQL column names from Zod schemas with dependency injection.
+- **Pillar IX: Type-Safe Recordset Transformation:** Secure transformation of flat database results into structured TypeScript objects.
 
 ### Pillar II: Query Grammar & Core Structures (`QueryPayload`)
 The architecture relies on a well-defined, type-safe object structure called `QueryPayload` to describe database queries. This approach ensures that all query definitions are declarative, serializable, and can be easily validated.

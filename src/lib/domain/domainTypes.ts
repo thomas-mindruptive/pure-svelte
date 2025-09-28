@@ -319,9 +319,6 @@ export const OrderItem_ProdDef_Category_Schema = OrderItemSchema.extend( {
 
 // ===== SCHEMAS => TYPES  =====
 
-// export type AllEntities = z.infer<typeof AllEntitiesSchema>;
-// export type AllEntitiesSetType = Set<AllEntities>;
-
 export type Wholesaler = z.infer<typeof WholesalerSchema>;
 export type ProductCategory = z.infer<typeof ProductCategorySchema>;
 export type Attribute = z.infer<typeof AttributeSchema>;
@@ -340,6 +337,7 @@ export type Form = z.infer<typeof FormSchema>;
 export type Order = z.infer<typeof OrderSchema>;
 export type OrderItem = z.infer<typeof OrderItemSchema>;
 export type OrderItem_ProdDef_Category = z.infer<typeof OrderItem_ProdDef_Category_Schema>;
+
 
 
 

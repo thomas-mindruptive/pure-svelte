@@ -320,6 +320,13 @@ export interface IAliasedTableRegistry {
 }
 
 /**
+ * Interface for flexible TableRegistry (for dependency injection)
+ */
+export interface ITableRegistry {
+  [entityName: string]: TableDefinition;
+}
+
+/**
  * Type Utilities
  */
 export type TableRegistryKeys = keyof typeof TableRegistry;

@@ -1,19 +1,23 @@
-import { TableRegistry } from "$lib/backendQueries/tableRegistry";
+import type { ITableRegistry, IAliasedTableRegistry } from "$lib/backendQueries/tableRegistry";
+import { AliasedTableRegistry } from "$lib/backendQueries/tableRegistry";
 import { log } from "$lib/utils/logger";
 import z from "zod";
+import type { QualifiedColumnsFromSchema } from "./domainTypes.derived";
+import { OrderItem_ProdDef_Category_Schema } from "./domainTypes";
 
 
 /**
  * Utility: Generate qualified column names from an array of schemas using TableRegistry
  * @param schemas - Array of Zod schemas
+ * @param tableRegistry - Registry mapping entity names to table definitions
  * @returns Array of qualified column names like ["ord.order_id", "ori.order_item_id", ...]
  */
-export function genQualifiedColumnsForSchemas(schemas: z.ZodObject<any>[]): string[] {
+export function genQualifiedColumnsForSchemas(schemas: z.ZodObject<any>[], tableRegistry: ITableRegistry): string[] {
   const columns: string[] = [];
 
   for (const schema of schemas) {
     // Find matching table config by schema reference
-    const tableEntry = Object.entries(TableRegistry).find(([, config]) => config.schema === schema);
+    const tableEntry = Object.entries(tableRegistry).find(([, config]) => config.schema === schema);
 
     if (!tableEntry) {
       throw new Error(`Schema not found in TableRegistry: ${schema.description || "unnamed schema"}`);
@@ -38,27 +42,28 @@ export function genQualifiedColumnsForSchemas(schemas: z.ZodObject<any>[]): stri
  * table fields get qualified with their respective aliases.
  *
  * Example:
- * 
+ *
  * const OrderItem_ProDef_Category = OrderItemSchema.extend({
  *   product_def: ProductDefinitionSchema,
  *   category: ProductCategorySchema
  * });
  *
- * genQualifiedColumns(OrderItem_Extended)
+ * genQualifiedColumns(OrderItem_Extended, tableRegistry)
  * // Returns: ["order_item_id", "quantity", "pd.product_def_id", "pd.name", "pc.category_id", "pc.name"]
- * 
+ *
  *
  * @param schema - Zod schema created with .extend() containing base fields + nested objects
+ * @param tableRegistry - Registry mapping entity names to table definitions
  * @returns Array of column names: base fields unqualified, joined fields with aliases
  */
-export function genQualifiedColumns(schema: z.ZodObject<any>): string[] {
+export function genQualifiedColumns(schema: z.ZodObject<any>, tableRegistry: ITableRegistry): string[] {
   const columns: string[] = [];
   const shape = schema.shape;
 
   for (const [fieldName, zodType] of Object.entries(shape)) {
     if (zodType instanceof z.ZodObject) {
       // This is a nested object representing a joined table (e.g., product_def, category)
-      const tableEntry = Object.entries(TableRegistry).find(([, config]) => config.schema === zodType);
+      const tableEntry = Object.entries(tableRegistry).find(([, config]) => config.schema === zodType);
 
       if (tableEntry) {
         const [, config] = tableEntry;
@@ -80,6 +85,65 @@ export function genQualifiedColumns(schema: z.ZodObject<any>): string[] {
 
   return columns;
 }
+
+/**
+ * Generate typed qualified column names from a schema - the reverse of recordsetTransformer.
+ *
+ * This is the type-safe version of genQualifiedColumns that returns properly typed column names
+ * that match exactly what recordsetTransformer expects as input.
+ *
+ * Example:
+ * const OrderItem_Extended = OrderItemSchema.extend({
+ *   product_def: ProductDefinitionSchema,
+ *   category: ProductCategorySchema
+ * });
+ *
+ * genTypedQualifiedColumns(OrderItem_Extended)
+ * // Returns: ["order_item_id", "quantity", "pd.product_def_id", "pd.title", "pc.category_id", "pc.name"]
+ * // With full TypeScript type safety
+ *
+ * @param schema - Zod schema with nested objects representing JOINed tables
+ * @param aliasedTableRegistry - Registry mapping aliases to table definitions
+ * @returns Array of qualified column names with full type safety
+ */
+export function genTypedQualifiedColumns<T extends z.ZodObject<any>>(
+  schema: T,
+  aliasedTableRegistry: IAliasedTableRegistry = AliasedTableRegistry
+): QualifiedColumnsFromSchema<T>[] {
+  const columns: string[] = [];
+  const shape = schema.shape;
+
+  for (const [fieldName, zodType] of Object.entries(shape)) {
+    if (zodType instanceof z.ZodObject) {
+      // This is a nested object representing a joined table (e.g., product_def, category)
+      // Find matching table config by schema reference - mirrors recordsetTransformer logic
+      const aliasEntry = Object.entries(aliasedTableRegistry).find(([, config]) => config.schema === zodType);
+
+      if (aliasEntry) {
+        const [alias, config] = aliasEntry;
+        const nestedKeys = zodType.keyof().options;
+
+        // Add qualified columns for joined table: "pd.product_def_id", "pd.title", etc.
+        columns.push(...nestedKeys.map((key: string) => `${alias}.${key}`));
+      } else {
+        throw new Error(
+          `Schema for nested field '${fieldName}' not found in AliasedTableRegistry. ` +
+          `Available aliases: ${Object.keys(aliasedTableRegistry).join(', ')}`
+        );
+      }
+    } else {
+      // This is a direct field from the base table - no alias qualification needed
+      // Base table fields remain unqualified in SELECT to maintain consistency with recordsetTransformer
+      columns.push(fieldName);
+    }
+  }
+
+  return columns as QualifiedColumnsFromSchema<T>[];
+}
+
+export const DomainTypesUtils_TestColumns = genTypedQualifiedColumns(OrderItem_ProdDef_Category_Schema);
+// The return type will be: ("order_item_id" | "quantity" | "pd.product_def_id" | "pd.title" | "pc.category_id" | "pc.name")[]
+
 
 // ===== UTILS =====
 /**

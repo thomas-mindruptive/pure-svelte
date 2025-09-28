@@ -1,10 +1,17 @@
+// File: src/lib/domain/domainTypes.ts (COMPLETE REWRITE with createSchemaWithMeta)
+
 import { z } from "zod";
 
-// ===== ALL ENTITIES =====
+// ===== SCHEMA META HELPER =====
 
-// export const AllEntitiesSchema = z
-//   .enum(["wholesalers", "categories", "product_definitions", "offerings", "attributes", "links", "orders", "order_items"])
-//   .describe("AllEntitiesSchema");
+type WithMeta<T, M> = T & { readonly _meta: M };
+
+function createSchemaWithMeta<
+  T extends z.ZodObject<any>,
+  M extends { alias: string; tableName: string; dbSchema: string }
+>(schema: T, meta: M): WithMeta<T, M> {
+  return schema.meta(meta) as WithMeta<T, M>;
+}
 
 // ===== GENERAL =====
 
@@ -21,7 +28,7 @@ export const WholesalerRelevanceSchema = z.enum(["lowest", "low", "medium", "hig
 export type WholesalerPriceRange = z.infer<typeof WholesalerPriceRangeSchema>;
 export type WholesalerRelevance = z.infer<typeof WholesalerRelevanceSchema>;
 
-export const WholesalerSchema = z
+const WholesalerSchemaBase = z
   .object({
     wholesaler_id: z.number().int().positive(),
     name: NameOrTitle,
@@ -38,6 +45,12 @@ export const WholesalerSchema = z
   })
   .describe("WholesalerSchema");
 
+export const WholesalerSchema = createSchemaWithMeta(WholesalerSchemaBase, {
+  alias: "w",
+  tableName: "wholesalers",
+  dbSchema: "dbo"
+} as const);
+
 /**
  * Schema for creating a new Wholesaler.
  * Omits server-generated fields like the primary key and timestamps.
@@ -49,13 +62,19 @@ export const WholesalerForCreateSchema = WholesalerSchema.omit({
 
 // ===== PRODUCT CATEGORY (dbo.product_categories) =====
 
-export const ProductCategorySchema = z
+const ProductCategorySchemaBase = z
   .object({
     category_id: z.number().int().positive(),
     name: NameOrTitle,
     description: z.string().max(500).nullable().optional(),
   })
   .describe("ProductCategorySchema");
+
+export const ProductCategorySchema = createSchemaWithMeta(ProductCategorySchemaBase, {
+  alias: "pc",
+  tableName: "product_categories",
+  dbSchema: "dbo"
+} as const);
 
 /**
  * Schema for creating a new ProductCategory.
@@ -67,13 +86,19 @@ export const ProductCategoryForCreateSchema = ProductCategorySchema.omit({
 
 // ===== ATTRIBUTE (dbo.attributes) =====
 
-export const AttributeSchema = z
+const AttributeSchemaBase = z
   .object({
     attribute_id: z.number().int().positive(),
     name: NameOrTitle,
     description: z.string().max(500).nullable().optional(),
   })
   .describe("AttributeSchema");
+
+export const AttributeSchema = createSchemaWithMeta(AttributeSchemaBase, {
+  alias: "a",
+  tableName: "attributes",
+  dbSchema: "dbo"
+} as const);
 
 /**
  * Schema for creating a new Attribute.
@@ -85,7 +110,7 @@ export const AttributeForCreateSchema = AttributeSchema.omit({
 
 // ===== PRODUCT DEFINITION (dbo.product_definitions) =====
 
-export const ProductDefinitionSchema = z
+const ProductDefinitionSchemaBase = z
   .object({
     product_def_id: z.number().int().positive(),
     category_id: z.number().int().positive(),
@@ -96,6 +121,12 @@ export const ProductDefinitionSchema = z
     created_at: z.string().optional(),
   })
   .describe("ProductDefinitionSchema");
+
+export const ProductDefinitionSchema = createSchemaWithMeta(ProductDefinitionSchemaBase, {
+  alias: "pd",
+  tableName: "product_definitions",
+  dbSchema: "dbo"
+} as const);
 
 /**
  * Schema for creating a new ProductDefinition.
@@ -108,7 +139,7 @@ export const ProductDefinitionForCreateSchema = ProductDefinitionSchema.omit({
 
 // ===== WHOLESALER CATEGORY (dbo.wholesaler_categories) =====
 
-export const WholesalerCategorySchema = z
+const WholesalerCategorySchemaBase = z
   .object({
     wholesaler_id: z.number().int().positive(),
     category_id: z.number().int().positive(),
@@ -117,6 +148,12 @@ export const WholesalerCategorySchema = z
     created_at: z.string().optional(),
   })
   .describe("WholesalerCategorySchema");
+
+export const WholesalerCategorySchema = createSchemaWithMeta(WholesalerCategorySchemaBase, {
+  alias: "wc",
+  tableName: "wholesaler_categories",
+  dbSchema: "dbo"
+} as const);
 
 /**
  * Schema for creating a new WholesalerCategory assignment.
@@ -141,7 +178,7 @@ export const WholesalerCategoryWithCountSchema = WholesalerCategory_CategorySche
 
 // ===== WHOLESALER ITEM OFFERING (dbo.wholesaler_item_offerings) =====
 
-export const WholesalerItemOfferingSchema = z
+const WholesalerItemOfferingSchemaBase = z
   .object({
     offering_id: z.number().int().positive(),
     wholesaler_id: z.number().int().positive(),
@@ -155,6 +192,12 @@ export const WholesalerItemOfferingSchema = z
     created_at: z.string().optional(),
   })
   .describe("WholesalerItemOfferingSchema");
+
+export const WholesalerItemOfferingSchema = createSchemaWithMeta(WholesalerItemOfferingSchemaBase, {
+  alias: "wio",
+  tableName: "wholesaler_item_offerings",
+  dbSchema: "dbo"
+} as const);
 
 /**
  * Schema for creating a new WholesalerItemOffering.
@@ -184,7 +227,7 @@ export const WholesalerItemOffering_ProductDef_Category_SupplierSchema = Wholesa
 
 // ===== WHOLESALER OFFERING LINK (dbo.wholesaler_offering_links) =====
 
-export const WholesalerOfferingLinkSchema = z
+const WholesalerOfferingLinkSchemaBase = z
   .object({
     link_id: z.number().int().positive(),
     offering_id: z.number().int().positive(),
@@ -193,6 +236,12 @@ export const WholesalerOfferingLinkSchema = z
     created_at: z.string().optional(),
   })
   .describe("WholesalerOfferingLinkSchema");
+
+export const WholesalerOfferingLinkSchema = createSchemaWithMeta(WholesalerOfferingLinkSchemaBase, {
+  alias: "wol",
+  tableName: "wholesaler_offering_links",
+  dbSchema: "dbo"
+} as const);
 
 /**
  * Schema for creating a new WholesalerOfferingLink.
@@ -205,13 +254,19 @@ export const WholesalerOfferingLinkForCreateSchema = WholesalerOfferingLinkSchem
 
 // ===== WHOLESALER OFFERING ATTRIBUTE (dbo.wholesaler_offering_attributes) =====
 
-export const WholesalerOfferingAttributeSchema = z
+const WholesalerOfferingAttributeSchemaBase = z
   .object({
     offering_id: z.number().int().positive(),
     attribute_id: z.number().int().positive(),
     value: z.string().max(200).nullable().optional(),
   })
   .describe("WholesalerOfferingAttributeSchema");
+
+export const WholesalerOfferingAttributeSchema = createSchemaWithMeta(WholesalerOfferingAttributeSchemaBase, {
+  alias: "woa",
+  tableName: "wholesaler_offering_attributes",
+  dbSchema: "dbo"
+} as const);
 
 /**
  * Schema for creating a new WholesalerOfferingAttribute assignment.
@@ -230,12 +285,18 @@ export const WholesalerOfferingAttribute_AttributeSchema = WholesalerOfferingAtt
 
 // ===== MATERIAL (dbo.materials) =====
 
-export const MaterialSchema = z
+const MaterialSchemaBase = z
   .object({
     material_id: z.number().int().positive(),
     name: NameOrTitle,
   })
   .describe("MaterialSchema");
+
+export const MaterialSchema = createSchemaWithMeta(MaterialSchemaBase, {
+  alias: "m",
+  tableName: "materials",
+  dbSchema: "dbo"
+} as const);
 
 /**
  * Schema for creating a new Material.
@@ -247,12 +308,18 @@ export const MaterialForCreateSchema = MaterialSchema.omit({
 
 // ===== FORM (dbo.forms) =====
 
-export const FormSchema = z
+const FormSchemaBase = z
   .object({
     form_id: z.number().int().positive(),
     name: NameOrTitle,
   })
   .describe("FormSchema");
+
+export const FormSchema = createSchemaWithMeta(FormSchemaBase, {
+  alias: "f",
+  tableName: "forms",
+  dbSchema: "dbo"
+} as const);
 
 /**
  * Schema for creating a new Form.
@@ -270,7 +337,7 @@ export const OrderStatusSchema = z
 
 export type OrderStatus = z.infer<typeof OrderStatusSchema>;
 
-export const OrderSchema = z
+const OrderSchemaBase = z
   .object({
     order_id: z.number().int().positive(),
     order_date: z.string(), // ISO date string
@@ -283,6 +350,12 @@ export const OrderSchema = z
   })
   .describe("OrderSchema");
 
+export const OrderSchema = createSchemaWithMeta(OrderSchemaBase, {
+  alias: "ord",
+  tableName: "orders",
+  dbSchema: "dbo"
+} as const);
+
 export const OrderForCreateSchema = OrderSchema.omit({
   order_id: true,
   created_at: true,
@@ -290,7 +363,7 @@ export const OrderForCreateSchema = OrderSchema.omit({
 
 // ===== ORDER ITEM (dbo.order_items) =====
 
-export const OrderItemSchema = z
+const OrderItemSchemaBase = z
   .object({
     order_item_id: z.number().int().positive(),
     order_id: z.number().int().positive(),
@@ -303,16 +376,20 @@ export const OrderItemSchema = z
   })
   .describe("OrderItemSchema");
 
+export const OrderItemSchema = createSchemaWithMeta(OrderItemSchemaBase, {
+  alias: "ori",
+  tableName: "order_items",
+  dbSchema: "dbo"
+} as const);
+
 export const OrderItemForCreateSchema = OrderItemSchema.omit({
   order_item_id: true,
   created_at: true,
 }).describe("OrderItemForCreateSchema");
 
-// ===== ORDER ITEM with JOINS  =====
+// ===== ORDER ITEM with JOINS (NOW WITH BRANDED SCHEMAS) =====
 
-//export const OrderItem_ProdDef_Category_Schema = [OrderItemSchema, ProductDefinitionSchema, ProductCategorySchema];
-
-export const OrderItem_ProdDef_Category_Schema = OrderItemSchema.extend( {
+export const OrderItem_ProdDef_Category_Schema = OrderItemSchema.extend({
   product_def: ProductDefinitionSchema,
   category: ProductCategorySchema 
 });
@@ -338,6 +415,7 @@ export type Order = z.infer<typeof OrderSchema>;
 export type OrderItem = z.infer<typeof OrderItemSchema>;
 export type OrderItem_ProdDef_Category = z.infer<typeof OrderItem_ProdDef_Category_Schema>;
 
-
+// ===== HELPER EXPORT =====
+export { createSchemaWithMeta, type WithMeta };
 
 

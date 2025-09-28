@@ -11,7 +11,7 @@
 import { json, error, type RequestHandler } from '@sveltejs/kit';
 import { db } from '$lib/backendQueries/db';
 import { log } from '$lib/utils/logger';
-import { mssqlErrorMapper } from '$lib/backendQueries/mssqlErrorMapper';
+import { buildUnexpectedError } from '$lib/backendQueries/entityOperations';
 import { WholesalerOfferingLinkForCreateSchema, type WholesalerItemOffering, type WholesalerOfferingLink } from '$lib/domain/domainTypes';
 import { validateEntity } from "$lib/domain/domainTypes.utils";
 import { v4 as uuidv4 } from 'uuid';
@@ -29,8 +29,9 @@ import type {
  * @description Creates a new offering link (replaces /api/offering-links/new).
  */
 export const POST: RequestHandler = async ({ request }) => {
-    log.infoHeader("POST /api/offering-links");
     const operationId = uuidv4();
+    const info = `POST /api/offering-links - ${operationId}`;
+    log.infoHeader(info);
     log.info(`[${operationId}] POST /offering-links: FN_START`);
 
     try {
@@ -149,9 +150,7 @@ export const POST: RequestHandler = async ({ request }) => {
         return json(response, { status: 201 });
 
     } catch (err: unknown) {
-        const { status, message } = mssqlErrorMapper.mapToHttpError(err);
-        log.error(`[${operationId}] FN_EXCEPTION: Unhandled error during offering link creation.`, { error: err });
-        throw error(status, message);
+        return buildUnexpectedError(err, info);
     }
 };
 
@@ -161,6 +160,8 @@ export const POST: RequestHandler = async ({ request }) => {
  */
 export const PUT: RequestHandler = async ({ request }) => {
     const operationId = uuidv4();
+    const info = `PUT /api/offering-links - ${operationId}`;
+    log.infoHeader(info);
     log.info(`[${operationId}] PUT /offering-links: FN_START`);
 
     try {
@@ -258,9 +259,7 @@ export const PUT: RequestHandler = async ({ request }) => {
         return json(response);
 
     } catch (err: unknown) {
-        const { status, message } = mssqlErrorMapper.mapToHttpError(err);
-        log.error(`[${operationId}] FN_EXCEPTION: Unhandled error.`, { error: err });
-        throw error(status, message);
+        return buildUnexpectedError(err, info);
     }
 };
 
@@ -270,6 +269,8 @@ export const PUT: RequestHandler = async ({ request }) => {
  */
 export const DELETE: RequestHandler = async ({ request }) => {
     const operationId = uuidv4();
+    const info = `DELETE /api/offering-links - ${operationId}`;
+    log.infoHeader(info);
     log.info(`[${operationId}] DELETE /offering-links: FN_START`);
 
     try {
@@ -360,8 +361,6 @@ export const DELETE: RequestHandler = async ({ request }) => {
         return json(response);
 
     } catch (err: unknown) {
-        const { status, message } = mssqlErrorMapper.mapToHttpError(err);
-        log.error(`[${operationId}] FN_EXCEPTION: Unhandled error.`, { error: err });
-        throw error(status, message);
+        return buildUnexpectedError(err, info);
     }
 };

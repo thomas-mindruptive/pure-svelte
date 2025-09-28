@@ -11,7 +11,7 @@ import { db } from "$lib/backendQueries/db";
 import { log } from "$lib/utils/logger";
 import { buildQuery, executeQuery } from "$lib/backendQueries/queryBuilder";
 import { supplierQueryConfig } from "$lib/backendQueries/queryConfig";
-import { mssqlErrorMapper } from "$lib/backendQueries/mssqlErrorMapper";
+import { buildUnexpectedError, validateIdUrlParam, validateAndUpdateEntity } from "$lib/backendQueries/entityOperations";
 import { type WhereCondition, ComparisonOperator, type QueryPayload, LogicalOperator } from "$lib/backendQueries/queryGrammar";
 import { AttributeSchema, type Attribute } from "$lib/domain/domainTypes";
 import { validateEntity } from "$lib/domain/domainTypes.utils";
@@ -34,16 +34,16 @@ import { checkAttributeDependencies } from "$lib/dataModel/dependencyChecks";
  * GET /api/attributes/[id] - Get a single attribute record
  */
 export const GET: RequestHandler = async ({ params }) => {
-  log.infoHeader("GET /api/attributes/[id]");
   const operationId = uuidv4();
-  const id = parseInt(params.id ?? "", 10);
-  log.info(`[${operationId}] GET /attributes/${id}: FN_START`);
-
-  if (isNaN(id) || id <= 0) {
-    throw error(400, "Invalid attribute ID. It must be a positive number.");
-  }
+  const info = `GET /api/attributes/${params.id} - ${operationId}`;
+  log.infoHeader(info);
+  log.info(`[${operationId}] GET /attributes/${params.id}: FN_START`);
 
   try {
+    const { id, errorResponse } = validateIdUrlParam(params.id);
+    if (errorResponse) {
+      return errorResponse;
+    }
     const result = await db.request().input("id", id).query("SELECT * FROM dbo.attributes WHERE attribute_id = @id");
 
     if (result.recordset.length === 0) {
@@ -63,9 +63,7 @@ export const GET: RequestHandler = async ({ params }) => {
     return json(response);
   } catch (err: unknown) {
     if ((err as { status: number })?.status !== 404) {
-      const { status, message } = mssqlErrorMapper.mapToHttpError(err);
-      log.error(`[${operationId}] FN_EXCEPTION: Unhandled error.`, { error: err });
-      throw error(status, message);
+      return buildUnexpectedError(err, info);
     }
     throw err;
   }
@@ -75,22 +73,15 @@ export const GET: RequestHandler = async ({ params }) => {
  * POST /api/attributes/[id] - Get attribute with flexible fields
  */
 export const POST: RequestHandler = async ({ params, request }) => {
-  log.infoHeader("POST /api/attributes/[id]");
   const operationId = uuidv4();
-  const id = parseInt(params.id ?? "", 10);
-  log.info(`[${operationId}] POST /attributes/${id}: FN_START`);
+  const info = `POST /api/attributes/${params.id} - ${operationId}`;
+  log.infoHeader(info);
+  log.info(`[${operationId}] POST /attributes/${params.id}: FN_START`);
 
   try {
-    if (isNaN(id) || id <= 0) {
-      const errRes: ApiErrorResponse = {
-        success: false,
-        message: "Invalid attribute ID. It must be a positive number.",
-        status_code: 400,
-        error_code: "BAD_REQUEST",
-        meta: { timestamp: new Date().toISOString() },
-      };
-      log.warn(`[${operationId}] FN_FAILURE: Invalid ID provided.`, { id: params.id });
-      return json(errRes, { status: 400 });
+    const { id, errorResponse } = validateIdUrlParam(params.id);
+    if (errorResponse) {
+      return errorResponse;
     }
 
     const requestBody = (await request.json()) as QueryRequest<Attribute>;
@@ -143,9 +134,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
     log.info(`[${operationId}] FN_SUCCESS: Returning ${results.length} record(s).`);
     return json(response);
   } catch (err: unknown) {
-    const { status, message } = mssqlErrorMapper.mapToHttpError(err);
-    log.error(`[${operationId}] FN_EXCEPTION: Unhandled error.`, { error: err });
-    throw error(status, message);
+    return buildUnexpectedError(err, info);
   }
 };
 
@@ -153,75 +142,23 @@ export const POST: RequestHandler = async ({ params, request }) => {
  * PUT /api/attributes/[id] - Update an existing attribute
  */
 export const PUT: RequestHandler = async ({ params, request }) => {
-  log.infoHeader("PUT /api/attributes/[id]");
   const operationId = uuidv4();
-  const id = parseInt(params.id ?? "", 10);
-  log.info(`[${operationId}] PUT /attributes/${id}: FN_START`);
+  const info = `PUT /api/attributes/${params.id} - ${operationId}`;
+  log.infoHeader(info);
+  log.info(`[${operationId}] PUT /attributes/${params.id}: FN_START`);
 
   try {
-    if (isNaN(id) || id <= 0) {
-      const errRes: ApiErrorResponse = {
-        success: false,
-        message: "Invalid attribute ID.",
-        status_code: 400,
-        error_code: "BAD_REQUEST",
-        meta: { timestamp: new Date().toISOString() },
-      };
-      log.warn(`[${operationId}] FN_FAILURE: Invalid ID provided.`, { id: params.id });
-      return json(errRes, { status: 400 });
+    const { id, errorResponse } = validateIdUrlParam(params.id);
+    if (errorResponse) {
+      return errorResponse;
     }
 
     const requestData = await request.json();
     log.info(`[${operationId}] Parsed request body`, { fields: Object.keys(requestData) });
 
-    const validation = validateEntity(AttributeSchema, { ...requestData, attribute_id: id });
-    if (!validation.isValid) {
-      const errRes: ApiErrorResponse = {
-        success: false,
-        message: "Validation failed.",
-        status_code: 400,
-        error_code: "VALIDATION_ERROR",
-        errors: validation.errors,
-        meta: { timestamp: new Date().toISOString() },
-      };
-      log.warn(`[${operationId}] FN_FAILURE: Validation failed.`, { errors: validation.errors });
-      return json(errRes, { status: 400 });
-    }
-
-    const { name, description } = validation.sanitized;
-
-    const result = await db.request().input("id", id).input("name", name).input("description", description).query(`
-                UPDATE dbo.attributes 
-                SET name=@name, description=@description
-                OUTPUT INSERTED.* 
-                WHERE attribute_id = @id
-            `);
-
-    if (result.recordset.length === 0) {
-      const errRes: ApiErrorResponse = {
-        success: false,
-        message: `Attribute with ID ${id} not found.`,
-        status_code: 404,
-        error_code: "NOT_FOUND",
-        meta: { timestamp: new Date().toISOString() },
-      };
-      log.warn(`[${operationId}] FN_FAILURE: Attribute not found for update.`);
-      return json(errRes, { status: 404 });
-    }
-
-    const response: ApiSuccessResponse<{ attribute: Attribute }> = {
-      success: true,
-      message: "Attribute updated successfully.",
-      data: { attribute: result.recordset[0] as Attribute },
-      meta: { timestamp: new Date().toISOString() },
-    };
-
-    log.info(`[${operationId}] FN_SUCCESS: Attribute updated.`);
-    return json(response);
+    return validateAndUpdateEntity(AttributeSchema, id, "attribute_id", requestData, "attribute");
   } catch (err: unknown) {
-    const { status, message } = mssqlErrorMapper.mapToHttpError(err);
-    log.error(`[${operationId}] FN_EXCEPTION: Unhandled error.`, { error: err });
-    throw error(status, message);
+    return buildUnexpectedError(err, info);
   }
 };
 
@@ -229,20 +166,15 @@ export const PUT: RequestHandler = async ({ params, request }) => {
  * DELETE /api/attributes/[id] - Delete attribute with dependency checks
  */
 export const DELETE: RequestHandler = async ({ params, request }) => {
-  log.infoHeader("DELETE /api/attributes/[id]");
   const operationId = uuidv4();
-  const id = parseInt(params.id ?? "", 10);
-  log.info(`[${operationId}] DELETE /attributes/${id}: FN_START`);
+  const info = `DELETE /api/attributes/${params.id} - ${operationId}`;
+  log.infoHeader(info);
+  log.info(`[${operationId}] DELETE /attributes/${params.id}: FN_START`);
 
   try {
-    if (isNaN(id) || id <= 0) {
-      const errRes: ApiErrorResponse = {
-        success: false,
-        message: "Invalid attribute ID.",
-        status_code: 400,
-        meta: { timestamp: new Date().toISOString() },
-      };
-      return json(errRes, { status: 400 });
+    const { id, errorResponse } = validateIdUrlParam(params.id);
+    if (errorResponse) {
+      return errorResponse;
     }
 
     const body: DeleteRequest<Attribute> = await request.json();
@@ -302,8 +234,6 @@ export const DELETE: RequestHandler = async ({ params, request }) => {
     if ((err as { status?: number })?.status === 404) {
       throw err;
     }
-    const { status, message } = mssqlErrorMapper.mapToHttpError(err);
-    log.error(`[${operationId}] FN_EXCEPTION: Unhandled error during DELETE.`, { error: err });
-    throw error(status, message);
+    return buildUnexpectedError(err, info);
   }
 };

@@ -12,7 +12,7 @@ import { db } from '$lib/backendQueries/db';
 import { log } from '$lib/utils/logger';
 import { buildQuery, executeQuery } from '$lib/backendQueries/queryBuilder';
 import { supplierQueryConfig } from '$lib/backendQueries/queryConfig';
-import { mssqlErrorMapper } from '$lib/backendQueries/mssqlErrorMapper';
+import { buildUnexpectedError, validateIdUrlParam } from '$lib/backendQueries/entityOperations';
 import { LogicalOperator, ComparisonOperator, type QueryPayload, type WhereCondition } from '$lib/backendQueries/queryGrammar';
 import type { WholesalerOfferingLink } from '$lib/domain/domainTypes';
 import { v4 as uuidv4 } from 'uuid';
@@ -29,13 +29,14 @@ import type {
  * @description READ ONLY endpoint for forms. All modifications use main relationship endpoint.
  */
 export const GET: RequestHandler = async ({ params }) => {
-    log.infoHeader("GET /api/offering-links/[id]");
     const operationId = uuidv4();
-    const id = parseInt(params.id ?? '', 10);
-    log.info(`[${operationId}] GET /offering-links/${id}: FN_START`);
+    const info = `GET /api/offering-links/${params.id} - ${operationId}`;
+    log.infoHeader(info);
+    log.info(`[${operationId}] GET /offering-links/${params.id}: FN_START`);
 
-    if (isNaN(id) || id <= 0) {
-        throw error(400, 'Invalid link ID. It must be a positive number.');
+    const { id, errorResponse } = validateIdUrlParam(params.id);
+    if (errorResponse) {
+        return errorResponse;
     }
 
     try {
@@ -79,9 +80,7 @@ export const GET: RequestHandler = async ({ params }) => {
 
     } catch (err: unknown) {
         if ((err as { status: number })?.status !== 404) {
-            const { status, message } = mssqlErrorMapper.mapToHttpError(err);
-            log.error(`[${operationId}] FN_EXCEPTION: Unhandled error.`, { error: err });
-            throw error(status, message);
+            return buildUnexpectedError(err, info);
         }
         throw err;
     }
@@ -92,22 +91,15 @@ export const GET: RequestHandler = async ({ params }) => {
  * @description Alternative READ ONLY endpoint for flexible form field selection.
  */
 export const POST: RequestHandler = async ({ params, request }) => {
-    log.infoHeader("POST /api/offering-links/[id]");
     const operationId = uuidv4();
-    const id = parseInt(params.id ?? '', 10);
-    log.info(`[${operationId}] POST /offering-links/${id}: FN_START`);
+    const info = `POST /api/offering-links/${params.id} - ${operationId}`;
+    log.infoHeader(info);
+    log.info(`[${operationId}] POST /offering-links/${params.id}: FN_START`);
 
     try {
-        if (isNaN(id) || id <= 0) {
-            const errRes: ApiErrorResponse = {
-                success: false,
-                message: 'Invalid link ID. It must be a positive number.',
-                status_code: 400,
-                error_code: 'BAD_REQUEST',
-                meta: { timestamp: new Date().toISOString() }
-            };
-            log.warn(`[${operationId}] FN_FAILURE: Invalid ID provided.`, { id: params.id });
-            return json(errRes, { status: 400 });
+        const { id, errorResponse } = validateIdUrlParam(params.id);
+        if (errorResponse) {
+            return errorResponse;
         }
 
         const requestBody = (await request.json()) as QueryRequest<WholesalerOfferingLink>;
@@ -159,9 +151,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
         return json(response);
 
     } catch (err: unknown) {
-        const { status, message } = mssqlErrorMapper.mapToHttpError(err);
-        log.error(`[${operationId}] FN_EXCEPTION: Unhandled error.`, { error: err });
-        throw error(status, message);
+        return buildUnexpectedError(err, info);
     }
 };
 

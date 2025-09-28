@@ -7,11 +7,11 @@
  * pattern by enforcing the database table name on the server.
  */
 
-import { json, error, type RequestHandler } from "@sveltejs/kit";
+import { json, type RequestHandler } from "@sveltejs/kit";
 import { log } from "$lib/utils/logger";
 import { buildQuery, executeQuery } from "$lib/backendQueries/queryBuilder";
 import { supplierQueryConfig } from "$lib/backendQueries/queryConfig";
-import { mssqlErrorMapper } from "$lib/backendQueries/mssqlErrorMapper";
+import { buildUnexpectedError } from "$lib/backendQueries/entityOperations";
 import type { WholesalerItemOffering } from "$lib/domain/domainTypes";
 import type {
   QueryRequest,
@@ -28,8 +28,9 @@ import { v4 as uuidv4 } from "uuid";
  * sorting, and pagination capabilities.
  */
 export const POST: RequestHandler = async (event) => {
-  log.infoHeader("POST /api/offerings/");
   const operationId = uuidv4();
+  const info = `POST /api/offerings - ${operationId}`;
+  log.infoHeader(info);
   log.info(`[${operationId}] POST /offerings: FN_START`);
 
   try {
@@ -93,14 +94,7 @@ export const POST: RequestHandler = async (event) => {
 
     return json(response);
   } catch (err: unknown) {
-    const { status, message } = mssqlErrorMapper.mapToHttpError(err);
-    log.error(`[${operationId}] FN_EXCEPTION: Unhandled error during offerings query.`, {
-      error: err,
-      mappedStatus: status,
-      mappedMessage: message,
-    });
-    // Only THROW for unexpected server errors.
-    throw error(status, message);
+    return buildUnexpectedError(err, info);
   }
 };
 

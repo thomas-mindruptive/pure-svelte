@@ -6,11 +6,11 @@
  * It follows the "Secure Entity Endpoint" pattern, enforcing the table name on the server.
  */
 
-import { json, error, type RequestHandler } from '@sveltejs/kit';
+import { json, type RequestHandler } from '@sveltejs/kit';
 import { log } from '$lib/utils/logger';
 import { buildQuery, executeQuery } from '$lib/backendQueries/queryBuilder';
 import { supplierQueryConfig } from '$lib/backendQueries/queryConfig';
-import { mssqlErrorMapper } from '$lib/backendQueries/mssqlErrorMapper';
+import { buildUnexpectedError } from '$lib/backendQueries/entityOperations';
 import type { ProductCategory } from '$lib/domain/domainTypes';
 import type { ApiErrorResponse, QueryRequest, QuerySuccessResponse } from '$lib/api/api.types';
 import { v4 as uuidv4 } from 'uuid';
@@ -20,8 +20,9 @@ import { v4 as uuidv4 } from 'uuid';
  * @description Fetches a list of product categories based on a client-provided query payload.
  */
 export const POST: RequestHandler = async (event) => {
-    log.infoHeader("POST /api/categories");
     const operationId = uuidv4();
+    const info = `POST /api/categories - ${operationId}`;
+    log.infoHeader(info);
     log.info(`[${operationId}] POST /categories: FN_START`);
 
     try {
@@ -76,9 +77,6 @@ export const POST: RequestHandler = async (event) => {
         log.info(`[${operationId}] FN_SUCCESS: Returning ${results.length} categories.`);
         return json(response);
     } catch (err: unknown) {
-        const { status, message } = mssqlErrorMapper.mapToHttpError(err);
-        log.error(`[${operationId}] FN_EXCEPTION: Unhandled error during category query.`, { error: err, mappedStatus: status, mappedMessage: message });
-        // Only THROW for unexpected server errors.
-        throw error(status, message);
+        return buildUnexpectedError(err, info);
     }
 };

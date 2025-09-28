@@ -11,7 +11,7 @@ import { json, error, type RequestHandler } from '@sveltejs/kit';
 import { log } from '$lib/utils/logger';
 import { buildQuery, executeQuery } from '$lib/backendQueries/queryBuilder';
 import { supplierQueryConfig } from '$lib/backendQueries/queryConfig';
-import { mssqlErrorMapper } from '$lib/backendQueries/mssqlErrorMapper';
+import { buildUnexpectedError } from '$lib/backendQueries/entityOperations';
 import { WholesalerItemOfferingForCreateSchema, type WholesalerItemOffering, type WholesalerItemOffering_ProductDef_Category_Supplier } from '$lib/domain/domainTypes';
 import { validateEntity } from "$lib/domain/domainTypes.utils";
 import type { ApiErrorResponse, ApiSuccessResponse } from '$lib/api/api.types';
@@ -25,7 +25,8 @@ import { db } from '$lib/backendQueries/db';
  */
 export const POST: RequestHandler = async ({ request }) => {
   const operationId = uuidv4();
-  log.infoHeader(`POST /api/offerings/new - ${operationId}`);
+  const info = `POST /api/offerings/new - ${operationId}`;
+  log.infoHeader(info);
 
   const transaction = db.transaction();
 
@@ -188,9 +189,7 @@ export const POST: RequestHandler = async ({ request }) => {
     log.info(`[${operationId}] FN_SUCCESS: Offering created with ID ${newOffering.offering_id}.`);
     return json(response, { status: 201 });
   } catch (err: unknown) {
-    const { status, message } = mssqlErrorMapper.mapToHttpError(err);
-    log.error(`[${operationId}] FN_EXCEPTION: Unhandled error during offering creation.`, { error: err });
     await transaction.rollback();
-    throw error(status, message);
+    return buildUnexpectedError(err, info);
   }
 };

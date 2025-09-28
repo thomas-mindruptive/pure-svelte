@@ -8,7 +8,7 @@
 import { json, error, type RequestHandler } from "@sveltejs/kit";
 import { db } from "$lib/backendQueries/db";
 import { log } from "$lib/utils/logger";
-import { mssqlErrorMapper } from "$lib/backendQueries/mssqlErrorMapper";
+import { buildUnexpectedError, validateIdUrlParam } from "$lib/backendQueries/entityOperations";
 import { WholesalerItemOfferingSchema, type WholesalerItemOffering, type WholesalerItemOffering_ProductDef_Category_Supplier } from "$lib/domain/domainTypes";
 import { validateEntity } from "$lib/domain/domainTypes.utils";
 import { v4 as uuidv4 } from "uuid";
@@ -27,16 +27,16 @@ import { deleteOffering } from "$lib/dataModel/deletes";
  * @description Retrieves a single, detailed offering record including product and category names.
  */
 export const GET: RequestHandler = async ({ params }) => {
-  log.infoHeader("GET /api/offerings/[id]");
   const operationId = uuidv4();
-  const id = parseInt(params.id ?? "", 10);
-  log.info(`[${operationId}] GET /offerings/${id}: FN_START`);
-
-  if (isNaN(id) || id <= 0) {
-    throw error(400, "Invalid offering ID.");
-  }
+  const info = `GET /api/offerings/${params.id} - ${operationId}`;
+  log.infoHeader(info);
+  log.info(`[${operationId}] GET /offerings/${params.id}: FN_START`);
 
   try {
+    const { id, errorResponse } = validateIdUrlParam(params.id);
+    if (errorResponse) {
+      return errorResponse;
+    }
     // This query now correctly joins all necessary tables to build the
     // WholesalerItemOffering_ProductDef_Category type.
     const result = await db.request().input("id", id).query(`
@@ -73,9 +73,7 @@ export const GET: RequestHandler = async ({ params }) => {
     if ((err as { status?: number })?.status === 404) {
       throw err; // Re-throw SvelteKit's 404 error
     }
-    const { status, message } = mssqlErrorMapper.mapToHttpError(err);
-    log.error(`[${operationId}] FN_EXCEPTION: Unhandled error during GET.`, { error: err });
-    throw error(status, message);
+    return buildUnexpectedError(err, info);
   }
 };
 
@@ -84,8 +82,9 @@ export const GET: RequestHandler = async ({ params }) => {
  * @description Update offering.
  */
 export const PUT: RequestHandler = async ({ request }) => {
-  log.infoHeader("PUT /api/offerings/[id]");
   const operationId = uuidv4();
+  const info = `PUT /api/offerings/[id] - ${operationId}`;
+  log.infoHeader(info);
   log.info(`[${operationId}] PUT /category-offerings: FN_START`);
 
   try {
@@ -185,9 +184,7 @@ export const PUT: RequestHandler = async ({ request }) => {
     log.info(`[${operationId}] FN_SUCCESS: Offering updated.`, { offering_id });
     return json(response);
   } catch (err: unknown) {
-    const { status, message } = mssqlErrorMapper.mapToHttpError(err);
-    log.error(`[${operationId}] FN_EXCEPTION: Unhandled error.`, { error: err });
-    throw error(status, message);
+    return buildUnexpectedError(err, info);
   }
 };
 
@@ -197,20 +194,15 @@ export const PUT: RequestHandler = async ({ request }) => {
  * architectural pattern for dependency checking and cascading.
  */
 export const DELETE: RequestHandler = async ({ params, request }): Promise<Response> => {
-  log.infoHeader("DELETE /api/offerings/[id]");
   const operationId = uuidv4();
-  const id = parseInt(params.id ?? "", 10);
-  log.info(`[${operationId}] DELETE /offerings/${id}: FN_START`);
+  const info = `DELETE /api/offerings/${params.id} - ${operationId}`;
+  log.infoHeader(info);
+  log.info(`[${operationId}] DELETE /offerings/${params.id}: FN_START`);
 
   try {
-    if (isNaN(id) || id <= 0) {
-      const errRes: ApiErrorResponse = {
-        success: false,
-        message: "Invalid offering ID.",
-        status_code: 400,
-        meta: { timestamp: new Date().toISOString() },
-      };
-      return json(errRes, { status: 400 });
+    const { id, errorResponse } = validateIdUrlParam(params.id);
+    if (errorResponse) {
+      return errorResponse;
     }
 
     const body: DeleteRequest<WholesalerItemOffering> = await request.json();
@@ -274,8 +266,6 @@ export const DELETE: RequestHandler = async ({ params, request }): Promise<Respo
     if ((err as { status?: number })?.status === 404) {
       throw err;
     }
-    const { status, message } = mssqlErrorMapper.mapToHttpError(err);
-    log.error(`[${operationId}] FN_EXCEPTION: Unhandled error during DELETE.`, { error: err });
-    throw error(status, message);
+    return buildUnexpectedError(err, info);
   }
 };

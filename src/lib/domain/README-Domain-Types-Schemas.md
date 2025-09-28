@@ -27,6 +27,9 @@ function createSchemaWithMeta<
 
 **Important Note**: We store metadata in `__brandMeta` rather than relying on Zod's `.meta()` method. Zod's `.meta()` is designed for JSON Schema generation and adds schemas to `z.globalRegistry`, but doesn't persist runtime-accessible metadata on the schema objects themselves. Our `__brandMeta` approach ensures metadata survives module export/import and is available at runtime.
 
+**Important Note**: When you create new schemas, e.g. with `MySchema.omit(...)`, always make sure to call `copyMetaFrom(MySchema, SchemaWithOmit)`.<br>
+Reason: Schema operations create copies WITHOUT the metadata. 
+
 ### Schema Definition Pattern
 
 ```typescript

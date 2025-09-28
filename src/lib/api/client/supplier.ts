@@ -21,7 +21,6 @@ import {
   type ProductCategory,
   type WholesalerCategory,
   type WholesalerCategory_Category,
-  WholesalerSchema,
 } from "$lib/domain/domainTypes";
 
 import type { ApiClient } from "./ApiClient";
@@ -35,9 +34,7 @@ import type {
 } from "$lib/api/api.types";
 import type { DeleteSupplierApiResponse, RemoveCategoryApiResponse } from "$lib/api/app/appSpecificTypes";
 import { LoadingState } from "./loadingState";
-import { genTypedQualifiedColumns } from "$lib/domain/domainTypes.utils";
-import { TableRegistry } from "$lib/backendQueries/tableRegistry";
-//import delay from '$lib/utils/delay';
+
 
 // Loading state managers remain global as they are a client-side concern.
 const supplierLoadingManager = new LoadingState();
@@ -47,9 +44,21 @@ export const supplierLoadingOperations = supplierLoadingManager;
 /**
  * The default query payload used when fetching a list of suppliers.
  */
-const supplierCols = genTypedQualifiedColumns(WholesalerSchema, TableRegistry)
+//const supplierCols = genQualifiedColumns(WholesalerSchema, TableRegistry)
 export const DEFAULT_SUPPLIER_QUERY: QueryPayload<Wholesaler> = {
-  select: supplierCols,
+  select: [
+    "wholesaler_id",
+    "name",
+    "country",
+    "region",
+    "price_range",
+    "relevance",
+    "status",
+    "dropship",
+    "website",
+    "created_at",
+    "email",
+  ],
   orderBy: [{ key: "name", direction: "asc" }],
 };
 

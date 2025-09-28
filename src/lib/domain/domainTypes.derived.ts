@@ -1,6 +1,6 @@
-import type { TableRegistry, IAliasedTableRegistry } from "$lib/backendQueries/tableRegistry";
-import z from "zod";
-import type { OrderItem_ProdDef_Category_Schema } from "./domainTypes";
+import type { TableRegistry } from "$lib/backendQueries/tableRegistry";
+import type z from "zod";
+
 
 // ===== TYPE-LEVEL COMPUTATION =====
 

@@ -177,7 +177,6 @@ for (const [name, schema] of Object.entries(AllBrandedSchemas)) {
     meta_in_def: (schema as any)._def?.meta,
     direct_meta: (schema as any)._meta,
   });
-  const schemaWithDef = schema as BrandedSchemaWithDef;
   const meta = (schema as any).__brandMeta;
 
   if (meta?.alias) {

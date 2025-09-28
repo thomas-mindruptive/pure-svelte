@@ -1,9 +1,9 @@
 import { z } from 'zod';
 
 // Type für branded schemas mit _meta
-type BrandedSchema = z.ZodObject<z.ZodRawShape> & {
-  _meta?: { alias: string; tableName: string; dbSchema: string };
-};
+// type BrandedSchema = z.ZodObject<z.ZodRawShape> & {
+//   _meta?: { alias: string; tableName: string; dbSchema: string };
+// };
 
 /**
  * Transform flat DB recordset into nested object structure based on schema.

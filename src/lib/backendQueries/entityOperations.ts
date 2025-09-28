@@ -9,12 +9,12 @@ import { log } from "$lib/utils/logger";
 import type { ApiErrorResponse, ApiSuccessResponse, HttpStatusCode } from "$lib/api/api.types";
 import { coerceErrorMessage } from "$lib/utils/errorUtils";
 
-type BrandedSchema = z.ZodObject<any> & { __brandMeta?: { tableName: string; dbSchema: string } };
+type BrandedSchema = z.ZodObject<z.ZodRawShape> & { __brandMeta?: { tableName: string; dbSchema: string } };
 
 /**
  * [CORE DB] Inserts a pre-validated entity record.
  */
-async function insertRecord<S extends BrandedSchema>(schema: S, data: z.infer<S>): Promise<Record<string, unknown>> {
+async function insertRecord<S extends BrandedSchema>(schema: S, data: z.output<S>): Promise<Record<string, unknown>> {
   log.debug(`insertRecord`);
 
   const meta = schema.__brandMeta!;
@@ -32,7 +32,7 @@ async function insertRecord<S extends BrandedSchema>(schema: S, data: z.infer<S>
   try {
     const request = db.request();
     for (const key of keys) {
-      request.input(key, (data as any)[key]);
+      request.input(key, (data as Record<string, unknown>)[key]);
     }
     const result = await request.query(sql);
     if (!result.recordset?.[0]) {
@@ -51,8 +51,8 @@ async function insertRecord<S extends BrandedSchema>(schema: S, data: z.infer<S>
 async function updateRecord<S extends BrandedSchema>(
   schema: S,
   id: number | string,
-  idColumn: string,
-  data: Partial<z.infer<S>>,
+  idColumn: keyof z.infer<S> & string,
+  data: Partial<z.output<S>>,
 ): Promise<Record<string, unknown> | null> {
   log.debug(`updateRecord`, { id, idColumn });
 
@@ -67,7 +67,7 @@ async function updateRecord<S extends BrandedSchema>(
   try {
     const request = db.request();
     for (const key of keys) {
-      request.input(key, (data as any)[key]);
+      request.input(key, (data as Record<string, unknown>)[key]);
     }
     request.input("id", id);
     const result = await request.query(sql);
@@ -105,7 +105,7 @@ export async function validateAndInsertEntity(
 
   try {
     const newRecord = await insertRecord(schemaForCreate, validation.sanitized);
-    const successResponse: ApiSuccessResponse<{ [key: string]: any }> = {
+    const successResponse: ApiSuccessResponse<Record<string, unknown>> = {
       success: true,
       message: `${entityName} created successfully.`,
       data: { [successDataWrapperKey]: newRecord },
@@ -129,10 +129,10 @@ export async function validateAndInsertEntity(
  * Validates data and updates an entity, returning a complete SvelteKit `Response`.
  * This function orchestrates the entire process for a PUT endpoint.
  */
-export async function validateAndUpdateEntity(
-  schema: BrandedSchema,
+export async function validateAndUpdateEntity<S extends BrandedSchema>(
+  schema: S,
   id: number | string,
-  idColumn: string,
+  idColumn: keyof z.infer<S> & string,
   rawData: unknown,
   successDataWrapperKey: string,
 ): Promise<Response> {
@@ -164,7 +164,7 @@ export async function validateAndUpdateEntity(
   }
 
   try {
-    const updatedRecord = await updateRecord(schema, id, idColumn, validation.sanitized);
+    const updatedRecord = await updateRecord(schema, id, idColumn, validation.sanitized as Partial<z.output<S>>);
 
     if (!updatedRecord) {
       const errorResponse: ApiErrorResponse = {
@@ -177,7 +177,7 @@ export async function validateAndUpdateEntity(
       return json(errorResponse, { status: 404 });
     }
 
-    const successResponse: ApiSuccessResponse<{ [key: string]: any }> = {
+    const successResponse: ApiSuccessResponse<Record<string, unknown>> = {
       success: true,
       message: `${entityName} updated successfully.`,
       data: { [successDataWrapperKey]: updatedRecord },
@@ -223,23 +223,48 @@ export function validateIdUrlParam(
 }
 
 /**
- * Build ApiErrorResponse and HTTP status 500 for unexpected errors.
+ * Build ApiErrorResponse for unexpected errors with smart SQL error mapping.
+ * Attempts to map SQL errors to appropriate HTTP status codes, falls back to 500.
  * @param err
  * @param info
  * @returns
  */
 export function buildUnexpectedError(err: unknown, info?: string) {
-  const errorMsg = coerceErrorMessage(err);
-  const additionalInfo = info ? ` - ${info}` : "";
-  const msg = `An unexpected error occurred ${additionalInfo}`;
-  log.error(msg, { errorMsg });
+  // Versuche zuerst DB-spezifisches Mapping
+  const { status, message } = mssqlErrorMapper.mapToHttpError(err);
 
-  const errorResponse: ApiErrorResponse = {
-    success: false,
-    message: "An unexpected internal server error occurred.",
-    status_code: 500,
-    error_code: "INTERNAL_SERVER_ERROR",
-    meta: { timestamp: new Date().toISOString() },
-  };
-  return json(errorResponse, { status: 500 });
+  if (status !== 500) {
+    // Das ist ein DB-spezifischer Fehler (409, 400, 404, etc.)
+    const errorMsg = coerceErrorMessage(err);
+    const additionalInfo = info ? ` - ${info}` : "";
+    log.error(`Database error occurred ${additionalInfo}`, { errorMsg });
+
+    const errorResponse: ApiErrorResponse = {
+      success: false,
+      message: message, // User-friendly DB message
+      status_code: status as HttpStatusCode,
+      error_code: status === 400 ? "BAD_REQUEST" :
+                 status === 404 ? "NOT_FOUND" :
+                 status === 409 ? "CONFLICT" :
+                 status === 422 ? "VALIDATION_ERROR" :
+                 "DATABASE_ERROR",
+      meta: { timestamp: new Date().toISOString() },
+    };
+    return json(errorResponse, { status });
+  } else {
+    // Generischer unerwarteter Fehler (JSON parse error, network, etc.)
+    const errorMsg = coerceErrorMessage(err);
+    const additionalInfo = info ? ` - ${info}` : "";
+    const msg = `An unexpected error occurred ${additionalInfo}`;
+    log.error(msg, { errorMsg });
+
+    const errorResponse: ApiErrorResponse = {
+      success: false,
+      message: "An unexpected internal server error occurred.",
+      status_code: 500,
+      error_code: "INTERNAL_SERVER_ERROR",
+      meta: { timestamp: new Date().toISOString() },
+    };
+    return json(errorResponse, { status: 500 });
+  }
 }

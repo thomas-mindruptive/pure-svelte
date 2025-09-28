@@ -1,3 +1,5 @@
+// src/lib/api/api.types.ts
+
 import type { QueryPayload } from "$lib/backendQueries/queryGrammar";
 
 /**

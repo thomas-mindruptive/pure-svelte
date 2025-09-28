@@ -2,13 +2,13 @@
 
 ## Overview
 
-This system implements type-safe SQL query generation using Zod schemas enhanced with compile-time meta information. Each schema carries metadata about its database alias, table name, and schema, enabling automatic generation of qualified column names for JOIN queries.
+This system implements type-safe SQL query generation using Zod schemas enhanced with compile-time and runtime meta information. Each schema carries metadata about its database alias, table name, and schema, enabling automatic generation of qualified column names for JOIN queries.
 
 ## Core Architecture
 
 ### Branded Schemas with Meta Information
 
-Schemas are created with embedded metadata using an intersection type approach:
+Schemas are created with embedded metadata using a custom approach that ensures both compile-time type safety and runtime accessibility:
 
 ```typescript
 type WithMeta<T, M> = T & { readonly _meta: M };
@@ -17,9 +17,15 @@ function createSchemaWithMeta<
   T extends z.ZodObject<any>,
   M extends { alias: string; tableName: string; dbSchema: string }
 >(schema: T, meta: M): WithMeta<T, M> {
-  return schema.meta(meta) as WithMeta<T, M>;
+  // Store metadata directly on the schema for runtime access
+  (schema as any).__brandMeta = meta;
+  // Call Zod's meta() for potential future compatibility
+  const schemaWithMeta = schema.meta(meta);
+  return schemaWithMeta as WithMeta<T, M>;
 }
 ```
+
+**Important Note**: We store metadata in `__brandMeta` rather than relying on Zod's `.meta()` method. Zod's `.meta()` is designed for JSON Schema generation and adds schemas to `z.globalRegistry`, but doesn't persist runtime-accessible metadata on the schema objects themselves. Our `__brandMeta` approach ensures metadata survives module export/import and is available at runtime.
 
 ### Schema Definition Pattern
 
@@ -148,14 +154,20 @@ export function genTypedQualifiedColumns<T extends z.ZodObject<any>>(
   const shape = schema.shape;
 
   for (const [fieldName, zodType] of Object.entries(shape)) {
-    if (zodType instanceof z.ZodObject && "_meta" in zodType) {
-      // Extract alias from branded schema meta
-      const meta = (zodType as any)._meta;
-      const alias = meta.alias;
-      const nestedKeys = zodType.keyof().options;
+    if (zodType instanceof z.ZodObject) {
+      // Extract metadata from __brandMeta property
+      const meta = (zodType as any).__brandMeta;
       
+      if (!meta?.alias) {
+        throw new Error(
+          `Schema for nested field '${fieldName}' has no metadata. ` +
+          `All nested schemas must be branded schemas created with createSchemaWithMeta.`
+        );
+      }
+      
+      const nestedKeys = zodType.keyof().options;
       // Add qualified columns: "pd.product_def_id", "pd.title", etc.
-      columns.push(...nestedKeys.map((key: string) => `${alias}.${key}`));
+      columns.push(...nestedKeys.map((key: string) => `${meta.alias}.${key}`));
     } else {
       // Direct field from base table - no qualification needed
       columns.push(fieldName);
@@ -163,6 +175,24 @@ export function genTypedQualifiedColumns<T extends z.ZodObject<any>>(
   }
 
   return columns as QualifiedColumnsFromBrandedSchemaWithJoins<T>[];
+}
+```
+
+### Lookup Maps Initialization
+
+```typescript
+// Lookup maps for efficient schema access by alias
+export const schemaByAlias = new Map<string, z.ZodObject<any>>();
+export const metaByAlias = new Map<string, SchemaMeta>();
+
+// Initialize lookup maps using __brandMeta
+for (const [name, schema] of Object.entries(AllBrandedSchemas)) {
+  const meta = (schema as any).__brandMeta;
+  
+  if (meta?.alias) {
+    schemaByAlias.set(meta.alias, schema);
+    metaByAlias.set(meta.alias, meta);
+  }
 }
 ```
 
@@ -213,6 +243,24 @@ const query: QueryPayload<OrderItem_ProdDef_Category> = {
 
 ## Technical Implementation
 
+### Metadata Storage Strategy
+
+Our implementation uses a custom metadata storage approach:
+
+1. **`__brandMeta` Property**: Runtime metadata is stored directly on schema objects as `__brandMeta`
+2. **Export/Import Safe**: This property survives module export/import cycles
+3. **Zod Compatibility**: We still call Zod's `.meta()` for potential future compatibility, but don't rely on it
+
+### Why Not Use Zod's `.meta()`?
+
+Zod's `.meta()` method (as of v4) is designed for JSON Schema generation and registry purposes. It:
+- Adds schemas to `z.globalRegistry` when an `id` is provided
+- Is primarily for schema documentation and JSON Schema export
+- Does not persist metadata on the schema object itself for runtime access
+- Does not survive module export/import cycles
+
+Our `__brandMeta` approach ensures reliable runtime access to metadata across the entire application.
+
 ### Schema Registry Replacement
 
 The branded schemas completely replace the need for a separate table registry. All necessary information is embedded directly in the schemas:
@@ -223,24 +271,12 @@ const TableRegistry = {
   wholesalers: { schema: WholesalerSchema, alias: "w", ... }
 }
 
-// Now: Self-contained branded schemas
+// Now: Self-contained branded schemas with __brandMeta
 const WholesalerSchema = createSchemaWithMeta(
   z.object({ ... }),
   { alias: "w", tableName: "wholesalers", dbSchema: "dbo" }
 );
-```
-
-### Type Resolution
-
-The type system can extract all necessary information directly from the branded schemas:
-
-```typescript
-// Extract alias from schema
-type WholesalerAlias = GetSchemaAlias<typeof WholesalerSchema>; // "w"
-
-// Generate qualified columns
-type WholesalerColumns = QualifiedColumnsFromBrandedSchema<typeof WholesalerSchema>;
-// "wholesaler_id" | "name" | "w.wholesaler_id" | "w.name" | ...
+// Metadata accessible via: (WholesalerSchema as any).__brandMeta
 ```
 
 ## File Structure

@@ -15,7 +15,6 @@ import { mssqlErrorMapper } from "$lib/backendQueries/mssqlErrorMapper";
 import { checkWholesalerDependencies } from "$lib/dataModel/dependencyChecks";
 import { LogicalOperator, ComparisonOperator, type QueryPayload, type WhereCondition } from "$lib/backendQueries/queryGrammar";
 import { WholesalerSchema, type Wholesaler } from "$lib/domain/domainTypes";
-import { validateEntity } from "$lib/domain/domainTypes.utils";
 import { v4 as uuidv4 } from "uuid";
 
 import type {
@@ -28,22 +27,23 @@ import type {
 } from "$lib/api/api.types";
 import { deleteSupplier } from "$lib/dataModel/deletes";
 import type { DeleteSupplierSuccessResponse } from "$lib/api/app/appSpecificTypes";
+import { validateAndUpdateEntity, validateIdUrlParam } from "$lib/backendQueries/entityOperations";
+import { coerceErrorMessage } from "$lib/utils/errorUtils";
 
 /**
  * GET /api/suppliers/[id] - Get a single, complete supplier record.
  */
 export const GET: RequestHandler = async ({ params }) => {
-  log.infoHeader("GET /api/suppliers/[id]");
   const operationId = uuidv4();
-  const id = parseInt(params.id ?? "", 10);
-  log.info(`[${operationId}] GET /suppliers/${id}: FN_START`);
-
-  if (isNaN(id) || id <= 0) {
-    // Hier können wir error() werfen, da es keine komplexe Client-Logik erfordert
-    throw error(400, "Invalid supplier ID. It must be a positive number.");
-  }
+  log.infoHeader(`GET /api/suppliers/${params.id} - ${operationId}`);
 
   try {
+    const { id, errorResponse } = validateIdUrlParam(params.id);
+    // Return an ApiErrorResponse and an appropriated HTTP status.
+    if (errorResponse) {
+      return errorResponse;
+    }
+
     // Direkte Abfrage, da keine komplexe Filterung vom Client kommt
     const result = await db.request().input("id", id).query("SELECT * FROM dbo.wholesalers WHERE wholesaler_id = @id");
 
@@ -79,22 +79,14 @@ export const GET: RequestHandler = async ({ params }) => {
  * ⚠️ Does NOT create a supplier. => /api/suppliers/new POST
  */
 export const POST: RequestHandler = async ({ params, request }) => {
-  log.infoHeader("POST /api/suppliers/[id]");
   const operationId = uuidv4();
-  const id = parseInt(params.id ?? "", 10);
-  log.info(`[${operationId}] POST /suppliers/${id}: FN_START`);
+  log.infoHeader(`POST /api/suppliers/${params.id} - ${operationId}`);
 
   try {
-    if (isNaN(id) || id <= 0) {
-      const errRes: ApiErrorResponse = {
-        success: false,
-        message: "Invalid supplier ID. It must be a positive number.",
-        status_code: 400,
-        error_code: "BAD_REQUEST",
-        meta: { timestamp: new Date().toISOString() },
-      };
-      log.warn(`[${operationId}] FN_FAILURE: Invalid ID provided.`, { id: params.id });
-      return json(errRes, { status: 400 });
+    const { id, errorResponse } = validateIdUrlParam(params.id);
+    // Return an ApiErrorResponse and an appropriated HTTP status.
+    if (errorResponse) {
+      return errorResponse;
     }
 
     const requestBody = (await request.json()) as QueryRequest<Wholesaler>;
@@ -151,82 +143,95 @@ export const POST: RequestHandler = async ({ params, request }) => {
  * PUT /api/suppliers/[id] - Update an existing supplier.
  */
 export const PUT: RequestHandler = async ({ params, request }) => {
-  log.infoHeader("PUT /api/suppliers/[id]");
   const operationId = uuidv4();
-  const id = parseInt(params.id ?? "", 10);
-  log.info(`[${operationId}] PUT /suppliers/${id}: FN_START`);
+  log.infoHeader(`PUT /api/suppliers/${params.id} - ${operationId}`);
 
   try {
-    if (isNaN(id) || id <= 0) {
-      const errRes: ApiErrorResponse = {
-        success: false,
-        message: "Invalid supplier ID.",
-        status_code: 400,
-        error_code: "BAD_REQUEST",
-        meta: { timestamp: new Date().toISOString() },
-      };
-      log.warn(`[${operationId}] FN_FAILURE: Invalid ID provided.`, { id: params.id });
-      return json(errRes, { status: 400 });
+    const { id, errorResponse } = validateIdUrlParam(params.id);
+    // Return an ApiErrorResponse and an appropriated HTTP status.
+    if (errorResponse) {
+      return errorResponse;
     }
+
+    // Old:
+    // if (isNaN(id) || id <= 0) {
+    //   const errRes: ApiErrorResponse = {
+    //     success: false,
+    //     message: "Invalid supplier ID.",
+    //     status_code: 400,
+    //     error_code: "BAD_REQUEST",
+    //     meta: { timestamp: new Date().toISOString() },
+    //   };
+    //   log.warn(`[${operationId}] FN_FAILURE: Invalid ID provided.`, { id: params.id });
+    //   return json(errRes, { status: 400 });
+    // }
 
     const requestData = await request.json();
-    log.info(`[${operationId}] Parsed request body`, { fields: Object.keys(requestData) });
+    log.info(`[${operationId}] Parsed request body`, { requestData });
+    return validateAndUpdateEntity(WholesalerSchema, id, "supplier_id", requestData, "supplier");
 
-    //const validation = validateWholesaler({ ...requestData, wholesaler_id: id }, { mode: "update" });
-    const validation = validateEntity(WholesalerSchema, { ...requestData, wholesaler_id: id });
+    // const validation = validateEntity(WholesalerSchema, { ...requestData, wholesaler_id: id });
 
-    if (!validation.isValid) {
-      const errRes: ApiErrorResponse = {
-        success: false,
-        message: "Validation failed.",
-        status_code: 400,
-        error_code: "VALIDATION_ERROR",
-        errors: validation.errors,
-        meta: { timestamp: new Date().toISOString() },
-      };
-      log.warn(`[${operationId}] FN_FAILURE: Validation failed.`, { errors: validation.errors });
-      return json(errRes, { status: 400 });
-    }
+    // if (!validation.isValid) {
+    //   const errRes: ApiErrorResponse = {
+    //     success: false,
+    //     message: "Validation failed.",
+    //     status_code: 400,
+    //     error_code: "VALIDATION_ERROR",
+    //     errors: validation.errors,
+    //     meta: { timestamp: new Date().toISOString() },
+    //   };
+    //   log.warn(`[${operationId}] FN_FAILURE: Validation failed.`, { errors: validation.errors });
+    //   return json(errRes, { status: 400 });
+    // }
 
-    const { name, country, region, status, dropship, website, b2b_notes } = validation.sanitized as Partial<Wholesaler>;
-    const result = await db
-      .request()
-      .input("id", id)
-      .input("name", name)
-      .input("country", country)
-      .input("region", region)
-      .input("status", status)
-      .input("dropship", dropship)
-      .input("website", website)
-      .input("b2b_notes", b2b_notes)
-      .query(
-        "UPDATE dbo.wholesalers SET name=@name, country=@country, region=@region, status=@status, dropship=@dropship, website=@website, b2b_notes=@b2b_notes OUTPUT INSERTED.* WHERE wholesaler_id = @id",
-      );
+    // const { name, country, region, status, dropship, website, b2b_notes } = validation.sanitized as Partial<Wholesaler>;
+    // const result = await db
+    //   .request()
+    //   .input("id", id)
+    //   .input("name", name)
+    //   .input("country", country)
+    //   .input("region", region)
+    //   .input("status", status)
+    //   .input("dropship", dropship)
+    //   .input("website", website)
+    //   .input("b2b_notes", b2b_notes)
+    //   .query(
+    //     "UPDATE dbo.wholesalers SET name=@name, country=@country, region=@region, status=@status, dropship=@dropship, website=@website, b2b_notes=@b2b_notes OUTPUT INSERTED.* WHERE wholesaler_id = @id",
+    //   );
 
-    if (result.recordset.length === 0) {
-      const errRes: ApiErrorResponse = {
-        success: false,
-        message: `Supplier with ID ${id} not found.`,
-        status_code: 404,
-        error_code: "NOT_FOUND",
-        meta: { timestamp: new Date().toISOString() },
-      };
-      log.warn(`[${operationId}] FN_FAILURE: Supplier not found for update.`);
-      return json(errRes, { status: 404 });
-    }
+    // if (result.recordset.length === 0) {
+    //   const errRes: ApiErrorResponse = {
+    //     success: false,
+    //     message: `Supplier with ID ${id} not found.`,
+    //     status_code: 404,
+    //     error_code: "NOT_FOUND",
+    //     meta: { timestamp: new Date().toISOString() },
+    //   };
+    //   log.warn(`[${operationId}] FN_FAILURE: Supplier not found for update.`);
+    //   return json(errRes, { status: 404 });
+    // }
 
-    const response: ApiSuccessResponse<{ supplier: Wholesaler }> = {
-      success: true,
-      message: "Supplier updated successfully.",
-      data: { supplier: result.recordset[0] as Wholesaler },
+    // const response: ApiSuccessResponse<{ supplier: Wholesaler }> = {
+    //   success: true,
+    //   message: "Supplier updated successfully.",
+    //   data: { supplier: result.recordset[0] as Wholesaler },
+    //   meta: { timestamp: new Date().toISOString() },
+    // };
+    // log.info(`[${operationId}] FN_SUCCESS: Supplier updated.`);
+    // return json(response);
+  } catch (err: unknown) {
+    const msg = coerceErrorMessage(err);
+    log.error(`An unexpected error occurred in the PUT /api/suppliers/[id] endpoint.`, { error: msg });
+
+    const errorResponse: ApiErrorResponse = {
+      success: false,
+      message: "An unexpected internal server error occurred.",
+      status_code: 500,
+      error_code: "INTERNAL_SERVER_ERROR",
       meta: { timestamp: new Date().toISOString() },
     };
-    log.info(`[${operationId}] FN_SUCCESS: Supplier updated.`);
-    return json(response);
-  } catch (err: unknown) {
-    const { status, message } = mssqlErrorMapper.mapToHttpError(err);
-    log.error(`[${operationId}] FN_EXCEPTION: Unhandled error.`, { error: err });
-    throw error(status, message);
+    return json(errorResponse, { status: 500 });
   }
 };
 
@@ -234,27 +239,21 @@ export const PUT: RequestHandler = async ({ params, request }) => {
  * DELETE /api/suppliers/[id] - Delete a supplier with dependency checks.
  */
 export const DELETE: RequestHandler = async ({ params, request }) => {
-  log.infoHeader("DELETE /api/suppliers/[id]");
   const operationId = uuidv4();
-  const id = parseInt(params.id ?? "", 10);
-  const body: DeleteRequest<Wholesaler> = await request.json();
-  log.info(`[${operationId}] DELETE /suppliers/${id}: FN_START`, { params, request, body });
-
-  const cascade = body.cascade || false;
-  const forceCascade = body.forceCascade || false;
+  log.infoHeader(`DELETE /api/suppliers/${params.id} - ${operationId}`);
 
   try {
-    if (isNaN(id) || id <= 0) {
-      const errRes: ApiErrorResponse = {
-        success: false,
-        message: "Invalid supplier ID.",
-        status_code: 400,
-        error_code: "BAD_REQUEST",
-        meta: { timestamp: new Date().toISOString() },
-      };
-      log.warn(`[${operationId}] FN_FAILURE: Invalid ID provided.`, { id: params.id });
-      return json(errRes, { status: 400 });
+    const { id, errorResponse } = validateIdUrlParam(params.id);
+    // Return an ApiErrorResponse and an appropriated HTTP status.
+    if (errorResponse) {
+      return errorResponse;
     }
+
+    const body: DeleteRequest<Wholesaler> = await request.json();
+    log.info(`[${operationId}] DELETE /suppliers/${id}: FN_START`, { params, request, body });
+
+    const cascade = body.cascade || false;
+    const forceCascade = body.forceCascade || false;
 
     const transaction = db.transaction();
     await transaction.begin();
@@ -289,7 +288,7 @@ export const DELETE: RequestHandler = async ({ params, request }) => {
       const deletedSupplierStats = await deleteSupplier(id, cascade || forceCascade, transaction);
       await transaction.commit();
       log.info(`[${operationId}] Transaction committed.`);
-      
+
       // === RETURN RESPONSE ========================================================================
 
       const response: DeleteSupplierSuccessResponse = {

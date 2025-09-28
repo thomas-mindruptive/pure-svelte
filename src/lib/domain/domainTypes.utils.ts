@@ -4,7 +4,6 @@ import { log } from "$lib/utils/logger";
 import z from "zod";
 import { AllBrandedSchemas } from "./domainTypes";
 
-console.log("WholesalerSchema _def.meta at import:", (AllBrandedSchemas.WholesalerSchema as any)._def?.meta);
 
 // ===== TYPE DEFINITIONS FOR BRANDED SCHEMAS =====
 
@@ -112,8 +111,8 @@ export function genTypedQualifiedColumns<T extends z.ZodObject<z.ZodRawShape>>(s
         // When .extend() is used, meta is lost. Try to find by schema shape comparison
         const schemaKeys = zodType.keyof().options as readonly string[];
 
-        console.log(`Trying to match schema for field '${fieldName}' with keys:`, schemaKeys);
-        console.log(
+        log.debug(`Trying to match schema for field '${fieldName}' with keys:`, schemaKeys);
+        log.debug(
           "Available schemas in map:",
           Array.from(schemaByAlias.entries()).map(([alias, s]) => ({
             alias,
@@ -126,7 +125,7 @@ export function genTypedQualifiedColumns<T extends z.ZodObject<z.ZodRawShape>>(s
           const mapSchemaKeys = s.keyof().options as readonly string[];
           const match = mapSchemaKeys.length === schemaKeys.length && schemaKeys.every((key) => mapSchemaKeys.includes(key));
           if (match) {
-            console.log(`Found matching schema with alias '${alias}'`);
+            log.debug(`Found matching schema with alias '${alias}'`);
           }
           return match;
         });
@@ -157,10 +156,6 @@ export function genTypedQualifiedColumns<T extends z.ZodObject<z.ZodRawShape>>(s
   return columns as QualifiedColumnsFromBrandedSchemaWithJoins<T>[];
 }
 
-// Test with the branded OrderItem_ProdDef_Category_Schema
-// const testColumns = genTypedQualifiedColumns(OrderItem_ProdDef_Category_Schema);
-// console.log("Generated columns:", testColumns);
-
 // ===== LOOKUP UTILS =====
 
 /**
@@ -172,7 +167,7 @@ export const metaByAlias = new Map<string, SchemaMeta>();
 
 // Initialize lookup maps
 for (const [name, schema] of Object.entries(AllBrandedSchemas)) {
-  console.log(`Schema ${name}:`, {
+  log.info(`dimainTypesUtils: Schema ${name}:`, {
     has_def: !!(schema as any)._def,
     meta_in_def: (schema as any)._def?.meta,
     direct_meta: (schema as any)._meta,

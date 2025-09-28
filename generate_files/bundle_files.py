@@ -64,6 +64,7 @@ INCLUDE_PATTERNS: List[str] = [
     "src/lib/backendQueries/**",
     "src/lib/api/client/supplier.ts",
     "src/lib/utils/recordsetTransformer.ts",
+    "src/routes/(browser)/suppliers/**"
 
 ]  
 
@@ -313,4 +314,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 

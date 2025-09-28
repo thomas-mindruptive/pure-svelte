@@ -1,19 +1,34 @@
 // File: src/lib/domain/domainTypes.ts (COMPLETE REWRITE with createSchemaWithMeta)
 
+import { log } from "$lib/utils/logger";
 import { z } from "zod";
 
 // ===== SCHEMA META HELPER =====
 
 type WithMeta<T, M> = T & { readonly _meta: M };
 
-function createSchemaWithMeta<
-  T extends z.ZodObject<any>,
-  M extends { alias: string; tableName: string; dbSchema: string }
->(schema: T, meta: M): WithMeta<T, M> {
-  const schemaWithMeta = schema.meta(meta) as WithMeta<T, M>;
-  console.log('Directly after .meta():', (schemaWithMeta as any)._def?.meta);
-  (schemaWithMeta as any).__brandMeta = meta;  // Einfach als normale Property
-  return schemaWithMeta;
+/**
+ * Add metadata to the schema itself (not a copy!) and return the schema.
+ * @param schema
+ * @param meta
+ * @returns
+ */
+function createSchemaWithMeta<T extends z.ZodObject<any>, M extends { alias: string; tableName: string; dbSchema: string }>(
+  schema: T,
+  meta: M,
+): WithMeta<T, M> {
+  (schema as any).__brandMeta = meta; // Einfach als normale Property
+  log.debug(`Added metadata to ${schema.description} - ${JSON.stringify(meta)}`);
+  return schema as WithMeta<T, M>;
+}
+
+/**
+ * Copy metadata. Creates a copy of the metadata, not a reference.
+ * @param from
+ * @param to
+ */
+export function copyMetaFrom(from: z.ZodObject<any>, to: z.ZodObject<any>) {
+  (to as any).__brandMeta = { ...(to as any).__brandMeta, ...(from as any).__brandMeta };
 }
 
 // ===== GENERAL =====
@@ -51,7 +66,7 @@ const WholesalerSchemaBase = z
 export const WholesalerSchema = createSchemaWithMeta(WholesalerSchemaBase, {
   alias: "w",
   tableName: "wholesalers",
-  dbSchema: "dbo"
+  dbSchema: "dbo",
 } as const);
 
 /**
@@ -62,6 +77,7 @@ export const WholesalerForCreateSchema = WholesalerSchema.omit({
   wholesaler_id: true,
   created_at: true,
 }).describe("WholesalerForCreateSchema");
+copyMetaFrom(WholesalerSchema, WholesalerForCreateSchema);
 
 // ===== PRODUCT CATEGORY (dbo.product_categories) =====
 
@@ -76,7 +92,7 @@ const ProductCategorySchemaBase = z
 export const ProductCategorySchema = createSchemaWithMeta(ProductCategorySchemaBase, {
   alias: "pc",
   tableName: "product_categories",
-  dbSchema: "dbo"
+  dbSchema: "dbo",
 } as const);
 
 /**
@@ -86,6 +102,7 @@ export const ProductCategorySchema = createSchemaWithMeta(ProductCategorySchemaB
 export const ProductCategoryForCreateSchema = ProductCategorySchema.omit({
   category_id: true,
 }).describe("ProductCategoryForCreateSchema");
+copyMetaFrom(ProductCategorySchema, ProductCategoryForCreateSchema);
 
 // ===== ATTRIBUTE (dbo.attributes) =====
 
@@ -100,7 +117,7 @@ const AttributeSchemaBase = z
 export const AttributeSchema = createSchemaWithMeta(AttributeSchemaBase, {
   alias: "a",
   tableName: "attributes",
-  dbSchema: "dbo"
+  dbSchema: "dbo",
 } as const);
 
 /**
@@ -110,6 +127,7 @@ export const AttributeSchema = createSchemaWithMeta(AttributeSchemaBase, {
 export const AttributeForCreateSchema = AttributeSchema.omit({
   attribute_id: true,
 }).describe("AttributeForCreateSchema");
+copyMetaFrom(AttributeSchema, AttributeForCreateSchema);
 
 // ===== PRODUCT DEFINITION (dbo.product_definitions) =====
 
@@ -128,7 +146,7 @@ const ProductDefinitionSchemaBase = z
 export const ProductDefinitionSchema = createSchemaWithMeta(ProductDefinitionSchemaBase, {
   alias: "pd",
   tableName: "product_definitions",
-  dbSchema: "dbo"
+  dbSchema: "dbo",
 } as const);
 
 /**
@@ -139,6 +157,7 @@ export const ProductDefinitionForCreateSchema = ProductDefinitionSchema.omit({
   product_def_id: true,
   created_at: true,
 }).describe("ProductDefinitionForCreateSchema");
+copyMetaFrom(ProductDefinitionSchema, ProductDefinitionForCreateSchema);
 
 // ===== WHOLESALER CATEGORY (dbo.wholesaler_categories) =====
 
@@ -155,7 +174,7 @@ const WholesalerCategorySchemaBase = z
 export const WholesalerCategorySchema = createSchemaWithMeta(WholesalerCategorySchemaBase, {
   alias: "wc",
   tableName: "wholesaler_categories",
-  dbSchema: "dbo"
+  dbSchema: "dbo",
 } as const);
 
 /**
@@ -165,6 +184,7 @@ export const WholesalerCategorySchema = createSchemaWithMeta(WholesalerCategoryS
 export const WholesalerCategoryForCreateSchema = WholesalerCategorySchema.omit({
   created_at: true,
 }).describe("WholesalerCategoryForCreateSchema");
+copyMetaFrom(WholesalerCategorySchema, WholesalerCategoryForCreateSchema);
 
 // ===== WHOLESALER CATEGORY including joins (dbo.wholesaler_categories) =====
 
@@ -199,7 +219,7 @@ const WholesalerItemOfferingSchemaBase = z
 export const WholesalerItemOfferingSchema = createSchemaWithMeta(WholesalerItemOfferingSchemaBase, {
   alias: "wio",
   tableName: "wholesaler_item_offerings",
-  dbSchema: "dbo"
+  dbSchema: "dbo",
 } as const);
 
 /**
@@ -210,6 +230,7 @@ export const WholesalerItemOfferingForCreateSchema = WholesalerItemOfferingSchem
   offering_id: true,
   created_at: true,
 }).describe("WholesalerItemOfferingForCreateSchema");
+copyMetaFrom(WholesalerItemOfferingSchema, WholesalerItemOfferingForCreateSchema);
 
 // ===== WHOLESALER ITEM OFFERING including join to product_def  =====
 
@@ -243,7 +264,7 @@ const WholesalerOfferingLinkSchemaBase = z
 export const WholesalerOfferingLinkSchema = createSchemaWithMeta(WholesalerOfferingLinkSchemaBase, {
   alias: "wol",
   tableName: "wholesaler_offering_links",
-  dbSchema: "dbo"
+  dbSchema: "dbo",
 } as const);
 
 /**
@@ -254,6 +275,7 @@ export const WholesalerOfferingLinkForCreateSchema = WholesalerOfferingLinkSchem
   link_id: true,
   created_at: true,
 }).describe("WholesalerOfferingLinkForCreateSchema");
+copyMetaFrom(WholesalerOfferingLinkSchema, WholesalerOfferingLinkForCreateSchema);
 
 // ===== WHOLESALER OFFERING ATTRIBUTE (dbo.wholesaler_offering_attributes) =====
 
@@ -268,7 +290,7 @@ const WholesalerOfferingAttributeSchemaBase = z
 export const WholesalerOfferingAttributeSchema = createSchemaWithMeta(WholesalerOfferingAttributeSchemaBase, {
   alias: "woa",
   tableName: "wholesaler_offering_attributes",
-  dbSchema: "dbo"
+  dbSchema: "dbo",
 } as const);
 
 /**
@@ -298,7 +320,7 @@ const MaterialSchemaBase = z
 export const MaterialSchema = createSchemaWithMeta(MaterialSchemaBase, {
   alias: "m",
   tableName: "materials",
-  dbSchema: "dbo"
+  dbSchema: "dbo",
 } as const);
 
 /**
@@ -308,6 +330,7 @@ export const MaterialSchema = createSchemaWithMeta(MaterialSchemaBase, {
 export const MaterialForCreateSchema = MaterialSchema.omit({
   material_id: true,
 }).describe("MaterialForCreateSchema");
+copyMetaFrom(MaterialSchema, MaterialForCreateSchema);
 
 // ===== FORM (dbo.forms) =====
 
@@ -321,7 +344,7 @@ const FormSchemaBase = z
 export const FormSchema = createSchemaWithMeta(FormSchemaBase, {
   alias: "f",
   tableName: "forms",
-  dbSchema: "dbo"
+  dbSchema: "dbo",
 } as const);
 
 /**
@@ -331,6 +354,7 @@ export const FormSchema = createSchemaWithMeta(FormSchemaBase, {
 export const FormForCreateSchema = FormSchema.omit({
   form_id: true,
 }).describe("FormForCreateSchema");
+copyMetaFrom(FormSchema, FormForCreateSchema);
 
 // ===== ORDER (dbo.orders) =====
 
@@ -356,13 +380,14 @@ const OrderSchemaBase = z
 export const OrderSchema = createSchemaWithMeta(OrderSchemaBase, {
   alias: "ord",
   tableName: "orders",
-  dbSchema: "dbo"
+  dbSchema: "dbo",
 } as const);
 
 export const OrderForCreateSchema = OrderSchema.omit({
   order_id: true,
   created_at: true,
 }).describe("OrderForCreateSchema");
+copyMetaFrom(OrderSchema, OrderForCreateSchema);
 
 // ===== ORDER ITEM (dbo.order_items) =====
 
@@ -382,19 +407,20 @@ const OrderItemSchemaBase = z
 export const OrderItemSchema = createSchemaWithMeta(OrderItemSchemaBase, {
   alias: "ori",
   tableName: "order_items",
-  dbSchema: "dbo"
+  dbSchema: "dbo",
 } as const);
 
 export const OrderItemForCreateSchema = OrderItemSchema.omit({
   order_item_id: true,
   created_at: true,
 }).describe("OrderItemForCreateSchema");
+copyMetaFrom(OrderItemSchema, OrderItemForCreateSchema);
 
 // ===== ORDER ITEM with JOINS (NOW WITH BRANDED SCHEMAS) =====
 
 export const OrderItem_ProdDef_Category_Schema = OrderItemSchema.extend({
   product_def: ProductDefinitionSchema,
-  category: ProductCategorySchema 
+  category: ProductCategorySchema,
 });
 
 // ===== SCHEMAS => TYPES  =====
@@ -432,13 +458,8 @@ export const AllBrandedSchemas = {
   OrderSchema,
   OrderItemSchema,
   MaterialSchema,
-  FormSchema
+  FormSchema,
 } as const;
 
 // ===== HELPER EXPORT =====
 export { createSchemaWithMeta, type WithMeta };
-
-
-console.log('WholesalerSchema _def.meta at export:', (WholesalerSchema as any)._def?.meta);
-
-

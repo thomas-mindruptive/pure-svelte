@@ -127,7 +127,7 @@ export class ApiClient {
 				throw new ApiError('Invalid JSON response from server', response.status);
 			}
 
-			// KORREKTE LOGIK: Bei Erfolg ODER erwarteten Fehlern das Ergebnis ZURÜCKGEBEN.
+			// Bei Erfolg ODER erwarteten Fehlern das Ergebnis ZURÜCKGEBEN.
 			if (response.ok || response.status === HTTP_STATUS.CONFLICT || response.status === HTTP_STATUS.BAD_REQUEST) {
 				return parsedData as TUnion;
 			}

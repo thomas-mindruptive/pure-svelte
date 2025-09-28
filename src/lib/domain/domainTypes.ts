@@ -415,6 +415,23 @@ export type Order = z.infer<typeof OrderSchema>;
 export type OrderItem = z.infer<typeof OrderItemSchema>;
 export type OrderItem_ProdDef_Category = z.infer<typeof OrderItem_ProdDef_Category_Schema>;
 
+// ===== ALL BRANDED SCHEMAS (= with meta info)  =====
+
+export const AllBrandedSchemas = {
+  WholesalerSchema,
+  ProductCategorySchema,
+  ProductDefinitionSchema,
+  WholesalerItemOfferingSchema,
+  AttributeSchema,
+  WholesalerOfferingLinkSchema,
+  WholesalerCategorySchema,
+  WholesalerOfferingAttributeSchema,
+  OrderSchema,
+  OrderItemSchema,
+  MaterialSchema,
+  FormSchema
+} as const;
+
 // ===== HELPER EXPORT =====
 export { createSchemaWithMeta, type WithMeta };
 

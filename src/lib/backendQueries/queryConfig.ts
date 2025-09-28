@@ -8,8 +8,7 @@
 
 import { ComparisonOperator, JoinType, LogicalOperator, type QueryPayload } from "$lib/backendQueries/queryGrammar";
 import { OrderItem_ProdDef_Category_Schema } from "$lib/domain/domainTypes";
-import { genQualifiedColumns } from "$lib/domain/domainTypes.utils";
-import { TableRegistry } from "./tableRegistry";
+import { genTypedQualifiedColumns } from "$lib/domain/domainTypes.utils";
 
 type Optional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
 
@@ -181,7 +180,7 @@ export const supplierQueryConfig: QueryConfig = {
       ],
     },
     "order->order_items->product_def->category": {
-      select: genQualifiedColumns(OrderItem_ProdDef_Category_Schema, TableRegistry),
+      select: genTypedQualifiedColumns(OrderItem_ProdDef_Category_Schema),
       from: { table: "dbo.orders", alias: "ord" },
       joins: [
         {

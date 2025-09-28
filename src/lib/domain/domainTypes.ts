@@ -10,7 +10,10 @@ function createSchemaWithMeta<
   T extends z.ZodObject<any>,
   M extends { alias: string; tableName: string; dbSchema: string }
 >(schema: T, meta: M): WithMeta<T, M> {
-  return schema.meta(meta) as WithMeta<T, M>;
+  const schemaWithMeta = schema.meta(meta) as WithMeta<T, M>;
+  console.log('Directly after .meta():', (schemaWithMeta as any)._def?.meta);
+  (schemaWithMeta as any).__brandMeta = meta;  // Einfach als normale Property
+  return schemaWithMeta;
 }
 
 // ===== GENERAL =====
@@ -434,5 +437,8 @@ export const AllBrandedSchemas = {
 
 // ===== HELPER EXPORT =====
 export { createSchemaWithMeta, type WithMeta };
+
+
+console.log('WholesalerSchema _def.meta at export:', (WholesalerSchema as any)._def?.meta);
 
 

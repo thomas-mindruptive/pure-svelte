@@ -1,9 +1,16 @@
-// File: src/lib/domain/domainTypes.utils.ts (UPDATED for Branded Schemas)
+// File: src/lib/domain/domainTypes.utils.ts
 
-import { AliasedTableRegistry } from "$lib/backendQueries/tableRegistry";
 import { log } from "$lib/utils/logger";
 import z from "zod";
-import { type AllBrandedSchemas, OrderItem_ProdDef_Category_Schema } from "./domainTypes";
+import { AllBrandedSchemas } from "./domainTypes";
+
+console.log("WholesalerSchema _def.meta at import:", (AllBrandedSchemas.WholesalerSchema as any)._def?.meta);
+
+// ===== TYPE DEFINITIONS FOR BRANDED SCHEMAS =====
+
+type SchemaMeta = { alias: string; tableName: string; dbSchema: string };
+type BrandedSchema = z.ZodObject<z.ZodRawShape> & { readonly _meta: SchemaMeta };
+type BrandedSchemaWithDef = z.ZodObject<z.ZodRawShape> & { _def?: { meta?: SchemaMeta } };
 
 // ===== TYPE UTILITIES FOR BRANDED SCHEMAS =====
 
@@ -25,22 +32,22 @@ export type GetSchemaTableName<T> = ExtractSchemaMeta<T> extends { tableName: in
 /**
  * Extract column names from schema (actual data fields, not Zod internals)
  */
-export type ExtractSchemaKeys<T extends z.ZodObject<any>> = Extract<keyof z.infer<T>, string>;
+export type ExtractSchemaKeys<T extends z.ZodObject<z.ZodRawShape>> = Extract<keyof z.infer<T>, string>;
 
 /**
  * Generate qualified columns for a single branded schema
  */
-export type QualifiedColumnsFromBrandedSchema<T extends z.ZodObject<any> & { _meta: any }> =
+export type QualifiedColumnsFromBrandedSchema<T extends BrandedSchema> =
   GetSchemaAlias<T> extends string ? ExtractSchemaKeys<T> | `${GetSchemaAlias<T>}.${ExtractSchemaKeys<T>}` : ExtractSchemaKeys<T>;
 
 /**
  * Generate qualified columns for schema with branded nested objects (JOIN scenario)
  * This is the main type used by genTypedQualifiedColumns
  */
-export type QualifiedColumnsFromBrandedSchemaWithJoins<T extends z.ZodObject<any>> =
+export type QualifiedColumnsFromBrandedSchemaWithJoins<T extends z.ZodObject<z.ZodRawShape>> =
   T extends z.ZodObject<infer Shape>
     ? {
-        [K in keyof Shape]: Shape[K] extends z.ZodObject<any> & { _meta: any }
+        [K in keyof Shape]: Shape[K] extends BrandedSchema
           ? GetSchemaAlias<Shape[K]> extends string
             ? `${GetSchemaAlias<Shape[K]>}.${Extract<keyof z.infer<Shape[K]>, string>}`
             : never
@@ -65,13 +72,15 @@ export type ValidFromClause = {
 }[keyof typeof AllBrandedSchemas];
 
 // Type-safe extraction from branded schemas collection
-type GetQualifiedColumnsFromSchema<S> = S extends z.ZodObject<any> & { _meta: { alias: infer A extends string } }
-  ? `${A}.${ExtractSchemaKeys<S>}`
+type GetQualifiedColumnsFromSchema<S> = S extends BrandedSchema
+  ? GetSchemaAlias<S> extends string
+    ? `${GetSchemaAlias<S>}.${ExtractSchemaKeys<S>}`
+    : never
   : never;
 
 // Apply to all schemas
 export type AllQualifiedColumns = {
-  [K in keyof typeof AllBrandedSchemas]: GetQualifiedColumnsFromSchema<(typeof AllBrandedSchemas)[K]>
+  [K in keyof typeof AllBrandedSchemas]: GetQualifiedColumnsFromSchema<(typeof AllBrandedSchemas)[K]>;
 }[keyof typeof AllBrandedSchemas];
 
 export type AllAliasedColumns = `${AllQualifiedColumns} AS ${string}`;
@@ -80,51 +89,67 @@ export type AliasKeys = GetSchemaAlias<(typeof AllBrandedSchemas)[keyof typeof A
 
 export type DbTableNames = GetFullTableName<(typeof AllBrandedSchemas)[keyof typeof AllBrandedSchemas]>;
 
-
-// ===== UTIL FUNCTIONS =====/ 
+// ===== UTIL FUNCTIONS =====
 
 /**
- * UPDATED: Generate typed qualified column names from a branded schema
- *
- * This function now works with branded schemas that have _meta information
- * instead of relying on AliasedTableRegistry lookup.
+ * Generate typed qualified column names from a branded schema
+ * Uses branded schemas with _meta information exclusively
  *
  * @param schema - Branded Zod schema with _meta information
  * @returns Array of qualified column names with full type safety
  */
-export function genTypedQualifiedColumns<T extends z.ZodObject<any>>(schema: T): QualifiedColumnsFromBrandedSchemaWithJoins<T>[] {
+export function genTypedQualifiedColumns<T extends z.ZodObject<z.ZodRawShape>>(schema: T): QualifiedColumnsFromBrandedSchemaWithJoins<T>[] {
   const columns: string[] = [];
   const shape = schema.shape;
 
   for (const [fieldName, zodType] of Object.entries(shape)) {
     if (zodType instanceof z.ZodObject) {
-      // Check if this is a branded schema with _meta
-      if ("_meta" in zodType) {
-        // Extract alias from meta information
-        const meta = (zodType as any)._meta;
-        const alias = meta.alias;
-        const nestedKeys = zodType.keyof().options;
+      // Get meta from either _meta (compile-time) or _def.meta (runtime)
+      const brandedZodType = zodType as BrandedSchemaWithDef;
+      const meta = (brandedZodType as any).__brandMeta;
 
-        // Add qualified columns for joined table: "pd.product_def_id", "pd.title", etc.
-        columns.push(...nestedKeys.map((key: string) => `${alias}.${key}`));
-      } else {
-        // Fallback: This schema doesn't have meta - try old AliasedTableRegistry lookup
-        log.warn(`Schema for field '${fieldName}' has no _meta information. Falling back to AliasedTableRegistry lookup.`);
+      if (!meta?.alias) {
+        // When .extend() is used, meta is lost. Try to find by schema shape comparison
+        const schemaKeys = zodType.keyof().options as readonly string[];
 
-        const aliasEntry = Object.entries(AliasedTableRegistry).find(([, config]) => config.schema === zodType);
-        if (aliasEntry) {
-          const [alias] = aliasEntry;
-          const nestedKeys = zodType.keyof().options;
-          columns.push(...nestedKeys.map((key: string) => `${alias}.${key}`));
-        } else {
-          throw new Error(
-            `Schema for nested field '${fieldName}' not found in AliasedTableRegistry and has no _meta. ` +
-              `Available aliases: ${Object.keys(AliasedTableRegistry).join(", ")}`,
-          );
+        console.log(`Trying to match schema for field '${fieldName}' with keys:`, schemaKeys);
+        console.log(
+          "Available schemas in map:",
+          Array.from(schemaByAlias.entries()).map(([alias, s]) => ({
+            alias,
+            keys: s.keyof().options,
+          })),
+        );
+
+        // Find matching schema by comparing keys
+        const schemaEntry = Array.from(schemaByAlias.entries()).find(([alias, s]) => {
+          const mapSchemaKeys = s.keyof().options as readonly string[];
+          const match = mapSchemaKeys.length === schemaKeys.length && schemaKeys.every((key) => mapSchemaKeys.includes(key));
+          if (match) {
+            console.log(`Found matching schema with alias '${alias}'`);
+          }
+          return match;
+        });
+
+        if (schemaEntry) {
+          const [alias] = schemaEntry;
+          columns.push(...schemaKeys.map((key) => `${alias}.${key}`));
+          continue;
         }
+
+        throw new Error(
+          `Schema for nested field '${fieldName}' has no meta.alias and could not be matched. ` +
+            `Schema keys: [${schemaKeys.join(", ")}]. ` +
+            `Available aliases in map: [${Array.from(schemaByAlias.keys()).join(", ")}]. ` +
+            `All nested schemas must be branded schemas created with createSchemaWithMeta.`,
+        );
       }
+
+      const nestedKeys = zodType.keyof().options as readonly string[];
+      // Add qualified columns: "pd.product_def_id", "pd.title", etc.
+      columns.push(...nestedKeys.map((key) => `${meta.alias}.${key}`));
     } else {
-      // This is a direct field from the base table - no alias qualification needed
+      // Direct field from base table - no qualification needed
       columns.push(fieldName);
     }
   }
@@ -132,16 +157,69 @@ export function genTypedQualifiedColumns<T extends z.ZodObject<any>>(schema: T):
   return columns as QualifiedColumnsFromBrandedSchemaWithJoins<T>[];
 }
 
-// ===== TEST THE NEW FUNCTION =====
-
 // Test with the branded OrderItem_ProdDef_Category_Schema
-const testColumns = genTypedQualifiedColumns(OrderItem_ProdDef_Category_Schema);
-console.log("Generated columns:", testColumns);
+// const testColumns = genTypedQualifiedColumns(OrderItem_ProdDef_Category_Schema);
+// console.log("Generated columns:", testColumns);
 
-// The return type should now be properly typed:
-// ("order_item_id" | "order_id" | "offering_id" | "quantity" | "unit_price" | "line_total" | "item_notes" | "created_at" | "pd.product_def_id" | "pd.category_id" | "pd.title" | "pd.description" | "pd.material_id" | "pd.form_id" | "pd.created_at" | "pc.category_id" | "pc.name" | "pc.description")[]
+// ===== LOOKUP UTILS =====
 
-// ===== UTILS (unchanged) =====
+/**
+ * Lookup maps for efficient schema access by alias
+ * Populated once at startup from AllBrandedSchemas
+ */
+export const schemaByAlias = new Map<string, z.ZodObject<z.ZodRawShape>>();
+export const metaByAlias = new Map<string, SchemaMeta>();
+
+// Initialize lookup maps
+for (const [name, schema] of Object.entries(AllBrandedSchemas)) {
+  console.log(`Schema ${name}:`, {
+    has_def: !!(schema as any)._def,
+    meta_in_def: (schema as any)._def?.meta,
+    direct_meta: (schema as any)._meta,
+  });
+  const schemaWithDef = schema as BrandedSchemaWithDef;
+  const meta = (schema as any).__brandMeta;
+
+  if (meta?.alias) {
+    schemaByAlias.set(meta.alias, schema);
+    metaByAlias.set(meta.alias, meta);
+  }
+}
+
+/**
+ * Get schema metadata by alias
+ */
+export function getSchemaMetaByAlias(alias: string): SchemaMeta | undefined {
+  return metaByAlias.get(alias);
+}
+
+/**
+ * Get schema by alias
+ */
+export function getSchemaByAlias(alias: string): z.ZodObject<z.ZodRawShape> | undefined {
+  return schemaByAlias.get(alias);
+}
+
+/**
+ * Check if a table is defined in any branded schema
+ * Used for security validation in query endpoint
+ * @param tableName - Can be "tableName" or "schema.tableName" format
+ * @returns true if table exists in branded schemas, false otherwise
+ */
+export function isTableInBrandedSchemas(tableName: string): boolean {
+  // Check all metadata entries
+  for (const meta of metaByAlias.values()) {
+    const fullTableName = `${meta.dbSchema}.${meta.tableName}`;
+
+    // Check both formats: "tableName" and "schema.tableName"
+    if (tableName === meta.tableName || tableName === fullTableName) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// ===== VALIDATION UTILS =====
 
 export type ValidationResultFor<S extends z.ZodTypeAny> =
   | {

@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import type { IAliasedTableRegistry } from '$lib/backendQueries/tableRegistry';
+
+// Type für branded schemas mit _meta
+type BrandedSchema = z.ZodObject<z.ZodRawShape> & {
+  _meta?: { alias: string; tableName: string; dbSchema: string };
+};
 
 /**
  * Transform flat DB recordset into nested object structure based on schema.
@@ -8,28 +12,26 @@ import type { IAliasedTableRegistry } from '$lib/backendQueries/tableRegistry';
  * into structured objects matching the provided Zod schema.
  *
  * @param recordset - Array of flat DB result objects with qualified column names
- * @param schema - Zod schema defining the expected nested structure
- * @param aliasedTableRegistry - Registry mapping aliases to table definitions
+ * @param schema - Zod schema defining the expected nested structure (with branded nested schemas)
  * @returns Array of structured objects matching the schema
  * @throws Error if recordset contains unexpected columns not defined in schema
  */
-export function transformToNestedObjects<T>(
+export function transformToNestedObjects<T extends z.ZodObject<z.ZodRawShape>>(
   recordset: Record<string, unknown>[],
-  schema: z.ZodObject<any>,
-  aliasedTableRegistry: IAliasedTableRegistry
-): T[] {
+  schema: T
+): z.infer<T>[] {
   return recordset.map((row, index) => {
-    const result: any = {};
+    const result: Record<string, unknown> = {};
 
     // Single loop over recordset columns
     for (const [column, value] of Object.entries(row)) {
-      const processed = processColumn(column, value, schema, aliasedTableRegistry, result);
+      const processed = processColumn(column, value, schema, result);
       if (!processed) {
         throw new Error(`Row ${index}: Unexpected column '${column}' not defined in schema`);
       }
     }
 
-    return result as T;
+    return result as z.infer<T>;
   });
 }
 
@@ -39,16 +41,14 @@ export function transformToNestedObjects<T>(
  * @param column - Column name from recordset (e.g., "quantity" or "pd.name")
  * @param value - Column value
  * @param schema - Zod schema to match against
- * @param aliasedTableRegistry - Registry mapping aliases to table definitions
  * @param result - Result object being built
  * @returns true if column was processed, false if unexpected
  */
-function processColumn(
+function processColumn<T extends z.ZodObject<z.ZodRawShape>>(
   column: string,
-  value: any,
-  schema: z.ZodObject<any>,
-  aliasedTableRegistry: IAliasedTableRegistry,
-  result: any
+  value: unknown,
+  schema: T,
+  result: Record<string, unknown>
 ): boolean {
   const shape = schema.shape;
 
@@ -59,15 +59,17 @@ function processColumn(
     // Find which nested object this belongs to
     for (const [schemaFieldName, zodType] of Object.entries(shape)) {
       if (zodType instanceof z.ZodObject) {
-        const tableConfig = aliasedTableRegistry[alias as keyof typeof aliasedTableRegistry];
-        if (tableConfig && tableConfig.schema === zodType) {
-          const nestedKeys = zodType.keyof().options;
+        // Check if this branded schema has the matching alias
+        const meta = (zodType as any).__brandMeta;
+        
+        if (meta?.alias === alias) {
+          const nestedKeys = zodType.keyof().options as readonly string[];
           if (nestedKeys.includes(fieldName)) {
             // Initialize nested object if not exists
             if (!result[schemaFieldName]) {
               result[schemaFieldName] = {};
             }
-            result[schemaFieldName][fieldName] = value;
+            (result[schemaFieldName] as Record<string, unknown>)[fieldName] = value;
             return true;
           }
         }

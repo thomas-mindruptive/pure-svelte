@@ -1,12 +1,9 @@
-// src/lib/server/queryBuilder.ts
+// src/lib/backendQueries/queryBuilder.ts
 
 /**
- * @file Secure SQL Query Builder (FINAL & CORRECTED)
- * @description This file contains the core logic for securely converting a type-safe
- * QueryPayload object into a parameterized SQL query. It relies on a strict security
- * configuration (`aliasedTablesConfig`) as a single source of truth. It supports both
- * server-enforced queries (via `fixedFrom`) for typed endpoints and more flexible,
- * client-defined queries for generic endpoints like `/api/query`.
+ * @file Secure SQL Query Builder with Branded Schemas
+ * @description Converts type-safe QueryPayload objects into parameterized SQL queries.
+ * Uses branded schemas with meta information as the single source of truth.
  */
 
 import { log } from '$lib/utils/logger';
@@ -15,7 +12,7 @@ import type { QueryPayload, WhereCondition, WhereConditionGroup, JoinClause, Sor
 import { isJoinColCondition, isWhereCondition, isWhereConditionGroup } from '$lib/backendQueries/queryGrammar';
 import type { QueryConfig } from '$lib/backendQueries/queryConfig';
 import type { Transaction } from 'mssql';
-import { AliasedTableRegistry, validateSelectColumns } from '$lib/backendQueries/tableRegistry';
+import { metaByAlias, schemaByAlias } from '$lib/domain/domainTypes.utils';
 
 // --- TYPE DEFINITIONS for internal use ---
 
@@ -27,6 +24,66 @@ type BuildContext = {
 	parameters: Parameters;
 	paramIndex: number;
 };
+
+// --- VALIDATION FUNCTIONS ---
+
+/**
+ * Validates SELECT columns against branded schema definitions
+ * @param selectColumns - Array of column names to validate
+ * @param hasJoins - Whether the query contains JOINs
+ */
+function validateSelectColumns(selectColumns: string[], hasJoins: boolean): void {
+	for (const column of selectColumns) {
+		// Handle qualified columns (e.g., "w.wholesaler_id")
+		if (column.includes('.')) {
+			const [alias, columnName] = column.split('.');
+			let cleanColumn = columnName;
+
+			// Handle AS clauses (e.g., "w.name AS supplier_name")
+			if (cleanColumn.includes(' AS ')) {
+				cleanColumn = cleanColumn.split(' AS ')[0].trim();
+			}
+
+			// Skip wildcard and aggregate functions
+			if (cleanColumn === '*' ||
+				cleanColumn.startsWith('COUNT(') ||
+				cleanColumn.startsWith('SUM(') ||
+				cleanColumn.startsWith('AVG(') ||
+				cleanColumn.startsWith('MAX(') ||
+				cleanColumn.startsWith('MIN(')) {
+				continue;
+			}
+
+			// Validate against branded schema
+			const schema = schemaByAlias.get(alias);
+			if (schema) {
+				const allowedColumns = schema.keyof().options;
+				if (!allowedColumns.includes(cleanColumn)) {
+					throw new Error(
+						`Column '${cleanColumn}' not found in metadata of schema with alias '${alias}'. ` +
+						`Available columns: ${allowedColumns.join(', ')}`
+					);
+				}
+			} else {
+				throw new Error(
+					`Alias '${alias}' is not defined in metadata of any branded schema. ` +
+					`Available aliases: ${Array.from(metaByAlias.keys()).join(', ')}`
+				);
+			}
+		} else {
+			// Unqualified column
+			if (hasJoins) {
+				// In JOIN queries, unqualified columns are ambiguous
+				throw new Error(
+					`Unqualified column '${column}' found in JOIN query. ` +
+					`All columns in JOIN queries must be qualified (e.g., 'w.name', 'pc.category_id').`
+				);
+			}
+			// In single-table queries, unqualified columns are fine - skip validation
+			// Let the SQL engine handle validation at runtime
+		}
+	}
+}
 
 // --- HELPER FUNCTIONS ---
 
@@ -141,23 +198,27 @@ export function buildQuery<T>(
 
 		const { table, alias } = fromSource;
 
-		// --- NESTED VALIDATION STEPS FOR THE FROM CLAUSE ---
-		// Fetch the entire configuration for the given alias from our single source of truth.
-		const aliasConfig = AliasedTableRegistry[alias as keyof typeof AliasedTableRegistry];
+		// --- VALIDATION USING BRANDED SCHEMAS ---
+		// Fetch the metadata for the given alias from our branded schemas
+		const meta = metaByAlias.get(alias);
 
-		// SECURITY CHECK 1: The alias must be explicitly registered in `aliasedTablesConfig`.
-		// This prevents any arbitrary strings from being used as aliases.
-		if (!aliasConfig) {
-			throw new Error(`Alias '${alias}' is not a registered alias.`);
+		// SECURITY CHECK 1: The alias must be defined in a branded schema
+		if (!meta) {
+			throw new Error(
+				`Alias '${alias}' is not defined in metadata of any branded schema. ` +
+				`Available aliases: ${Array.from(metaByAlias.keys()).join(', ')}`
+			);
 		}
 
 		// SECURITY CHECK 2: The alias must be used for its designated table.
-		// This crucial check prevents misuse, e.g., a client trying to query `dbo.users` using the valid alias 'w'.
-		const expectedFullTableName = `${aliasConfig.dbSchema}.${aliasConfig.tableName}`;
-		const expectedTableName = aliasConfig.tableName;
+		const expectedFullTableName = `${meta.dbSchema}.${meta.tableName}`;
+		const expectedTableName = meta.tableName;
 
 		if (table !== expectedFullTableName && table !== expectedTableName) {
-			throw new Error(`Alias '${alias}' is registered for table '${expectedFullTableName}', but was incorrectly used for table '${table}'.`);
+			throw new Error(
+				`Alias '${alias}' is defined in metadata for table '${expectedFullTableName}', ` +
+				`but was incorrectly used for table '${table}'.`
+			);
 		}
 
 		// If all checks pass, construct the final FROM clause string for the SQL query.
@@ -165,7 +226,7 @@ export function buildQuery<T>(
 		fromTableForMetadata = table;
 	}
 
-	// --- 2. Validate SELECT columns against Table Registry schemas ---
+	// --- 2. Validate SELECT columns against Branded Schema definitions ---
 	const hasJoins = realJoins.length > 0;
 	if (select && Array.isArray(select)) {
 		validateSelectColumns(select as string[], hasJoins);
@@ -177,13 +238,20 @@ export function buildQuery<T>(
 		if (!alias) throw new Error("All JOINs must have an alias for consistency and security.");
 
 		// Perform the same validation checks for each JOIN's alias and table.
-		const aliasConfig = AliasedTableRegistry[alias as keyof typeof AliasedTableRegistry];
-		if (!aliasConfig) throw new Error(`JOIN alias '${alias}' is not a registered alias.`);
+		const meta = metaByAlias.get(alias);
+		if (!meta) {
+			throw new Error(
+				`JOIN alias '${alias}' is not defined in metadata of any branded schema. ` +
+				`Available aliases: ${Array.from(metaByAlias.keys()).join(', ')}`
+			);
+		}
 
-		const expectedFullTableName = `${aliasConfig.dbSchema}.${aliasConfig.tableName}`;
+		const expectedFullTableName = `${meta.dbSchema}.${meta.tableName}`;
 
 		if (table !== expectedFullTableName) {
-			throw new Error(`JOIN alias '${alias}' is for table '${expectedFullTableName}', not '${table}'.`);
+			throw new Error(
+				`JOIN alias '${alias}' is defined in metadata for table '${expectedFullTableName}', not '${table}'.`
+			);
 		}
 
 		const onClause = buildOnClause(on, ctx);

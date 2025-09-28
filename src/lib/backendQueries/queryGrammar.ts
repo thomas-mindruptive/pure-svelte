@@ -1,12 +1,8 @@
 // src/lib/clientAndBack/queryGrammar.ts
 
-import {
-  type AllAliasedColumns,
-  type AllQualifiedColumns,
-  type ValidFromClause,
-  type DbTableNames,
-  type AliasKeys,
-} from "./tableRegistry";
+import type { DbTableNames, AliasKeys, AllQualifiedColumns, AllAliasedColumns, ValidFromClause } from "$lib/domain/domainTypes.utils";
+
+
 
 /**
  * @file Query Grammar & Core Structures - FINAL

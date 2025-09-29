@@ -14,11 +14,9 @@ import { supplierQueryConfig } from "$lib/backendQueries/queryConfig";
 import { buildUnexpectedError, validateIdUrlParam, validateAndUpdateEntity } from "$lib/backendQueries/entityOperations";
 import { type WhereCondition, ComparisonOperator, type QueryPayload, LogicalOperator } from "$lib/backendQueries/queryGrammar";
 import { AttributeSchema, type Attribute } from "$lib/domain/domainTypes";
-import { validateEntity } from "$lib/domain/domainTypes.utils";
 import { v4 as uuidv4 } from "uuid";
 
 import type {
-  ApiErrorResponse,
   ApiSuccessResponse,
   DeleteConflictResponse,
   DeleteRequest,

@@ -6,14 +6,11 @@
  * It performs server-side validation against the domain schema and returns the newly created entity.
  */
 
-import { json, error, type RequestHandler } from '@sveltejs/kit';
-import { db } from '$lib/backendQueries/db';
+import { type RequestHandler } from '@sveltejs/kit';
 import { log } from '$lib/utils/logger';
 import { buildUnexpectedError, validateAndInsertEntity } from '$lib/backendQueries/entityOperations';
 import { ProductDefinitionForCreateSchema, type ProductDefinition } from '$lib/domain/domainTypes';
-import { validateEntity } from "$lib/domain/domainTypes.utils";
 import { v4 as uuidv4 } from 'uuid';
-import type { ApiErrorResponse, ApiSuccessResponse } from '$lib/api/api.types';
 
 /**
  * POST /api/product-definitions/new

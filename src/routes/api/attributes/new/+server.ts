@@ -7,18 +7,11 @@
  * Level 4 Master-Data creation following established patterns.
  */
 
-import { json, error, type RequestHandler } from '@sveltejs/kit';
-import { db } from '$lib/backendQueries/db';
+import { type RequestHandler } from '@sveltejs/kit';
 import { log } from '$lib/utils/logger';
 import { buildUnexpectedError, validateAndInsertEntity } from '$lib/backendQueries/entityOperations';
 import { AttributeForCreateSchema, type Attribute } from '$lib/domain/domainTypes';
-import { validateEntity } from "$lib/domain/domainTypes.utils";
 import { v4 as uuidv4 } from 'uuid';
-
-import type {
-    ApiErrorResponse,
-    ApiSuccessResponse
-} from '$lib/api/api.types';
 
 /**
  * POST /api/attributes/new

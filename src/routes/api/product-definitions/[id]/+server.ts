@@ -12,10 +12,8 @@ import { log } from "$lib/utils/logger";
 import { buildUnexpectedError, validateIdUrlParam, validateAndUpdateEntity } from "$lib/backendQueries/entityOperations";
 import { checkProductDefinitionDependencies } from "$lib/dataModel/dependencyChecks";
 import { ProductDefinitionSchema, type ProductDefinition } from "$lib/domain/domainTypes";
-import { validateEntity } from "$lib/domain/domainTypes.utils";
 import { v4 as uuidv4 } from "uuid";
 import type {
-  ApiErrorResponse,
   ApiSuccessResponse,
   DeleteConflictResponse,
   DeleteRequest,

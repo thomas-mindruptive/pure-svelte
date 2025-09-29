@@ -16,61 +16,65 @@ import { error } from "@sveltejs/kit";
 // prettier-ignore
 export const supplierHierarchyConfig: HierarchyTree = {
   name: "suppliers",
-  rootItem: createHierarchyNode({
-    // LEVEL 0 (List) - Visible root. No urlParamName.
-    item: { key: "suppliers", type: "list", href: "/suppliers", label: "Suppliers" },
-    children: [
-      createHierarchyNode({
-        // LEVEL 1 (Object) - Hidden, represents the selected supplier. Has urlParamName.
-        item: { key: "supplier", type: "object", href: "/suppliers/[supplierId]", label: "Supplier", display: false, urlParamName: "supplierId" },
-        defaultChild: "categories",
-        children: [
-          createHierarchyNode({
-            // LEVEL 2 (List) - In our case, the categories list is already displayed on the SupplierDetailPage
-            // =>  href: "/suppliers/[supplierId]"
-            item: { key: "categories", type: "list", href: "/suppliers/[supplierId]", label: "Categories", urlParamName: "supplierId" },
-            children: [
-              createHierarchyNode({
-                // LEVEL 3 (Object) - Hidden, represents the selected category. Has urlParamName.
-                item: { key: "category", type: "object", href: "/suppliers/[supplierId]/categories/[categoryId]", label: "Category", display: false, urlParamName: "categoryId" },
-                defaultChild: "offerings",
-                children: [
-                  createHierarchyNode({
-                    // LEVEL 4 (List) - Visible offerings list. 
-                    // In our case, the offerings list is already displayed on the CategoryDetailPage.
-                    // => gref points there
-                    item: { key: "offerings", type: "list", href: "/suppliers/[supplierId]/categories/[categoryId]", label: "Offerings", urlParamName: "offeringId" },
-                    children: [
-                      createHierarchyNode({
-                        // LEVEL 5 (Object) - Hidden, represents the selected offering. Has urlParamName.
-                        item: { key: "offering", type: "object", href: "/suppliers/[supplierId]/categories/[categoryId]/offerings/[offeringId]", label: "Offering", display: false, urlParamName: "offeringId" },
-                        defaultChild: "links",
-                        children: [
-                           createHierarchyNode({
-                            // LEVEL 6 (Leaf)
-                            item: { key: "attributes", type: "list", href:"/suppliers/[supplierId]/categories/[categoryId]/offerings/[offeringId]/attributes", label: "Attributes" },
-                          }),
-                          createHierarchyNode({
-                            // LEVEL 6 (Leaf)
-                            item: { key: "links", type: "list", href:"/suppliers/[supplierId]/categories/[categoryId]/offerings/[offeringId]/links", label: "Links" },
-                          }),
-                        ]
-                      })
-                    ]
-                  })
-                ]
-              })
-            ]
-          }),
-           // Sibling branch for addresses, just for demo purposes.
-           createHierarchyNode({
-            item: {
-              key: "addresses",  type: "list", href:"/suppliers/[supplierId]/addresses", label: "Addresses", urlParamName: "addressId"}, // This is a leaf-like node, so urlParamName is okay here.
-          }),
-        ]
-      })
-    ]
-  }),
+  rootItem:
+    // Supplier List - Visible root. No urlParamName.
+    createHierarchyNode({
+      item: { key: "suppliers", type: "list", href: "/suppliers", label: "Suppliers" },
+      children: [
+        // Supplier Object - Hidden, represents the selected supplier. Has urlParamName.
+        createHierarchyNode({
+          item: { key: "supplier", type: "object", href: "/suppliers/[supplierId]", label: "Supplier", display: false, urlParamName: "supplierId" },
+          defaultChild: "categories",
+          children: [
+            // Category List - Visible categories list. Displayed on SupplierDetailPage.
+            createHierarchyNode({
+              item: { key: "categories", type: "list", href: "/suppliers/[supplierId]", label: "Categories", urlParamName: "supplierId" },
+              children: [
+                // Category Object - Hidden, represents the selected category. Has urlParamName.
+                createHierarchyNode({
+                  item: { key: "category", type: "object", href: "/suppliers/[supplierId]/categories/[categoryId]", label: "Category", display: false, urlParamName: "categoryId" },
+                  defaultChild: "offerings",
+                  children: [
+                    // Offering List - Visible offerings list. Displayed on CategoryDetailPage.
+                    createHierarchyNode({
+                      item: { key: "offerings", type: "list", href: "/suppliers/[supplierId]/categories/[categoryId]", label: "Offerings", urlParamName: "offeringId" },
+                      children: [
+                        // Offering Object - Hidden, represents the selected offering. Has urlParamName.
+                        createHierarchyNode({
+                          item: { key: "offering", type: "object", href: "/suppliers/[supplierId]/categories/[categoryId]/offerings/[offeringId]", label: "Offering", display: false, urlParamName: "offeringId" },
+                          defaultChild: "links",
+                          children: [
+                            // Attribute List - Leaf node for offering attributes.
+                            createHierarchyNode({
+                              item: { key: "attributes", type: "list", href:"/suppliers/[supplierId]/categories/[categoryId]/offerings/[offeringId]/attributes", label: "Attributes" },
+                            }),
+                            // Link List - Leaf node for offering links.
+                            createHierarchyNode({
+                              item: { key: "links", type: "list", href:"/suppliers/[supplierId]/categories/[categoryId]/offerings/[offeringId]/links", label: "Links" },
+                            }),
+                          ]
+                        })
+                      ]
+                    })
+                  ]
+                })
+              ]
+            }),
+            // Order List - Visible orders list under supplier.
+            createHierarchyNode({
+              item: { key: "orders", type: "list", href: "/suppliers/[supplierId]/orders", label: "Orders", urlParamName: "supplierId" },
+              children: [
+                // Order Object - Hidden, represents the selected order. Has urlParamName.
+                createHierarchyNode({
+                  item: { key: "order", type: "object", href: "/suppliers/[supplierId]/orders/[orderId]", label: "Order", display: false, urlParamName: "orderId" },
+                  children: []
+                })
+              ]
+            }),
+          ]
+        })
+      ]
+    }),
 };
 
 // ================================================================================================
@@ -83,55 +87,53 @@ export const supplierHierarchyConfig: HierarchyTree = {
 // prettier-ignore
 export const productCategoriesHierarchyConfig: HierarchyTree = {
   name: "categories",
-  rootItem: createHierarchyNode({
-    // Categories List - Visible root. No urlParamName.
-    item: { key: "categories", type: "list", href: "/categories", label: "Product Categories" },
-    children: [
-      createHierarchyNode({
+  rootItem:
+    // Category List - Visible root. No urlParamName.
+    createHierarchyNode({
+      item: { key: "categories", type: "list", href: "/categories", label: "Product Categories" },
+      children: [
         // Category Object - Hidden, represents the selected category. Has urlParamName.
-        item: { key: "category", type: "object", href: "/categories/[categoryId]", label: "Category", display: false, urlParamName: "categoryId" },
-        defaultChild: "productdefinitions",
-        children: [
-          createHierarchyNode({
-            // ProductDef List - Visible product definitions list. We display product def on CategoryDetailPage => "/categories/[categoryId]/"
-            // The CategoryDetailPage contains a list of productdefinitions => href = "/categories/[categoryId]/"
-            item: { key: "productdefinitions", type: "list", href: "/categories/[categoryId]/", label: "Product Definitions", urlParamName: "categoryId" },
-            children: [
-                // ProductDef Object
+        createHierarchyNode({
+          item: { key: "category", type: "object", href: "/categories/[categoryId]", label: "Category", display: false, urlParamName: "categoryId" },
+          defaultChild: "productdefinitions",
+          children: [
+            // ProductDef List - Visible product definitions list. Displayed on CategoryDetailPage.
+            createHierarchyNode({
+              item: { key: "productdefinitions", type: "list", href: "/categories/[categoryId]/", label: "Product Definitions", urlParamName: "categoryId" },
+              children: [
+                // ProductDef Object - Hidden, represents the selected product definition. Has urlParamName.
                 createHierarchyNode({
-                item: { key: "productDefintition", type: "object", href: "/categories/[categoryId]/productdefinitions/[productDefId]", label: "Product Definition", display: false, urlParamName: "productDefId" },
-                children: [
-                  // Oferings List
-                  createHierarchyNode({
-                    item: { key: "offerings", type: "list", href: "/categories/[categoryId]/productdefinitions/[productDefId]", label: "Offerings", urlParamName: "offeringId" },
-                    children: [
-                      // Offering Object
-                      createHierarchyNode({
-                        item: { key: "offering", type: "object", href: "/categories/[categoryId]/productdefinitions/[productDefId]/offerings/[offeringId]", label: "Offering", display: false, urlParamName: "offeringId" },
-                        defaultChild: "links",
-                        children: [
-                          // Attributes List
-                          createHierarchyNode({
-                            // Leaf
-                            item: { key: "attributes", type: "list", href:"/categories/[categoryId]/productdefinitions/[productDefId]/offerings/[offeringId]/attributes", label: "Attributes" },
-                          }),
-                          // Link List
-                          createHierarchyNode({
-                            // Leaf
-                            item: { key: "links", type: "list", href:"/categories/[categoryId]/productdefinitions/[productDefId]/offerings/[offeringId]/links", label: "Links" },
-                          }),
-                        ]
-                      })
-                    ]
-                  })
-                ]
-              }),
-            ],
-          }),
-        ],
-      }),
-    ],
-  }),
+                  item: { key: "productDefintition", type: "object", href: "/categories/[categoryId]/productdefinitions/[productDefId]", label: "Product Definition", display: false, urlParamName: "productDefId" },
+                  children: [
+                    // Offering List - Visible offerings list for product definition.
+                    createHierarchyNode({
+                      item: { key: "offerings", type: "list", href: "/categories/[categoryId]/productdefinitions/[productDefId]", label: "Offerings", urlParamName: "offeringId" },
+                      children: [
+                        // Offering Object - Hidden, represents the selected offering. Has urlParamName.
+                        createHierarchyNode({
+                          item: { key: "offering", type: "object", href: "/categories/[categoryId]/productdefinitions/[productDefId]/offerings/[offeringId]", label: "Offering", display: false, urlParamName: "offeringId" },
+                          defaultChild: "links",
+                          children: [
+                            // Attribute List - Leaf node for offering attributes.
+                            createHierarchyNode({
+                              item: { key: "attributes", type: "list", href:"/categories/[categoryId]/productdefinitions/[productDefId]/offerings/[offeringId]/attributes", label: "Attributes" },
+                            }),
+                            // Link List - Leaf node for offering links.
+                            createHierarchyNode({
+                              item: { key: "links", type: "list", href:"/categories/[categoryId]/productdefinitions/[productDefId]/offerings/[offeringId]/links", label: "Links" },
+                            }),
+                          ]
+                        })
+                      ]
+                    })
+                  ]
+                }),
+              ],
+            }),
+          ],
+        }),
+      ],
+    }),
 };
 
 /**
@@ -140,18 +142,18 @@ export const productCategoriesHierarchyConfig: HierarchyTree = {
 // prettier-ignore
 export const attributesHierarchyConfig: HierarchyTree = {
   name: "attributes",
-  rootItem: createHierarchyNode({
-    // LEVEL 0 (List) - The visible root of the hierarchy
-    item: { key: "attributes", type: "list", href: "/attributes", label: "Attributes" },
-    children: [
-      createHierarchyNode({
-        // LEVEL 1 (Object) - Hidden node representing a single selected attribute
-        item: { key: "attribute", type: "object", href: "/attributes/[attributeId]", label: "Attribute", display: false, urlParamName: "attributeId" },
-        // This is the end of this navigation branch, so no children are needed.
-        children: []
-      }),
-    ],
-  }),
+  rootItem:
+    // Attribute List - Visible root. No urlParamName.
+    createHierarchyNode({
+      item: { key: "attributes", type: "list", href: "/attributes", label: "Attributes" },
+      children: [
+        // Attribute Object - Hidden, represents the selected attribute. Has urlParamName.
+        createHierarchyNode({
+          item: { key: "attribute", type: "object", href: "/attributes/[attributeId]", label: "Attribute", display: false, urlParamName: "attributeId" },
+          children: []
+        }),
+      ],
+    }),
 };
 
 /**
@@ -160,29 +162,30 @@ export const attributesHierarchyConfig: HierarchyTree = {
 // prettier-ignore
 export const ordersHierarchyConfig: HierarchyTree = {
   name: "orders",
-  rootItem: createHierarchyNode({
-    // Order List - The visible root of the hierarchy
-    item: { key: "orders", type: "list", href: "/orders", label: "Orders" },
-    children: [
-      createHierarchyNode({
-        // Order Object - Hidden node representing a single selected attribute
-        item: { key: "order", type: "object", href: "/orders/[orderId]", label: "Order", display: false, urlParamName: "orderId" },
-        children: [
-          // OrderItem List - We display order items directly on OrderDetailPage
-          createHierarchyNode({
-            item: { key: "orderItems", type: "list", href: "/orders/[orderId]", label: "Order Items", urlParamName: "orderId" },
-           children: [
-             // OrderItem Object 
-             createHierarchyNode({
-             item: { key: "orderItem", type: "list", href: "/orders/orderitems/[orderItemId]", label: "Order Items", display: false, urlParamName: "orderItemId" },
-             children: []
-          }),
-           ]
-          }),
-        ]
-      }),
-    ],
-  }),
+  rootItem:
+    // Order List - Visible root. No urlParamName.
+    createHierarchyNode({
+      item: { key: "orders", type: "list", href: "/orders", label: "Orders" },
+      children: [
+        // Order Object - Hidden, represents the selected order. Has urlParamName.
+        createHierarchyNode({
+          item: { key: "order", type: "object", href: "/orders/[orderId]", label: "Order", display: false, urlParamName: "orderId" },
+          children: [
+            // OrderItem List - Visible order items list. Displayed on OrderDetailPage.
+            createHierarchyNode({
+              item: { key: "orderItems", type: "list", href: "/orders/[orderId]", label: "Order Items", urlParamName: "orderId" },
+              children: [
+                // OrderItem Object - Hidden, represents the selected order item. Has urlParamName.
+                createHierarchyNode({
+                  item: { key: "orderItem", type: "list", href: "/orders/orderitems/[orderItemId]", label: "Order Items", display: false, urlParamName: "orderItemId" },
+                  children: []
+                }),
+              ]
+            }),
+          ]
+        }),
+      ],
+    }),
 };
 
 // ================================================================================================

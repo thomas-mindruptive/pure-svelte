@@ -148,7 +148,7 @@ export function getOfferingApi(client: ApiClient) {
       const operationId = `loadOfferingAttributes-${offeringId}`;
       offeringLoadingManager.start(operationId);
       try {
-        const request: PredefinedQueryRequest = {
+        const request: PredefinedQueryRequest<WholesalerOfferingAttribute_Attribute> = {
           namedQuery: "offering_attributes",
           payload: {
             select: [
@@ -427,7 +427,7 @@ export function getOfferingApi(client: ApiClient) {
       const operationId = `loadOfferingLinks-${offeringId}`;
       offeringLoadingManager.start(operationId);
       try {
-        const request: PredefinedQueryRequest = {
+        const request: PredefinedQueryRequest<WholesalerOfferingLink> = {
           namedQuery: "offering_links",
           payload: {
             select: ["wol.link_id", "wol.offering_id", "wol.url", "wol.notes", "wol.created_at"],

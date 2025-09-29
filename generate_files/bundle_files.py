@@ -63,10 +63,11 @@ INCLUDE_PATTERNS: List[str] = [
     "src/lib/domain/**",
     "src/lib/backendQueries/**",
     "src/lib/api/client/supplier.ts",
-    "src/lib/utils/recordsetTransformer.ts",
-    "src/routes/(browser)/suppliers/**"
-
-]  
+    "src/lib/api/client/order.ts",
+    "src/lib/components/domain/order/**",
+    "src/lib/components/grids/**",
+    "src/routes/(browser)/suppliers/**",
+]
 
 # =========================
 # Logging
@@ -304,7 +305,9 @@ def main():
 
     if TREE_ONLY:
         write_tree(
-            START_DIR, TREE_OUTPUT_FILE, include_all_files=TREE_INCLUDE_ALL_FILES_EXCEPT_EXCLUDES
+            START_DIR,
+            TREE_OUTPUT_FILE,
+            include_all_files=TREE_INCLUDE_ALL_FILES_EXCEPT_EXCLUDES,
         )
         print("--- Fertig (Tree-Modus) ---")
     else:
@@ -314,5 +317,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-

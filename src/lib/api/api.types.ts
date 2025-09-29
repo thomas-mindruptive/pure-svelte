@@ -121,9 +121,9 @@ export interface QueryRequest<T> {
 /**
  * Request for predefined named JOIN query
  */
-export interface PredefinedQueryRequest {
+export interface PredefinedQueryRequest<T> {
   namedQuery: string;
-  payload: QueryPayload<any>;
+  payload: QueryPayload<T>;
 }
 
 // ===== 5. RESPONSE DATA TYPES =====

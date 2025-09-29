@@ -1,5 +1,7 @@
 import { createHierarchyNode, type HierarchyTree, type Hierarchy } from "$lib/components/sidebarAndNav/HierarchySidebar.types";
+import { validateHierarchies } from "$lib/components/sidebarAndNav/hierarchyUtils";
 import { log } from "$lib/utils/logger";
+import { error } from "@sveltejs/kit";
 
 // ================================================================================================
 // SUPPLIER HIERARCHY CONFIGURATION (NEW DATA-DRIVEN STRUCTURE)
@@ -160,7 +162,7 @@ export const ordersHierarchyConfig: HierarchyTree = {
   name: "orders",
   rootItem: createHierarchyNode({
     // Order List - The visible root of the hierarchy
-    item: { key: "order", type: "list", href: "/orders", label: "Orders" },
+    item: { key: "orders", type: "list", href: "/orders", label: "Orders" },
     children: [
       createHierarchyNode({
         // Order Object - Hidden node representing a single selected attribute
@@ -210,19 +212,13 @@ export function getHierarchyByName(name: string): HierarchyTree | undefined {
 
 function validateHierarchyNames(): boolean {
   const hierarchies = getAppHierarchies();
-  const names = hierarchies.map((tree) => tree.name);
-  const uniqueNames = new Set(names);
-
-  if (names.length !== uniqueNames.size) {
-    const duplicates = names.filter((name, index) => names.indexOf(name) !== index);
-    const msg = `Duplicate hierarchy names found, exiting: ${JSON.stringify(duplicates, null, 4)}`
-    log.errorLn("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-    log.error(msg);
-    log.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-    process.exit(1);
+  const validationResult = validateHierarchies(hierarchies);
+  if (!validationResult.isValid) {
+    const msg = `The hierarchy config is invalid: ${JSON.stringify(validationResult, null, 4)}`
+    throw error(500, msg);
   }
   return true;
 }
 
 validateHierarchyNames();
-log.info("✅ Hierarchy configuration validation passed");
+log.info("✅ Initial hierarchy configuration validation passed");

@@ -15,6 +15,7 @@ import {
   reconcilePaths,
   findNodesAndParamValuesForPath,
   resolveAllHrefsInTree,
+  validateUniqueHierarchyNames,
 } from "$lib/components/sidebarAndNav/hierarchyUtils";
 import {
   getCurrentPathForContext,
@@ -44,11 +45,28 @@ function initializeAndCacheHierarchies(): RuntimeHierarchyTree[] {
   }
   log.debug("Initializing and caching runtime hierarchies for the first time...");
   const staticHierarchies = getAppHierarchies();
+
+  // Check if tree names are unique.
+  const uniqueNameValRes = validateUniqueHierarchyNames(staticHierarchies);
+  if (!uniqueNameValRes.isValid) {
+    const msg = `Navigation tree names must be unique. ${JSON.stringify(uniqueNameValRes.errors, null, 4)}`;
+    log.errorLn(`!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!`);
+    log.error(msg);
+    log.error(`!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!`)
+    throw new Error(msg);
+  }
+
+  // Create runtime trees. 
   const initialRuntimeHierarchies: RuntimeHierarchyTree[] = [];
   for (const staticTree of staticHierarchies) {
-    const runtimeTree = convertToRuntimeTree(staticTree);
-    initialRuntimeHierarchies.push(runtimeTree);
-    runtimeHierarchyCache.set(runtimeTree.name, runtimeTree);
+    const runtimeTreeResult = convertToRuntimeTree(staticTree);
+    if (!runtimeTreeResult.isValid) {
+      const msg = `Runtime tree ${staticTree.name} is invalid: ${JSON.stringify(runtimeTreeResult.errors, null, 4)}`
+      log.error(msg);
+      throw error(500, msg);
+    }
+    initialRuntimeHierarchies.push(runtimeTreeResult.runtimeTree);
+    runtimeHierarchyCache.set(runtimeTreeResult.runtimeTree.name, runtimeTreeResult.runtimeTree);
   }
   return initialRuntimeHierarchies;
 }
@@ -74,7 +92,7 @@ function findTreeForUrl(allHierarchies: RuntimeHierarchyTree[], url: URL): Runti
     activeTree = allHierarchies.find((tree) => tree.rootItem.item.key === firstPathSegment);
   }
   if (!activeTree) {
-    throw error(404, `Page not found: No hierarchy tree configured for path segment '${firstPathSegment}'.`);
+    throw error(404, `No hierarchy tree configured for path segment '${firstPathSegment}'.`);
   }
   return activeTree;
 }

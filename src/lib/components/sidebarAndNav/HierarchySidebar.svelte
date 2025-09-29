@@ -9,7 +9,7 @@
 		RuntimeHierarchyItem
 	} from './HierarchySidebar.types';
 	// Step 1: Import validation utilities
-	import { validateRuntimeTree } from '$lib/components/sidebarAndNav/hierarchyUtils';
+	import { validateTree } from '$lib/components/sidebarAndNav/hierarchyUtils';
 	import ValidationWrapper from '$lib/components/validation/ValidationWrapper.svelte';
     import type { ValidationError } from '../validation/validation.types';
 
@@ -101,7 +101,7 @@ function flattenTreeNode(
 		const allErrors: ValidationError[] = [];
 
 		for (const tree of hierarchy) {
-			const result = validateRuntimeTree(tree);
+			const result = validateTree(tree);
 			if (!result.isValid) {
 				// Transform the string errors into the structured error object
 				for (const errorString of result.errors) {

@@ -1,13 +1,15 @@
 // File: src/lib/components/sidebarAndNav/hierarchyUtils.ts
 
+import { assertDefined } from "$lib/utils/assertions";
 import { log } from "$lib/utils/logger";
-import type {
-  Hierarchy,
-  HierarchyItem,
-  HierarchyTree,
-  RuntimeHierarchyItem,
-  RuntimeHierarchyTree,
-  RuntimeHierarchyTreeNode,
+import {
+  isRuntimeHierarchyTreeNode,
+  type HierarchyItem,
+  type HierarchyTree,
+  type HierarchyTreeNode,
+  type RuntimeHierarchyItem,
+  type RuntimeHierarchyTree,
+  type RuntimeHierarchyTreeNode,
 } from "./HierarchySidebar.types";
 import { NavigationError } from "./navigationError";
 
@@ -109,45 +111,37 @@ function convertNodeToRuntime(staticNode: GenericStaticNode): RuntimeHierarchyTr
  * @param staticTree The static tree configuration.
  * @returns An initial RuntimeHierarchyTree without specific parameter values.
  */
-export function convertToRuntimeTree(staticTree: HierarchyTree): RuntimeHierarchyTree {
+export function convertToRuntimeTree(staticTree: HierarchyTree): {
+  isValid: boolean;
+  errors: string[];
+  runtimeTree: RuntimeHierarchyTree;
+} {
   const runtimeTree: RuntimeHierarchyTree = {
     name: staticTree.name,
     rootItem: convertNodeToRuntime(staticTree.rootItem as unknown as GenericStaticNode),
   };
   initLevels(runtimeTree);
 
-  // STEP 2: Call validation right after creation, but only in development.
-  if (import.meta.env.DEV) {
-    const result = validateRuntimeTree(runtimeTree);
-    if (!result.isValid) {
-      log.error(`❌ Validation failed for hierarchy tree '${runtimeTree.name}':`, result.errors);
-      // Optional: Throw an error to halt execution immediately in dev.
-      // throw new Error(`Hierarchy validation failed for '${runtimeTree.name}'. See console for details.`);
-    } else {
-      log.info(`✅ Hierarchy validation passed for '${runtimeTree.name}'`);
-    }
+  let errors: string[] = [];
+  let isValid = true;
+
+  // Call validation right after creation.
+  const result = validateTree(runtimeTree);
+  errors = errors.concat(result.errors);
+  isValid = isValid && result.isValid;
+
+  if (!result.isValid) {
+    const msg = `❌ Validation failed for hierarchy tree '${runtimeTree.name}, ${JSON.stringify(result.errors, null, 4)}':`;
+    log.error(msg);
+    // DO not throw. Parent must handle it!
+  } else {
+    log.info(`✅ Hierarchy validation passed for '${runtimeTree.name}'`);
   }
 
-  return runtimeTree;
+  return {isValid, errors, runtimeTree};
 }
 
 // === COMBINED BUILD FUNCTION ===================================================================
-
-/**
- * Converts static hierarchy configurations to full runtime hierarchies.
- * This function combines the initial creation and the parameter update steps.
- * Use this when you don't have a cached runtime tree available.
- * @param staticHierarchies Array of static HierarchyTree configurations.
- * @param params URL parameters object (e.g., {supplierId: 3, categoryId: 5}).
- * @returns A new array of RuntimeHierarchyTree with urlParamValues and levels set.
- */
-export function old_buildRuntimeHierarchy(
-  staticHierarchies: Hierarchy,
-  params: Record<string, string | number | null>,
-): RuntimeHierarchyTree[] {
-  const initialHierarchies = staticHierarchies.map((tree) => convertToRuntimeTree(tree));
-  return old_updateRuntimeHierarchyParameters(initialHierarchies, params);
-}
 
 // === HIERARCHY UTILITIES =======================================================================
 
@@ -610,26 +604,85 @@ export function updateDisabledStates(tree: RuntimeHierarchyTree, navigationPath:
 }
 
 /**
- * Validates that a runtime tree has a proper structure, values, and no duplicate keys.
- * @param tree The runtime tree to validate.
- * @returns A validation result with any errors found.
+ * Validate that passed hierarchies have unique names.
+ * @param hierarchies
  */
-export function validateRuntimeTree(tree: RuntimeHierarchyTree): {
+export function validateUniqueHierarchyNames(hierarchies: (RuntimeHierarchyTree | HierarchyTree)[]): {
   isValid: boolean;
   errors: string[];
 } {
+  assertDefined(hierarchies, "hierarchies");
   const errors: string[] = [];
-  // STEP 1: Add a Set to track keys encountered during traversal.
+  let isValid = true;
+  // Check tree names
+  const names = hierarchies.map((tree) => tree.name);
+  const uniqueNames = new Set(names);
+  if (names.length !== uniqueNames.size) {
+    const duplicates = names.filter((name, index) => names.indexOf(name) !== index);
+    const msg = `❌ Duplicate hierarchy names found: ${JSON.stringify(duplicates, null, 4)}`;
+    log.error(msg);
+    errors.push(msg);
+    isValid = false;
+  }
+  return { isValid, errors };
+}
+
+/**
+ * Validate the passed hierarchies.
+ * @param hierarchies
+ */
+export function validateHierarchies(hierarchies: (RuntimeHierarchyTree | HierarchyTree)[]): {
+  isValid: boolean;
+  errors: string[];
+} {
+  assertDefined(hierarchies, "hierarchies");
+
+  let errors: string[] = [];
+  let isValid = true;
+
+  // Check tree names
+  const uniqueNameValRes = validateUniqueHierarchyNames(hierarchies);
+  isValid = uniqueNameValRes.isValid;
+  errors = errors.concat(uniqueNameValRes.errors);
+
+  // Check each tree.
+  for (const tree of hierarchies) {
+    const res = validateTree(tree);
+    if (!res.isValid) {
+      isValid = false;
+    }
+    errors = errors.concat(res.errors);
+  }
+
+  return { isValid, errors };
+}
+
+/**
+ * Validates that a tree has a proper structure, values, and no duplicate keys.
+ * @param tree The tree to validate.
+ * @returns A validation result with any errors found.
+ */
+export function validateTree(tree: RuntimeHierarchyTree | HierarchyTree): {
+  isValid: boolean;
+  errors: string[];
+} {
+  assertDefined(tree, "tree");
+
+  // Track errors.
+  const errors: string[] = [];
+  // Set to track keys encountered during traversal.
   const seenKeys = new Set<string>();
 
-  function validateNode(node: RuntimeHierarchyTreeNode, path: string): void {
+  function validateNode(node: RuntimeHierarchyTreeNode | HierarchyTreeNode<string, HierarchyTreeNode<any, any>[]>, path: string): void {
     // Basic property checks
     if (!node.item.key) errors.push(`${path}: Missing key`);
     if (!node.item.label) errors.push(`${path}: Missing label`);
-    if (node.item.level === undefined) errors.push(`${path}: Missing level`);
-    // Note: urlParamValue is initialized later, so we don't check it here.
+    if (isRuntimeHierarchyTreeNode(node)) {
+      if (node.item.level === undefined) errors.push(`${path}: Missing level`);
+      // Note: urlParamValue is initialized later, so we don't check it here.
+    }
 
-    // NEW CHECK: Enforce unique keys within the tree.
+    // Enforce unique keys within the tree.
     if (node.item.key) {
       if (seenKeys.has(node.item.key)) {
         errors.push(`${path}: Duplicate key '${node.item.key}' found in tree '${tree.name}'. Keys must be unique.`);

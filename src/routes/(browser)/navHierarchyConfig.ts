@@ -82,33 +82,38 @@ export const supplierHierarchyConfig: HierarchyTree = {
 export const productCategoriesHierarchyConfig: HierarchyTree = {
   name: "categories",
   rootItem: createHierarchyNode({
-    // LEVEL 0 (List) - Visible root. No urlParamName.
+    // Categories List - Visible root. No urlParamName.
     item: { key: "categories", type: "list", href: "/categories", label: "Product Categories" },
     children: [
       createHierarchyNode({
-        // LEVEL 1 (Object) - Hidden, represents the selected category. Has urlParamName.
+        // Category Object - Hidden, represents the selected category. Has urlParamName.
         item: { key: "category", type: "object", href: "/categories/[categoryId]", label: "Category", display: false, urlParamName: "categoryId" },
         defaultChild: "productdefinitions",
         children: [
           createHierarchyNode({
-            // LEVEL 2 (List) - Visible product definitions list.
+            // ProductDef List - Visible product definitions list. We display product def on CategoryDetailPage => "/categories/[categoryId]/"
             // The CategoryDetailPage contains a list of productdefinitions => href = "/categories/[categoryId]/"
             item: { key: "productdefinitions", type: "list", href: "/categories/[categoryId]/", label: "Product Definitions", urlParamName: "categoryId" },
             children: [
+                // ProductDef Object
                 createHierarchyNode({
                 item: { key: "productDefintition", type: "object", href: "/categories/[categoryId]/productdefinitions/[productDefId]", label: "Product Definition", display: false, urlParamName: "productDefId" },
                 children: [
+                  // Oferings List
                   createHierarchyNode({
                     item: { key: "offerings", type: "list", href: "/categories/[categoryId]/productdefinitions/[productDefId]", label: "Offerings", urlParamName: "offeringId" },
                     children: [
+                      // Offering Object
                       createHierarchyNode({
                         item: { key: "offering", type: "object", href: "/categories/[categoryId]/productdefinitions/[productDefId]/offerings/[offeringId]", label: "Offering", display: false, urlParamName: "offeringId" },
                         defaultChild: "links",
                         children: [
+                          // Attributes List
                           createHierarchyNode({
                             // Leaf
                             item: { key: "attributes", type: "list", href:"/categories/[categoryId]/productdefinitions/[productDefId]/offerings/[offeringId]/attributes", label: "Attributes" },
                           }),
+                          // Link List
                           createHierarchyNode({
                             // Leaf
                             item: { key: "links", type: "list", href:"/categories/[categoryId]/productdefinitions/[productDefId]/offerings/[offeringId]/links", label: "Links" },
@@ -128,7 +133,7 @@ export const productCategoriesHierarchyConfig: HierarchyTree = {
 };
 
 /**
- * Defines the navigation hierarchy for global Attributes master data.
+ * Navigation hierarchy for global Attributes master data.
  */
 // prettier-ignore
 export const attributesHierarchyConfig: HierarchyTree = {
@@ -147,6 +152,37 @@ export const attributesHierarchyConfig: HierarchyTree = {
   }),
 };
 
+/**
+ * Navigation hierarchy for global Orders master data.
+ */
+// prettier-ignore
+export const ordersHierarchyConfig: HierarchyTree = {
+  name: "orders",
+  rootItem: createHierarchyNode({
+    // Order List - The visible root of the hierarchy
+    item: { key: "order", type: "list", href: "/orders", label: "Orders" },
+    children: [
+      createHierarchyNode({
+        // Order Object - Hidden node representing a single selected attribute
+        item: { key: "order", type: "object", href: "/orders/[orderId]", label: "Order", display: false, urlParamName: "orderId" },
+        children: [
+          // OrderItem List - We display order items directly on OrderDetailPage
+          createHierarchyNode({
+            item: { key: "orderItems", type: "list", href: "/orders/[orderId]", label: "Order Items", urlParamName: "orderId" },
+           children: [
+             // OrderItem Object 
+             createHierarchyNode({
+             item: { key: "orderItem", type: "list", href: "/orders/orderitems/[orderItemId]", label: "Order Items", display: false, urlParamName: "orderItemId" },
+             children: []
+          }),
+           ]
+          }),
+        ]
+      }),
+    ],
+  }),
+};
+
 // ================================================================================================
 // MAIN EXPORT FUNCTIONS
 // ================================================================================================
@@ -156,7 +192,7 @@ export const attributesHierarchyConfig: HierarchyTree = {
  * This is the main entry point for getting hierarchy definitions.
  */
 export function getAppHierarchies(): Hierarchy {
-  return [supplierHierarchyConfig, productCategoriesHierarchyConfig, attributesHierarchyConfig];
+  return [supplierHierarchyConfig, productCategoriesHierarchyConfig, attributesHierarchyConfig, ordersHierarchyConfig];
 }
 
 /**
@@ -179,16 +215,14 @@ function validateHierarchyNames(): boolean {
 
   if (names.length !== uniqueNames.size) {
     const duplicates = names.filter((name, index) => names.indexOf(name) !== index);
-    throw new Error(`Duplicate hierarchy names found: ${duplicates.join(", ")}`);
+    const msg = `Duplicate hierarchy names found, exiting: ${JSON.stringify(duplicates, null, 4)}`
+    log.errorLn("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+    log.error(msg);
+    log.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+    process.exit(1);
   }
   return true;
 }
 
-if (import.meta.env.DEV) {
-  try {
-    validateHierarchyNames();
-    log.info("✅ Hierarchy configuration validation passed");
-  } catch (error) {
-    log.error("❌ Hierarchy configuration validation failed:", error);
-  }
-}
+validateHierarchyNames();
+log.info("✅ Hierarchy configuration validation passed");

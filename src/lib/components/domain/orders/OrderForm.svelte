@@ -39,13 +39,13 @@
 
   // === VALIDATE =================================================================================
 
-  let { errors } = $derived.by(() => {
+  let { schemaValidationErrors } = $derived.by(() => {
     const result = OrderSchema.nullable().safeParse(initial);
     if (result.error) {
       log.error(`Validation of supplier data to OrderSchema failed.`, result.error);
     }
     return {
-      errors: result.success ? null : result.error.issues,
+      schemaValidationErrors: result.success ? null : result.error.issues,
       isValid: result.success,
     };
   });
@@ -114,7 +114,7 @@
   }
 </script>
 
-<ValidationWrapper {errors}>
+<ValidationWrapper errors={schemaValidationErrors}>
   <FormShell
     entity="Order"
     initial={initial as Order}

@@ -13,8 +13,18 @@
   import CategoryAssignment from "$lib/components/domain/suppliers/CategoryAssignment.svelte";
 
   // API & Type Imports
-  import { getSupplierApi, supplierLoadingState } from "$lib/api/client/supplier";
-  import type { ProductCategory, WholesalerCategory_Category, WholesalerCategory, Wholesaler } from "$lib/domain/domainTypes";
+  import { supplierLoadingState } from "$lib/api/client/supplier";
+  import {
+    type ProductCategory,
+    type WholesalerCategory_Category,
+    type WholesalerCategory,
+    type Wholesaler,
+    type Order,
+    OrderItem_ProdDef_Category,
+    OrderItem_ProdDef_Category_Schema,
+    OrderSchema,
+  } from "$lib/domain/domainTypes";
+  import { z } from "zod";
   import { categoryLoadingState } from "$lib/api/client/category";
   import { ApiClient } from "$lib/api/client/ApiClient";
   import type { ID, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
@@ -28,18 +38,27 @@
   import { assertDefined } from "$lib/utils/assertions";
   import { cascadeDeleteAssignments, type CompositeID } from "$lib/api/client/cascadeDelete";
   import { stringsToNumbers } from "$lib/utils/typeConversions";
+  import { getOrderApi } from "$lib/api/client/order";
+  import { error } from "@sveltejs/kit";
 
   // === PROPS ====================================================================================
 
-  let { data }: { data: SupplierDetailPage_LoadDataAsync } = $props();
+  let { data }: { data: { orderId: string | null; isCreateMode: boolean } } = $props();
 
   // === STATE ====================================================================================
 
   let resolvedData = $state<SupplierDetailPage_LoadData | null>(null);
+  let order = $state<Order | null>(null);
+  let orderItems = $state<OrderItem_ProdDef_Category[] | null>(null);
   let isLoading = $state(true);
   let loadingError = $state<{ message: string; status?: number } | null>(null);
   const isCreateMode = $derived(!resolvedData?.supplier);
   const allowForceCascadingDelte = $state(true);
+
+  // === API =====================================================================================
+
+  const client = new ApiClient(fetch);
+  const orderApi = getOrderApi(client);
 
   // === LOAD =====================================================================================
 
@@ -54,21 +73,19 @@
       resolvedData = null;
 
       try {
-        // 2. Resolve all promises in parallel.
-        const [supplier, assignedCategories, availableCategories] = await Promise.all([
-          data.supplier,
-          data.assignedCategories,
-          data.availableCategories,
-        ]);
+        const orderId = Number(data.orderId);
+
+        if (isNaN(orderId) && data.orderId?.toLowerCase() !== "new") {
+          throw error(400, `OrderDetailPage: Invalid Order ID - ${data.orderId} `);
+        }
+
+        if (isCreateMode) {
+          [order, orderItems] = await Promise.all([orderApi.loadOrder(orderId), orderApi.loadOrderItemsForOrder(orderId)]);
+          const orderValidationResult = OrderSchema.safeParse(order);
+          const orderItemsValidationResult = z.array(OrderItem_ProdDef_Category_Schema).safeParse(orderItems);
+        }
 
         if (aborted) return;
-
-        // 3. Assemble the data object for validation.
-        const dataToValidate = {
-          supplier,
-          assignedCategories,
-          availableCategories,
-        };
 
         // 4. Validate the resolved data against the Zod schema.
         const validationResult = SupplierDetailPage_LoadDataSchema.safeParse(dataToValidate);
@@ -83,16 +100,14 @@
         resolvedData = validationResult.data;
       } catch (rawError: any) {
         if (aborted) return;
-        // 6. Handle any error from fetching or validation.
         const status = rawError.status ?? 500;
-        const message = rawError.message || "Failed to load supplier details.";
+        const message = rawError.message || "Failed to load order details.";
         loadingError = { message, status };
         log.error("Promise processing failed", {
           rawError,
         });
       } finally {
         if (!aborted) {
-          // 7. Always end the loading state.
           isLoading = false;
         }
       }
@@ -105,9 +120,6 @@
   });
 
   // === EVENTS & STRATEGIES ======================================================================
-
-  const client = new ApiClient(fetch);
-  const supplierApi = getSupplierApi(client);
 
   async function handleFormSubmitted(info: { data: Wholesaler; result: unknown }) {
     addNotification(`Supplier saved successfully.`, "success");
@@ -165,8 +177,8 @@
 
     log.info("Re-fetching category lists after assignment...");
     const [updatedAssigned, updatedAvailable] = await Promise.all([
-      supplierApi.loadCategoriesForSupplier(supplierId),
-      supplierApi.loadAvailableCategoriesForSupplier(supplierId),
+      orderApi.loadCategoriesForSupplier(supplierId),
+      orderApi.loadAvailableCategoriesForSupplier(supplierId),
     ]);
     resolvedData.assignedCategories = updatedAssigned;
     resolvedData.availableCategories = updatedAvailable;
@@ -193,7 +205,7 @@
         ...(comment !== undefined ? { comment } : {}),
         ...(link !== undefined ? { link } : {}),
       };
-      await supplierApi.assignCategoryToSupplier(supplierId, wholesalerCategory);
+      await orderApi.assignCategoryToSupplier(supplierId, wholesalerCategory);
       addNotification(`Category "${category.name}" assigned successfully.`, "success");
 
       // await!
@@ -218,7 +230,7 @@
     }));
     dataChanged = await cascadeDeleteAssignments(
       compositeIds,
-      supplierApi.removeCategoryFromSupplier,
+      orderApi.removeCategoryFromSupplier,
       {
         domainObjectName: "Category",
         hardDepInfo: "Category has hard dependencies. Delete?",

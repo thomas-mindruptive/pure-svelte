@@ -419,6 +419,7 @@ copyMetaFrom(OrderItemSchema, OrderItemForCreateSchema);
 // ===== ORDER ITEM with JOINS (NOW WITH BRANDED SCHEMAS) =====
 
 export const OrderItem_ProdDef_Category_Schema = OrderItemSchema.extend({
+  order: OrderSchema,
   product_def: ProductDefinitionSchema,
   category: ProductCategorySchema,
 });

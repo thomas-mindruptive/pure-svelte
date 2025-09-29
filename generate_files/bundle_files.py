@@ -64,9 +64,8 @@ INCLUDE_PATTERNS: List[str] = [
     "src/lib/backendQueries/**",
     "src/lib/api/client/supplier.ts",
     "src/lib/api/client/order.ts",
-    "src/lib/components/domain/order/**",
+    "src/lib/components/domain/orders/**",
     "src/lib/components/grids/**",
-    "src/routes/(browser)/suppliers/**",
 ]
 
 # =========================

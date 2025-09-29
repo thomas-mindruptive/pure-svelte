@@ -8,11 +8,12 @@
 
 import { log } from "$lib/utils/logger";
 import { type QueryPayload } from "$lib/backendQueries/queryGrammar";
-import type { ProductDefinition, WholesalerItemOffering_ProductDef_Category_Supplier } from "$lib/domain/domainTypes";
+import { WholesalerItemOffering_ProductDef_Category_SupplierSchema, type ProductDefinition, type WholesalerItemOffering_ProductDef_Category_Supplier } from "$lib/domain/domainTypes";
 import type { ApiClient } from "./ApiClient";
 import { createPostBody, createQueryBody, getErrorMessage } from "./common";
 import type { DeleteApiResponse, DeleteRequest, PredefinedQueryRequest, QueryResponseData } from "$lib/api/api.types";
 import { LoadingState } from "./loadingState";
+import { genTypedQualifiedColumns } from "$lib/domain/domainTypes.utils";
 
 
 // Create a dedicated loading state manager for this entity.
@@ -169,19 +170,9 @@ export function getProductDefinitionApi(client: ApiClient) {
       const operationId = `loadOfferingsForProductDefinition-${productDefId}`;
       productDefinitionLoadingManager.start(operationId);
       try {
+        const cols = genTypedQualifiedColumns(WholesalerItemOffering_ProductDef_Category_SupplierSchema);
         const payload: QueryPayload<WholesalerItemOffering_ProductDef_Category_Supplier> = {
-          select: [
-            "wio.wholesaler_id",
-            "wio.offering_id",
-            "wio.price",
-            "wio.currency",
-            "wio.comment",
-            "pd.title AS product_def_title",
-            "pd.product_def_id",
-            "pc.category_id",
-            "pc.name AS category_name",
-            "w.name AS supplier_name",
-          ],
+          select: cols,
           where: {
             whereCondOp: "AND",
             conditions: [{ key: "wio.product_def_id", whereCondOp: "=", val: productDefId }],
@@ -189,7 +180,7 @@ export function getProductDefinitionApi(client: ApiClient) {
           orderBy: [{ key: "w.name", direction: "asc" }],
         };
 
-        const request: PredefinedQueryRequest = {
+        const request: PredefinedQueryRequest<WholesalerItemOffering_ProductDef_Category_Supplier> = {
           namedQuery: "product_definition_offerings",
           payload: payload,
         };

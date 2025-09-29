@@ -1,6 +1,7 @@
-<!-- SupplierListPage.svelte -->
+<!-- OrderListPage.svelte -->
+
 <script lang="ts">
-  import type { Order, OrderItem_ProdDef_Category, Wholesaler } from "$lib/domain/domainTypes";
+  import type { Order, OrderItem_ProdDef_Category, OrderItem_ProdDef_Category_Schema, Wholesaler } from "$lib/domain/domainTypes";
   import { goto } from "$app/navigation";
   import { log } from "$lib/utils/logger";
 
@@ -8,21 +9,21 @@
 
   // --- API & Strategy Imports ---
   import { ApiClient } from "$lib/api/client/ApiClient";
-  import type { ID, DeleteStrategy, RowActionStrategy, ColumnDef } from "$lib/components/grids/Datagrid.types";
+  import type { ID, DeleteStrategy, RowActionStrategy, ColumnDefBase } from "$lib/components/grids/Datagrid.types";
 
   import { stringsToNumbers } from "$lib/utils/typeConversions";
   import { cascadeDelete } from "$lib/api/client/cascadeDelete";
   import { page } from "$app/state";
   import { getOrderApi, orderLoadingState } from "$lib/api/client/order";
-    import Datagrid from "$lib/components/grids/Datagrid.svelte";
+  import Datagrid from "$lib/components/grids/Datagrid.svelte";
 
   // === PROPS ====================================================================================
 
-  let { data }: { data: { orders: Promise<Order[]> } } = $props();
+  //let { data }: { data: { orders: Promise<OrderItem_ProdDef_Category[]> } } = $props();
 
   // === STATE ====================================================================================
 
-  let resolvedOrders = $state<Order[]>([]);
+  let resolvedOrders = $state<OrderItem_ProdDef_Category[]>([]);
   let isLoading = $state(true); // The component always starts in a loading state.
   let loadingOrValidationError = $state<{
     message: string;
@@ -30,8 +31,20 @@
   } | null>(null);
   const allowForceCascadingDelte = $state(true);
 
+  // === API ======================================================================================
+
+  const client = new ApiClient(fetch);
+  const orderApi = getOrderApi(client);
+
   // === LOAD =====================================================================================
 
+  /**
+   * ⚠️ NOTE: with this list page, we change the +page.ts -> load -> page.svelte pattern!
+   * Reason: We use the "streaming API" approach anyway, 
+   * i.e. the "load" function only returns promises, not the data itself.
+   * => There is no advantage, quite the oopisite: 
+   * We would have to maintain an indirection (= +page.ts).
+   */
   $effect(() => {
     // For Svelte cleanup funtion!
     let aborted = false;
@@ -45,35 +58,29 @@
       loadingOrValidationError = null;
       resolvedOrders = []; // Clear old data to prevent stale UI
 
-      if (!data.orders) {
-        const message = `Cannot load orders because data.orders is not defined`;
-        log.error(message);
-        loadingOrValidationError = { message, status: 0 };
-      } else {
-        try {
-          // Await the promise to get the data.
-          if (!aborted) {
-            resolvedOrders = await data.orders;
-            log.debug(`Orders promise resolved successfully.`);
-          }
-        } catch (rawError: any) {
-          // If the promise rejects, perform the robust error handling.
+      try {
+        // Await the promise to get the data.
+        if (!aborted) {
+          resolvedOrders = await orderApi.loadOrders();
+          log.debug(`Orders promise resolved successfully.`);
+        }
+      } catch (rawError: any) {
+        // If the promise rejects, perform the robust error handling.
 
-          if (!aborted) {
-            const status = rawError.status ?? 500;
-            const message = rawError.body?.message || rawError.message || "An unknown error occurred while loading.";
+        if (!aborted) {
+          const status = rawError.status ?? 500;
+          const message = rawError.body?.message || rawError.message || "An unknown error occurred while loading.";
 
-            // Set the clean error state for the UI to display.
-            loadingOrValidationError = { message, status };
+          // Set the clean error state for the UI to display.
+          loadingOrValidationError = { message, status };
 
-            // Log the full, raw error object for debugging purposes.
-            log.error("Promise rejected while loading.", { rawError });
-          }
-        } finally {
-          // Always set loading to false when the process is complete (success or fail).
-          if (!aborted) {
-            isLoading = false;
-          }
+          // Log the full, raw error object for debugging purposes.
+          log.error("Promise rejected while loading.", { rawError });
+        }
+      } finally {
+        // Always set loading to false when the process is complete (success or fail).
+        if (!aborted) {
+          isLoading = false;
         }
       }
     };
@@ -86,12 +93,6 @@
       aborted = true;
     };
   });
-
-  // === API ======================================================================================
-
-  // 3. These functions handle user interactions within the grid. They remain unchanged.
-  const client = new ApiClient(fetch);
-  const orderApi = getOrderApi(client);
 
   // === EVENTS ===================================================================================
 
@@ -129,9 +130,9 @@
 
   // === COLUMNS =====
 
-  const columns: ColumnDef<OrderItem_ProdDef_Category>[] = [
+  const columns: ColumnDefBase<typeof OrderItem_ProdDef_Category_Schema>[] = [
     { key: "order_id", header: "Email", accessor: null, sortable: true },
-    { key: "product_def", header: "Email", accessor: (p) => p.product_def.title, sortable: true },
+    { key: "pd.title", header: "Email", accessor: (p) => p.product_def.title, sortable: true },
   ];
 
   const getId = (r: Wholesaler) => r.wholesaler_id;
@@ -150,9 +151,7 @@
 <!----- TEMPLATE ----->
 
 <div class="list-page-content-wrapper">
-  <h1>Suppliers</h1>
-  <p>Select a supplier to view their details and manage their product categories.</p>
-
+  <h1>Orders</h1>
 
   {#if loadingOrValidationError}
     <div class="component-error-boundary">
@@ -170,15 +169,15 @@
         Create Order
       </button>
       <Datagrid
-        rows = {resolvedOrders}
+        rows={resolvedOrders}
         {columns}
         {getId}
-        loading = {isLoading || $orderLoadingState}
+        loading={isLoading || $orderLoadingState}
         gridId="wholesalers"
         entity="wholesaler"
         {deleteStrategy}
         {rowActionStrategy}
-        apiLoadFunc = {orderApi.loadOrdersWithWhereAndOrder}
+        apiLoadFunc={orderApi.loadOrdersWithWhereAndOrder}
         maxBodyHeight="550px"
       />
     </div>

@@ -14,8 +14,9 @@ import { mssqlErrorMapper } from "$lib/backendQueries/mssqlErrorMapper";
 import type { ApiErrorResponse, QueryRequest, PredefinedQueryRequest, QuerySuccessResponse } from "$lib/api/api.types";
 import { v4 as uuidv4 } from "uuid";
 import { isTableInBrandedSchemas } from "$lib/domain/domainTypes.utils";
+import type z from "zod";
 
-function isPredefinedQuery(body: unknown): body is PredefinedQueryRequest {
+function isPredefinedQuery(body: unknown): body is PredefinedQueryRequest<z.ZodObject<any>> {
   return typeof body === "object" && body !== null && "namedQuery" in body && "payload" in body;
 }
 

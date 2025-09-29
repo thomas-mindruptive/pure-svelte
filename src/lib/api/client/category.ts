@@ -8,17 +8,19 @@
 
 import { log } from "$lib/utils/logger";
 import { ComparisonOperator, type QueryPayload, type SortDescriptor, type WhereConditionGroup } from "$lib/backendQueries/queryGrammar";
-import type {
-  ProductCategory,
-  ProductDefinition,
-  Wholesaler,
-  WholesalerItemOffering_ProductDef_Category_Supplier,
+import {
+  WholesalerItemOffering_ProductDef_Category_SupplierSchema,
+  type ProductCategory,
+  type ProductDefinition,
+  type Wholesaler,
+  type WholesalerItemOffering_ProductDef_Category_Supplier,
 } from "$lib/domain/domainTypes";
 import type { ApiClient } from "./ApiClient";
 import { createPostBody, createQueryBody, getErrorMessage } from "./common";
 import type { PredefinedQueryRequest, QueryResponseData } from "$lib/api/api.types";
 import type { DeleteCategoryApiResponse } from "$lib/api/app/appSpecificTypes"; // CORRECTED IMPORT PATH
 import { LoadingState } from "./loadingState";
+import { genTypedQualifiedColumns } from "$lib/domain/domainTypes.utils";
 const categoryLoadingManager = new LoadingState();
 export const categoryLoadingState = categoryLoadingManager.isLoadingStore;
 
@@ -204,7 +206,7 @@ export function getCategoryApi(client: ApiClient) {
       categoryLoadingManager.start(operationId);
       try {
         // 1. Define the request object for the generic /api/query endpoint.
-        const request: PredefinedQueryRequest = {
+        const request: PredefinedQueryRequest<Wholesaler> = {
           // 2. Specify the name of the server-side join configuration to use.
           //    This join correctly links wholesalers (w) to product_categories (pc).
           namedQuery: "supplier_categories",
@@ -250,24 +252,11 @@ export function getCategoryApi(client: ApiClient) {
       const operationId = `loadOfferingsForSupplierCategory-${supplierId}-${categoryId}`;
       categoryLoadingManager.start(operationId);
       try {
-        const request: PredefinedQueryRequest = {
+        const cols = genTypedQualifiedColumns(WholesalerItemOffering_ProductDef_Category_SupplierSchema)
+        const request: PredefinedQueryRequest<WholesalerItemOffering_ProductDef_Category_Supplier> = {
           namedQuery: "category_offerings",
           payload: {
-            select: [
-              "wio.offering_id",
-              "wio.wholesaler_id",
-              "wio.category_id",
-              "wio.product_def_id",
-              "wio.price",
-              "wio.currency",
-              "wio.size",
-              "wio.dimensions",
-              "wio.comment",
-              "wio.created_at",
-              "pd.title AS product_def_title",
-              "pd.description AS product_def_description",
-              "pc.name AS category_name",
-            ],
+            select: cols,
             where: {
               whereCondOp: "AND",
               conditions: [

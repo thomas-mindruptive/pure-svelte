@@ -1,4 +1,6 @@
 import type { WhereConditionGroup, SortDescriptor } from "$lib/backendQueries/queryGrammar";
+import type { QualifiedColumnsFromBrandedSchemaWithJoins } from "$lib/domain/domainTypes.utils";
+import type z from "zod";
 
 // ===== COLUMNS ==================================================================================
 
@@ -21,6 +23,23 @@ export type ColumnDefDirect<T> = {
   width?: string;
   class?: string;
 };
+
+export type ColumnDefBase<S extends z.ZodObject<any>> = {
+  key: QualifiedColumnsFromBrandedSchemaWithJoins<S>;
+  header: string;
+  accessor?: ((row: z.infer<S>) => unknown) | null;
+  sortable?: boolean;
+  width?: string;
+  class?: string;
+};
+
+export type ColumnDefDirect_<S extends z.ZodObject<any>> = ColumnDefBase<S> & {
+  accessor?: never; // no accessor allowed
+}
+
+export type ColumnDefWithAccessor_<S extends z.ZodObject<any>> = ColumnDefBase<S> & {
+  accessor?: ((row: z.infer<S>) => unknown) | null;
+}
 
 // Union: either direct access OR accessor
 export type ColumnDef<T> = ColumnDefWithAccessor<T> | ColumnDefDirect<T>;

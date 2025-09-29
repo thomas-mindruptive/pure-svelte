@@ -199,7 +199,7 @@ export function getSupplierApi(client: ApiClient) {
       const operationId = `loadCategoriesForSupplier-${supplierId}`;
       supplierLoadingOperations.start(operationId);
       try {
-        const request: PredefinedQueryRequest = {
+        const request: PredefinedQueryRequest<WholesalerCategoryWithCount> = {
           namedQuery: "supplier_categories",
           payload: {
             select: ["w.wholesaler_id", "wc.category_id", "pc.name AS category_name", "wc.comment", "wc.link"],
@@ -231,7 +231,7 @@ export function getSupplierApi(client: ApiClient) {
       const operationId = `loadCategoriesForSupplier-${supplierId}`;
       supplierLoadingOperations.start(operationId);
       try {
-        const request: PredefinedQueryRequest = {
+        const request: PredefinedQueryRequest<WholesalerCategoryWithCount> = {
           namedQuery: "supplier_category->category",
           payload: {
             select: ["wc.wholesaler_id", "wc.category_id", "pc.name AS category_name", "wc.comment", "wc.link"],

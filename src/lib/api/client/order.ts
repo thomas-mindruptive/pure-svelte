@@ -9,7 +9,7 @@
 
 import { log } from "$lib/utils/logger";
 import { type QueryPayload, type SortDescriptor, type WhereConditionGroup } from "$lib/backendQueries/queryGrammar";
-import { OrderSchema, type Order, type OrderItem_ProdDef_Category, OrderItem_ProdDef_Category_Schema } from "$lib/domain/domainTypes";
+import { type Order, type OrderItem_ProdDef_Category, OrderItem_ProdDef_Category_Schema } from "$lib/domain/domainTypes";
 
 import type { ApiClient } from "./ApiClient";
 import { createPostBody, createQueryBody, getErrorMessage } from "./common";
@@ -26,10 +26,11 @@ export const orderLoadingOperations = orderLoadingManager;
 /**
  * The default query payload used when fetching a list.
  */
-const orderCols = genTypedQualifiedColumns(OrderSchema);
-export const DEFAULT_ORDER_QUERY: QueryPayload<Order> = {
+const orderCols = genTypedQualifiedColumns(OrderItem_ProdDef_Category_Schema);
+export const DEFAULT_ORDER_QUERY: QueryPayload<OrderItem_ProdDef_Category> = {
+  from: {table: "dbo.orders", alias: "ord"},
   select: orderCols,
-  orderBy: [{ key: "order_date", direction: "desc" }],
+  orderBy: [{ key: "ord.order_date", direction: "desc" }],
 };
 
 /**
@@ -45,18 +46,18 @@ export function getOrderApi(client: ApiClient) {
     /**
      * Load a list.
      */
-    async loadOrders(query: Partial<QueryPayload<Order>> = {}): Promise<Order[]> {
+    async loadOrders(query: Partial<QueryPayload<OrderItem_ProdDef_Category>> = {}): Promise<OrderItem_ProdDef_Category[]> {
       const operationId = "loadOrders";
       orderLoadingOperations.start(operationId);
       try {
-        const fullQuery: QueryPayload<Order> = { ...DEFAULT_ORDER_QUERY, ...query };
+        const fullQuery: QueryPayload<OrderItem_ProdDef_Category> = { ...DEFAULT_ORDER_QUERY, ...query };
         const responseData = await client.apiFetch<QueryResponseData<Order>>(
-          "/api/orders",
+          "/api/query",
           { method: "POST", body: createQueryBody(fullQuery) },
           { context: operationId },
         );
         log.info(`Load successful.`, responseData);
-        return responseData.results as Order[];
+        return responseData.results as OrderItem_ProdDef_Category[];
       } catch (err) {
         log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
         throw err;
@@ -71,8 +72,11 @@ export function getOrderApi(client: ApiClient) {
      * @param orderBy
      * @returns
      */
-    async loadOrdersWithWhereAndOrder(where: WhereConditionGroup<Order> | null, orderBy: SortDescriptor<Order>[] | null): Promise<Order[]> {
-      const queryPartial: Partial<QueryPayload<Order>> = {};
+    async loadOrdersWithWhereAndOrder(
+      where: WhereConditionGroup<OrderItem_ProdDef_Category> | null,
+      orderBy: SortDescriptor<OrderItem_ProdDef_Category>[] | null,
+    ): Promise<OrderItem_ProdDef_Category[]> {
+      const queryPartial: Partial<QueryPayload<OrderItem_ProdDef_Category>> = {};
       if (where) {
         queryPartial.where = where;
       }

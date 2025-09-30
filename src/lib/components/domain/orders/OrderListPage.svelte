@@ -42,7 +42,7 @@
    * ⚠️ NOTE: with this list page, we change the +page.ts -> load -> page.svelte pattern!
    * Reason: We use the "streaming API" approach anyway, 
    * i.e. the "load" function only returns promises, not the data itself.
-   * => There is no advantage, quite the oopisite: 
+   * => There is no advantage, quite the opposite: 
    * We would have to maintain an indirection (= +page.ts).
    */
   $effect(() => {
@@ -128,15 +128,15 @@
     goto(`${page.url.pathname}/new`);
   }
 
-  // === COLUMNS =====
+  // === DATAGRID DATA =====
 
   const columns: ColumnDefBase<typeof OrderSchema>[] = [
-    { key: "order_id", header: "Email", accessor: null, sortable: true },
+    { key: "order_id", header: "ID", accessor: null, sortable: true },
   ];
 
   const getId = (r: Wholesaler) => r.wholesaler_id;
 
-  // ===== GRID STRATEGIES =====
+  // ===== DATAGRID STRATEGIES =====
 
   const deleteStrategy: DeleteStrategy<Order> = {
     execute: handleOrderDelete,

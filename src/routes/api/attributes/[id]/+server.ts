@@ -25,7 +25,7 @@ import type {
   QuerySuccessResponse,
 } from "$lib/api/api.types";
 import type { DeletedAttributeData } from "$lib/api/app/appSpecificTypes";
-import { deleteAttribute } from "$lib/dataModel/deletes";
+import { deleteAttribute } from "$lib/backendQueries/cascadingDeleteOperations";
 import { checkAttributeDependencies } from "$lib/dataModel/dependencyChecks";
 
 /**

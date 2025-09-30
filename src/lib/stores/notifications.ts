@@ -1,9 +1,9 @@
 // src/lib/stores/notifications.ts
+import { browser } from "$app/environment";
+import { convertToHtml } from "$lib/utils/formatUtils";
+import { log } from "$lib/utils/logger";
 import { writable } from "svelte/store";
 import { v4 as uuidv4 } from "uuid";
-import DOMPurify from "dompurify";
-import { browser } from "$app/environment";
-import { log } from "$lib/utils/logger";
 
 export interface Notification {
   id: string;
@@ -18,7 +18,7 @@ export function addNotification(message: string, type: "success" | "error" | "in
   const id = uuidv4();
 
   if (browser) {
-      const sanitizedMessage = DOMPurify.sanitize(message.replace(/\n/g, "<br>"));
+      const sanitizedMessage = convertToHtml(message);
       log.debug(`Raw notification message: ${message}, Sanitized message: ${sanitizedMessage}`);
       message = sanitizedMessage;
   }

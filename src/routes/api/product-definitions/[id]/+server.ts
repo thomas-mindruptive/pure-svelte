@@ -19,7 +19,7 @@ import type {
   DeleteRequest,
   DeleteSuccessResponse,
 } from "$lib/api/api.types";
-import { deleteProductDefinition } from "$lib/dataModel/deletes";
+import { deleteProductDefinition } from "$lib/backendQueries/cascadingDeleteOperations";
 
 /**
  * GET /api/product-definitions/[id]

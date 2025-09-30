@@ -423,10 +423,11 @@ export const OrderItemForCreateSchema = OrderItemSchema.omit({
 }).describe("OrderItemForCreateSchema");
 copyMetaFrom(OrderItemSchema, OrderItemForCreateSchema);
 
-// ===== ORDER ITEM with JOINS (NOW WITH BRANDED SCHEMAS) =====
+// ===== ORDER ITEM with JOINS =====
 
 export const OrderItem_ProdDef_Category_Schema = OrderItemSchema.extend({
   order: OrderSchema,
+  offering: WholesalerItemOfferingSchema,
   product_def: ProductDefinitionSchema,
   category: ProductCategorySchema,
 });

@@ -28,6 +28,7 @@
   import CategoryForm from "./CategoryForm.svelte";
   import { cascadeDelete } from "$lib/api/client/cascadeDelete";
   import { stringsToNumbers } from "$lib/utils/typeConversions";
+    import { error } from "@sveltejs/kit";
 
   // === PROPS ====================================================================================
 
@@ -72,7 +73,7 @@
         if (!validationResult.success) {
           log.error("Zod validation failed", validationResult.error.issues);
           // Treat a validation failure as a loading error.
-          throw new Error(
+          throw error(500,
             `CategoryDetailPage: Received invalid data structure from the API: ${JSON.stringify(validationResult.error.issues)}`,
           );
         }

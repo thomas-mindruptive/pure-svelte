@@ -17,7 +17,7 @@ import { v4 as uuidv4 } from "uuid";
 
 import type { ApiSuccessResponse, DeleteConflictResponse, DeleteRequest } from "$lib/api/api.types";
 import type { DeleteCategorySuccessResponse } from "$lib/api/app/appSpecificTypes";
-import { deleteProductCategory } from "$lib/dataModel/deletes";
+import { deleteProductCategory } from "$lib/backendQueries/cascadingDeleteOperations";
 
 /**
  * GET /api/categories/[id]

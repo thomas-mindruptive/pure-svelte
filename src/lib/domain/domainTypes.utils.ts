@@ -91,11 +91,26 @@ export type DbTableNames = GetFullTableName<(typeof AllBrandedSchemas)[keyof typ
 // ===== UTIL FUNCTIONS =====
 
 /**
- * Generate typed qualified column names from a branded schema
- * Uses branded schemas with _meta information exclusively
+ * Generates a type-safe array of qualified column names from a branded Zod schema.
  *
+ * This function processes schemas that may contain nested branded schemas (JOIN scenarios)
+ * and produces SQL-qualified column names (e.g., "pd.title", "w.name").
+ *
+ * **How it works:**
+ * - Direct fields (non-objects) are returned as-is: `["order_id", "status"]`
+ * - Nested branded schemas are expanded with their alias: `["pd.product_def_id", "pd.title"]`
+ * - Falls back to schema shape matching when `.extend()` loses metadata
+ *
+ * **Example:**
+ * ```typescript
+ * const cols = genTypedQualifiedColumns(OrderItem_ProdDef_Category_Schema);
+ * // Returns: ["ori.order_item_id", "pd.product_def_id", "pd.title", "pc.category_id", ...]
+ * ```
+ *
+ * @template T - A Zod object schema, potentially with nested branded schemas
  * @param schema - Branded Zod schema with _meta information
  * @returns Array of qualified column names with full type safety
+ * @throws Error if a nested schema lacks metadata and cannot be matched
  */
 export function genTypedQualifiedColumns<T extends z.ZodObject<z.ZodRawShape>>(schema: T): QualifiedColumnsFromBrandedSchemaWithJoins<T>[] {
   const columns: string[] = [];
@@ -181,24 +196,61 @@ for (const [name, schema] of Object.entries(AllBrandedSchemas)) {
 }
 
 /**
- * Get schema metadata by alias
+ * Retrieves schema metadata by its alias identifier.
+ *
+ * Uses the pre-initialized lookup map for O(1) access to metadata
+ * containing alias, tableName, and dbSchema information.
+ *
+ * @param alias - The schema alias (e.g., "pd", "w", "ord")
+ * @returns The schema metadata object, or undefined if not found
+ *
+ * @example
+ * ```typescript
+ * const meta = getSchemaMetaByAlias("pd");
+ * // Returns: { alias: "pd", tableName: "product_definitions", dbSchema: "dbo" }
+ * ```
  */
 export function getSchemaMetaByAlias(alias: string): SchemaMeta | undefined {
   return metaByAlias.get(alias);
 }
 
 /**
- * Get schema by alias
+ * Retrieves a branded Zod schema by its alias identifier.
+ *
+ * Uses the pre-initialized lookup map for O(1) schema access.
+ * Useful for dynamic schema resolution in query building.
+ *
+ * @param alias - The schema alias (e.g., "pd", "w", "ord")
+ * @returns The Zod schema object, or undefined if not found
+ *
+ * @example
+ * ```typescript
+ * const schema = getSchemaByAlias("pd");
+ * // Returns: ProductDefinitionSchema
+ * ```
  */
 export function getSchemaByAlias(alias: string): z.ZodObject<z.ZodRawShape> | undefined {
   return schemaByAlias.get(alias);
 }
 
 /**
- * Check if a table is defined in any branded schema
- * Used for security validation in query endpoint
- * @param tableName - Can be "tableName" or "schema.tableName" format
- * @returns true if table exists in branded schemas, false otherwise
+ * Validates whether a table name exists in the branded schema registry.
+ *
+ * **Security Critical:** This function is used by the query endpoint to prevent
+ * SQL injection by ensuring only whitelisted tables can be queried.
+ *
+ * Accepts both short form ("product_definitions") and fully qualified form
+ * ("dbo.product_definitions") for flexible validation.
+ *
+ * @param tableName - Table name in either format: "tableName" or "schema.tableName"
+ * @returns `true` if the table exists in any branded schema, `false` otherwise
+ *
+ * @example
+ * ```typescript
+ * isTableInBrandedSchemas("product_definitions");       // true
+ * isTableInBrandedSchemas("dbo.product_definitions");   // true
+ * isTableInBrandedSchemas("malicious_table"); // false
+ * ```
  */
 export function isTableInBrandedSchemas(tableName: string): boolean {
   // Check all metadata entries
@@ -215,6 +267,8 @@ export function isTableInBrandedSchemas(tableName: string): boolean {
 
 // ===== VALIDATION UTILS =====
 
+export type ValErrorRecord = Record<string, string[]>;
+
 export type ValidationResultFor<S extends z.ZodTypeAny> =
   | {
       isValid: true;
@@ -223,10 +277,42 @@ export type ValidationResultFor<S extends z.ZodTypeAny> =
     }
   | {
       isValid: false;
-      errors: Record<string, string[]>;
+      errors: ValErrorRecord;
       sanitized: undefined;
     };
 
+/**
+ * Validates data against a Zod schema and returns a structured validation result.
+ *
+ * This is a high-level validation wrapper that combines Zod's `safeParse` with
+ * custom error formatting optimized for form validation and API responses.
+ *
+ * **Success case:**
+ * - Returns `{ isValid: true, errors: {}, sanitized: <validated data> }`
+ * - The `sanitized` data includes any Zod transformations/defaults applied
+ *
+ * **Failure case:**
+ * - Returns `{ isValid: false, errors: { field: ["message"] }, sanitized: undefined }`
+ * - Field errors are organized by field name for easy UI binding
+ * - Global errors are stored under the `_root` key
+ *
+ * @template S - The Zod schema type
+ * @param schema - Zod schema to validate against
+ * @param data - Raw data to validate (can be any type)
+ * @returns Structured validation result with type-safe error and data handling
+ *
+ * @example
+ * ```typescript
+ * const result = validateEntity(OrderSchema, rawData);
+ * if (result.isValid) {
+ *   // result.sanitized is fully typed as Order
+ *   console.log(result.sanitized.order_id);
+ * } else {
+ *   // result.errors is Record<string, string[]>
+ *   console.log(result.errors.order_date); // ["Invalid date format"]
+ * }
+ * ```
+ */
 export function validateEntity<S extends z.ZodTypeAny>(schema: S, data: unknown): ValidationResultFor<S> {
   const res = schema.safeParse(data);
   const validationResult = toValidationResult(res);
@@ -234,15 +320,72 @@ export function validateEntity<S extends z.ZodTypeAny>(schema: S, data: unknown)
   return validationResult;
 }
 
-export function toValidationResult<S extends z.ZodTypeAny>(result: z.ZodSafeParseResult<z.output<S>>): ValidationResultFor<S> {
-  if (result.success) {
+/**
+ * Converts a Zod parse result into a standardized validation result format.
+ *
+ * This low-level utility transforms Zod's native result format into our
+ * application's validation result structure with typed error handling.
+ *
+ * The function guarantees mutually exclusive states via discriminated union:
+ * - When `isValid: true`, `errors` is an empty object and `sanitized` contains data
+ * - When `isValid: false`, `errors` contains messages and `sanitized` is undefined
+ *
+ * @template S - The Zod schema type
+ * @param zodParseResult - Raw result from `schema.safeParse()`
+ * @returns Structured validation result with discriminated union type safety
+ *
+ * @see {@link toErrorRecord} for error formatting details
+ */
+export function toValidationResult<S extends z.ZodTypeAny>(zodParseResult: z.ZodSafeParseResult<z.output<S>>): ValidationResultFor<S> {
+  if (zodParseResult.success) {
     return {
       isValid: true,
       errors: {} as Record<string, never>,
-      sanitized: result.data,
+      sanitized: zodParseResult.data,
     };
   }
-  const { fieldErrors, formErrors } = z.flattenError(result.error);
+  const errors = toErrorRecord(zodParseResult.error); 
+  return {
+    isValid: false,
+    errors,
+    sanitized: undefined,
+  };
+}
+
+/**
+ * Converts a Zod error into a field-indexed error record optimized for forms and APIs.
+ *
+ * This function flattens Zod's nested error structure into a simple key-value map
+ * where each field name maps to an array of error messages.
+ *
+ * **Output format:**
+ * ```typescript
+ * {
+ *   order_date: ["Required", "Must be a valid date"],
+ *   total_amount: ["Must be positive"],
+ *   _root: ["Global validation failed"] // non-field-specific errors
+ * }
+ * ```
+ *
+ * **Key behaviors:**
+ * - Only includes fields that have actual error messages (empty arrays are omitted)
+ * - Global/form-level errors are stored under the special `_root` key
+ * - Field names match the original data structure for easy UI binding
+ *
+ * @param error - ZodError from a failed validation. If undefined, return empty record.
+ * @returns Record mapping field names to error message arrays
+ *
+ * @example
+ * ```typescript
+ * const result = OrderSchema.safeParse(invalidData);
+ * if (!result.success) {
+ *   const errors = toErrorRecord(result.error);
+ *   // Use in form: <input error={errors.order_date?.[0]} />
+ * }
+ * ```
+ */
+export function toErrorRecord(error: z.ZodError): ValErrorRecord {
+  const { fieldErrors, formErrors } = z.flattenError(error);
 
   // Ensure we only keep fields that actually have messages
   const errors: Record<string, string[]> = {};
@@ -253,9 +396,5 @@ export function toValidationResult<S extends z.ZodTypeAny>(result: z.ZodSafePars
   // Global errors (not tied to a specific field) are stored under "_root"
   if (formErrors.length) errors._root = formErrors;
 
-  return {
-    isValid: false,
-    errors,
-    sanitized: undefined,
-  };
+  return errors;
 }

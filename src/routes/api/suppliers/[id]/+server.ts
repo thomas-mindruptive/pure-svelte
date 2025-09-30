@@ -23,7 +23,7 @@ import type {
   QueryRequest,
   QuerySuccessResponse,
 } from "$lib/api/api.types";
-import { deleteSupplier } from "$lib/dataModel/deletes";
+import { deleteSupplier } from "$lib/backendQueries/cascadingDeleteOperations";
 import type { DeleteSupplierSuccessResponse } from "$lib/api/app/appSpecificTypes";
 import { buildUnexpectedError, validateAndUpdateEntity, validateIdUrlParam } from "$lib/backendQueries/entityOperations";
 

@@ -12,7 +12,7 @@ import { type QueryPayload, type SortDescriptor, type WhereConditionGroup } from
 import { type Order, type Order_Wholesaler, type OrderItem_ProdDef_Category, OrderItem_ProdDef_Category_Schema, OrderSchema } from "$lib/domain/domainTypes";
 
 import type { ApiClient } from "./ApiClient";
-import { createJsonBody, createJsonAndWrapInPayload, getErrorMessage } from "./common";
+import { createJsonBody, getErrorMessage } from "./common";
 import type { PredefinedQueryRequest, QueryResponseData } from "$lib/api/api.types";
 import type { DeleteSupplierApiResponse } from "$lib/api/app/appSpecificTypes";
 import { LoadingState } from "./loadingState";

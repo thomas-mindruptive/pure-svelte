@@ -1,0 +1,82 @@
+
+/**
+ * Sanitize HTML without DOM parsing.
+ * 
+ * - Keeps only whitelisted tags
+ * - Keeps only whitelisted attributes
+ * - Removes dangerous URL schemes
+ */
+export function sanitizeHtml(input: string): string {
+  // Whitelisted tags
+  const allowedTags = new Set([
+    "b", "i", "em", "strong", "u",
+    "p", "br", "ul", "ol", "li",
+    "blockquote", "code", "pre",
+    "h1", "h2", "h3",
+    "a"
+  ]);
+
+  // Whitelisted attributes per tag
+  const allowedAttrs: Record<string, string[]> = {
+    a: ["href", "title"],
+  };
+
+  // 1. Remove dangerous tags entirely
+  let out = input.replace(/<\/?(script|style|iframe|object|embed)[^>]*>/gi, "");
+
+  // 2. Process all tags
+  out = out.replace(
+    /<([^>\s/]+)([^>]*)>/gi,
+    (match: string, tag: string, attrs: string): string => {
+      const tagName = tag.toLowerCase();
+
+      // Drop disallowed tags
+      if (!allowedTags.has(tagName)) return "";
+
+      let safeAttrs = "";
+      const attrWhitelist = allowedAttrs[tagName] || [];
+
+      attrs.replace(
+        /([a-z0-9-]+)\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi,
+        (m: string, name: string, value: string): string => {
+          const attrName = name.toLowerCase();
+
+          // Skip non-whitelisted attributes
+          if (!attrWhitelist.includes(attrName)) return "";
+
+          // Strip surrounding quotes
+          const cleanValue = value.replace(/^['"]|['"]$/g, "");
+
+          // Skip dangerous schemes
+          if (/^(javascript:|data:|vbscript:)/i.test(cleanValue)) return "";
+
+          safeAttrs += ` ${attrName}="${cleanValue}"`;
+          return "";
+        }
+      );
+
+      return `<${tagName}${safeAttrs}>`;
+    }
+  );
+
+  return out;
+}
+
+/**
+ * Convert string to HTML. 
+ * Converts newLines to <br>.
+ * @param str 
+ * @returns 
+ */
+export function convertToHtml(str: string | undefined) {
+    if (!str) return "undefined";
+    const res= sanitizeHtml(str.replace(/\n/g, "<br>"));
+    return res;
+}
+
+export function stringifyForHtml(thing: unknown) {
+    const json = JSON.stringify(thing, null, 4);
+    const hmtl = convertToHtml(json);
+    return hmtl;
+}
+

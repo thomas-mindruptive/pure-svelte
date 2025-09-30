@@ -20,7 +20,7 @@ import type {
 } from "$lib/api/api.types";
 import { checkOfferingDependencies } from "$lib/dataModel/dependencyChecks";
 import type { DeleteOfferingSuccessResponse } from "$lib/api/app/appSpecificTypes";
-import { deleteOffering } from "$lib/dataModel/deletes";
+import { deleteOffering } from "$lib/backendQueries/cascadingDeleteOperations";
 
 /**
  * GET /api/offerings/[id]

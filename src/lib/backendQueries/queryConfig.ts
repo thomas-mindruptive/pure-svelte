@@ -7,7 +7,7 @@
  */
 
 import { ComparisonOperator, JoinType, LogicalOperator, type QueryPayload } from "$lib/backendQueries/queryGrammar";
-import { OrderItem_ProdDef_Category_Schema } from "$lib/domain/domainTypes";
+import { Order_Wholesaler_Schema, OrderItem_ProdDef_Category_Schema } from "$lib/domain/domainTypes";
 import { genTypedQualifiedColumns } from "$lib/domain/domainTypes.utils";
 
 type Optional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
@@ -178,6 +178,21 @@ export const supplierQueryConfig: QueryConfig = {
           },
         },
       ],
+    },
+    "order->wholesaler": {
+      select: genTypedQualifiedColumns(Order_Wholesaler_Schema),
+      from: { table: "dbo.orders", alias: "ord" },
+      joins: [
+        {
+          type: JoinType.INNER,
+          table: "dbo.wholesalers",
+          alias: "w",
+          on: {
+            joinCondOp: "AND",
+            conditions: [{ columnA: "ord.wholesaler_id", op: "=", columnB: "w.wholesaler_id" }],
+          },
+        }
+      ]
     },
     "order->order_items->product_def->category": {
       select: genTypedQualifiedColumns(OrderItem_ProdDef_Category_Schema),

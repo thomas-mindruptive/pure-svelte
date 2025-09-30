@@ -17,7 +17,7 @@ import {
 import type { Attribute } from "$lib/domain/domainTypes";
 
 import type { ApiClient } from "./ApiClient";
-import { createPostBody, createQueryBody, getErrorMessage } from "./common";
+import { createJsonBody, createJsonAndWrapInPayload, getErrorMessage } from "./common";
 import type { DeleteApiResponse, DeleteRequest, QueryResponseData } from "$lib/api/api.types";
 import { LoadingState } from "./loadingState";
 
@@ -53,7 +53,7 @@ export function getAttributeApi(client: ApiClient) {
         const fullQuery: QueryPayload<Attribute> = { ...DEFAULT_ATTRIBUTE_QUERY, ...query };
         const responseData = await client.apiFetch<QueryResponseData<Attribute>>(
           "/api/attributes",
-          { method: "POST", body: createQueryBody(fullQuery) },
+          { method: "POST", body: createJsonAndWrapInPayload(fullQuery) },
           { context: operationId },
         );
         return responseData.results as Attribute[];
@@ -95,7 +95,7 @@ export function getAttributeApi(client: ApiClient) {
       try {
         const responseData = await client.apiFetch<{ attribute: Attribute }>(
           "/api/attributes/new",
-          { method: "POST", body: createPostBody(attributeData) },
+          { method: "POST", body: createJsonBody(attributeData) },
           { context: operationId },
         );
         return responseData.attribute;
@@ -116,7 +116,7 @@ export function getAttributeApi(client: ApiClient) {
       try {
         const responseData = await client.apiFetch<{ attribute: Attribute }>(
           `/api/attributes/${attributeId}`,
-          { method: "PUT", body: createPostBody(updates) },
+          { method: "PUT", body: createJsonBody(updates) },
           { context: operationId },
         );
         return responseData.attribute;
@@ -147,7 +147,7 @@ export function getAttributeApi(client: ApiClient) {
             cascade,
             forceCascade
         };
-        const body = createPostBody(deleteRequest);
+        const body = createJsonBody(deleteRequest);
 
         return await client.apiFetchUnion<DeleteApiResponse<{ attribute_id: number; name: string }, string[]>>(
           url,
@@ -184,7 +184,7 @@ export function getAttributeApi(client: ApiClient) {
         };
         const responseData = await client.apiFetch<QueryResponseData<Attribute>>(
           "/api/attributes",
-          { method: "POST", body: createQueryBody(query) },
+          { method: "POST", body: createJsonAndWrapInPayload(query) },
           { context: operationId },
         );
         return responseData.results as Attribute[];
@@ -219,7 +219,7 @@ export function getAttributeApi(client: ApiClient) {
         const query: QueryPayload<Attribute> = { select: ["attribute_id"], where: whereCondition, limit: 1 };
         const responseData = await client.apiFetch<QueryResponseData<Attribute>>(
           "/api/attributes",
-          { method: "POST", body: createQueryBody(query) },
+          { method: "POST", body: createJsonAndWrapInPayload(query) },
           { context: operationId },
         );
         return responseData.results.length === 0;

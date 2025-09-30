@@ -120,6 +120,8 @@ export interface QueryRequest<T> {
 
 /**
  * Request for predefined named JOIN query
+ * Note: TypeScript cannot prevent excess properties in variable assignments due to structural typing.
+ * Use explicit type annotation on payload variable to catch excess properties.
  */
 export interface PredefinedQueryRequest<T> {
   namedQuery: string;

@@ -20,7 +20,7 @@ import type {
 } from "$lib/domain/domainTypes";
 
 import type { ApiClient } from "./ApiClient";
-import { createPostBody, createQueryBody, getErrorMessage } from "./common";
+import { createJsonBody, createJsonAndWrapInPayload, getErrorMessage } from "./common";
 import type {
   DeleteApiResponse,
   PredefinedQueryRequest,
@@ -80,7 +80,7 @@ export function getOfferingApi(client: ApiClient) {
       const operationId = "createOfferingForCategory";
       offeringLoadingManager.start(operationId);
       try {
-        const body = createPostBody(offeringData);
+        const body = createJsonBody(offeringData);
         const responseData = await client.apiFetch<{ offering: WholesalerItemOffering_ProductDef }>(
           "/api/offerings/new",
           { method: "POST", body },
@@ -103,7 +103,7 @@ export function getOfferingApi(client: ApiClient) {
       const operationId = `updateOffering-${offeringId}`;
       offeringLoadingManager.start(operationId);
       try {
-        const body = createPostBody({ offering_id: offeringId, ...updates });
+        const body = createJsonBody({ offering_id: offeringId, ...updates });
         const responseData = await client.apiFetch<{ offering: WholesalerItemOffering }>(
           `/api/offerings/${offeringId}`,
           { method: "PUT", body },
@@ -132,7 +132,7 @@ export function getOfferingApi(client: ApiClient) {
           id: offeringId,
           cascade,
         };
-        const body = createPostBody(removeRequest);
+        const body = createJsonBody(removeRequest);
         return await client.apiFetchUnion<DeleteOfferingApiResponse>(url, { method: "DELETE", body }, { context: operationId });
       } finally {
         offeringLoadingManager.finish(operationId);
@@ -173,7 +173,7 @@ export function getOfferingApi(client: ApiClient) {
         };
         const responseData = await client.apiFetch<QueryResponseData<WholesalerOfferingAttribute_Attribute>>(
           "/api/query",
-          { method: "POST", body: createPostBody(request) },
+          { method: "POST", body: createJsonBody(request) },
           { context: operationId },
         );
         return responseData.results as WholesalerOfferingAttribute_Attribute[];
@@ -202,7 +202,7 @@ export function getOfferingApi(client: ApiClient) {
         };
         const responseData = await client.apiFetch<QueryResponseData<Attribute>>(
           "/api/attributes",
-          { method: "POST", body: createQueryBody(query) },
+          { method: "POST", body: createJsonAndWrapInPayload(query) },
           { context: operationId },
         );
         return responseData.results as Attribute[];
@@ -271,7 +271,7 @@ export function getOfferingApi(client: ApiClient) {
         // This single, efficient query is sent to the generic query endpoint.
         const responseData = await client.apiFetch<QueryResponseData<Attribute>>(
           "/api/query",
-          { method: "POST", body: createQueryBody(payload) },
+          { method: "POST", body: createJsonAndWrapInPayload(payload) },
           { context: operationId },
         );
 
@@ -333,7 +333,7 @@ export function getOfferingApi(client: ApiClient) {
         };
         const responseData = await client.apiFetch<AssignmentSuccessData<WholesalerOfferingAttribute>>(
           "/api/offering-attributes",
-          { method: "POST", body: createPostBody(requestBody) },
+          { method: "POST", body: createJsonBody(requestBody) },
           { context: operationId },
         );
         return responseData.assignment;
@@ -362,7 +362,7 @@ export function getOfferingApi(client: ApiClient) {
         };
         const responseData = await client.apiFetch<AssignmentSuccessData<WholesalerOfferingAttribute>>(
           `/api/offering-attributes`,
-          { method: "PUT", body: createPostBody(requestBody) },
+          { method: "PUT", body: createJsonBody(requestBody) },
           { context: operationId },
         );
         return responseData.assignment;
@@ -404,7 +404,7 @@ export function getOfferingApi(client: ApiClient) {
             },
             string[]
           >
-        >("/api/offering-attributes", { method: "DELETE", body: createPostBody(requestBody) }, { context: operationId });
+        >("/api/offering-attributes", { method: "DELETE", body: createJsonBody(requestBody) }, { context: operationId });
       } catch (err) {
         log.error(`[${operationId}] Failed.`, {
           offeringId,
@@ -446,7 +446,7 @@ export function getOfferingApi(client: ApiClient) {
         };
         const responseData = await client.apiFetch<QueryResponseData<WholesalerOfferingLink>>(
           "/api/query",
-          { method: "POST", body: createPostBody(request) },
+          { method: "POST", body: createJsonBody(request) },
           { context: operationId },
         );
         log.info(`[${operationId}] Loaded ${responseData.results.length} links for offering ${offeringId}.`, responseData.results);
@@ -475,7 +475,7 @@ export function getOfferingApi(client: ApiClient) {
         };
         const responseData = await client.apiFetch<{
           link: WholesalerOfferingLink;
-        }>("/api/offering-links", { method: "POST", body: createPostBody(requestBody) }, { context: operationId });
+        }>("/api/offering-links", { method: "POST", body: createJsonBody(requestBody) }, { context: operationId });
         return responseData.link;
       } catch (err) {
         log.error(`[${operationId}] Failed.`, {
@@ -498,7 +498,7 @@ export function getOfferingApi(client: ApiClient) {
         const rb = { link_id: linkId, ...updates };
         const responseData = await client.apiFetch<{
           link: WholesalerOfferingLink;
-        }>(`/api/offering-links`, { method: "PUT", body: createPostBody(rb) }, { context: operationId });
+        }>(`/api/offering-links`, { method: "PUT", body: createJsonBody(rb) }, { context: operationId });
         return responseData.link;
       } catch (err) {
         log.error(`[${operationId}] Failed.`, {
@@ -525,7 +525,7 @@ export function getOfferingApi(client: ApiClient) {
         };
         return await client.apiFetchUnion<DeleteApiResponse<{ link_id: number; url: string }, string[]>>(
           "/api/offering-links",
-          { method: "DELETE", body: createPostBody(requestBody) },
+          { method: "DELETE", body: createJsonBody(requestBody) },
           { context: operationId },
         );
       } catch (err) {
@@ -583,7 +583,7 @@ export function getOfferingApi(client: ApiClient) {
         // This complex query is sent to the generic /api/query endpoint
         const responseData = await client.apiFetch<QueryResponseData<ProductDefinition>>(
           "/api/query",
-          { method: "POST", body: createQueryBody(payload) },
+          { method: "POST", body: createJsonAndWrapInPayload(payload) },
           { context: operationId },
         );
 

@@ -16,7 +16,7 @@ import {
   type WholesalerItemOffering_ProductDef_Category_Supplier,
 } from "$lib/domain/domainTypes";
 import type { ApiClient } from "./ApiClient";
-import { createPostBody, createQueryBody, getErrorMessage } from "./common";
+import { createJsonBody, createJsonAndWrapInPayload, getErrorMessage } from "./common";
 import type { PredefinedQueryRequest, QueryResponseData } from "$lib/api/api.types";
 import type { DeleteCategoryApiResponse } from "$lib/api/app/appSpecificTypes"; // CORRECTED IMPORT PATH
 import { LoadingState } from "./loadingState";
@@ -50,7 +50,7 @@ export function getCategoryApi(client: ApiClient) {
         };
         const responseData = await client.apiFetch<QueryResponseData<ProductCategory>>(
           "/api/categories",
-          { method: "POST", body: createQueryBody(fullQuery) },
+          { method: "POST", body: createJsonAndWrapInPayload(fullQuery) },
           { context: operationId },
         );
         return responseData.results as ProductCategory[];
@@ -113,7 +113,7 @@ export function getCategoryApi(client: ApiClient) {
       try {
         const responseData = await client.apiFetch<{ category: ProductCategory }>(
           "/api/categories/new",
-          { method: "POST", body: createPostBody(categoryData) },
+          { method: "POST", body: createJsonBody(categoryData) },
           { context: operationId },
         );
         return responseData.category;
@@ -134,7 +134,7 @@ export function getCategoryApi(client: ApiClient) {
       try {
         const responseData = await client.apiFetch<{ category: ProductCategory }>(
           `/api/categories/${categoryId}`,
-          { method: "PUT", body: createPostBody(updates) },
+          { method: "PUT", body: createJsonBody(updates) },
           { context: operationId },
         );
         return responseData.category;
@@ -154,7 +154,7 @@ export function getCategoryApi(client: ApiClient) {
       categoryLoadingManager.start(operationId);
       try {
         const url = `/api/categories/${categoryId}`;
-        const body = createPostBody({ cascade, forceCascade });
+        const body = createJsonBody({ cascade, forceCascade });
         return await client.apiFetchUnion<DeleteCategoryApiResponse>(url, { method: "DELETE", body }, { context: operationId });
       } finally {
         categoryLoadingManager.finish(operationId);
@@ -180,7 +180,7 @@ export function getCategoryApi(client: ApiClient) {
 
         const responseData = await client.apiFetch<QueryResponseData<ProductDefinition>>(
           "/api/product-definitions", // Nutzt den Standard-Endpunkt
-          { method: "POST", body: createQueryBody(query) },
+          { method: "POST", body: createJsonAndWrapInPayload(query) },
           { context: operationId },
         );
         return responseData.results as ProductDefinition[];
@@ -229,7 +229,7 @@ export function getCategoryApi(client: ApiClient) {
         // 6. Send the request to the generic query endpoint.
         const responseData = await client.apiFetch<QueryResponseData<Wholesaler>>(
           "/api/query",
-          { method: "POST", body: createPostBody(request) },
+          { method: "POST", body: createJsonBody(request) },
           { context: operationId },
         );
 
@@ -269,7 +269,7 @@ export function getCategoryApi(client: ApiClient) {
         };
         const responseData = await client.apiFetch<QueryResponseData<OfferingWithDetails>>(
           "/api/query",
-          { method: "POST", body: createPostBody(request) },
+          { method: "POST", body: createJsonBody(request) },
           { context: operationId },
         );
         return responseData.results as OfferingWithDetails[];

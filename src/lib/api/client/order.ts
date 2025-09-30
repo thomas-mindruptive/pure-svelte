@@ -9,10 +9,10 @@
 
 import { log } from "$lib/utils/logger";
 import { type QueryPayload, type SortDescriptor, type WhereConditionGroup } from "$lib/backendQueries/queryGrammar";
-import { type Order, type OrderItem_ProdDef_Category, OrderItem_ProdDef_Category_Schema } from "$lib/domain/domainTypes";
+import { type Order, type Order_Wholesaler, type OrderItem_ProdDef_Category, OrderItem_ProdDef_Category_Schema, OrderSchema } from "$lib/domain/domainTypes";
 
 import type { ApiClient } from "./ApiClient";
-import { createPostBody, createQueryBody, getErrorMessage } from "./common";
+import { createJsonBody, createJsonAndWrapInPayload, getErrorMessage } from "./common";
 import type { PredefinedQueryRequest, QueryResponseData } from "$lib/api/api.types";
 import type { DeleteSupplierApiResponse } from "$lib/api/app/appSpecificTypes";
 import { LoadingState } from "./loadingState";
@@ -26,8 +26,8 @@ export const orderLoadingOperations = orderLoadingManager;
 /**
  * The default query payload used when fetching a list.
  */
-const orderCols = genTypedQualifiedColumns(OrderItem_ProdDef_Category_Schema);
-export const DEFAULT_ORDER_QUERY: QueryPayload<OrderItem_ProdDef_Category> = {
+const orderCols = genTypedQualifiedColumns(OrderSchema);
+export const DEFAULT_ORDER_QUERY: QueryPayload<Order> = {
   from: {table: "dbo.orders", alias: "ord"},
   select: orderCols,
   orderBy: [{ key: "ord.order_date", direction: "desc" }],
@@ -46,18 +46,22 @@ export function getOrderApi(client: ApiClient) {
     /**
      * Load a list.
      */
-    async loadOrders(query: Partial<QueryPayload<OrderItem_ProdDef_Category>> = {}): Promise<OrderItem_ProdDef_Category[]> {
+    async loadOrders(query: Partial<QueryPayload<Order_Wholesaler>> = {}): Promise<Order_Wholesaler[]> {
       const operationId = "loadOrders";
       orderLoadingOperations.start(operationId);
       try {
-        const fullQuery: QueryPayload<OrderItem_ProdDef_Category> = { ...DEFAULT_ORDER_QUERY, ...query };
-        const responseData = await client.apiFetch<QueryResponseData<Order>>(
+        const queryPayload: QueryPayload<Order_Wholesaler> = { ...DEFAULT_ORDER_QUERY, ...query };
+        const predefQuery: PredefinedQueryRequest<Order_Wholesaler> = {
+          namedQuery: "order->wholesaler",
+          payload: queryPayload
+        };
+        const responseData = await client.apiFetch<QueryResponseData<Order_Wholesaler>>(
           "/api/query",
-          { method: "POST", body: createQueryBody(fullQuery) },
+          { method: "POST", body: createJsonBody(predefQuery) },
           { context: operationId },
         );
         log.info(`Load successful.`, responseData);
-        return responseData.results as OrderItem_ProdDef_Category[];
+        return responseData.results as Order_Wholesaler[];
       } catch (err) {
         log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
         throw err;
@@ -73,10 +77,10 @@ export function getOrderApi(client: ApiClient) {
      * @returns
      */
     async loadOrdersWithWhereAndOrder(
-      where: WhereConditionGroup<OrderItem_ProdDef_Category> | null,
-      orderBy: SortDescriptor<OrderItem_ProdDef_Category>[] | null,
-    ): Promise<OrderItem_ProdDef_Category[]> {
-      const queryPartial: Partial<QueryPayload<OrderItem_ProdDef_Category>> = {};
+      where: WhereConditionGroup<Order_Wholesaler> | null,
+      orderBy: SortDescriptor<Order_Wholesaler>[] | null,
+    ): Promise<Order_Wholesaler[]> {
+      const queryPartial: Partial<QueryPayload<Order_Wholesaler>> = {};
       if (where) {
         queryPartial.where = where;
       }
@@ -90,11 +94,11 @@ export function getOrderApi(client: ApiClient) {
     /**
      * Loads a single, complete supplier object by its ID.
      */
-    async loadOrder(orderId: number): Promise<Order> {
+    async loadOrder(orderId: number): Promise<Order_Wholesaler> {
       const operationId = `loadOrder-${orderId}`;
       orderLoadingOperations.start(operationId);
       try {
-        const responseData = await client.apiFetch<{ order: Order }>(`/api/orders/${orderId}`, { method: "GET" }, { context: operationId });
+        const responseData = await client.apiFetch<{ order: Order_Wholesaler }>(`/api/orders/${orderId}`, { method: "GET" }, { context: operationId });
         return responseData.order;
       } catch (err) {
         log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
@@ -113,7 +117,7 @@ export function getOrderApi(client: ApiClient) {
       try {
         const responseData = await client.apiFetch<{ order: Order }>(
           "/api/orders/new",
-          { method: "POST", body: createPostBody(orderData) },
+          { method: "POST", body: createJsonBody(orderData) },
           { context: operationId },
         );
         return responseData.order;
@@ -134,7 +138,7 @@ export function getOrderApi(client: ApiClient) {
       try {
         const responseData = await client.apiFetch<{ order: Order }>(
           `/api/orders/${orderId}`,
-          { method: "PUT", body: createPostBody(updates) },
+          { method: "PUT", body: createJsonBody(updates) },
           { context: operationId },
         );
         return responseData.order;
@@ -154,7 +158,7 @@ export function getOrderApi(client: ApiClient) {
       orderLoadingOperations.start(operationId);
       try {
         const url = `/api/oders/${orderId}`;
-        const body = createPostBody({ cascade, forceCascade });
+        const body = createJsonBody({ cascade, forceCascade });
         return await client.apiFetchUnion<DeleteSupplierApiResponse>(url, { method: "DELETE", body }, { context: operationId });
       } finally {
         orderLoadingOperations.finish(operationId);
@@ -181,7 +185,7 @@ export function getOrderApi(client: ApiClient) {
         };
         const responseData = await client.apiFetch<QueryResponseData<OrderItem_ProdDef_Category>>(
           "/api/query",
-          { method: "POST", body: createPostBody(request) },
+          { method: "POST", body: createJsonBody(request) },
           { context: operationId },
         );
         if (responseData.results?.length > 1) {

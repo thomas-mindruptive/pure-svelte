@@ -20,7 +20,7 @@
 
   // === PROPS ====================================================================================
 
-  export type SupplierFormProps = {
+  export type Props = {
     initial?: Order | undefined | null;
     isCreateMode: boolean;
     disabled?: boolean;
@@ -30,7 +30,7 @@
     onChanged?: ChangedCallback;
   };
 
-  const { initial, isCreateMode, disabled = false, onSubmitted, onSubmitError, onCancelled, onChanged }: SupplierFormProps = $props();
+  const { initial, isCreateMode, disabled = false, onSubmitted, onSubmitError, onCancelled, onChanged }: Props = $props();
 
   // === API ======================================================================================
 
@@ -92,7 +92,7 @@
         return await orderApi.createOrder(data);
       }
     } catch (e) {
-      log.error({ component: "SupplierForm", error: String(e) }, "SUBMIT_FAILED");
+      log.error({ component: "OrderForm", error: String(e) }, "SUBMIT_FAILED");
       throw e;
     }
   }

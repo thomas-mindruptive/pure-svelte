@@ -1,7 +1,7 @@
 <!-- OrderListPage.svelte -->
 
 <script lang="ts">
-  import type { Order, OrderItem_ProdDef_Category, OrderItem_ProdDef_Category_Schema, Wholesaler } from "$lib/domain/domainTypes";
+  import type { Order, OrderSchema, Wholesaler } from "$lib/domain/domainTypes";
   import { goto } from "$app/navigation";
   import { log } from "$lib/utils/logger";
 
@@ -19,11 +19,11 @@
 
   // === PROPS ====================================================================================
 
-  //let { data }: { data: { orders: Promise<OrderItem_ProdDef_Category[]> } } = $props();
+  const { data }: { data: { loadEventFetch: typeof fetch } } = $props();
 
   // === STATE ====================================================================================
 
-  let resolvedOrders = $state<OrderItem_ProdDef_Category[]>([]);
+  let resolvedOrders = $state<Order[]>([]);
   let isLoading = $state(true); // The component always starts in a loading state.
   let loadingOrValidationError = $state<{
     message: string;
@@ -33,7 +33,7 @@
 
   // === API ======================================================================================
 
-  const client = new ApiClient(fetch);
+  const client = new ApiClient(data.loadEventFetch);
   const orderApi = getOrderApi(client);
 
   // === LOAD =====================================================================================
@@ -130,9 +130,8 @@
 
   // === COLUMNS =====
 
-  const columns: ColumnDefBase<typeof OrderItem_ProdDef_Category_Schema>[] = [
+  const columns: ColumnDefBase<typeof OrderSchema>[] = [
     { key: "order_id", header: "Email", accessor: null, sortable: true },
-    { key: "pd.title", header: "Email", accessor: (p) => p.product_def.title, sortable: true },
   ];
 
   const getId = (r: Wholesaler) => r.wholesaler_id;

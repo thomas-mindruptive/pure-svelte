@@ -24,7 +24,7 @@ import {
 } from "$lib/domain/domainTypes";
 
 import type { ApiClient } from "./ApiClient";
-import { createPostBody, createQueryBody, getErrorMessage } from "./common";
+import { createJsonBody, createJsonAndWrapInPayload, getErrorMessage } from "./common";
 import type {
   PredefinedQueryRequest,
   QueryResponseData,
@@ -81,7 +81,7 @@ export function getSupplierApi(client: ApiClient) {
         const fullQuery: QueryPayload<Wholesaler> = { ...DEFAULT_SUPPLIER_QUERY, ...query };
         const responseData = await client.apiFetch<QueryResponseData<Wholesaler>>(
           "/api/suppliers",
-          { method: "POST", body: createQueryBody(fullQuery) },
+          { method: "POST", body: createJsonAndWrapInPayload(fullQuery) },
           { context: operationId },
         );
         log.info(`loadSuppliers: successful.`, responseData);
@@ -142,7 +142,7 @@ export function getSupplierApi(client: ApiClient) {
       try {
         const responseData = await client.apiFetch<{ supplier: Wholesaler }>(
           "/api/suppliers/new",
-          { method: "POST", body: createPostBody(supplierData) },
+          { method: "POST", body: createJsonBody(supplierData) },
           { context: operationId },
         );
         return responseData.supplier;
@@ -163,7 +163,7 @@ export function getSupplierApi(client: ApiClient) {
       try {
         const responseData = await client.apiFetch<{ supplier: Wholesaler }>(
           `/api/suppliers/${supplierId}`,
-          { method: "PUT", body: createPostBody(updates) },
+          { method: "PUT", body: createJsonBody(updates) },
           { context: operationId },
         );
         return responseData.supplier;
@@ -183,7 +183,7 @@ export function getSupplierApi(client: ApiClient) {
       supplierLoadingOperations.start(operationId);
       try {
         const url = `/api/suppliers/${supplierId}`;
-        const body = createPostBody({ cascade, forceCascade });
+        const body = createJsonBody({ cascade, forceCascade });
         return await client.apiFetchUnion<DeleteSupplierApiResponse>(url, { method: "DELETE", body }, { context: operationId });
       } finally {
         supplierLoadingOperations.finish(operationId);
@@ -212,7 +212,7 @@ export function getSupplierApi(client: ApiClient) {
         };
         const responseData = await client.apiFetch<QueryResponseData<WholesalerCategoryWithCount>>(
           "/api/query",
-          { method: "POST", body: createPostBody(request) },
+          { method: "POST", body: createJsonBody(request) },
           { context: operationId },
         );
         return responseData.results as WholesalerCategoryWithCount[];
@@ -247,7 +247,7 @@ export function getSupplierApi(client: ApiClient) {
         };
         const responseData = await client.apiFetch<QueryResponseData<WholesalerCategory_Category>>(
           "/api/query",
-          { method: "POST", body: createPostBody(request) },
+          { method: "POST", body: createJsonBody(request) },
           { context: operationId },
         );
         if (responseData.results?.length > 1) {
@@ -278,7 +278,7 @@ export function getSupplierApi(client: ApiClient) {
         };
         const responseData = await client.apiFetch<QueryResponseData<ProductCategory>>(
           "/api/categories",
-          { method: "POST", body: createQueryBody(query) },
+          { method: "POST", body: createJsonAndWrapInPayload(query) },
           { context: operationId },
         );
         return responseData.results as ProductCategory[];
@@ -333,7 +333,7 @@ export function getSupplierApi(client: ApiClient) {
         };
         const response = await client.apiFetch<AssignmentSuccessData<WholesalerCategory>>(
           "/api/supplier-categories",
-          { method: "POST", body: createPostBody(requestBody) },
+          { method: "POST", body: createJsonBody(requestBody) },
           { context: operationId },
         );
         return response;
@@ -365,7 +365,7 @@ export function getSupplierApi(client: ApiClient) {
         };
         return await client.apiFetchUnion<RemoveCategoryApiResponse>(
           "/api/supplier-categories",
-          { method: "DELETE", body: createPostBody(requestBody) },
+          { method: "DELETE", body: createJsonBody(requestBody) },
           { context: operationId },
         );
       } finally {

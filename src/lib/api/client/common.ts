@@ -7,7 +7,7 @@
  * of the client-side data fetching strategy.
  */
 
-import { type ValidationErrors, type QueryRequest } from '../api.types';
+import { type ValidationErrors, type QueryRequest, type PredefinedQueryRequest } from '../api.types';
 import type { QueryPayload } from '$lib/backendQueries/queryGrammar';
 
 /**
@@ -157,7 +157,7 @@ export interface ApiRequestOptions {
  * @param data The object to serialize.
  * @returns A JSON string representation of the data.
  */
-export function createPostBody(data: unknown): string {
+export function createJsonBody(data: unknown): string {
 	return JSON.stringify(data);
 }
 
@@ -168,7 +168,7 @@ export function createPostBody(data: unknown): string {
  * @param payload The `QueryPayload` defining the desired query.
  * @returns A JSON string representation of the `QueryRequest`.
  */
-export function createQueryBody<T>(payload: QueryPayload<T>): string {
+export function createJsonAndWrapInPayload<T>(payload: QueryPayload<T>): string {
 	const request: QueryRequest<T> = { payload };
 	return JSON.stringify(request);
 }

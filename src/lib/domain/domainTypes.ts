@@ -367,6 +367,7 @@ export type OrderStatus = z.infer<typeof OrderStatusSchema>;
 const OrderSchemaBase = z
   .object({
     order_id: z.number().int().positive(),
+    wholesaler_id: z.number().int().positive(),
     order_date: z.string(), // ISO date string
     order_number: z.string().max(100).nullable().optional(),
     status: OrderStatusSchema,
@@ -388,6 +389,12 @@ export const OrderForCreateSchema = OrderSchema.omit({
   created_at: true,
 }).describe("OrderForCreateSchema");
 copyMetaFrom(OrderSchema, OrderForCreateSchema);
+
+// ===== ORDER with joins =====
+
+export const Order_Wholesaler_Schema = OrderSchema.extend ({
+  wholesaler: WholesalerSchema
+})
 
 // ===== ORDER ITEM (dbo.order_items) =====
 
@@ -442,6 +449,7 @@ export type WholesalerOfferingAttribute_Attribute = z.infer<typeof WholesalerOff
 export type Material = z.infer<typeof MaterialSchema>;
 export type Form = z.infer<typeof FormSchema>;
 export type Order = z.infer<typeof OrderSchema>;
+export type Order_Wholesaler = z.infer<typeof Order_Wholesaler_Schema>;
 export type OrderItem = z.infer<typeof OrderItemSchema>;
 export type OrderItem_ProdDef_Category = z.infer<typeof OrderItem_ProdDef_Category_Schema>;
 

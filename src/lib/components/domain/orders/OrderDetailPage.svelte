@@ -20,44 +20,39 @@
     type WholesalerCategory,
     type Wholesaler,
     type Order,
-    OrderItem_ProdDef_Category,
+    type OrderItem_ProdDef_Category,
     OrderItem_ProdDef_Category_Schema,
     OrderSchema,
+    type Order_Wholesaler,
   } from "$lib/domain/domainTypes";
   import { z } from "zod";
   import { categoryLoadingState } from "$lib/api/client/category";
   import { ApiClient } from "$lib/api/client/ApiClient";
   import type { ID, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
 
-  // Schemas
-  import {
-    SupplierDetailPage_LoadDataSchema,
-    type SupplierDetailPage_LoadData,
-    type SupplierDetailPage_LoadDataAsync,
-  } from "$lib/components/domain/suppliers/supplierDetailPage.types";
   import { assertDefined } from "$lib/utils/assertions";
-  import { cascadeDeleteAssignments, type CompositeID } from "$lib/api/client/cascadeDelete";
+  import { cascadeDelete, cascadeDeleteAssignments, type CompositeID } from "$lib/api/client/cascadeDelete";
   import { stringsToNumbers } from "$lib/utils/typeConversions";
-  import { getOrderApi } from "$lib/api/client/order";
+  import { getOrderApi, orderLoadingState } from "$lib/api/client/order";
   import { error } from "@sveltejs/kit";
+    import { page } from "$app/state";
+    import OrderForm from "./OrderForm.svelte";
 
   // === PROPS ====================================================================================
 
-  let { data }: { data: { orderId: string | null; isCreateMode: boolean } } = $props();
+  let { data }: { data: { orderId: number; isCreateMode: boolean; loadEventFetch: typeof fetch } } = $props();
 
   // === STATE ====================================================================================
 
-  let resolvedData = $state<SupplierDetailPage_LoadData | null>(null);
   let order = $state<Order | null>(null);
   let orderItems = $state<OrderItem_ProdDef_Category[] | null>(null);
   let isLoading = $state(true);
   let loadingError = $state<{ message: string; status?: number } | null>(null);
-  const isCreateMode = $derived(!resolvedData?.supplier);
   const allowForceCascadingDelte = $state(true);
 
   // === API =====================================================================================
 
-  const client = new ApiClient(fetch);
+  const client = new ApiClient(data.loadEventFetch);
   const orderApi = getOrderApi(client);
 
   // === LOAD =====================================================================================
@@ -70,34 +65,19 @@
       // 1. Reset state for each new load.
       isLoading = true;
       loadingError = null;
-      resolvedData = null;
 
       try {
-        const orderId = Number(data.orderId);
-
-        if (isNaN(orderId) && data.orderId?.toLowerCase() !== "new") {
-          throw error(400, `OrderDetailPage: Invalid Order ID - ${data.orderId} `);
-        }
-
-        if (isCreateMode) {
-          [order, orderItems] = await Promise.all([orderApi.loadOrder(orderId), orderApi.loadOrderItemsForOrder(orderId)]);
+        if (data.isCreateMode) {
+          [order, orderItems] = await Promise.all([orderApi.loadOrder(data.orderId), orderApi.loadOrderItemsForOrder(data.orderId)]);
           const orderValidationResult = OrderSchema.safeParse(order);
           const orderItemsValidationResult = z.array(OrderItem_ProdDef_Category_Schema).safeParse(orderItems);
+          if (!(orderValidationResult.success && orderItemsValidationResult)) {
+            const msg = `Validation failed: ${JSON.stringify(orderValidationResult.error?.issues, null, 4)},\n${JSON.stringify(orderItemsValidationResult.error?.issues, null, 4)}`;
+            log.error(msg);
+            throw error(500, msg);
+          }
         }
-
         if (aborted) return;
-
-        // 4. Validate the resolved data against the Zod schema.
-        const validationResult = SupplierDetailPage_LoadDataSchema.safeParse(dataToValidate);
-
-        if (!validationResult.success) {
-          log.error("Zod validation failed", validationResult.error.issues);
-          // Treat a validation failure as a loading error.
-          throw new Error("SupplierDetailPage: Received invalid data structure from the API.");
-        }
-
-        // 5. On success, populate the state with the validated, resolved data.
-        resolvedData = validationResult.data;
       } catch (rawError: any) {
         if (aborted) return;
         const status = rawError.status ?? 500;
@@ -124,7 +104,7 @@
   async function handleFormSubmitted(info: { data: Wholesaler; result: unknown }) {
     addNotification(`Supplier saved successfully.`, "success");
 
-    if (isCreateMode) {
+    if (data.isCreateMode) {
       log.info("Submit successful in CREATE mode. Navigating to edit page...");
 
       // Get the new ID from the event data.
@@ -170,153 +150,50 @@
   /**
    * Reload categories and set them into the state.
    */
-  async function reloadCategories() {
-    assertDefined(resolvedData, "reloadCategories: Supplier must be loaded/available", ["supplier"]);
-
-    const supplierId = resolvedData.supplier?.wholesaler_id;
-
-    log.info("Re-fetching category lists after assignment...");
-    const [updatedAssigned, updatedAvailable] = await Promise.all([
-      orderApi.loadCategoriesForSupplier(supplierId),
-      orderApi.loadAvailableCategoriesForSupplier(supplierId),
-    ]);
-    resolvedData.assignedCategories = updatedAssigned;
-    resolvedData.availableCategories = updatedAvailable;
-    log.info("Local state updated. UI will refresh seamlessly.");
+  async function reloadOrderItems() {
+    assertDefined(order, "order");
+    log.info("Re-fetching order items ...");
+    orderItems = await  orderApi.loadOrderItemsForOrder(order.order_id),
+    log.info("Local state updated.");
   }
 
   // ===== BUSINESS LOGIC =====
 
-  /**
-   * Handles the assignment of a new category.
-   */
-  async function assignCategory(category: ProductCategory, comment?: string, link?: string) {
-    if (!resolvedData) return;
-    const supplierId = resolvedData.supplier?.wholesaler_id;
-
-    if (!supplierId) {
-      log.error("Cannot assign category in create mode.");
-      addNotification("Cannot assign category in create mode.", "error");
-      return;
-    }
-    try {
-      const wholesalerCategory: Omit<WholesalerCategory, "wholesaler_id"> = {
-        category_id: category.category_id,
-        ...(comment !== undefined ? { comment } : {}),
-        ...(link !== undefined ? { link } : {}),
-      };
-      await orderApi.assignCategoryToSupplier(supplierId, wholesalerCategory);
-      addNotification(`Category "${category.name}" assigned successfully.`, "success");
-
-      // await!
-      await reloadCategories();
-    } catch (error) {
-      log.error(`Failed to assign category`, {
-        supplierId,
-        error,
-      });
-      addNotification("Failed to assign category.", "error");
-    }
-  }
-
-  async function handleCategoryDelete(ids: ID[]): Promise<void> {
-    log.info(`Deleting categories`, { ids });
+  async function handleOrdersDelete(ids: ID[]): Promise<void> {
+    log.info(`Deleting orders`, { ids });
     let dataChanged = false;
 
     const idsAsNumber = stringsToNumbers(ids);
-    const compositeIds: CompositeID[] = idsAsNumber.map((id) => ({
-      parent1Id: resolvedData!.supplier!.wholesaler_id,
-      parent2Id: id,
-    }));
-    dataChanged = await cascadeDeleteAssignments(
-      compositeIds,
-      orderApi.removeCategoryFromSupplier,
+    dataChanged = await cascadeDelete(
+      idsAsNumber,
+      orderApi.deleteOrder,
       {
-        domainObjectName: "Category",
-        hardDepInfo: "Category has hard dependencies. Delete?",
-        softDepInfo: "Category has soft dependencies. Delete?",
+        domainObjectName: "Order",
+        hardDepInfo: "Has hard dependencies. Delete?",
+        softDepInfo: "Has has soft dependencies. Delete?",
       },
       allowForceCascadingDelte,
     );
 
     if (dataChanged) {
       // Reload and change state.
-      reloadCategories();
+      reloadOrderItems();
     }
   }
 
   /**
-   * Executes the deletion process for category assignments.
-   */
-  // async function handleCategoryDelete_old(ids: ID[]): Promise<void> {
-  //   if (!resolvedData?.supplier) {
-  //     const msg = "Cannot delete catagory in create mode or when supplier not yet loaded.";
-  //     addNotification(msg, "error");
-  //     throw new Error(msg);
-  //   }
-
-  //   // The logic for this function remains complex and is unchanged.
-  //   // It correctly uses the client-side API.
-  //   let dataChanged = false;
-  //   for (const id of ids) {
-  //     const [supplierIdStr, categoryIdStr] = String(id).split("-");
-  //     const supplierId = Number(supplierIdStr);
-  //     const categoryId = Number(categoryIdStr);
-  //     if (isNaN(supplierId) || isNaN(categoryId)) continue;
-
-  //     const initialResult = await supplierApi.removeCategoryFromSupplier({
-  //       supplierId,
-  //       categoryId,
-  //       cascade: false,
-  //     });
-
-  //     if (initialResult.success) {
-  //       addNotification(`Category assignment removed.`, "success");
-  //       dataChanged = true;
-  //     } else if ("cascade_available" in initialResult && initialResult.cascade_available) {
-  //       const offeringCount = (initialResult.dependencies as any)?.offering_count ?? 0;
-  //       const confirmed = await requestConfirmation(
-  //         `This category has ${offeringCount} offerings for this supplier. Remove the assignment and all these offerings?`,
-  //         "Confirm Cascade Delete",
-  //       );
-  //       if (confirmed.confirmed) {
-  //         const cascadeResult = await supplierApi.removeCategoryFromSupplier({
-  //           supplierId,
-  //           categoryId,
-  //           cascade: true,
-  //         });
-  //         if (cascadeResult.success) {
-  //           addNotification("Category assignment and its offerings removed.", "success");
-  //           dataChanged = true;
-  //         } else {
-  //           addNotification(cascadeResult.message || "Failed to remove assignment.", "error");
-  //         }
-  //       }
-  //     } else {
-  //       addNotification(initialResult.message || "Could not remove assignment.", "error");
-  //     }
-  //   }
-
-  //   if (dataChanged) {
-  //     goto(`/suppliers/${resolvedData.supplier.wholesaler_id}`, {
-  //       invalidateAll: true,
-  //     });
-  //   }
-  // }
-
-  /**
    * Navigates to the next hierarchy level (offerings for a category).
    */
-  function handleCategorySelect(category: WholesalerCategory_Category) {
-    goto(`/suppliers/${category.wholesaler_id}/categories/${category.category_id}`);
+  function handleOrderItemSelect(order: Order_Wholesaler) {
+    goto(`${page.url.pathname}/oderitems/${order.order_id}`);
   }
 
   // Strategy objects for the CategoryGrid component.
-  const deleteStrategy: DeleteStrategy<WholesalerCategory_Category> = {
-    execute: handleCategoryDelete,
+  const deleteStrategy: DeleteStrategy<Order_Wholesaler> = {
+    execute: handleOrdersDelete,
   };
-  const rowActionStrategy: RowActionStrategy<WholesalerCategory_Category> = {
-    click: handleCategorySelect,
+  const rowActionStrategy: RowActionStrategy<Order_Wholesaler> = {
+    click: handleOrderItemSelect,
   };
 </script>
 
@@ -326,16 +203,17 @@
     <h3>Error Loading Supplier (Status: {loadingError.status})</h3>
     <p>{loadingError.message}</p>
   </div>
-{:else if isLoading || !resolvedData}
-  <div class="detail-page-layout">Loading supplier details...</div>
+{:else if isLoading || !order}
+  <div class="detail-page-layout">Loading details...</div>
 {:else}
   <!-- The main UI is only rendered on success, using the `resolvedData` state. -->
   <div class="detail-page-layout">
     <!-- Section 1: Supplier details form -->
     <div class="form-section">
-      <SupplierForm
-        initial={resolvedData.supplier}
-        disabled={$supplierLoadingState}
+      <OrderForm
+        isCreateMode={data.isCreateMode}
+        initial={order}
+        disabled={$orderLoadingState}
         onSubmitted={handleFormSubmitted}
         onCancelled={handleFormCancelled}
         onSubmitError={handleFormSubmitError}
@@ -343,27 +221,11 @@
       />
     </div>
 
-    <!-- Section 2: Assign new categories -->
-    <div class="assignment-section">
-      {#if resolvedData.supplier}
-        <CategoryAssignment
-          supplierId={resolvedData.supplier.wholesaler_id}
-          availableCategories={resolvedData.availableCategories}
-          loading={$categoryLoadingState}
-          assignCbk={assignCategory}
-          onError={(msg) => addNotification(msg, "error")}
-        />
-      {:else}
-        <p>Category assignment selection will be available after supplier has been saved.</p>
-      {/if}
-    </div>
-
     <!-- Section 3: Grid of assigned categories -->
 
     <div class="grid-section">
-      {#if resolvedData.supplier}
-        <h2>Assigned Categories</h2>
-        <p>Products this supplier can offer are organized by these categories. Click a category to manage its product offerings.</p>
+      {#if order}
+        <h2>Order Items</h2>
         <SupplierCategoriesGrid
           rows={resolvedData.assignedCategories}
           loading={$categoryLoadingState}
@@ -371,7 +233,7 @@
           {rowActionStrategy}
         />
       {:else}
-        <p>Assigned categories will be available after supplier has been saved.</p>
+        <p>Order items will be available after supplier has been saved.</p>
       {/if}
     </div>
   </div>

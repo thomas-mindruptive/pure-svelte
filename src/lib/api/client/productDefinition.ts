@@ -10,7 +10,7 @@ import { log } from "$lib/utils/logger";
 import { type QueryPayload } from "$lib/backendQueries/queryGrammar";
 import { WholesalerItemOffering_ProductDef_Category_SupplierSchema, type ProductDefinition, type WholesalerItemOffering_ProductDef_Category_Supplier } from "$lib/domain/domainTypes";
 import type { ApiClient } from "./ApiClient";
-import { createPostBody, createQueryBody, getErrorMessage } from "./common";
+import { createJsonBody, createJsonAndWrapInPayload, getErrorMessage } from "./common";
 import type { DeleteApiResponse, DeleteRequest, PredefinedQueryRequest, QueryResponseData } from "$lib/api/api.types";
 import { LoadingState } from "./loadingState";
 import { genTypedQualifiedColumns } from "$lib/domain/domainTypes.utils";
@@ -49,7 +49,7 @@ export function getProductDefinitionApi(client: ApiClient) {
         };
         const responseData = await client.apiFetch<QueryResponseData<ProductDefinition>>(
           "/api/product-definitions",
-          { method: "POST", body: createQueryBody(fullQuery) },
+          { method: "POST", body: createJsonAndWrapInPayload(fullQuery) },
           { context: operationId },
         );
         return responseData.results as ProductDefinition[];
@@ -91,7 +91,7 @@ export function getProductDefinitionApi(client: ApiClient) {
       try {
         const responseData = await client.apiFetch<{ productDefinition: ProductDefinition }>(
           "/api/product-definitions/new",
-          { method: "POST", body: createPostBody(productDefData) },
+          { method: "POST", body: createJsonBody(productDefData) },
           { context: operationId },
         );
         return responseData.productDefinition;
@@ -112,7 +112,7 @@ export function getProductDefinitionApi(client: ApiClient) {
       try {
         const responseData = await client.apiFetch<{ productDefinition: ProductDefinition }>(
           `/api/product-definitions/${productDefId}`,
-          { method: "PUT", body: createPostBody(updates) },
+          { method: "PUT", body: createJsonBody(updates) },
           { context: operationId },
         );
         return responseData.productDefinition;
@@ -142,7 +142,7 @@ export function getProductDefinitionApi(client: ApiClient) {
           cascade,
           forceCascade
         };
-        const body = createPostBody(removeRequest);
+        const body = createJsonBody(removeRequest);
 
         const url = `/api/product-definitions/${productDefId}`;
         return await client.apiFetchUnion<DeleteApiResponse<Pick<ProductDefinition, "product_def_id" | "title">, string[]>>(
@@ -187,7 +187,7 @@ export function getProductDefinitionApi(client: ApiClient) {
 
         const responseData = await client.apiFetch<QueryResponseData<WholesalerItemOffering_ProductDef_Category_Supplier>>(
           "/api/query",
-          { method: "POST", body: createPostBody(request) },
+          { method: "POST", body: createJsonBody(request) },
           { context: operationId },
         );
         return responseData.results as WholesalerItemOffering_ProductDef_Category_Supplier[];

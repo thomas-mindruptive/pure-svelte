@@ -9,7 +9,8 @@
    * => There is no advantage, quite the oopisite:
    * We would have to maintain an indirection (= +page.ts).
    */
-  import SupplierListPage from "$lib/components/domain/orders/OrderListPage.svelte";
+  import OrderListPage from "$lib/components/domain/orders/OrderListPage.svelte";
+  const { data } = $props();
 </script>
 
-<SupplierListPage />
+<OrderListPage {data} />

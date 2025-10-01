@@ -1,7 +1,10 @@
-<script lang="ts">
+<script
+  lang="ts"
+  generics="T"
+>
   import FormShell from "$lib/components/forms/FormShell.svelte";
   import { log } from "$lib/utils/logger";
-  import { OrderSchema, type Order, type Wholesaler } from "$lib/domain/domainTypes";
+  import { OrderSchema, type Order, type Order_Wholesaler, type Wholesaler } from "$lib/domain/domainTypes";
   import "$lib/components/styles/form.css";
   import "$lib/components/styles/grid.css";
   import { ApiClient } from "$lib/api/client/ApiClient";
@@ -15,7 +18,7 @@
   import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
   import { assertDefined } from "$lib/utils/assertions";
   import { getOrderApi } from "$lib/api/client/order";
-    import { formatDateForInput, formatDateForApi } from "$lib/utils/formatUtils";
+  import { formatDateForInput, formatDateForApi } from "$lib/utils/formatUtils";
 
   type ValidationErrors = Record<string, string[]>;
 
@@ -25,6 +28,8 @@
     initial?: Order | undefined | null;
     isCreateMode: boolean;
     availableWholesalers: Wholesaler[];
+    isOrdersRoute: boolean;
+    isSuppliersRoute: boolean;
     disabled?: boolean;
     onSubmitted?: SubmittedCallback;
     onSubmitError?: SubmitErrorCallback;
@@ -32,7 +37,28 @@
     onChanged?: ChangedCallback;
   };
 
-  const { initial, isCreateMode, availableWholesalers, disabled = false, onSubmitted, onSubmitError, onCancelled, onChanged }: Props = $props();
+  const allProps: Props = $props();
+
+  const {
+    initial,
+    isCreateMode,
+    availableWholesalers,
+    isOrdersRoute,
+    isSuppliersRoute,
+    disabled = false,
+    onSubmitted,
+    onSubmitError,
+    onCancelled,
+    onChanged,
+  } = allProps;
+  // Silence tsc:
+  isSuppliersRoute;
+
+  // === LOG ======================================================================================
+
+  $effect(() => {
+    log.debug(`Props: `, allProps);
+  });
 
   // === DEFAULTS =================================================================================
 
@@ -41,7 +67,7 @@
     const base = initial || {};
     return {
       ...base,
-      status: base.status ?? "pending",
+      status: (base as Order_Wholesaler).status ?? "pending",
     } as Order;
   });
 
@@ -93,8 +119,6 @@
 
   // ===== HELPERS =====
 
-
-
   // ===== FORM CALLBACKS =====
 
   async function submitOrder(raw: Record<string, any>) {
@@ -134,7 +158,7 @@
 <ValidationWrapper errors={schemaValidationErrors}>
   <FormShell
     entity="Order"
-    initial={initialWithDefaults as Order}
+    initial={initialWithDefaults as Order_Wholesaler}
     validate={validateOrder}
     autoValidate="change"
     submitCbk={submitOrder}
@@ -149,7 +173,7 @@
       ========================================================================================== -->
 
     {#snippet header({ data, dirty })}
-      {@const order = data as Order}
+      {@const order = data as Order_Wholesaler}
       <div class="form-header">
         <div>
           {#if isCreateMode}
@@ -171,9 +195,8 @@
       -- Fields 
       ========================================================================================== -->
 
-    {#snippet fields({ getS, set, errors, markTouched })}
+    {#snippet fields({ getS, get, set, errors, markTouched })}
       <div class="form-body">
-
         <!-- ================================================================================
           == BASIC ORDER INFORMATION
           ================================================================================ -->
@@ -199,24 +222,34 @@
           </div>
 
           <!-- Wholesaler/Supplier -->
+
           <div class="form-group">
             <label for="wholesaler">Supplier *</label>
-            <select
-              id="wholesaler"
-              name="wholesaler_id"
-              value={getS("wholesaler_id") ?? ""}
-              class:invalid={errors.wholesaler_id}
-              onchange={(e) => set(["wholesaler_id"], parseInt((e.currentTarget as HTMLSelectElement).value))}
-              onblur={() => markTouched("wholesaler_id")}
-              required
-            >
-              <option value="">Select supplier...</option>
-              {#each availableWholesalers as wholesaler (wholesaler.wholesaler_id)}
-                <option value={wholesaler.wholesaler_id}>{wholesaler.name}</option>
-              {/each}
-            </select>
-            {#if errors.wholesaler_id}
-              <div class="error-text">{errors.wholesaler_id[0]}</div>
+            {#if isOrdersRoute}
+              <select
+                id="wholesaler"
+                name="wholesaler_id"
+                value={getS("wholesaler_id") ?? ""}
+                class:invalid={errors.wholesaler_id}
+                onchange={(e) => set(["wholesaler_id"], parseInt((e.currentTarget as HTMLSelectElement).value))}
+                onblur={() => markTouched("wholesaler_id")}
+                required
+              >
+                <option value="">Select supplier...</option>
+                {#each availableWholesalers as wholesaler (wholesaler.wholesaler_id)}
+                  <option value={wholesaler.wholesaler_id}>{wholesaler.name}</option>
+                {/each}
+              </select>
+              {#if errors.wholesaler_id}
+                <div class="error-text">{errors.wholesaler_id[0]}</div>
+              {/if}
+            {:else}
+              <input
+                id="wholesaler"
+                type="text"
+                disabled
+                value={get(["wholesaler", "name"])}
+              />
             {/if}
           </div>
 

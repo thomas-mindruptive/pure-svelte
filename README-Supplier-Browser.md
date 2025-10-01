@@ -804,6 +804,154 @@ When implementing a new entity (e.g., Orders), follow this comprehensive checkli
 
 ---
 
+## Critical Bugs to Avoid - Lessons Learned
+
+This section documents **actual bugs** that occurred during development. Each entry includes the bug, its impact, and the correct pattern.
+
+### Bug #1: Off-by-One Error in Array Length Checks
+
+**The Bug:**
+```typescript
+// ❌ WRONG - Returns empty array when exactly 1 item exists
+if (responseData.results?.length > 1) {
+  return transformToNestedObjects(responseData.results, Schema);
+} else {
+  return [];
+}
+```
+
+**Impact:**
+- First OrderItem created for an Order would not appear in the list
+- Any single-item result would be lost
+- Silent data loss - no error thrown
+
+**Root Cause:** Copied code from a "warn if multiple" pattern and used `> 1` instead of `> 0`
+
+**Correct Pattern:**
+```typescript
+// ✅ CORRECT - Handles 0, 1, or many items
+if (responseData.results && responseData.results.length > 0) {
+  return transformToNestedObjects(responseData.results, Schema);
+} else {
+  return [];
+}
+
+// Mental checklist for array operations:
+// ✓ What happens with 0 elements?
+// ✓ What happens with 1 element?
+// ✓ What happens with 2+ elements?
+```
+
+**Where it occurred:** `src/lib/api/client/order.ts:197` (fixed)
+
+**Detection:** User reported that new OrderItems didn't appear after creation
+
+---
+
+### Bug #2: Missing autoValidate in Forms
+
+**The Bug:**
+```typescript
+// ❌ WRONG - FormShell defaults to autoValidate="submit"
+<FormShell
+  entity="Order"
+  initial={initial}
+  submitCbk={submitOrder}
+  {disabled}
+>
+```
+
+**Impact:**
+- HTML5 validation errors don't clear when user fixes the input
+- User sees stale "Please select..." messages even after selecting a value
+- Poor UX - user thinks form is broken
+
+**Root Cause:** Forgot to set `autoValidate` prop, relying on default behavior
+
+**Correct Pattern:**
+```typescript
+// ✅ CORRECT - Explicitly set validation mode
+<FormShell
+  entity="Order"
+  initial={initial}
+  autoValidate="change"  // or "blur" depending on UX preference
+  submitCbk={submitOrder}
+  {disabled}
+>
+
+// Choose validation mode:
+// - "submit": Validate only on form submission (default)
+// - "blur": Validate when field loses focus (good UX for most forms)
+// - "change": Validate on every input change (immediate feedback, can be noisy)
+```
+
+**Where it occurred:** `OrderForm.svelte`, `OrderItemForm.svelte` (fixed)
+
+**Detection:** User noticed validation messages didn't update after fixing input
+
+---
+
+### Bug #3: UI Defaults Not Applied to Form Data
+
+**The Bug:**
+```typescript
+// ❌ WRONG - Default only affects display, not actual data
+<select value={getS("status") ?? "pending"}>
+  <option value="pending">Pending</option>
+</select>
+
+// formState.data.status remains undefined/null!
+```
+
+**Impact:**
+- Form shows "Pending" but submits `null` for status
+- Database constraint violations or unexpected behavior
+- Mismatch between UI and actual data
+
+**Root Cause:** Misunderstanding - `?? "pending"` is just a display fallback, doesn't set the value in FormShell state
+
+**Correct Pattern:**
+```typescript
+// ✅ CORRECT - Apply defaults BEFORE passing to FormShell
+const initialWithDefaults = $derived.by(() => {
+  const base = initial || {};
+  return {
+    ...base,
+    status: base.status ?? "pending",  // Set actual default value
+  } as Order;
+});
+
+<FormShell initial={initialWithDefaults} ... />
+```
+
+**Where it occurred:** `OrderForm.svelte` (fixed)
+
+**Detection:** FormShell debug block showed `status: null` despite dropdown showing "Pending"
+
+---
+
+### Prevention Checklist for New Code
+
+When writing new API client methods:
+- [ ] Test with 0 results
+- [ ] Test with exactly 1 result
+- [ ] Test with multiple results
+- [ ] Add explicit comments for edge cases
+
+When creating new forms:
+- [ ] Set `autoValidate` explicitly
+- [ ] Apply defaults in `$derived.by` before FormShell
+- [ ] Test create mode with empty initial data
+- [ ] Verify FormShell debug shows expected values
+
+When using array operations:
+- [ ] Ask: "What if the array is empty?"
+- [ ] Ask: "What if there's exactly one element?"
+- [ ] Use `length > 0` for "any items", not `length > 1`
+- [ ] Use `length === 1` for "exactly one", not `length > 0`
+
+---
+
 ## Implementation Pitfalls & Best Practices
 
 ### ApiClient: Handling the Response Body

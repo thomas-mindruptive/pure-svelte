@@ -3,26 +3,26 @@
   import { goto } from "$app/navigation";
   import { addNotification } from "$lib/stores/notifications";
   import { log } from "$lib/utils/logger";
-  // Component Imports
+// Component Imports
   import "$lib/components/styles/assignment-section.css";
   import "$lib/components/styles/detail-page-layout.css";
   import "$lib/components/styles/grid-section.css";
-  // API & Type Imports
+// API & Type Imports
   import { ApiClient } from "$lib/api/client/ApiClient";
   import type { ColumnDefBase, DeleteStrategy, ID, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
   import {
-    OrderItem_ProdDef_Category_Schema,
-    OrderSchema,
-    WholesalerSchema,
-    type Order,
-    type Order_Wholesaler,
-    type OrderItem_ProdDef_Category,
-    type Wholesaler,
+      OrderItem_ProdDef_Category_Schema,
+      OrderSchema,
+      WholesalerSchema,
+      type Order,
+      type OrderItem_ProdDef_Category,
+      type Wholesaler
   } from "$lib/domain/domainTypes";
 
   import { page } from "$app/state";
   import { cascadeDelete } from "$lib/api/client/cascadeDelete";
   import { getOrderApi, orderLoadingState } from "$lib/api/client/order";
+  import { getOrderItemApi } from "$lib/api/client/orderItem";
   import { getSupplierApi } from "$lib/api/client/supplier";
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
   import { safeParseFirstN, toErrorRecord, type ValErrorRecord } from "$lib/domain/domainTypes.utils";
@@ -61,6 +61,7 @@
 
   const client = new ApiClient(data.loadEventFetch);
   const orderApi = getOrderApi(client);
+  const orderItemApi = getOrderItemApi(client);
   const supplierApi = getSupplierApi(client);
 
   // === LOAD =====================================================================================
@@ -187,18 +188,18 @@
     goto(`${page.url.pathname}/orderitems/new`);
   }
 
-  async function handleOrdersDelete(ids: ID[]): Promise<void> {
-    log.info(`Deleting orders`, { ids });
+  async function handleOrderItemsDelete(ids: ID[]): Promise<void> {
+    log.info(`Deleting order items`, { ids });
     let dataChanged = false;
 
     const idsAsNumber = stringsToNumbers(ids);
     dataChanged = await cascadeDelete(
       idsAsNumber,
-      orderApi.deleteOrder,
+      orderItemApi.deleteOrderItem,
       {
-        domainObjectName: "Order",
+        domainObjectName: "OrderItem",
         hardDepInfo: "Has hard dependencies. Delete?",
-        softDepInfo: "Has has soft dependencies. Delete?",
+        softDepInfo: "Has soft dependencies. Delete?",
       },
       allowForceCascadingDelte,
     );
@@ -223,18 +224,18 @@
     { key: "wio.price", header: "Price", accessor: (orderItem) => orderItem.offering.price, sortable: true },
     { key: "wio.comment", header: "Comment", accessor: (orderItem) => orderItem.offering.comment, sortable: true },
     { key: "wio.size", header: "Size", accessor: (orderItem) => orderItem.offering.size, sortable: true },
-    { key: "wio.dimensions", header: "Size", accessor: (orderItem) => orderItem.offering.dimensions, sortable: true },
+    { key: "wio.dimensions", header: "Dimensions", accessor: (orderItem) => orderItem.offering.dimensions, sortable: true },
   ];
 
-  const getId = (r: Wholesaler) => r.wholesaler_id;
+  const getId = (r: OrderItem_ProdDef_Category) => r.order_item_id;
 
   // === DATAGRID STRATEGIES =====
 
-  // Strategy objects for the CategoryGrid component.
-  const deleteStrategy: DeleteStrategy<Order_Wholesaler> = {
-    execute: handleOrdersDelete,
+  // Strategy objects for the OrderItem grid.
+  const deleteStrategy: DeleteStrategy<OrderItem_ProdDef_Category> = {
+    execute: handleOrderItemsDelete,
   };
-  const rowActionStrategy: RowActionStrategy<Order_Wholesaler> = {
+  const rowActionStrategy: RowActionStrategy<OrderItem_ProdDef_Category> = {
     click: handleOrderItemSelect,
   };
 </script>
@@ -283,11 +284,10 @@
             {columns}
             {getId}
             loading={isLoading || $orderLoadingState}
-            gridId="wholesalers"
-            entity="wholesaler"
+            gridId="orderItems"
+            entity="orderItem"
             {deleteStrategy}
             {rowActionStrategy}
-            apiLoadFunc={orderApi.loadOrdersWithWhereAndOrder}
             maxBodyHeight="550px"
           />
         </div>

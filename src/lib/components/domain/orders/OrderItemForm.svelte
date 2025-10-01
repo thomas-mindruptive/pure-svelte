@@ -5,7 +5,7 @@
     OrderItemSchema,
     type Order,
     type OrderItem,
-    type WholesalerItemOffering_ProductDef_Category_Supplier,
+    type WholesalerItemOffering_ProductDef_Category_Supplier_Nested,
   } from "$lib/domain/domainTypes";
   import "$lib/components/styles/form.css";
   import "$lib/components/styles/grid.css";
@@ -29,7 +29,7 @@
     initial?: OrderItem | undefined | null;
     isCreateMode: boolean;
     order: Order;
-    availableOfferings: WholesalerItemOffering_ProductDef_Category_Supplier[];
+    availableOfferings: WholesalerItemOffering_ProductDef_Category_Supplier_Nested[];
     disabled?: boolean;
     onSubmitted?: SubmittedCallback;
     onSubmitError?: SubmitErrorCallback;
@@ -178,7 +178,6 @@
               onchange={(e) => {
                 const offeringId = parseInt((e.currentTarget as HTMLSelectElement).value);
                 set(["offering_id"], offeringId);
-                // TODO: Change to nested schema like OrderItem_ProdDef_Category and recordSetTransformer
                 // Find the offering and auto-fill unit_price
                 const offering = availableOfferings.find(o => o.offering_id === offeringId);
                 if (offering?.price) {
@@ -189,10 +188,9 @@
               required
             >
               <option value="">Select offering...</option>
-              <!-- TODO: Change to nested schema like OrderItem_ProdDef_Category and recordSetTransformer -->
               {#each availableOfferings as offeringDetail (offeringDetail.offering_id)}
                 <option value={offeringDetail.offering_id}>
-                  {offeringDetail.category_name} - {offeringDetail.product_def_title}
+                  {offeringDetail.category.name} - {offeringDetail.product_def.title}
                   {#if offeringDetail.size}({offeringDetail.size}){/if}
                   - €{offeringDetail.price}
                 </option>

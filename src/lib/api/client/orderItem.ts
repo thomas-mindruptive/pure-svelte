@@ -15,7 +15,7 @@ import {
 } from "$lib/domain/domainTypes";
 import { log } from "$lib/utils/logger";
 
-import type { PredefinedQueryRequest, QueryResponseData } from "$lib/api/api.types";
+import type { DeleteApiResponse, PredefinedQueryRequest, QueryResponseData } from "$lib/api/api.types";
 import { transformToNestedObjects } from "$lib/backendQueries/recordsetTransformer";
 import type { ApiClient } from "./ApiClient";
 import { createJsonBody, getErrorMessage } from "./common";
@@ -122,12 +122,13 @@ export function getOrderItemApi(client: ApiClient) {
     /**
      * Deletes an order item.
      */
-    async deleteOrderItem(orderItemId: number): Promise<{ success: boolean }> {
+    async deleteOrderItem(orderItemId: number, cascade = false, forceCascade = false): Promise<DeleteApiResponse<{ order_item_id: number }, string[]>> {
       const operationId = `deleteOrderItem-${orderItemId}`;
       orderItemLoadingOperations.start(operationId);
       try {
         const url = `/api/order-items/${orderItemId}`;
-        return await client.apiFetch<{ success: boolean }>(url, { method: "DELETE" }, { context: operationId });
+        const body = createJsonBody({ cascade, forceCascade });
+        return await client.apiFetchUnion<DeleteApiResponse<{ order_item_id: number }, string[]>>(url, { method: "DELETE", body }, { context: operationId });
       } finally {
         orderItemLoadingOperations.finish(operationId);
       }

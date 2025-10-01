@@ -241,6 +241,11 @@ export const WholesalerItemOffering_ProductDefSchema = WholesalerItemOfferingSch
 
 // ===== WHOLESALER ITEM OFFERING including joins (dbo.wholesaler_item_offerings) to product_def and category =====
 
+/**
+ * FLAT SCHEMA (LEGACY): Direct properties for joined data.
+ * Use WholesalerItemOffering_ProductDef_Category_Supplier_NestedSchema instead for new code.
+ * This schema will be deprecated once all usages are migrated to nested schema.
+ */
 export const WholesalerItemOffering_ProductDef_Category_SupplierSchema = WholesalerItemOfferingSchema.extend({
   product_def_title: z.string().optional(),
   product_def_description: z.string().nullable().optional(),
@@ -248,6 +253,26 @@ export const WholesalerItemOffering_ProductDef_Category_SupplierSchema = Wholesa
   category_description: z.string().nullable().optional(),
   wholesaler_name: NameOrTitle.optional(),
 }).describe("WholesalerItemOffering_ProductDef_Category_SupplierSchema");
+
+/**
+ * NESTED SCHEMA (RECOMMENDED): Uses nested branded schemas for joined data.
+ * This schema works with genTypedQualifiedColumns() and transformToNestedObjects().
+ * Follows the same pattern as OrderItem_ProdDef_Category_Schema.
+ *
+ * Example usage:
+ * ```typescript
+ * const cols = genTypedQualifiedColumns(WholesalerItemOffering_ProductDef_Category_Supplier_NestedSchema);
+ * const results = await fetchData(cols);
+ * const nested = transformToNestedObjects(results, WholesalerItemOffering_ProductDef_Category_Supplier_NestedSchema);
+ * // Access: nested[0].product_def.title, nested[0].category.name, nested[0].wholesaler.name
+ * ```
+ */
+export const WholesalerItemOffering_ProductDef_Category_Supplier_NestedSchema = WholesalerItemOfferingSchema.extend({
+  product_def: ProductDefinitionSchema,
+  category: ProductCategorySchema,
+  wholesaler: WholesalerSchema,
+}).describe("WholesalerItemOffering_ProductDef_Category_Supplier_NestedSchema");
+copyMetaFrom(WholesalerItemOfferingSchema, WholesalerItemOffering_ProductDef_Category_Supplier_NestedSchema);
 
 // ===== WHOLESALER OFFERING LINK (dbo.wholesaler_offering_links) =====
 
@@ -446,6 +471,7 @@ export type WholesalerCategoryWithCount = z.infer<typeof WholesalerCategoryWithC
 export type WholesalerItemOffering = z.infer<typeof WholesalerItemOfferingSchema>;
 export type WholesalerItemOffering_ProductDef = z.infer<typeof WholesalerItemOffering_ProductDefSchema>;
 export type WholesalerItemOffering_ProductDef_Category_Supplier = z.infer<typeof WholesalerItemOffering_ProductDef_Category_SupplierSchema>;
+export type WholesalerItemOffering_ProductDef_Category_Supplier_Nested = z.infer<typeof WholesalerItemOffering_ProductDef_Category_Supplier_NestedSchema>;
 export type WholesalerOfferingLink = z.infer<typeof WholesalerOfferingLinkSchema>;
 export type WholesalerOfferingAttribute = z.infer<typeof WholesalerOfferingAttributeSchema>;
 export type WholesalerOfferingAttribute_Attribute = z.infer<typeof WholesalerOfferingAttribute_AttributeSchema>;

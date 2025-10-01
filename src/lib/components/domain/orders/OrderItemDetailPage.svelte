@@ -13,7 +13,7 @@
     type Order,
     type OrderItem,
     type OrderItem_ProdDef_Category,
-    type WholesalerItemOffering_ProductDef_Category_Supplier,
+    type WholesalerItemOffering_ProductDef_Category_Supplier_Nested,
   } from "$lib/domain/domainTypes";
 
   import { getOrderApi } from "$lib/api/client/order";
@@ -44,7 +44,7 @@
 
   let order = $state<Order | null>(null);
   let orderItem = $state<OrderItem_ProdDef_Category | null>(null);
-  let availableOfferings = $state<WholesalerItemOffering_ProductDef_Category_Supplier[]>([]);
+  let availableOfferings = $state<WholesalerItemOffering_ProductDef_Category_Supplier_Nested[]>([]);
   let isLoading = $state(true);
   const errors = $state<Record<string, ValErrorRecord>>({});
 
@@ -88,7 +88,6 @@
         }
 
         // Load available offerings for the order's supplier
-        // TODO: Change to nested schema like OrderItem_ProdDef_Category and use transformToNestedObjects
         if (order?.wholesaler_id) {
           availableOfferings = await supplierApi.loadOfferingsForSupplier(order.wholesaler_id);
           log.info(`Loaded ${availableOfferings.length} offerings for supplier ${order.wholesaler_id}`);

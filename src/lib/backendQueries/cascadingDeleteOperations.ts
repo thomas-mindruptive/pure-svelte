@@ -806,3 +806,57 @@ export async function deleteOrder(
   // 3) Return the data of the now-deleted resource + stats
   return { deleted: deletedOrderData, stats };
 }
+
+/**
+ * Deletes an OrderItem.
+ * OrderItems are leaf nodes and have no dependencies, so cascade is not needed.
+ * @param id The ID of the OrderItem to delete.
+ * @param transaction The active MSSQL transaction object.
+ * @returns A promise that resolves with the data of the deleted order item.
+ * @throws An error if the order item with the given ID is not found.
+ */
+export async function deleteOrderItem(
+  id: number,
+  transaction: Transaction,
+): Promise<{ deleted: { order_item_id: number }; stats: Record<string, number> }> {
+  assertDefined(id, `id must be defined for deleteOrderItem`);
+  log.info(`(delete) Preparing to delete OrderItem ID: ${id}`);
+
+  const orderItemIdParam = "orderItemId";
+
+  // 1) Read order item first (existence check + data for return)
+  const selectResult = await transaction
+    .request()
+    .input(orderItemIdParam, id)
+    .query<{ order_item_id: number }>(`
+      SELECT order_item_id
+      FROM dbo.order_items
+      WHERE order_item_id = @${orderItemIdParam};
+    `);
+
+  if (selectResult.recordset.length === 0) {
+    throw new Error(`OrderItem with ID ${id} not found.`);
+  }
+  const deletedOrderItemData = selectResult.recordset[0];
+  log.debug(`(delete) Found order item to delete (ID: ${id})`);
+
+  // 2) Delete the order item (no cascade needed - leaf node)
+  log.debug(`(delete) Executing delete for OrderItem ID: ${id}`);
+  const res = await transaction.request().input(orderItemIdParam, id).query(`
+    DELETE FROM dbo.order_items
+    WHERE order_item_id = @${orderItemIdParam};
+  `);
+
+  const affected = Array.isArray(res.rowsAffected) ? res.rowsAffected.reduce((a, b) => a + b, 0) : (res.rowsAffected ?? 0);
+  log.debug(`(delete) Delete affected rows: ${affected}`);
+
+  const stats: Record<string, number> = {
+    total: 0,
+    deletedOrderItems: affected,
+  };
+
+  log.info(`(delete) Delete operation for OrderItem ID: ${id} completed successfully.`);
+
+  // 3) Return the data of the now-deleted resource + stats
+  return { deleted: deletedOrderItemData, stats };
+}

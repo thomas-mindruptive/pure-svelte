@@ -308,3 +308,53 @@ export async function checkOrderDependencies(
   // Orders do not have hard dependencies that would prevent deletion
   return { hard: [], soft: softDependencies };
 }
+
+/**
+ * Checks for informative dependencies on an OrderItem.
+ * OrderItems are leaf nodes and have no blocking dependencies,
+ * but we return informative context about the referenced offering and supplier.
+ * @param orderItemId The ID of the order item to check.
+ * @param transaction The active database transaction object.
+ * @returns An object containing soft dependencies with offering/supplier info (for user information only).
+ */
+export async function checkOrderItemDependencies(
+  orderItemId: number,
+  transaction: Transaction,
+): Promise<{ hard: string[]; soft: string[] }> {
+  const softDependencies: string[] = [];
+  log.info(`(dependencyChecks) Checking dependencies for orderItemId: ${orderItemId}`);
+
+  const transWrapper = new TransWrapper(transaction, null);
+  transWrapper.begin();
+
+  try {
+    // Get offering and supplier information for context
+    const offeringInfoCheck = await transWrapper.request().input("orderItemId", orderItemId).query`
+      SELECT
+        wio.offering_id,
+        pd.title AS product_title,
+        w.name AS supplier_name,
+        w.wholesaler_id
+      FROM dbo.order_items oi
+      LEFT JOIN dbo.wholesaler_item_offerings wio ON oi.offering_id = wio.offering_id
+      LEFT JOIN dbo.product_definitions pd ON wio.product_def_id = pd.product_def_id
+      LEFT JOIN dbo.wholesalers w ON wio.wholesaler_id = w.wholesaler_id
+      WHERE oi.order_item_id = @orderItemId
+    `;
+
+    if (offeringInfoCheck.recordset.length > 0 && offeringInfoCheck.recordset[0].offering_id) {
+      const info = offeringInfoCheck.recordset[0];
+      const productInfo = info.product_title || `Offering #${info.offering_id}`;
+      const supplierInfo = info.supplier_name || `Supplier #${info.wholesaler_id}`;
+      softDependencies.push(`References offering '${productInfo}' from supplier '${supplierInfo}'`);
+    }
+
+    transWrapper.commit();
+  } catch {
+    transWrapper.rollback();
+  }
+
+  log.info(`(dependencyChecks) Found dependencies for orderItemId: ${orderItemId}`, { soft: softDependencies });
+  // OrderItems are leaf nodes - no hard dependencies that would prevent deletion
+  return { hard: [], soft: softDependencies };
+}

@@ -21,6 +21,8 @@ import {
   type ProductCategory,
   type WholesalerCategory,
   type WholesalerCategory_Category,
+  type WholesalerItemOffering_ProductDef_Category_Supplier,
+  WholesalerItemOffering_ProductDef_Category_SupplierSchema,
 } from "$lib/domain/domainTypes";
 
 import type { ApiClient } from "./ApiClient";
@@ -34,6 +36,7 @@ import type {
 } from "$lib/api/api.types";
 import type { DeleteSupplierApiResponse, RemoveCategoryApiResponse } from "$lib/api/app/appSpecificTypes";
 import { LoadingState } from "./loadingState";
+import { genTypedQualifiedColumns } from "$lib/domain/domainTypes.utils";
 
 
 // Loading state managers remain global as they are a client-side concern.
@@ -368,6 +371,43 @@ export function getSupplierApi(client: ApiClient) {
           { method: "DELETE", body: createJsonBody(requestBody) },
           { context: operationId },
         );
+      } finally {
+        supplierLoadingOperations.finish(operationId);
+      }
+    },
+
+    // ===== OFFERINGS =====
+
+    /**
+     * Loads all offerings for a specific supplier (across all categories).
+     * TODO: Change to nested schema like OrderItem_ProdDef_Category and use transformToNestedObjects
+     */
+    async loadOfferingsForSupplier(supplierId: number): Promise<WholesalerItemOffering_ProductDef_Category_Supplier[]> {
+      const operationId = `loadOfferingsForSupplier-${supplierId}`;
+      supplierLoadingOperations.start(operationId);
+      try {
+        const cols = genTypedQualifiedColumns(WholesalerItemOffering_ProductDef_Category_SupplierSchema);
+        const request: PredefinedQueryRequest<WholesalerItemOffering_ProductDef_Category_Supplier> = {
+          namedQuery: "category_offerings",
+          payload: {
+            select: cols,
+            where: {
+              key: "wio.wholesaler_id",
+              whereCondOp: ComparisonOperator.EQUALS,
+              val: supplierId,
+            },
+            orderBy: [{ key: "wio.created_at", direction: "desc" }],
+          },
+        };
+        const responseData = await client.apiFetch<QueryResponseData<WholesalerItemOffering_ProductDef_Category_Supplier>>(
+          "/api/query",
+          { method: "POST", body: createJsonBody(request) },
+          { context: operationId },
+        );
+        return responseData.results as WholesalerItemOffering_ProductDef_Category_Supplier[];
+      } catch (err) {
+        log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
+        throw err;
       } finally {
         supplierLoadingOperations.finish(operationId);
       }

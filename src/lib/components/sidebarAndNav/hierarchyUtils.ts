@@ -476,7 +476,7 @@ export function findNodesAndParamValuesForPath(tree: RuntimeHierarchyTree, primi
     if (!nextNode) {
       const pathSoFar = `/${primitivePath.slice(0, i).join("/")}`;
       if (typeof segment === "string") {
-        const message = `Validation failed: Path segment '${segment}' not found as a child of '${currentNode.item.key}' (path so far: ${pathSoFar}).`;
+        const message = `hierarchyUtils: Validation failed: Path segment '${segment}' not found as a child of '${currentNode.item.key}' (path so far: ${pathSoFar}).`;
         log.error(message);
         throw new NavigationError(message, "ERR_INVALID_STRING_SEGMENT");
       } else {

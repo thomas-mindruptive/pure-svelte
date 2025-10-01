@@ -67,7 +67,19 @@ export const supplierHierarchyConfig: HierarchyTree = {
                 // Order Object - Hidden, represents the selected order. Has urlParamName.
                 createHierarchyNode({
                   item: { key: "order", type: "object", href: "/suppliers/[supplierId]/orders/[orderId]", label: "Order", display: false, urlParamName: "orderId" },
-                  children: []
+                  children: [
+                    // OrderItem List - Visible order items list. Displayed on OrderDetailPage.
+                    createHierarchyNode({
+                      item: { key: "orderitems", type: "list", href: "/suppliers/[supplierId]/orders/[orderId]", label: "Order Items", urlParamName: "orderId" },
+                      children: [
+                        // OrderItem Object - Hidden, represents the selected order item. Has urlParamName.
+                        createHierarchyNode({
+                          item: { key: "orderItemId", type: "object", href: "/suppliers/[supplierId]/orders/[orderId]/orderitems/[orderItemId]", label: "Order Item", display: false, urlParamName: "orderItemId" },
+                          children: []
+                        }),
+                      ]
+                    }),
+                  ]
                 })
               ]
             }),
@@ -173,11 +185,11 @@ export const ordersHierarchyConfig: HierarchyTree = {
           children: [
             // OrderItem List - Visible order items list. Displayed on OrderDetailPage.
             createHierarchyNode({
-              item: { key: "orderItems", type: "list", href: "/orders/[orderId]", label: "Order Items", urlParamName: "orderId" },
+              item: { key: "orderitems", type: "list", href: "/orders/[orderId]", label: "Order Items", urlParamName: "orderId" },
               children: [
                 // OrderItem Object - Hidden, represents the selected order item. Has urlParamName.
                 createHierarchyNode({
-                  item: { key: "orderItem", type: "list", href: "/orders/orderitems/[orderItemId]", label: "Order Items", display: false, urlParamName: "orderItemId" },
+                  item: { key: "orderItemId", type: "object", href: "/orders/[orderId]/orderitems/[orderItemId]", label: "Order Item", display: false, urlParamName: "orderItemId" },
                   children: []
                 }),
               ]

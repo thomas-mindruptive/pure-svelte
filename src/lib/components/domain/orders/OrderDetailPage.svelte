@@ -212,8 +212,8 @@
   /**
    * Navigates to the next hierarchy level.
    */
-  function handleOrderItemSelect(order: Order_Wholesaler) {
-    goto(`${page.url.pathname}/oderitems/${order.order_id}`);
+  function handleOrderItemSelect(orderItem: OrderItem_ProdDef_Category) {
+    goto(`${page.url.pathname}/orderitems/${orderItem.order_item_id}`);
   }
 
   // === DATAGRID DATA =====

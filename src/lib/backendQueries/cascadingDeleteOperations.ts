@@ -697,3 +697,112 @@ export async function deleteAttribute(
   // 3) Return the data of the now-deleted resource + stats
   return { deleted: deletedAttributeData, stats };
 }
+
+/**
+ * Deletes an Order, with an option to cascade and delete all its order items.
+ * @param id The ID of the Order to delete.
+ * @param cascade If true, performs a cascade delete of all dependent order items.
+ * @param transaction The active MSSQL transaction object.
+ * @returns A promise that resolves with the data of the deleted order and deletion stats.
+ * @throws An error if the order with the given ID is not found.
+ */
+export async function deleteOrder(
+  id: number,
+  cascade: boolean,
+  transaction: Transaction,
+): Promise<{ deleted: { order_id: number; order_number: string | null }; stats: Record<string, number> }> {
+  assertDefined(id, `id must be defined for deleteOrder`);
+  log.info(`(delete) Preparing to delete Order ID: ${id} with cascade=${cascade}`);
+
+  const orderIdParam = "orderId";
+
+  // 1) Read order first (existence check + data for return)
+  const selectResult = await transaction
+    .request()
+    .input(orderIdParam, id)
+    .query<{ order_id: number; order_number: string | null }>(`
+      SELECT order_id, order_number
+      FROM dbo.orders
+      WHERE order_id = @${orderIdParam};
+    `);
+
+  if (selectResult.recordset.length === 0) {
+    throw new Error(`Order with ID ${id} not found.`);
+  }
+  const deletedOrderData = selectResult.recordset[0];
+  log.debug(`(delete) Found order to delete: Order #${deletedOrderData.order_number} (ID: ${id})`);
+
+  let stats: Record<string, number> = {};
+
+  // 2) Execute delete path
+  if (cascade) {
+    log.debug(`(delete) Executing CASCADE delete for Order ID: ${id}`);
+
+    const cascadeDeleteQuery = `
+      SET XACT_ABORT ON;
+      SET NOCOUNT ON;
+
+      DECLARE
+        @deletedOrderItems INT = 0,
+        @deletedOrders INT = 0;
+
+      -- 1) Delete order items
+      DELETE FROM dbo.order_items
+      WHERE order_id = @${orderIdParam};
+      SET @deletedOrderItems = @@ROWCOUNT;
+
+      -- 2) Delete the order
+      DELETE FROM dbo.orders
+      WHERE order_id = @${orderIdParam};
+      SET @deletedOrders = @@ROWCOUNT;
+
+      -- Return deletion stats
+      SELECT
+        @deletedOrderItems AS deletedOrderItems,
+        @deletedOrders AS deletedOrders;
+    `;
+
+    const res = await transaction.request().input(orderIdParam, id).query(cascadeDeleteQuery);
+
+    if (res?.recordset?.[0]) {
+      stats = res.recordset[0];
+      stats.total = stats.deletedOrderItems;
+    } else {
+      stats = {
+        total: 0,
+        deletedOrderItems: 0,
+        deletedOrders: 0,
+      };
+    }
+
+    log.debug(
+      `(delete) Cascade stats for Order ${id}: ` +
+        `orderItems=${stats.deletedOrderItems}, orders=${stats.deletedOrders}`,
+    );
+  } else {
+    log.debug(`(delete) Executing NON-CASCADE delete for Order ID: ${id}`);
+    try {
+      const res = await transaction.request().input(orderIdParam, id).query(`
+          DELETE FROM dbo.orders
+          WHERE order_id = @${orderIdParam};
+        `);
+
+      const affected = Array.isArray(res.rowsAffected) ? res.rowsAffected.reduce((a, b) => a + b, 0) : (res.rowsAffected ?? 0);
+      log.debug(`(delete) Non-cascade delete affected rows: ${affected}`);
+    } catch (err: any) {
+      if (err.number === 547) {
+        // FK constraint violation
+        log.warn(`(delete) FK constraint prevented non-cascade delete of Order ID: ${id}`, { error: err.message });
+        throw new Error(
+          `Cannot delete Order ${id}: it has dependent order items. Use cascade=true to delete them as well.`,
+        );
+      }
+      throw err;
+    }
+  }
+
+  log.info(`(delete) Delete operation for Order ID: ${id} completed successfully.`);
+
+  // 3) Return the data of the now-deleted resource + stats
+  return { deleted: deletedOrderData, stats };
+}

@@ -56,12 +56,24 @@ function processColumn<T extends z.ZodObject<z.ZodRawShape>>(
   if (column.includes('.')) {
     const [alias, fieldName] = column.split('.');
 
+    // Check if this is the base table alias
+    const baseMeta = (schema as any).__brandMeta;
+    if (baseMeta?.alias === alias) {
+      // This is a base table column with qualified name (e.g., "ord.order_id")
+      // Treat it as a direct field
+      if (fieldName in shape && !(shape[fieldName] instanceof z.ZodObject)) {
+        result[fieldName] = value;
+        return true;
+      }
+      return false;
+    }
+
     // Find which nested object this belongs to
     for (const [schemaFieldName, zodType] of Object.entries(shape)) {
       if (zodType instanceof z.ZodObject) {
         // Check if this branded schema has the matching alias
         const meta = (zodType as any).__brandMeta;
-        
+
         if (meta?.alias === alias) {
           const nestedKeys = zodType.keyof().options as readonly string[];
           if (nestedKeys.includes(fieldName)) {

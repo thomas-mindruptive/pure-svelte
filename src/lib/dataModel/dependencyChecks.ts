@@ -255,8 +255,8 @@ export async function checkAttributeDependencies(
   try {
     // Soft Dependency: Assignments to offerings (dbo.wholesaler_offering_attributes)
     const assignmentsCheck = await db.request().input("attributeId", attributeId).query`
-            SELECT COUNT(*) as count 
-            FROM dbo.wholesaler_offering_attributes 
+            SELECT COUNT(*) as count
+            FROM dbo.wholesaler_offering_attributes
             WHERE attribute_id = @attributeId
         `;
     if (assignmentsCheck.recordset[0].count > 0) {
@@ -268,5 +268,43 @@ export async function checkAttributeDependencies(
   }
 
   // Attributes, as master data, do not have hard dependencies that would prevent a cascade.
+  return { hard: [], soft: softDependencies };
+}
+
+/**
+ * Checks for dependencies on an Order.
+ * This is used before deleting an orders record.
+ * @param orderId The ID of the order to check.
+ * @param transaction The active database transaction object.
+ * @returns An object containing lists of hard and soft dependencies.
+ */
+export async function checkOrderDependencies(
+  orderId: number,
+  transaction: Transaction,
+): Promise<{ hard: string[]; soft: string[] }> {
+  const softDependencies: string[] = [];
+  log.info(`(dependencyChecks) Checking dependencies for orderId: ${orderId}`);
+
+  const transWrapper = new TransWrapper(transaction, null);
+  transWrapper.begin();
+
+  try {
+    // Soft Dependency: Order Items (dbo.order_items)
+    const orderItemsCheck = await transWrapper.request().input("orderId", orderId).query`
+      SELECT COUNT(*) as count
+      FROM dbo.order_items
+      WHERE order_id = @orderId
+    `;
+    if (orderItemsCheck.recordset[0].count > 0) {
+      softDependencies.push(`${orderItemsCheck.recordset[0].count} order items`);
+    }
+
+    transWrapper.commit();
+  } catch {
+    transWrapper.rollback();
+  }
+
+  log.info(`(dependencyChecks) Found dependencies for orderId: ${orderId}`, { soft: softDependencies });
+  // Orders do not have hard dependencies that would prevent deletion
   return { hard: [], soft: softDependencies };
 }

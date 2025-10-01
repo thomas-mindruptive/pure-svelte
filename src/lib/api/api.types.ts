@@ -125,7 +125,7 @@ export interface QueryRequest<T> {
  */
 export interface PredefinedQueryRequest<T> {
   namedQuery: string;
-  payload: QueryPayload<T>;
+  payload?: Partial<QueryPayload<T>>;
 }
 
 // ===== 5. RESPONSE DATA TYPES =====

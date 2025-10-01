@@ -9,7 +9,7 @@
 import { json, error, type RequestHandler } from "@sveltejs/kit";
 import { log } from "$lib/utils/logger";
 import { buildQuery, executeQuery } from "$lib/backendQueries/queryBuilder";
-import { supplierQueryConfig } from "$lib/backendQueries/queryConfig";
+import { queryConfig } from "$lib/backendQueries/queryConfig";
 import { mssqlErrorMapper } from "$lib/backendQueries/mssqlErrorMapper";
 import type { ApiErrorResponse, QueryRequest, PredefinedQueryRequest, QuerySuccessResponse } from "$lib/api/api.types";
 import { v4 as uuidv4 } from "uuid";
@@ -17,7 +17,7 @@ import { isTableInBrandedSchemas } from "$lib/domain/domainTypes.utils";
 import type z from "zod";
 
 function isPredefinedQuery(body: unknown): body is PredefinedQueryRequest<z.ZodObject<any>> {
-  return typeof body === "object" && body !== null && "namedQuery" in body && "payload" in body;
+  return typeof body === "object" && body !== null && "namedQuery" in body;
 }
 
 function isStandardQuery(body: unknown): body is QueryRequest<unknown> {
@@ -37,13 +37,14 @@ export const POST: RequestHandler = async (event) => {
     const requestBody = await event.request.json();
 
     if (isPredefinedQuery(requestBody)) {
+      // NOTE: payload can be undefined. 
       const { namedQuery, payload } = requestBody;
-      log.info(`[${operationId}] Handling PredefinedQueryRequest`, { namedQuery });
+      log.info(`[${operationId}] Handling PredefinedQueryRequest`, { requestBody });
 
-      if (!(namedQuery in (supplierQueryConfig.joinConfigurations || {}))) {
+      if (!(namedQuery in (queryConfig.predefinedQueryies || {}))) {
         const errRes: ApiErrorResponse = {
           success: false,
-          message: `Predefined query '${namedQuery}' is not allowed.`,
+          message: `Predefined query '${namedQuery}' is not listed in predfined queries (queryConfig).`,
           status_code: 403,
           error_code: "FORBIDDEN",
           meta: { timestamp: new Date().toISOString() },
@@ -51,7 +52,10 @@ export const POST: RequestHandler = async (event) => {
         return json(errRes, { status: 403 });
       }
 
-      const { sql, parameters, metadata } = buildQuery(payload, supplierQueryConfig, namedQuery);
+      // NOTE: queryBuilder checks valid combinations, e.g. if "select" and "from" are 
+      // in the predefined query if not payload ist passed. It throws if not valid.
+
+      const { sql, parameters, metadata } = buildQuery(payload, queryConfig, namedQuery);
       const results = await executeQuery(sql, parameters);
 
       log.debug(`[${operationId}] Executed SQL: ${sql} with parameters: ${JSON.stringify(parameters)}`, { result: results });
@@ -105,7 +109,7 @@ export const POST: RequestHandler = async (event) => {
         return json(errRes, { status: 403 });
       }
 
-      const { sql, parameters, metadata } = buildQuery(payload, supplierQueryConfig);
+      const { sql, parameters, metadata } = buildQuery(payload, queryConfig);
       const results = await executeQuery(sql, parameters);
 
       log.debug(`[${operationId}] Executed SQL: ${sql} with parameters: ${JSON.stringify(parameters)}`, results);

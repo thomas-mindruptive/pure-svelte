@@ -9,7 +9,7 @@
 import { json, error, type RequestHandler } from '@sveltejs/kit';
 import { log } from '$lib/utils/logger';
 import { buildQuery, executeQuery } from '$lib/backendQueries/queryBuilder';
-import { supplierQueryConfig } from '$lib/backendQueries/queryConfig';
+import { queryConfig } from '$lib/backendQueries/queryConfig';
 import { mssqlErrorMapper } from '$lib/backendQueries/mssqlErrorMapper';
 import type { ProductDefinition } from '$lib/domain/domainTypes';
 import type { ApiErrorResponse, QueryRequest, QuerySuccessResponse } from '$lib/api/api.types';
@@ -48,7 +48,7 @@ export const POST: RequestHandler = async (event) => {
 		});
 
 		// 3. Build and execute the query using the secure, generic query builder.
-		const { sql, parameters, metadata } = buildQuery(clientPayload, supplierQueryConfig, undefined, { table: 'dbo.product_definitions', alias: 'pd' });
+		const { sql, parameters, metadata } = buildQuery(clientPayload, queryConfig, undefined, { table: 'dbo.product_definitions', alias: 'pd' });
 		const results = await executeQuery(sql, parameters);
 
 		// 4. Format the response using the standard `QuerySuccessResponse` type.

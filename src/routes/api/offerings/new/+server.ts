@@ -10,7 +10,7 @@
 import { json, error, type RequestHandler } from '@sveltejs/kit';
 import { log } from '$lib/utils/logger';
 import { buildQuery, executeQuery } from '$lib/backendQueries/queryBuilder';
-import { supplierQueryConfig } from '$lib/backendQueries/queryConfig';
+import { queryConfig } from '$lib/backendQueries/queryConfig';
 import { buildUnexpectedError } from '$lib/backendQueries/entityOperations';
 import { WholesalerItemOfferingForCreateSchema, type WholesalerItemOffering, type WholesalerItemOffering_ProductDef_Category_Supplier } from '$lib/domain/domainTypes';
 import { validateEntity } from "$lib/domain/domainTypes.utils";
@@ -164,7 +164,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
     const { sql: builtSql, parameters } = buildQuery(
       queryPayloadOfferingPlusProdDef,
-      supplierQueryConfig,
+      queryConfig,
       "wholesaler_item_offering_product_def", // <-- KORREKTER NAME WIRD VERWENDET
     );
 

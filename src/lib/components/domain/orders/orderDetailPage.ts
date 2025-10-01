@@ -13,7 +13,7 @@ export function load({ params, fetch: loadEventFetch }: LoadEvent) {
     // This error is thrown immediately as it's a client-side validation error.
     throw error(400, `orderDetailPage: Invalid Order ID - ${JSON.stringify(params)} `);
   }
-  if (params.orderId?.toLowerCase() !== "new") {
+  if (params.orderId?.toLowerCase() === "new") {
     isCreateMode = true;
   }
   log.info(`load: ${orderId}`);

@@ -61,7 +61,13 @@ async function updateRecord<S extends BrandedSchema>(
     throw new Error(`Metadata is missing from ${schema.description}`);
   }
   const fullTableName = `${meta.dbSchema}.${meta.tableName}`;
-  const keys = Object.keys(data);
+  // Filter out the ID column to prevent updating identity columns
+  const keys = Object.keys(data).filter((k) => k !== idColumn);
+
+  if (keys.length === 0) {
+    throw new Error(`No fields to update for ${fullTableName} (ID column was the only field provided)`);
+  }
+
   const sql = `UPDATE ${fullTableName} SET ${keys.map((k) => `${k} = @${k}`).join(", ")} OUTPUT INSERTED.* WHERE ${idColumn} = @id;`;
 
   try {

@@ -1,9 +1,9 @@
 // File: src/lib/domain/domainTypes.utils.ts
 
 import { log } from "$lib/utils/logger";
-import z from "zod";
+import z, { ZodError, type ZodIssue } from "zod";
 import { AllBrandedSchemas } from "./domainTypes";
-
+import type { SafeParseReturnType } from "zod/v3";
 
 // ===== TYPE DEFINITIONS FOR BRANDED SCHEMAS =====
 
@@ -109,12 +109,26 @@ export type DbTableNames = GetFullTableName<(typeof AllBrandedSchemas)[keyof typ
  *
  * @template T - A Zod object schema, potentially with nested branded schemas
  * @param schema - Branded Zod schema with _meta information
+ * @param qualifyAllColsFully - If true, base table columns are fully qualified (e.g., "ori.order_id"). If false, they remain unqualified (e.g., "order_id"). Default: false
  * @returns Array of qualified column names with full type safety
  * @throws Error if a nested schema lacks metadata and cannot be matched
  */
-export function genTypedQualifiedColumns<T extends z.ZodObject<z.ZodRawShape>>(schema: T): QualifiedColumnsFromBrandedSchemaWithJoins<T>[] {
+export function genTypedQualifiedColumns<T extends z.ZodObject<z.ZodRawShape>>(
+  schema: T,
+  qualifyAllColsFully = false,
+): QualifiedColumnsFromBrandedSchemaWithJoins<T>[] {
   const columns: string[] = [];
   const shape = schema.shape;
+  const baseMeta = (schema as any).__brandMeta;
+  const baseAlias = baseMeta?.alias;
+
+  // Validate that base schema has metadata when fully qualified columns are required
+  if (qualifyAllColsFully && !baseAlias) {
+    throw new Error(
+      `qualifyAllColsFully=true requires base schema to have metadata with alias. ` +
+        `Use copyMetaFrom() after .extend() to preserve metadata from the base schema.`
+    );
+  }
 
   for (const [fieldName, zodType] of Object.entries(shape)) {
     if (zodType instanceof z.ZodObject) {
@@ -147,7 +161,7 @@ export function genTypedQualifiedColumns<T extends z.ZodObject<z.ZodRawShape>>(s
 
         if (schemaEntry) {
           const [alias] = schemaEntry;
-          columns.push(...schemaKeys.map((key) => `${alias}.${key}`));
+          columns.push(...schemaKeys.map((key) => `${alias}.${key} AS '${alias}.${key}'`));
           continue;
         }
 
@@ -160,13 +174,19 @@ export function genTypedQualifiedColumns<T extends z.ZodObject<z.ZodRawShape>>(s
       }
 
       const nestedKeys = zodType.keyof().options as readonly string[];
-      // Add qualified columns: "pd.product_def_id", "pd.title", etc.
-      columns.push(...nestedKeys.map((key) => `${meta.alias}.${key}`));
+      // Add qualified columns with alias: "pd.product_def_id AS 'pd.product_def_id'", etc.
+      columns.push(...nestedKeys.map((key) => `${meta.alias}.${key} AS '${meta.alias}.${key}'`));
     } else {
-      // Direct field from base table - no qualification needed
-      columns.push(fieldName);
+      // Direct field from base table
+      if (qualifyAllColsFully && baseAlias) {
+        columns.push(`${baseAlias}.${fieldName} AS '${baseAlias}.${fieldName}'`);
+      } else {
+        columns.push(fieldName);
+      }
     }
   }
+
+  log.info(`Generated qualified columns:`, columns);
 
   return columns as QualifiedColumnsFromBrandedSchemaWithJoins<T>[];
 }
@@ -344,7 +364,7 @@ export function toValidationResult<S extends z.ZodTypeAny>(zodParseResult: z.Zod
       sanitized: zodParseResult.data,
     };
   }
-  const errors = toErrorRecord(zodParseResult.error); 
+  const errors = toErrorRecord(zodParseResult.error);
   return {
     isValid: false,
     errors,
@@ -397,4 +417,80 @@ export function toErrorRecord(error: z.ZodError): ValErrorRecord {
   if (formErrors.length) errors._root = formErrors;
 
   return errors;
+}
+
+/**
+ * Safely parses only the first `n` elements of an array against a given Zod schema.
+ *
+ * This function is useful when working with very large arrays where validating
+ * every element would be too expensive. Instead, it validates only a prefix of
+ * the array (first `n` elements) for structural correctness. If all of those
+ * elements pass validation, the entire array is considered valid. The return
+ * value is fully compatible with Zod's `safeParse`, i.e. it returns an object
+ * of type `SafeParseReturnType<unknown, T[]>`.
+ *
+ * Performance considerations:
+ * - Does not copy or slice the input array.
+ * - Stops after `n` iterations or the end of the array (whichever comes first).
+ * - Uses plain `for` loops and index access for minimal overhead.
+ *
+ * @template - The Zod schema type for each array element.
+ *
+ * @param  - The Zod schema to validate each array element against.
+ * @param  - The input value to validate. Must be an array.
+ * @param n - Maximum number of elements to validate from the start of the array.
+ *
+ * @returns A Zod `SafeParseReturnType`:
+
+ *
+ * @example
+ * const CustomerSchema = z.object({
+ *   id: z.string(),
+ *   name: z.string(),
+ * });
+ *
+ * const customers = [{ id: "1", name: "Alice" }, { id: "2", name: "Bob" }];
+ *
+ * const result = safeParseFirstN(CustomerSchema, customers, 1);
+ *
+ */
+export function safeParseFirstN<T extends z.ZodTypeAny>(
+  elementSchema: T,
+  data: unknown,
+  n: number
+): ReturnType<z.ZodArray<T>['safeParse']> {
+  const arraySchema = z.array(elementSchema);
+  
+  if (data === undefined || data === null || !Array.isArray(data)) {
+    return arraySchema.safeParse(data);
+  }
+
+  const issues: z.ZodError['issues'] = [];
+  const parsed: Array<z.infer<T>> = [];
+  const len = data.length;
+  const limit = n < len ? n : len;
+
+  for (let i = 0; i < limit; i++) {
+    const result = elementSchema.safeParse(data[i]);
+    if (!result.success) {
+      for (const issue of result.error.issues) {
+        issues.push({
+          ...issue,
+          path: [i, ...issue.path],
+        });
+      }
+    } else {
+      parsed.push(result.data);
+    }
+  }
+
+  if (issues.length > 0) {
+    const failResult = arraySchema.safeParse([]);
+    if (!failResult.success) {
+      failResult.error.issues = issues;
+      return failResult;
+    }
+  }
+
+  return { success: true, data: parsed };
 }

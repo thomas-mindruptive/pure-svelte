@@ -15,13 +15,13 @@ type Optional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
 type QueryConfigEntry = Required<Pick<QueryPayload<any>, "from">> & Optional<QueryPayload<any>, "select">;
 
 export interface QueryConfig {
-  joinConfigurations: { [viewName: string]: QueryConfigEntry };
+  predefinedQueryies: { [viewName: string]: QueryConfigEntry };
 }
 
 // --- The Configuration Object ---
 
-export const supplierQueryConfig: QueryConfig = {
-  joinConfigurations: {
+export const queryConfig: QueryConfig = {
+  predefinedQueryies: {
     supplier_categories: {
       from: { table: "dbo.wholesalers", alias: "w" },
       joins: [
@@ -180,7 +180,8 @@ export const supplierQueryConfig: QueryConfig = {
       ],
     },
     "order->wholesaler": {
-      select: genTypedQualifiedColumns(Order_Wholesaler_Schema),
+      // Fully qualify all columns. => qualifyAllColsFully = true.
+      select: genTypedQualifiedColumns(Order_Wholesaler_Schema, true),
       from: { table: "dbo.orders", alias: "ord" },
       joins: [
         {
@@ -192,10 +193,11 @@ export const supplierQueryConfig: QueryConfig = {
             conditions: [{ columnA: "ord.wholesaler_id", op: "=", columnB: "w.wholesaler_id" }],
           },
         }
-      ]
+      ],
+      orderBy: [{ key: "ord.order_date", direction: "desc" }]
     },
     "order->order_items->product_def->category": {
-      select: genTypedQualifiedColumns(OrderItem_ProdDef_Category_Schema),
+      select: genTypedQualifiedColumns(OrderItem_ProdDef_Category_Schema, true),
       from: { table: "dbo.orders", alias: "ord" },
       joins: [
         {
@@ -213,7 +215,7 @@ export const supplierQueryConfig: QueryConfig = {
           alias: "wio",
           on: {
             joinCondOp: "AND",
-            conditions: [{ columnA: "ori.offering_id", op: "=", columnB: "ori.offering_id" }],
+            conditions: [{ columnA: "ori.offering_id", op: "=", columnB: "wio.offering_id" }],
           },
         },
         {

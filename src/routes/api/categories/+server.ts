@@ -9,7 +9,7 @@
 import { json, type RequestHandler } from '@sveltejs/kit';
 import { log } from '$lib/utils/logger';
 import { buildQuery, executeQuery } from '$lib/backendQueries/queryBuilder';
-import { supplierQueryConfig } from '$lib/backendQueries/queryConfig';
+import { queryConfig } from '$lib/backendQueries/queryConfig';
 import { buildUnexpectedError } from '$lib/backendQueries/entityOperations';
 import type { ProductCategory } from '$lib/domain/domainTypes';
 import type { ApiErrorResponse, QueryRequest, QuerySuccessResponse } from '$lib/api/api.types';
@@ -49,7 +49,7 @@ export const POST: RequestHandler = async (event) => {
         });
 
         // 3. Build and execute the query.
-        const { sql, parameters, metadata } = buildQuery(clientPayload, supplierQueryConfig, undefined, { table: 'dbo.product_categories', alias: 'pc' });
+        const { sql, parameters, metadata } = buildQuery(clientPayload, queryConfig, undefined, { table: 'dbo.product_categories', alias: 'pc' });
         log.debug(`Built query: `, sql);
         const results = await executeQuery(sql, parameters);
 

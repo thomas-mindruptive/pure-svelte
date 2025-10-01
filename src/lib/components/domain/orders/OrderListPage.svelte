@@ -1,7 +1,7 @@
 <!-- OrderListPage.svelte -->
 
 <script lang="ts">
-  import type { Order, OrderSchema, Wholesaler } from "$lib/domain/domainTypes";
+  import { Order_Wholesaler_Schema, type Order_Wholesaler } from "$lib/domain/domainTypes";
   import { goto } from "$app/navigation";
   import { log } from "$lib/utils/logger";
 
@@ -16,6 +16,8 @@
   import { page } from "$app/state";
   import { getOrderApi, orderLoadingState } from "$lib/api/client/order";
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
+    import { safeParseFirstN } from "$lib/domain/domainTypes.utils";
+    import { convertToHtml } from "$lib/utils/formatUtils";
 
   // === PROPS ====================================================================================
 
@@ -23,7 +25,7 @@
 
   // === STATE ====================================================================================
 
-  let resolvedOrders = $state<Order[]>([]);
+  let resolvedOrders = $state<Order_Wholesaler[]>([]);
   let isLoading = $state(true); // The component always starts in a loading state.
   let loadingOrValidationError = $state<{
     message: string;
@@ -40,9 +42,9 @@
 
   /**
    * ⚠️ NOTE: with this list page, we change the +page.ts -> load -> page.svelte pattern!
-   * Reason: We use the "streaming API" approach anyway, 
+   * Reason: We use the "streaming API" approach anyway,
    * i.e. the "load" function only returns promises, not the data itself.
-   * => There is no advantage, quite the opposite: 
+   * => There is no advantage, quite the opposite:
    * We would have to maintain an indirection (= +page.ts).
    */
   $effect(() => {
@@ -59,14 +61,17 @@
       resolvedOrders = []; // Clear old data to prevent stale UI
 
       try {
-        // Await the promise to get the data.
         if (!aborted) {
           resolvedOrders = await orderApi.loadOrders();
-          log.debug(`Orders promise resolved successfully.`);
+          const valResult = safeParseFirstN(Order_Wholesaler_Schema, resolvedOrders, 4);
+          if (!valResult.success) {
+            const msg = `Cannot validate orders: ${convertToHtml(JSON.stringify(valResult.error.issues))}`
+            loadingOrValidationError = {message: msg, status: 500};
+            log.error(msg);
+          }
+          log.debug(`Orders promise resolved successfully.`, resolvedOrders);
         }
       } catch (rawError: any) {
-        // If the promise rejects, perform the robust error handling.
-
         if (!aborted) {
           const status = rawError.status ?? 500;
           const message = rawError.body?.message || rawError.message || "An unknown error occurred while loading.";
@@ -96,7 +101,7 @@
 
   // === EVENTS ===================================================================================
 
-  function handleOrderSelect(order: Order): void {
+  function handleOrderSelect(order: Order_Wholesaler): void {
     log.info(`Navigating to detail for: ${order.order_id}`);
     goto(`${page.url.pathname}/${order.order_id}`);
   }
@@ -130,19 +135,17 @@
 
   // === DATAGRID DATA =====
 
-  const columns: ColumnDefBase<typeof OrderSchema>[] = [
-    { key: "order_id", header: "ID", accessor: null, sortable: true },
-  ];
+  const columns: ColumnDefBase<typeof Order_Wholesaler_Schema>[] = [{ key: "order_id", header: "ID", accessor: null, sortable: true }];
 
-  const getId = (r: Wholesaler) => r.wholesaler_id;
+  const getId = (r: Order_Wholesaler) => r.order_id;
 
   // ===== DATAGRID STRATEGIES =====
 
-  const deleteStrategy: DeleteStrategy<Order> = {
+  const deleteStrategy: DeleteStrategy<Order_Wholesaler> = {
     execute: handleOrderDelete,
   };
 
-  const rowActionStrategy: RowActionStrategy<Order> = {
+  const rowActionStrategy: RowActionStrategy<Order_Wholesaler> = {
     click: handleOrderSelect,
   };
 </script>
@@ -172,8 +175,8 @@
         {columns}
         {getId}
         loading={isLoading || $orderLoadingState}
-        gridId="wholesalers"
-        entity="wholesaler"
+        gridId="orders"
+        entity="order"
         {deleteStrategy}
         {rowActionStrategy}
         apiLoadFunc={orderApi.loadOrdersWithWhereAndOrder}

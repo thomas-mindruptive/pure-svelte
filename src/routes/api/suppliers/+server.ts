@@ -10,7 +10,7 @@
 import { json, error, type RequestHandler } from '@sveltejs/kit';
 import { log } from '$lib/utils/logger';
 import { buildQuery, executeQuery } from '$lib/backendQueries/queryBuilder';
-import { supplierQueryConfig } from '$lib/backendQueries/queryConfig';
+import { queryConfig } from '$lib/backendQueries/queryConfig';
 import { mssqlErrorMapper } from '$lib/backendQueries/mssqlErrorMapper';
 import type { Wholesaler } from '$lib/domain/domainTypes';
 import type { QueryRequest, QuerySuccessResponse, ApiErrorResponse } from '$lib/api/api.types';
@@ -46,7 +46,7 @@ export const POST: RequestHandler = async (event) => {
 		});
 
 		// 3. Build and execute the query.
-		const { sql, parameters, metadata } = buildQuery(clientPayload, supplierQueryConfig, undefined, { table: 'dbo.wholesalers', alias: 'w' });
+		const { sql, parameters, metadata } = buildQuery(clientPayload, queryConfig, undefined, { table: 'dbo.wholesalers', alias: 'w' });
 		const results = await executeQuery(sql, parameters);
 		log.info(`[${operationId}] Executed suppliers query: result: %O`, results );
 

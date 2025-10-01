@@ -10,7 +10,7 @@
 import { json, type RequestHandler } from "@sveltejs/kit";
 import { log } from "$lib/utils/logger";
 import { buildQuery, executeQuery } from "$lib/backendQueries/queryBuilder";
-import { supplierQueryConfig } from "$lib/backendQueries/queryConfig";
+import { queryConfig } from "$lib/backendQueries/queryConfig";
 import { buildUnexpectedError } from "$lib/backendQueries/entityOperations";
 import type { WholesalerItemOffering } from "$lib/domain/domainTypes";
 import type {
@@ -58,7 +58,7 @@ export const POST: RequestHandler = async (event) => {
     });
 
     // 3. Build and execute the query.
-    const { sql, parameters, metadata } = buildQuery(clientPayload, supplierQueryConfig, undefined, {
+    const { sql, parameters, metadata } = buildQuery(clientPayload, queryConfig, undefined, {
       table: "dbo.wholesaler_item_offerings",
       alias: "wio",
     });

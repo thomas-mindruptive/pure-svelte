@@ -10,7 +10,7 @@ import { json, error, type RequestHandler } from "@sveltejs/kit";
 import { db } from "$lib/backendQueries/db";
 import { log } from "$lib/utils/logger";
 import { buildQuery, executeQuery } from "$lib/backendQueries/queryBuilder";
-import { supplierQueryConfig } from "$lib/backendQueries/queryConfig";
+import { queryConfig } from "$lib/backendQueries/queryConfig";
 import { checkWholesalerDependencies } from "$lib/dataModel/dependencyChecks";
 import { LogicalOperator, ComparisonOperator, type QueryPayload, type WhereCondition } from "$lib/backendQueries/queryGrammar";
 import { WholesalerSchema, type Wholesaler } from "$lib/domain/domainTypes";
@@ -106,7 +106,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
       limit: 1,
     };
 
-    const { sql, parameters, metadata } = buildQuery(securePayload, supplierQueryConfig);
+    const { sql, parameters, metadata } = buildQuery(securePayload, queryConfig);
     const results = await executeQuery(sql, parameters);
 
     const response: QuerySuccessResponse<Wholesaler> = {

@@ -7,16 +7,22 @@
  * context-aware ApiClient instance.
  */
 
-import { log } from "$lib/utils/logger";
 import { type QueryPayload, type SortDescriptor, type WhereConditionGroup } from "$lib/backendQueries/queryGrammar";
-import { type Order, type Order_Wholesaler, type OrderItem_ProdDef_Category, OrderItem_ProdDef_Category_Schema, OrderSchema } from "$lib/domain/domainTypes";
+import {
+  type Order,
+  type Order_Wholesaler,
+  type OrderItem_ProdDef_Category,
+  Order_Wholesaler_Schema,
+  OrderItem_ProdDef_Category_Schema
+} from "$lib/domain/domainTypes";
+import { log } from "$lib/utils/logger";
 
-import type { ApiClient } from "./ApiClient";
-import { createJsonBody, getErrorMessage } from "./common";
 import type { PredefinedQueryRequest, QueryResponseData } from "$lib/api/api.types";
 import type { DeleteSupplierApiResponse } from "$lib/api/app/appSpecificTypes";
+import type { ApiClient } from "./ApiClient";
+import { createJsonBody, getErrorMessage } from "./common";
 import { LoadingState } from "./loadingState";
-import { genTypedQualifiedColumns } from "$lib/domain/domainTypes.utils";
+import { transformToNestedObjects } from "$lib/backendQueries/recordsetTransformer";
 
 // Loading state managers remain global as they are a client-side concern.
 const orderLoadingManager = new LoadingState();
@@ -26,12 +32,6 @@ export const orderLoadingOperations = orderLoadingManager;
 /**
  * The default query payload used when fetching a list.
  */
-const orderCols = genTypedQualifiedColumns(OrderSchema);
-export const DEFAULT_ORDER_QUERY: QueryPayload<Order> = {
-  from: {table: "dbo.orders", alias: "ord"},
-  select: orderCols,
-  orderBy: [{ key: "ord.order_date", direction: "desc" }],
-};
 
 /**
  * Factory function to create a supplier-specific API client.
@@ -50,10 +50,8 @@ export function getOrderApi(client: ApiClient) {
       const operationId = "loadOrders";
       orderLoadingOperations.start(operationId);
       try {
-        const queryPayload: QueryPayload<Order_Wholesaler> = { ...DEFAULT_ORDER_QUERY, ...query };
         const predefQuery: PredefinedQueryRequest<Order_Wholesaler> = {
           namedQuery: "order->wholesaler",
-          payload: queryPayload
         };
         const responseData = await client.apiFetch<QueryResponseData<Order_Wholesaler>>(
           "/api/query",
@@ -61,7 +59,12 @@ export function getOrderApi(client: ApiClient) {
           { context: operationId },
         );
         log.info(`Load successful.`, responseData);
-        return responseData.results as Order_Wholesaler[];
+        // Transform flat recordset to nested objects
+        const transformed = transformToNestedObjects(
+          responseData.results as Record<string, unknown>[],
+          Order_Wholesaler_Schema
+        );
+        return transformed;
       } catch (err) {
         log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
         throw err;
@@ -98,7 +101,11 @@ export function getOrderApi(client: ApiClient) {
       const operationId = `loadOrder-${orderId}`;
       orderLoadingOperations.start(operationId);
       try {
-        const responseData = await client.apiFetch<{ order: Order_Wholesaler }>(`/api/orders/${orderId}`, { method: "GET" }, { context: operationId });
+        const responseData = await client.apiFetch<{ order: Order_Wholesaler }>(
+          `/api/orders/${orderId}`,
+          { method: "GET" },
+          { context: operationId },
+        );
         return responseData.order;
       } catch (err) {
         log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
@@ -173,12 +180,10 @@ export function getOrderApi(client: ApiClient) {
     async loadOrderItemsForOrder(orderId: number): Promise<OrderItem_ProdDef_Category[]> {
       const operationId = `loadOrderItemsForOrder-${orderId}`;
       orderLoadingOperations.start(operationId);
-      const columns = genTypedQualifiedColumns(OrderItem_ProdDef_Category_Schema);
       try {
         const request: PredefinedQueryRequest<OrderItem_ProdDef_Category> = {
           namedQuery: "order->order_items->product_def->category",
           payload: {
-            select: columns,
             where: { key: "ord.order_id", whereCondOp: "=", val: orderId },
             orderBy: [{ key: "pc.name", direction: "asc" }],
           },
@@ -189,9 +194,12 @@ export function getOrderApi(client: ApiClient) {
           { context: operationId },
         );
         if (responseData.results?.length > 1) {
-          throw new Error("loadCategoryAssignmentForSupplier: Only one supplier <-> category assignment expectd.");
-        } else if (responseData.results?.length === 1) {
-          return responseData.results as OrderItem_ProdDef_Category[];
+          // Transform flat recordset to nested objects
+          const transformed = transformToNestedObjects(
+            responseData.results as Record<string, unknown>[],
+            OrderItem_ProdDef_Category_Schema
+          );
+          return transformed;
         } else {
           return [];
         }

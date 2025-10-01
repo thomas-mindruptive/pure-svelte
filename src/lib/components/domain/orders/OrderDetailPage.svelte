@@ -28,7 +28,7 @@
   import { stringsToNumbers } from "$lib/utils/typeConversions";
   import { error } from "@sveltejs/kit";
   import OrderForm from "./OrderForm.svelte";
-  import { toErrorRecord, type ValErrorRecord } from "$lib/domain/domainTypes.utils";
+  import { safeParseFirstN, toErrorRecord, type ValErrorRecord } from "$lib/domain/domainTypes.utils";
   import { stringifyForHtml } from "$lib/utils/formatUtils";
 
   // === PROPS ====================================================================================
@@ -41,7 +41,7 @@
   let orderItems = $state<OrderItem_ProdDef_Category[] | null>(null);
   let isLoading = $state(true);
   //let loadingError = $state<{ message: string; status?: number } | null>(null);
-  const errors = $state<ValErrorRecord[]>([]);
+  const errors = $state<Record<string, ValErrorRecord>>({});
   const allowForceCascadingDelte = $state(true);
 
   // === API =====================================================================================
@@ -53,9 +53,11 @@
 
   // This is the core of the async pattern. It runs whenever the `data` prop changes.
   $effect(() => {
+    log.info("$effect triggered", { orderId: data.orderId, isCreateMode: data.isCreateMode });
     let aborted = false;
 
     const processPromises = async () => {
+      log.info("processPromises started");
       isLoading = true;
 
       try {
@@ -68,9 +70,15 @@
            */
           [order, orderItems] = await Promise.all([orderApi.loadOrder(data.orderId), orderApi.loadOrderItemsForOrder(data.orderId)]);
           const orderValidationResult = OrderSchema.safeParse(order);
-          const orderItemsValidationResult = z.array(OrderItem_ProdDef_Category_Schema).safeParse(orderItems);
-          if (orderValidationResult.error) errors.push(toErrorRecord(orderValidationResult.error));
-          if (orderItemsValidationResult.error) errors.push(toErrorRecord(orderItemsValidationResult.error));
+          const orderItemsValidationResult = safeParseFirstN(OrderItem_ProdDef_Category_Schema, orderItems, 3); // z.array(OrderItem_ProdDef_Category_Schema).safeParse(orderItems);
+          if (orderValidationResult.error) {
+            errors.order = toErrorRecord(orderValidationResult.error);
+            log.error(`Error validating order:`, errors.order);
+          }
+          if (orderItemsValidationResult.error) {
+            errors.orderItems = toErrorRecord(orderItemsValidationResult.error);
+            log.error(`Error validating order items:`, errors.orderItems);
+          }
         }
         if (aborted) return;
 
@@ -96,28 +104,28 @@
 
   // === EVENTS & STRATEGIES ======================================================================
 
-  async function handleFormSubmitted(info: { data: Wholesaler; result: unknown }) {
-    addNotification(`Supplier saved successfully.`, "success");
+  async function handleFormSubmitted(info: { data: Order; result: unknown }) {
+    addNotification(`Order saved successfully.`, "success");
 
     if (data.isCreateMode) {
       log.info("Submit successful in CREATE mode. Navigating to edit page...");
 
       // Get the new ID from the event data.
       // Thanks to our FormShell fix, info.data is the complete object from the API.
-      const newSupplierId = info.data?.wholesaler_id;
+      const newOrderId = info.data?.order_id;
 
-      if (newSupplierId) {
+      if (newOrderId) {
         // Build the new "edit mode" URL.
-        const newUrl = `/suppliers/${newSupplierId}`;
+        const newUrl = `/orders/${newOrderId}`;
 
         // Navigate to the new URL to switch to edit mode.
         // invalidateAll is crucial to re-run the load function with the new ID.
         await goto(newUrl, { invalidateAll: true });
       } else {
         // This is a fallback case in case the API response was malformed.
-        log.error("Could not redirect after create: new wholesaler_id is missing from response.", { data: info.data });
+        log.error("Could not redirect after create: new order_id is missing from response.", { data: info.data });
         addNotification("Could not redirect to edit page, returning to list.", "error");
-        // Do not go to suppliers because we are in an invalid state.
+        // Do not go to orders because we are in an invalid state.
       }
     } else {
       // FormShell has already updated its state.
@@ -126,12 +134,12 @@
     }
   }
 
-  async function handleFormSubmitError(info: { data: Wholesaler; error: unknown }) {
+  async function handleFormSubmitError(info: { data: Order; error: unknown }) {
     log.error(`Form submit error`, info.error);
     addNotification(`Form submit error: ${info.error}`, "error");
   }
 
-  async function handleFormCancelled(info: { data: Wholesaler; reason?: string }) {
+  async function handleFormCancelled(info: { data: Order; reason?: string }) {
     log.debug(`Form cancelled`);
     addNotification(`Form cancelled.`, "info");
   }
@@ -143,7 +151,7 @@
   // ===== HELPERS =====
 
   /**
-   * Reload categories and set them into the state.
+   * Reload order items and set them into the state.
    */
   async function reloadOrderItems() {
     assertDefined(order, "order");
@@ -181,7 +189,7 @@
   }
 
   /**
-   * Navigates to the next hierarchy level (offerings for a category).
+   * Navigates to the next hierarchy level.
    */
   function handleOrderItemSelect(order: Order_Wholesaler) {
     goto(`${page.url.pathname}/oderitems/${order.order_id}`);
@@ -211,12 +219,12 @@
 </script>
 
 <!-- TEMPLATE  with conditional rendering based on loading state -->
-{#if errors.length > 0}
+{#if (Object.keys(errors).length > 0)}
   <div class="component-error-boundary">
     <h3>Errors</h3>
     <p>{@html stringifyForHtml(errors)}</p>
   </div>
-{:else if isLoading || !order}
+{:else if isLoading }
   <div class="detail-page-layout">Loading details...</div>
 {:else}
   <!-- The main UI is only rendered on success, using the `resolvedData` state. -->
@@ -234,11 +242,11 @@
       />
     </div>
 
-    <!-- Section 3: Grid of assigned categories -->
+    <!-- Section 3: Grid  -->
 
     <div class="grid-section">
       {#if data.isCreateMode}
-        <p>Order items will be available after category has been saved.</p>
+        <p>Order items will be available after order has been saved.</p>
       {:else}
         <h2>Order Items</h2>
         <div class="grid-section">

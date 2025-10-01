@@ -395,6 +395,7 @@ copyMetaFrom(OrderSchema, OrderForCreateSchema);
 export const Order_Wholesaler_Schema = OrderSchema.extend ({
   wholesaler: WholesalerSchema
 })
+copyMetaFrom(OrderSchema, Order_Wholesaler_Schema);
 
 // ===== ORDER ITEM (dbo.order_items) =====
 
@@ -431,6 +432,7 @@ export const OrderItem_ProdDef_Category_Schema = OrderItemSchema.extend({
   product_def: ProductDefinitionSchema,
   category: ProductCategorySchema,
 });
+copyMetaFrom(OrderItemSchema, OrderItem_ProdDef_Category_Schema);
 
 // ===== SCHEMAS => TYPES  =====
 
@@ -473,3 +475,5 @@ export const AllBrandedSchemas = {
 
 // ===== HELPER EXPORT =====
 export { createSchemaWithMeta, type WithMeta };
+
+// DEBUG: log.debug(`+++++ domainTypes.ts, Order_Wholesaler_Schema: ${JSON.stringify(Order_Wholesaler_Schema, null, 4)}`)

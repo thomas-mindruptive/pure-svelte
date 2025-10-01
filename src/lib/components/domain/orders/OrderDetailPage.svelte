@@ -3,21 +3,21 @@
   import { goto } from "$app/navigation";
   import { addNotification } from "$lib/stores/notifications";
   import { log } from "$lib/utils/logger";
-// Component Imports
+  // Component Imports
   import "$lib/components/styles/assignment-section.css";
   import "$lib/components/styles/detail-page-layout.css";
   import "$lib/components/styles/grid-section.css";
-// API & Type Imports
+  // API & Type Imports
   import { ApiClient } from "$lib/api/client/ApiClient";
   import type { ColumnDefBase, DeleteStrategy, ID, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
   import {
-      OrderItem_ProdDef_Category_Schema,
-      OrderSchema,
-      WholesalerSchema,
-      type Order,
-      type Order_Wholesaler,
-      type OrderItem_ProdDef_Category,
-      type Wholesaler,
+    OrderItem_ProdDef_Category_Schema,
+    OrderSchema,
+    WholesalerSchema,
+    type Order,
+    type Order_Wholesaler,
+    type OrderItem_ProdDef_Category,
+    type Wholesaler,
   } from "$lib/domain/domainTypes";
 
   import { page } from "$app/state";
@@ -34,7 +34,18 @@
 
   // === PROPS ====================================================================================
 
-  let { data }: { data: { orderId: number; isCreateMode: boolean; loadEventFetch: typeof fetch } } = $props();
+  let {
+    data,
+  }: {
+    data: {
+      orderId: number;
+      isCreateMode: boolean;
+      isOrdersRoute: boolean;
+      isSuppliersRoute: boolean;
+      loadEventFetch: typeof fetch;
+      params: Record<string, number | string>;
+    };
+  } = $props();
 
   // === STATE ====================================================================================
 
@@ -77,7 +88,7 @@
           orderItems = [];
         } else {
           /**
-           * NOTE: We collect val errors but we throw in case of other errors, see "catch".
+           * NOTE: We collect validation errors but we throw in case of other errors, see "catch".
            */
           [order, orderItems] = await Promise.all([orderApi.loadOrder(data.orderId), orderApi.loadOrderItemsForOrder(data.orderId)]);
           const orderValidationResult = OrderSchema.safeParse(order);
@@ -92,7 +103,6 @@
           }
         }
         if (aborted) return;
-
       } catch (rawError: any) {
         // Throw error for severe problems!
         if (aborted) return;
@@ -230,12 +240,12 @@
 </script>
 
 <!-- TEMPLATE  with conditional rendering based on loading state -->
-{#if (Object.keys(errors).length > 0)}
+{#if Object.keys(errors).length > 0}
   <div class="component-error-boundary">
     <h3>Errors</h3>
     <p>{@html stringifyForHtml(errors)}</p>
   </div>
-{:else if isLoading }
+{:else if isLoading}
   <div class="detail-page-layout">Loading details...</div>
 {:else}
   <!-- The main UI is only rendered on success, using the `resolvedData` state. -->

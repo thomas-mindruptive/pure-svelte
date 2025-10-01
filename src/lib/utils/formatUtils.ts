@@ -80,3 +80,20 @@ export function stringifyForHtml(thing: unknown) {
     return hmtl;
 }
 
+  /**
+   * Formats an ISO date string to YYYY-MM-DD for HTML5 date input
+   */
+  export function formatDateForInput(dateString: string | null | undefined): string {
+    if (!dateString) return "";
+    return new Date(dateString).toISOString().split('T')[0];
+  }
+
+  /**
+   * Converts YYYY-MM-DD to ISO string for API consistency
+   */
+  export function formatDateForApi(dateString: string): string {
+    if (!dateString) return "";
+    // Create date at midnight UTC
+    return new Date(dateString + 'T00:00:00.000Z').toISOString();
+  }
+

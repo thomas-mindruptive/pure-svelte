@@ -194,7 +194,7 @@ export function getOrderApi(client: ApiClient) {
           { method: "POST", body: createJsonBody(request) },
           { context: operationId },
         );
-        if (responseData.results?.length > 1) {
+        if (responseData.results && responseData.results.length > 0) {
           // Transform flat recordset to nested objects
           const transformed = transformToNestedObjects(
             responseData.results as Record<string, unknown>[],

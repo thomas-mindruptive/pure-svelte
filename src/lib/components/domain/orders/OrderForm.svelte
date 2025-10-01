@@ -15,6 +15,7 @@
   import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
   import { assertDefined } from "$lib/utils/assertions";
   import { getOrderApi } from "$lib/api/client/order";
+    import { formatDateForInput, formatDateForApi } from "$lib/utils/formatUtils";
 
   type ValidationErrors = Record<string, string[]>;
 
@@ -32,6 +33,17 @@
   };
 
   const { initial, isCreateMode, availableWholesalers, disabled = false, onSubmitted, onSubmitError, onCancelled, onChanged }: Props = $props();
+
+  // === DEFAULTS =================================================================================
+
+  // Apply default values
+  const initialWithDefaults = $derived.by(() => {
+    const base = initial || {};
+    return {
+      ...base,
+      status: base.status ?? "pending",
+    } as Order;
+  });
 
   // === API ======================================================================================
 
@@ -81,22 +93,7 @@
 
   // ===== HELPERS =====
 
-  /**
-   * Formats an ISO date string to YYYY-MM-DD for HTML5 date input
-   */
-  function formatDateForInput(dateString: string | null | undefined): string {
-    if (!dateString) return "";
-    return new Date(dateString).toISOString().split('T')[0];
-  }
 
-  /**
-   * Converts YYYY-MM-DD to ISO string for API consistency
-   */
-  function formatDateForApi(dateString: string): string {
-    if (!dateString) return "";
-    // Create date at midnight UTC
-    return new Date(dateString + 'T00:00:00.000Z').toISOString();
-  }
 
   // ===== FORM CALLBACKS =====
 
@@ -137,8 +134,9 @@
 <ValidationWrapper errors={schemaValidationErrors}>
   <FormShell
     entity="Order"
-    initial={initial as Order}
+    initial={initialWithDefaults as Order}
     validate={validateOrder}
+    autoValidate="change"
     submitCbk={submitOrder}
     {disabled}
     onSubmitted={handleSubmitted}

@@ -53,7 +53,6 @@
   let orderItems = $state<OrderItem_ProdDef_Category[] | null>(null);
   let availableWholesalers = $state<Wholesaler[]>([]);
   let isLoading = $state(true);
-  //let loadingError = $state<{ message: string; status?: number } | null>(null);
   const errors = $state<Record<string, ValErrorRecord>>({});
   const allowForceCascadingDelte = $state(true);
 

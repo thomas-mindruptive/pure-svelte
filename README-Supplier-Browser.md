@@ -136,7 +136,13 @@ The `/api/query` endpoint is a central architectural component that handles all 
 
 #### Purpose
 - **Complex JOINs**: Multi-table operations that require predefined, optimized query structures.
-- **Named Queries**: Predefined query configurations like `supplier_categories`, `product_definition_offerings`, etc.
+- **Named Queries**: Predefined query configurations (see `queryConfig.ts`):
+  - `supplier_categories` - Suppliers with assigned categories
+  - `category_offerings` - Categories with offerings and product definitions
+  - `offering->product_def->category->wholesaler` - Complete offering data with all relations
+  - `order->wholesaler` - Orders with wholesaler information
+  - `order->order_items->product_def->category` - Orders with items and product details
+  - `offering_attributes`, `offering_links` - Offering relationships
 - **Security**: All table and alias access is validated against a central `aliasedTablesConfig` on the server to prevent unauthorized data access.
 
 ### Master Data Pattern: QueryPayload + Individual CRUD
@@ -282,6 +288,18 @@ The client implements a highly robust **Optimistic Delete** pattern managed by a
 | Create | `POST /api/offerings/new` | `Omit<Offering, 'offering_id'>` | ✅ | ✅ | Body must contain all FKs. |
 | Update | `PUT /api/offerings/[id]` | `Partial<Offering>` | ✅ | ✅ | |
 | Delete | `DELETE /api/offerings/[id]` | - | ✅ | ✅ | |
+| **ORDERS (Master Data)** | | | | | |
+| Query List | `POST /api/orders` | `QueryRequest<Order>` | ✅ | ✅ | |
+| Read Single | `GET /api/orders/[id]` | - | ✅ | ✅ | |
+| Create | `POST /api/orders/new` | `Omit<Order, 'order_id'>` | ✅ | ✅ | |
+| Update | `PUT /api/orders/[id]` | `Partial<Order>` | ✅ | ✅ | |
+| Delete | `DELETE /api/orders/[id]` | `DeleteRequest<Order>` | ✅ | ✅ | |
+| **ORDER ITEMS (Hierarchical - 1:n)** | | | | | |
+| Query via JOINs | `POST /api/query` | `namedQuery: 'order->order_items->product_def->category'` | ✅ | ✅ | |
+| Read Single | `GET /api/order-items/[id]` | - | ✅ | ✅ | |
+| Create | `POST /api/order-items/new` | `Omit<OrderItem, 'order_item_id'>` | ✅ | ✅ | |
+| Update | `PUT /api/order-items/[id]` | `Partial<OrderItem>` | ✅ | ✅ | |
+| Delete | `DELETE /api/order-items/[id]` | `DeleteRequest<OrderItem>` | ✅ | ✅ | |
 | **SUPPLIER-CATEGORIES (Assignment - n:m)** | | | | | |
 | Query via JOINs | `POST /api/query` | `namedQuery: 'supplier_categories'` | ✅ | ✅ | |
 | Create Assignment | `POST /api/supplier-categories` | `AssignmentRequest` | ✅ | ✅ | |
@@ -557,6 +575,12 @@ The frontend follows a **Domain-Driven file structure** combined with a **Page D
 - `src/routes/(browser)/suppliers/+page.ts` (Route delegation)
 - `src/lib/components/domain/suppliers/supplierListPage.ts` (Domain load logic)
 - `src/lib/components/domain/suppliers/SupplierListPage.svelte` (Domain UI component)
+
+**Note (Detail Pages):** For complex detail pages with nested data loading (e.g., OrderDetailPage), the pattern has evolved:
+- Load function extracts **only** URL params, route context, and `loadEventFetch`
+- Component's `$effect` handles **all async data loading** with proper cleanup
+- No Promise-based validation in load function
+- Reference: `OrderDetailPage.svelte:70`, `orderDetailPage.ts:8`
 
 ### Client-side deletion helpers 
 To handle different deletion scenarios in a type-safe manner, the generic `cascadeDelete` helper has been refactored into two specialized functions:

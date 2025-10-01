@@ -48,6 +48,13 @@ const WholesalerSchema = createSchemaWithMeta(
 );
 ```
 
+**CRITICAL:** When creating derived schemas (e.g., with `.extend()`, `.omit()`, `.pick()`), always copy metadata:
+```typescript
+const ExtendedSchema = BaseSchema.extend({ newField: z.string() });
+copyMetaFrom(BaseSchema, ExtendedSchema); // REQUIRED - metadata is lost otherwise
+```
+Without `copyMetaFrom()`, the derived schema will lack `__brandMeta` and fail in `genTypedQualifiedColumns()`.
+
 ## Type System
 
 ### Meta Information Extraction
@@ -199,41 +206,95 @@ for (const [name, schema] of Object.entries(AllBrandedSchemas)) {
 }
 ```
 
-## Usage Examples
+## Complete Workflow: Nested Schemas with JOIN Queries
 
-### Define JOIN Schema with Nested Branded Schemas
+### The Pattern (Recommended for all JOIN queries)
+
+**When to use:** Whenever you need to query data from multiple joined tables (e.g., OrderItems with Product and Category data).
+
+**Why nested schemas:** SQL returns FLAT recordsets with qualified columns like `ori.order_item_id`, `pd.title`, `pc.name`. We transform this into TypeScript objects with nested structure: `{ order_item_id, product_def: { title, ... }, category: { name, ... } }`.
+
+### Step 1: Define Nested Schema
 
 ```typescript
+// Extend base schema with nested branded schemas
 export const OrderItem_ProdDef_Category_Schema = OrderItemSchema.extend({
   product_def: ProductDefinitionSchema,  // Branded schema with _meta
   category: ProductCategorySchema        // Branded schema with _meta
 });
+copyMetaFrom(OrderItemSchema, OrderItem_ProdDef_Category_Schema); // CRITICAL - preserves metadata!
 ```
 
-### Generate Type-Safe Columns
+### Step 2: Generate Qualified SQL Columns
 
 ```typescript
-// Automatically generates correctly typed qualified columns
-const columns = genTypedQualifiedColumns(OrderItem_ProdDef_Category_Schema);
-// Type: ("order_item_id" | "quantity" | "pd.product_def_id" | "pd.title" | "pc.category_id" | "pc.name" | ...)[]
+// CRITICAL: For JOIN queries, ALWAYS use qualifyAllColsFully = true
+const cols = genTypedQualifiedColumns(OrderItem_ProdDef_Category_Schema, true);
+
+// WHY true is required:
+// ❌ Without true: ["order_item_id", "product_def_id", "category_id", "product_def_id", "category_id", ...]
+//    → DUPLICATE column names! (product_def_id appears in both order_items and product_definitions)
+//    → SQL returns ambiguous results, transformToNestedObjects fails
+//
+// ✅ With true: ["ori.order_item_id", "ori.product_def_id", "pd.product_def_id", "ori.category_id", "pc.category_id", ...]
+//    → Every column is UNIQUE and can be mapped to correct nested object
 ```
 
-### Use in Query Builder
+### Step 3: Execute Query
 
 ```typescript
-const query: QueryPayload<OrderItem_ProdDef_Category> = {
-  select: genTypedQualifiedColumns(OrderItem_ProdDef_Category_Schema),
-  from: { table: "dbo.order_items", alias: "ori" },
-  joins: [
-    {
-      type: JoinType.INNER,
-      table: "dbo.product_definitions",
-      alias: "pd",
-      on: { /* ... */ }
-    }
-  ]
+const request: PredefinedQueryRequest<OrderItem_ProdDef_Category> = {
+  namedQuery: "order->order_items->product_def->category",
+  payload: {
+    select: cols,  // Qualified columns from step 2
+    where: { key: "ori.order_item_id", whereCondOp: "=", val: orderItemId }
+  }
 };
+
+const responseData = await client.apiFetch<QueryResponseData<OrderItem_ProdDef_Category>>(
+  "/api/query",
+  { method: "POST", body: createJsonBody(request) }
+);
+
+// responseData.results is FLAT with qualified keys:
+// [{ "ori.order_item_id": 1, "ori.quantity": 5, "pd.title": "Foo", "pc.name": "Bar" }]
 ```
+
+### Step 4: Transform Flat to Nested
+
+```typescript
+import { transformToNestedObjects } from "$lib/backendQueries/recordsetTransformer";
+
+const nestedObjects = transformToNestedObjects(
+  responseData.results as Record<string, unknown>[],
+  OrderItem_ProdDef_Category_Schema
+);
+
+// ✅ Result is NESTED TypeScript objects with correct types:
+// [{
+//   order_item_id: 1,
+//   quantity: 5,
+//   product_def: { product_def_id: 10, title: "Foo", ... },
+//   category: { category_id: 3, name: "Bar", ... }
+// }]
+```
+
+**Reference Implementation:** `src/lib/api/client/orderItem.ts:41-77`, `src/lib/api/client/supplier.ts:387-414`
+
+## Legacy Pattern: Flat Schemas (Deprecated)
+
+**Avoid:** Creating flat schemas with aliased fields. This duplicates field definitions and loses type safety.
+
+```typescript
+// ❌ LEGACY - Do not use for new code
+export const OrderItem_Flat_Schema = z.object({
+  order_item_id: z.number(),
+  product_def_title: z.string(),  // Duplicates ProductDefinitionSchema.title
+  category_name: z.string()        // Duplicates ProductCategorySchema.name
+});
+```
+
+Use nested schemas with `transformToNestedObjects` instead.
 
 ## Architecture Benefits
 

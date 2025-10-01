@@ -82,6 +82,38 @@ export const queryConfig: QueryConfig = {
         },
       ],
     },
+    "offering->product_def->category->wholesaler": {
+      from: { table: "dbo.wholesaler_item_offerings", alias: "wio" },
+      joins: [
+        {
+          type: JoinType.INNER,
+          table: "dbo.product_definitions",
+          alias: "pd",
+          on: {
+            joinCondOp: LogicalOperator.AND,
+            conditions: [{ columnA: "wio.product_def_id", op: ComparisonOperator.EQUALS, columnB: "pd.product_def_id" }],
+          },
+        },
+        {
+          type: JoinType.INNER,
+          table: "dbo.product_categories",
+          alias: "pc",
+          on: {
+            joinCondOp: LogicalOperator.AND,
+            conditions: [{ columnA: "wio.category_id", op: ComparisonOperator.EQUALS, columnB: "pc.category_id" }],
+          },
+        },
+        {
+          type: JoinType.INNER,
+          table: "dbo.wholesalers",
+          alias: "w",
+          on: {
+            joinCondOp: LogicalOperator.AND,
+            conditions: [{ columnA: "wio.wholesaler_id", op: ComparisonOperator.EQUALS, columnB: "w.wholesaler_id" }],
+          },
+        },
+      ],
+    },
     wholesaler_category_offerings: {
       from: { table: "dbo.wholesaler_categories", alias: "wc" },
       joins: [

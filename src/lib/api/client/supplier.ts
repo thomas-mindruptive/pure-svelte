@@ -388,9 +388,9 @@ export function getSupplierApi(client: ApiClient) {
       const operationId = `loadOfferingsForSupplier-${supplierId}`;
       supplierLoadingOperations.start(operationId);
       try {
-        const cols = genTypedQualifiedColumns(WholesalerItemOffering_ProductDef_Category_Supplier_NestedSchema);
+        const cols = genTypedQualifiedColumns(WholesalerItemOffering_ProductDef_Category_Supplier_NestedSchema, true);
         const request: PredefinedQueryRequest<WholesalerItemOffering_ProductDef_Category_Supplier_Nested> = {
-          namedQuery: "category_offerings",
+          namedQuery: "offering->product_def->category->wholesaler",
           payload: {
             select: cols,
             where: {

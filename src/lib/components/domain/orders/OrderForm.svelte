@@ -1,7 +1,7 @@
 <script lang="ts">
   import FormShell from "$lib/components/forms/FormShell.svelte";
   import { log } from "$lib/utils/logger";
-  import { OrderSchema, type Order } from "$lib/domain/domainTypes";
+  import { OrderSchema, type Order, type Wholesaler } from "$lib/domain/domainTypes";
   import "$lib/components/styles/form.css";
   import "$lib/components/styles/grid.css";
   import { ApiClient } from "$lib/api/client/ApiClient";
@@ -23,6 +23,7 @@
   export type Props = {
     initial?: Order | undefined | null;
     isCreateMode: boolean;
+    availableWholesalers: Wholesaler[];
     disabled?: boolean;
     onSubmitted?: SubmittedCallback;
     onSubmitError?: SubmitErrorCallback;
@@ -30,7 +31,7 @@
     onChanged?: ChangedCallback;
   };
 
-  const { initial, isCreateMode, disabled = false, onSubmitted, onSubmitError, onCancelled, onChanged }: Props = $props();
+  const { initial, isCreateMode, availableWholesalers, disabled = false, onSubmitted, onSubmitError, onCancelled, onChanged }: Props = $props();
 
   // === API ======================================================================================
 
@@ -76,6 +77,25 @@
       valid: Object.keys(errors).length === 0,
       errors,
     };
+  }
+
+  // ===== HELPERS =====
+
+  /**
+   * Formats an ISO date string to YYYY-MM-DD for HTML5 date input
+   */
+  function formatDateForInput(dateString: string | null | undefined): string {
+    if (!dateString) return "";
+    return new Date(dateString).toISOString().split('T')[0];
+  }
+
+  /**
+   * Converts YYYY-MM-DD to ISO string for API consistency
+   */
+  function formatDateForApi(dateString: string): string {
+    if (!dateString) return "";
+    // Create date at midnight UTC
+    return new Date(dateString + 'T00:00:00.000Z').toISOString();
   }
 
   // ===== FORM CALLBACKS =====
@@ -169,14 +189,36 @@
               id="order-date"
               name="order_date"
               type="date"
-              value={getS("order_date") ?? ""}
+              value={formatDateForInput(getS("order_date"))}
               class:invalid={errors.order_date}
-              oninput={(e) => set(["order_date"], (e.currentTarget as HTMLInputElement).value)}
+              oninput={(e) => set(["order_date"], formatDateForApi((e.currentTarget as HTMLInputElement).value))}
               onblur={() => markTouched("order_date")}
               required
             />
             {#if errors.order_date}
               <div class="error-text">{errors.order_date[0]}</div>
+            {/if}
+          </div>
+
+          <!-- Wholesaler/Supplier -->
+          <div class="form-group">
+            <label for="wholesaler">Supplier *</label>
+            <select
+              id="wholesaler"
+              name="wholesaler_id"
+              value={getS("wholesaler_id") ?? ""}
+              class:invalid={errors.wholesaler_id}
+              onchange={(e) => set(["wholesaler_id"], parseInt((e.currentTarget as HTMLSelectElement).value))}
+              onblur={() => markTouched("wholesaler_id")}
+              required
+            >
+              <option value="">Select supplier...</option>
+              {#each availableWholesalers as wholesaler (wholesaler.wholesaler_id)}
+                <option value={wholesaler.wholesaler_id}>{wholesaler.name}</option>
+              {/each}
+            </select>
+            {#if errors.wholesaler_id}
+              <div class="error-text">{errors.wholesaler_id[0]}</div>
             {/if}
           </div>
 

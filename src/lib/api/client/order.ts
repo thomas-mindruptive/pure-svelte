@@ -52,6 +52,7 @@ export function getOrderApi(client: ApiClient) {
       try {
         const predefQuery: PredefinedQueryRequest<Order_Wholesaler> = {
           namedQuery: "order->wholesaler",
+          payload: query,
         };
         const responseData = await client.apiFetch<QueryResponseData<Order_Wholesaler>>(
           "/api/query",

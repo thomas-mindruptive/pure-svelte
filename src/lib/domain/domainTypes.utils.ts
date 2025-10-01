@@ -1,9 +1,8 @@
 // File: src/lib/domain/domainTypes.utils.ts
 
 import { log } from "$lib/utils/logger";
-import z, { ZodError, type ZodIssue } from "zod";
+import z from "zod";
 import { AllBrandedSchemas } from "./domainTypes";
-import type { SafeParseReturnType } from "zod/v3";
 
 // ===== TYPE DEFINITIONS FOR BRANDED SCHEMAS =====
 

@@ -3,33 +3,34 @@
   import { goto } from "$app/navigation";
   import { addNotification } from "$lib/stores/notifications";
   import { log } from "$lib/utils/logger";
-  // Component Imports
+// Component Imports
   import "$lib/components/styles/assignment-section.css";
   import "$lib/components/styles/detail-page-layout.css";
   import "$lib/components/styles/grid-section.css";
-  // API & Type Imports
+// API & Type Imports
   import { ApiClient } from "$lib/api/client/ApiClient";
   import type { ColumnDefBase, DeleteStrategy, ID, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
   import {
-    OrderItem_ProdDef_Category_Schema,
-    OrderSchema,
-    type Order,
-    type Order_Wholesaler,
-    type OrderItem_ProdDef_Category,
-    type Wholesaler,
+      OrderItem_ProdDef_Category_Schema,
+      OrderSchema,
+      WholesalerSchema,
+      type Order,
+      type Order_Wholesaler,
+      type OrderItem_ProdDef_Category,
+      type Wholesaler,
   } from "$lib/domain/domainTypes";
-  import { z } from "zod";
 
   import { page } from "$app/state";
   import { cascadeDelete } from "$lib/api/client/cascadeDelete";
   import { getOrderApi, orderLoadingState } from "$lib/api/client/order";
+  import { getSupplierApi } from "$lib/api/client/supplier";
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
+  import { safeParseFirstN, toErrorRecord, type ValErrorRecord } from "$lib/domain/domainTypes.utils";
   import { assertDefined } from "$lib/utils/assertions";
+  import { stringifyForHtml } from "$lib/utils/formatUtils";
   import { stringsToNumbers } from "$lib/utils/typeConversions";
   import { error } from "@sveltejs/kit";
   import OrderForm from "./OrderForm.svelte";
-  import { safeParseFirstN, toErrorRecord, type ValErrorRecord } from "$lib/domain/domainTypes.utils";
-  import { stringifyForHtml } from "$lib/utils/formatUtils";
 
   // === PROPS ====================================================================================
 
@@ -39,6 +40,7 @@
 
   let order = $state<Order | null>(null);
   let orderItems = $state<OrderItem_ProdDef_Category[] | null>(null);
+  let availableWholesalers = $state<Wholesaler[]>([]);
   let isLoading = $state(true);
   //let loadingError = $state<{ message: string; status?: number } | null>(null);
   const errors = $state<Record<string, ValErrorRecord>>({});
@@ -48,6 +50,7 @@
 
   const client = new ApiClient(data.loadEventFetch);
   const orderApi = getOrderApi(client);
+  const supplierApi = getSupplierApi(client);
 
   // === LOAD =====================================================================================
 
@@ -61,16 +64,24 @@
       isLoading = true;
 
       try {
+        // Load wholesalers for the form (needed in both CREATE and EDIT mode)
+        availableWholesalers = await supplierApi.loadSuppliers();
+        const wholesalersValidationResult = safeParseFirstN(WholesalerSchema, availableWholesalers, 3);
+        if (wholesalersValidationResult.error) {
+          errors.wholesalers = toErrorRecord(wholesalersValidationResult.error);
+          log.error(`Error validating wholesalers:`, errors.wholesalers);
+        }
+
         if (data.isCreateMode) {
-          order = null; 
+          order = null;
           orderItems = [];
         } else {
           /**
-           * NOTE: We collect val errors but we throw in case of other errors, see "catch".  
+           * NOTE: We collect val errors but we throw in case of other errors, see "catch".
            */
           [order, orderItems] = await Promise.all([orderApi.loadOrder(data.orderId), orderApi.loadOrderItemsForOrder(data.orderId)]);
           const orderValidationResult = OrderSchema.safeParse(order);
-          const orderItemsValidationResult = safeParseFirstN(OrderItem_ProdDef_Category_Schema, orderItems, 3); // z.array(OrderItem_ProdDef_Category_Schema).safeParse(orderItems);
+          const orderItemsValidationResult = safeParseFirstN(OrderItem_ProdDef_Category_Schema, orderItems, 3);
           if (orderValidationResult.error) {
             errors.order = toErrorRecord(orderValidationResult.error);
             log.error(`Error validating order:`, errors.order);
@@ -234,6 +245,7 @@
       <OrderForm
         isCreateMode={data.isCreateMode}
         initial={order}
+        {availableWholesalers}
         disabled={$orderLoadingState}
         onSubmitted={handleFormSubmitted}
         onCancelled={handleFormCancelled}

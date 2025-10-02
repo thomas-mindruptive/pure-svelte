@@ -25,28 +25,53 @@
   } from "$lib/domain/domainTypes";
   // Schemas
   import { cascadeDeleteAssignments, type CompositeID } from "$lib/api/client/cascadeDelete";
-  import {
-    type SupplierDetailPage_LoadData,
-    type SupplierDetailPage_LoadDataAsync,
-  } from "$lib/components/domain/suppliers/supplierDetailPage.types";
   import type { ValidationErrorTree } from "$lib/components/validation/validation.types";
+  import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
   import { safeParseFirstN, zodToValidationErrorTree } from "$lib/domain/domainTypes.utils";
   import { assertDefined } from "$lib/utils/assertions";
-  import { stringifyForHtml } from "$lib/utils/formatUtils";
   import { stringsToNumbers } from "$lib/utils/typeConversions";
   import { error } from "@sveltejs/kit";
+  import { page } from "$app/state";
+
+
+  // ===== TYPES ===================================================================================
+
+  // TODO: Validate through typing, derived from navigationHierarchieConfig.
+  export type ChildRelationships = "categories" | "orders";
 
   // === PROPS ====================================================================================
 
-  let { data }: { data: SupplierDetailPage_LoadDataAsync } = $props();
+  //let { data }: { data: SupplierDetailPage_LoadDataAsync } = $props();
+
+  export interface SupplierDetailPageProps {
+    supplierId: number;
+    isCreateMode: boolean;
+    activeChildPath: ChildRelationships;
+    loadEventFetch: typeof fetch;
+    params: Record<string, number | string>;
+  }
+
+  let { data }: { data: SupplierDetailPageProps } = $props();
 
   // === STATE ====================================================================================
 
-  let resolvedData = $state<SupplierDetailPage_LoadData | null>(null);
+  let supplier = $state<Wholesaler | null>(null);
+  let assignedCategories = $state<WholesalerCategory_Category[]>([]);
+  let availableCategories = $state<ProductCategory[]>([]);
+
+  //let resolvedData = $state<SupplierDetailPage_LoadData | null>(null);
   let isLoading = $state(true);
   const errors = $state<Record<string, ValidationErrorTree>>({});
-  const isCreateMode = $derived(!resolvedData?.supplier);
   const allowForceCascadingDelte = $state(true);
+
+  // === API =====================================================================================
+
+  // The following code is executed only ONCE whe the component is mounted => this is OK.
+  if (!data.loadEventFetch) {
+    throw error(500, `SupplierDetailPage: data.loadEventFetch must be defined.`);
+  }
+  const client = new ApiClient(data.loadEventFetch);
+  const supplierApi = getSupplierApi(client);
 
   // === LOAD =====================================================================================
 
@@ -57,15 +82,19 @@
     const processPromises = async () => {
       // 1. Reset state for each new load.
       isLoading = true;
-      resolvedData = null;
+      //resolvedData = null;
 
       try {
         // 2. Resolve all promises in parallel.
-        const [supplier, assignedCategories, availableCategories] = await Promise.all([
-          data.supplier,
-          data.assignedCategories,
-          data.availableCategories,
-        ]);
+        // const [supplier, assignedCategories, availableCategories] = await Promise.all([
+        //   data.supplier,
+        //   data.assignedCategories,
+        //   data.availableCategories,
+        // ]);
+
+        supplier = await supplierApi.loadSupplier(data.supplierId);
+        ((assignedCategories = await supplierApi.loadCategoriesForSupplier(data.supplierId)),
+          (availableCategories = await supplierApi.loadAvailableCategoriesForSupplier(data.supplierId)));
 
         if (aborted) return;
 
@@ -87,7 +116,7 @@
         }
 
         // 5. On success, populate the state with the validated, resolved data.
-        resolvedData = { ...data, supplier, assignedCategories, availableCategories };
+        //resolvedData = { ...data, supplier, assignedCategories, availableCategories };
         //
       } catch (rawError: any) {
         // Throw error for severe problems!
@@ -112,13 +141,10 @@
 
   // === EVENTS & STRATEGIES ======================================================================
 
-  const client = new ApiClient(fetch);
-  const supplierApi = getSupplierApi(client);
-
   async function handleFormSubmitted(info: { data: Wholesaler; result: unknown }) {
     addNotification(`Supplier saved successfully.`, "success");
 
-    if (isCreateMode) {
+    if (data.isCreateMode) {
       log.info("Submit successful in CREATE mode. Navigating to edit page...");
 
       // Get the new ID from the event data.
@@ -165,17 +191,17 @@
    * Reload categories and set them into the state.
    */
   async function reloadCategories() {
-    assertDefined(resolvedData, "reloadCategories: Supplier must be loaded/available", ["supplier"]);
+    assertDefined(supplier, "reloadCategories: Supplier must be loaded/available");
 
-    const supplierId = resolvedData.supplier?.wholesaler_id;
+    const supplierId = supplier.wholesaler_id;
 
     log.info("Re-fetching category lists after assignment...");
     const [updatedAssigned, updatedAvailable] = await Promise.all([
       supplierApi.loadCategoriesForSupplier(supplierId),
       supplierApi.loadAvailableCategoriesForSupplier(supplierId),
     ]);
-    resolvedData.assignedCategories = updatedAssigned;
-    resolvedData.availableCategories = updatedAvailable;
+    assignedCategories = updatedAssigned;
+    availableCategories = updatedAvailable;
     log.info("Local state updated. UI will refresh seamlessly.");
   }
 
@@ -185,14 +211,17 @@
    * Handles the assignment of a new category.
    */
   async function assignCategory(category: ProductCategory, comment?: string, link?: string) {
-    if (!resolvedData) return;
-    const supplierId = resolvedData.supplier?.wholesaler_id;
+    assertDefined(category, "category");
 
-    if (!supplierId) {
+    if (data.isCreateMode) {
       log.error("Cannot assign category in create mode.");
       addNotification("Cannot assign category in create mode.", "error");
       return;
     }
+
+    assertDefined(supplier, "supplier");
+    const supplierId = supplier.wholesaler_id;
+
     try {
       const wholesalerCategory: Omit<WholesalerCategory, "wholesaler_id"> = {
         category_id: category.category_id,
@@ -217,9 +246,16 @@
     log.info(`Deleting categories`, { ids });
     let dataChanged = false;
 
+    if (data.isCreateMode) {
+      log.error("Cannot delete category in create mode.");
+      addNotification("Cannot delte category in create mode.", "error");
+      return;
+    }
+
+    assertDefined(supplier, "supplier");
     const idsAsNumber = stringsToNumbers(ids);
     const compositeIds: CompositeID[] = idsAsNumber.map((id) => ({
-      parent1Id: resolvedData!.supplier!.wholesaler_id,
+      parent1Id: supplier!.wholesaler_id,
       parent2Id: id,
     }));
     dataChanged = await cascadeDeleteAssignments(
@@ -243,74 +279,96 @@
    * Navigates to the next hierarchy level (offerings for a category).
    */
   function handleCategorySelect(category: WholesalerCategory_Category) {
-    goto(`/suppliers/${category.wholesaler_id}/categories/${category.category_id}`);
+    goto(`${page.url.pathname}/categories/${category.category_id}`);
   }
 
   // Strategy objects for the CategoryGrid component.
   const deleteStrategy: DeleteStrategy<WholesalerCategory_Category> = {
     execute: handleCategoryDelete,
   };
+
   const rowActionStrategy: RowActionStrategy<WholesalerCategory_Category> = {
     click: handleCategorySelect,
   };
+
+  // === SNIPPETS =================================================================================
+
+  /**
+   * Renders the assigned categories grid section
+   */
 </script>
 
-<!-- TEMPLATE  with conditional rendering based on loading state -->
-{#if Object.keys(errors).length > 0}
-  <div class="component-error-boundary">
-    <h3>Errors</h3>
-    <p>{@html stringifyForHtml(errors)}</p>
-  </div>
-{:else if isLoading || !resolvedData}
-  <div class="detail-page-layout">Loading supplier details...</div>
-{:else}
-  <!-- The main UI is only rendered on success, using the `resolvedData` state. -->
-  <div class="detail-page-layout">
-    <!-- Section 1: Supplier details form -->
-    <div class="form-section">
-      <SupplierForm
-        initial={resolvedData.supplier}
-        disabled={$supplierLoadingState}
-        onSubmitted={handleFormSubmitted}
-        onCancelled={handleFormCancelled}
-        onSubmitError={handleFormSubmitError}
-        onChanged={handleFormChanged}
+<!------------------------------------------------------------------------------------------------
+  SNIPPETS 
+  ------------------------------------------------------------------------------------------------>
+
+<!-- CATEGORY GRID-------------------------------------------------------------------------------->
+{#snippet categoryGridSection()}
+  <div class="grid-section">
+    {#if data.isCreateMode}
+      <p>Assigned categories will be available after supplier has been saved.</p>
+    {:else}
+      <h2>Assigned Categories</h2>
+      <p>Products this supplier can offer are organized by these categories. Click a category to manage its product offerings.</p>
+      <SupplierCategoriesGrid
+        rows={assignedCategories}
+        loading={$categoryLoadingState}
+        {deleteStrategy}
+        {rowActionStrategy}
       />
-    </div>
-
-    <!-- Section 2: Assign new categories -->
-    <div class="assignment-section">
-      {#if resolvedData.supplier}
-        <CategoryAssignment
-          supplierId={resolvedData.supplier.wholesaler_id}
-          availableCategories={resolvedData.availableCategories}
-          loading={$categoryLoadingState}
-          assignCbk={assignCategory}
-          onError={(msg) => addNotification(msg, "error")}
-        />
-      {:else}
-        <p>Category assignment selection will be available after supplier has been saved.</p>
-      {/if}
-    </div>
-
-    <!-- Section 3: Grid of assigned categories -->
-
-    <div class="grid-section">
-      {#if resolvedData.supplier}
-        <h2>Assigned Categories</h2>
-        <p>Products this supplier can offer are organized by these categories. Click a category to manage its product offerings.</p>
-        <SupplierCategoriesGrid
-          rows={resolvedData.assignedCategories}
-          loading={$categoryLoadingState}
-          {deleteStrategy}
-          {rowActionStrategy}
-        />
-      {:else}
-        <p>Assigned categories will be available after supplier has been saved.</p>
-      {/if}
-    </div>
+    {/if}
   </div>
-{/if}
+{/snippet}
+
+<!------------------------------------------------------------------------------------------------
+  TEMPLATE 
+  ------------------------------------------------------------------------------------------------>
+<ValidationWrapper {errors}>
+  {#if isLoading}
+    <div class="detail-page-layout">Loading supplier details...</div>
+  {:else}
+    <!-- The main UI is only rendered on success, using the `resolvedData` state. -->
+    <div class="detail-page-layout">
+      <!-- Section 1: Supplier details form -->
+      <div class="form-section">
+        <SupplierForm
+          initial={supplier}
+          disabled={$supplierLoadingState}
+          onSubmitted={handleFormSubmitted}
+          onCancelled={handleFormCancelled}
+          onSubmitError={handleFormSubmitError}
+          onChanged={handleFormChanged}
+        />
+      </div>
+
+      <!-- Section 2: Assign new categories -->
+      <div class="assignment-section">
+        {#if supplier}
+          <CategoryAssignment
+            supplierId={supplier.wholesaler_id}
+            {availableCategories}
+            loading={$categoryLoadingState}
+            assignCbk={assignCategory}
+            onError={(msg) => addNotification(msg, "error")}
+          />
+        {:else}
+          <p>Category assignment selection will be available after supplier has been saved.</p>
+        {/if}
+      </div>
+
+      <!-- Section 3: Grid of assigned categories -->
+      {#if (data.activeChildPath = "categories")}
+        {@render categoryGridSection()}
+      {:else if (data.activeChildPath = "orders")}
+        <h1>TODO - Orders</h1>
+      {:else}
+        <div class="component-error-boundary">
+          Invalid child path: {data.activeChildPath}
+        </div>
+      {/if}
+    </div>
+  {/if}
+</ValidationWrapper>
 
 <style>
   .form-section {

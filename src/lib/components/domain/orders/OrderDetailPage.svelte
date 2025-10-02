@@ -59,6 +59,10 @@
 
   // === API =====================================================================================
 
+  // The following code is executed only ONCE whe the component is mounted => this is OK.
+  if (!data.loadEventFetch) {
+    throw error(500, `OrderDetailPage: data.loadEventFetch must be defined.`)
+  }
   const client = new ApiClient(data.loadEventFetch);
   const orderApi = getOrderApi(client);
   const orderItemApi = getOrderItemApi(client);

@@ -1,9 +1,7 @@
 <script lang="ts">
   import { default as confirmationStore, type ConfirmationOption } from "$lib/stores/confirmation";
   import { fade } from "svelte/transition";
-  import DOMPurify from "dompurify";
-  import { browser } from "$app/environment";
-  import { log } from "$lib/utils/logger";
+  import { stringifyForHtml } from "$lib/utils/formatUtils";
 
   let dialog: HTMLDialogElement;
 
@@ -11,14 +9,8 @@
 
   const formattedMessage = $derived.by(() => {
     const messageFromStore = $confirmationStore.message;
-    if (browser) {
-      const sanitizedMessage = DOMPurify.sanitize(messageFromStore.replace(/\n/g, "<br>"));
-      log.debug(`Raw message: ${messageFromStore}, Sanitized message: ${sanitizedMessage}`);
-      return sanitizedMessage;
-    } else {
-      log.debug(`browser is undefined, original message: ${messageFromStore}`);
-      return messageFromStore;
-    }
+    const sanitizedMessage = stringifyForHtml(messageFromStore);
+    return sanitizedMessage;
   });
 
   // Reagiert auf Änderungen im Store

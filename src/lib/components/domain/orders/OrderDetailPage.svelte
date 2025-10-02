@@ -25,13 +25,13 @@
   import { getOrderItemApi } from "$lib/api/client/orderItem";
   import { getSupplierApi } from "$lib/api/client/supplier";
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
-  import { safeParseFirstN, zodToValidationErrors } from "$lib/domain/domainTypes.utils";
+  import type { ValidationErrorTree } from "$lib/components/validation/validation.types";
+  import { safeParseFirstN, zodToValidationErrorTree } from "$lib/domain/domainTypes.utils";
   import { assertDefined } from "$lib/utils/assertions";
   import { stringifyForHtml } from "$lib/utils/formatUtils";
   import { stringsToNumbers } from "$lib/utils/typeConversions";
   import { error } from "@sveltejs/kit";
   import OrderForm from "./OrderForm.svelte";
-    import type { ValidationErrors } from "$lib/components/validation/validation.types";
 
   // === PROPS ====================================================================================
 
@@ -54,7 +54,7 @@
   let orderItems = $state<OrderItem_ProdDef_Category[] | null>(null);
   let availableWholesalers = $state<Wholesaler[]>([]);
   let isLoading = $state(true);
-  const errors = $state<Record<string, ValidationErrors>>({});
+  const errors = $state<Record<string, ValidationErrorTree>>({});
   const allowForceCascadingDelte = $state(true);
 
   // === API =====================================================================================
@@ -80,7 +80,7 @@
         availableWholesalers = await supplierApi.loadSuppliers();
         const wholesalersValidationResult = safeParseFirstN(WholesalerSchema, availableWholesalers, 3);
         if (wholesalersValidationResult.error) {
-          errors.wholesalers = zodToValidationErrors(wholesalersValidationResult.error);
+          errors.wholesalers = zodToValidationErrorTree(wholesalersValidationResult.error);
           log.error(`Error validating wholesalers:`, errors.wholesalers);
         }
 
@@ -95,11 +95,11 @@
           const orderValidationResult = OrderSchema.safeParse(order);
           const orderItemsValidationResult = safeParseFirstN(OrderItem_ProdDef_Category_Schema, orderItems, 3);
           if (orderValidationResult.error) {
-            errors.order = zodToValidationErrors(orderValidationResult.error);
+            errors.order = zodToValidationErrorTree(orderValidationResult.error);
             log.error(`Error validating order:`, errors.order);
           }
           if (orderItemsValidationResult.error) {
-            errors.orderItems = zodToValidationErrors(orderItemsValidationResult.error);
+            errors.orderItems = zodToValidationErrorTree(orderItemsValidationResult.error);
             log.error(`Error validating order items:`, errors.orderItems);
           }
         }
@@ -257,8 +257,8 @@
         isCreateMode={data.isCreateMode}
         initial={order}
         {availableWholesalers}
-        isOrdersRoute = {data.isOrdersRoute}
-        isSuppliersRoute = {data.isSuppliersRoute}
+        isOrdersRoute={data.isOrdersRoute}
+        isSuppliersRoute={data.isSuppliersRoute}
         disabled={$orderLoadingState}
         onSubmitted={handleFormSubmitted}
         onCancelled={handleFormCancelled}

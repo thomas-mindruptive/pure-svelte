@@ -1,43 +1,40 @@
 <!-- src/lib/pages/suppliers/SupplierDetailPage.svelte -->
 <script lang="ts">
   import { goto } from "$app/navigation";
-  import { log } from "$lib/utils/logger";
   import { addNotification } from "$lib/stores/notifications";
-
+  import { log } from "$lib/utils/logger";
   // Component Imports
-  import "$lib/components/styles/detail-page-layout.css";
-  import "$lib/components/styles/assignment-section.css";
-  import "$lib/components/styles/grid-section.css";
-  import SupplierForm from "$lib/components/domain/suppliers/SupplierForm.svelte";
-  import SupplierCategoriesGrid from "$lib/components/domain/suppliers/SupplierCategoriesGrid.svelte";
   import CategoryAssignment from "$lib/components/domain/suppliers/CategoryAssignment.svelte";
-
+  import SupplierCategoriesGrid from "$lib/components/domain/suppliers/SupplierCategoriesGrid.svelte";
+  import SupplierForm from "$lib/components/domain/suppliers/SupplierForm.svelte";
+  import "$lib/components/styles/assignment-section.css";
+  import "$lib/components/styles/detail-page-layout.css";
+  import "$lib/components/styles/grid-section.css";
   // API & Type Imports
+  import { ApiClient } from "$lib/api/client/ApiClient";
+  import { categoryLoadingState } from "$lib/api/client/category";
   import { getSupplierApi, supplierLoadingState } from "$lib/api/client/supplier";
+  import type { DeleteStrategy, ID, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
   import {
     type ProductCategory,
-    type WholesalerCategory_Category,
-    type WholesalerCategory,
-    type Wholesaler,
-    WholesalerSchema,
     ProductCategorySchema,
+    type Wholesaler,
+    type WholesalerCategory,
+    type WholesalerCategory_Category,
+    WholesalerSchema,
   } from "$lib/domain/domainTypes";
-  import { categoryLoadingState } from "$lib/api/client/category";
-  import { ApiClient } from "$lib/api/client/ApiClient";
-  import type { ID, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
-
   // Schemas
+  import { cascadeDeleteAssignments, type CompositeID } from "$lib/api/client/cascadeDelete";
   import {
     type SupplierDetailPage_LoadData,
     type SupplierDetailPage_LoadDataAsync,
   } from "$lib/components/domain/suppliers/supplierDetailPage.types";
+  import type { ValidationErrorTree } from "$lib/components/validation/validation.types";
+  import { safeParseFirstN, zodToValidationErrorTree } from "$lib/domain/domainTypes.utils";
   import { assertDefined } from "$lib/utils/assertions";
-  import { cascadeDeleteAssignments, type CompositeID } from "$lib/api/client/cascadeDelete";
-  import { stringsToNumbers } from "$lib/utils/typeConversions";
-  import { safeParseFirstN, zodToValidationErrors } from "$lib/domain/domainTypes.utils";
   import { stringifyForHtml } from "$lib/utils/formatUtils";
+  import { stringsToNumbers } from "$lib/utils/typeConversions";
   import { error } from "@sveltejs/kit";
-  import type { ValidationErrors } from "$lib/components/validation/validation.types";
 
   // === PROPS ====================================================================================
 
@@ -47,7 +44,7 @@
 
   let resolvedData = $state<SupplierDetailPage_LoadData | null>(null);
   let isLoading = $state(true);
-  const errors = $state<Record<string, ValidationErrors>>({});
+  const errors = $state<Record<string, ValidationErrorTree>>({});
   const isCreateMode = $derived(!resolvedData?.supplier);
   const allowForceCascadingDelte = $state(true);
 
@@ -77,15 +74,15 @@
         const availableCategoriesVal = safeParseFirstN(ProductCategorySchema, availableCategories, 3);
 
         if (supplierVal.error) {
-          errors.supplier = zodToValidationErrors(supplierVal.error);
+          errors.supplier = zodToValidationErrorTree(supplierVal.error);
           log.error("Supplier validation failed", errors.supplier);
         }
         if (assignedCategoriesVal.error) {
-          errors.assignedCategories = zodToValidationErrors(assignedCategoriesVal.error);
+          errors.assignedCategories = zodToValidationErrorTree(assignedCategoriesVal.error);
           log.error("Assigned categories validation failed", errors.assignedCategories);
         }
         if (availableCategoriesVal.error) {
-          errors.availableCategories = zodToValidationErrors(availableCategoriesVal.error);
+          errors.availableCategories = zodToValidationErrorTree(availableCategoriesVal.error);
           log.error("Available categories validation failed", errors.availableCategories);
         }
 

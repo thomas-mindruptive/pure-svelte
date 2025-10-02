@@ -440,7 +440,7 @@ export function zodToValidationErrors(error: z.ZodError): ValidationErrors {
  * }
  * ```
  */
-export function zodToValidationErrorTree_(error: z.ZodError): ValidationErrorTree {
+export function zodToValidationErrorTree(error: z.ZodError): ValidationErrorTree {
   const zodTree = z.treeifyError(error);
 
   function convertNode(node: unknown): ValidationErrorTree {

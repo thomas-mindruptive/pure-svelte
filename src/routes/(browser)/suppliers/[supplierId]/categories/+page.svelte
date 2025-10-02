@@ -1,4 +1,4 @@
-<!-- src/routes/suppliers/[supplierId]/categories/+page.svelte -->
+<!-- src/routes/suppliers/[supplierId]/+page.svelte -->
 <script lang="ts">
   /**
    * Route Delegator (UI)

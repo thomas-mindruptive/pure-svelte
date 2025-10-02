@@ -14,20 +14,30 @@
 
   // API & Type Imports
   import { getSupplierApi, supplierLoadingState } from "$lib/api/client/supplier";
-  import type { ProductCategory, WholesalerCategory_Category, WholesalerCategory, Wholesaler } from "$lib/domain/domainTypes";
+  import {
+    type ProductCategory,
+    type WholesalerCategory_Category,
+    type WholesalerCategory,
+    type Wholesaler,
+    WholesalerSchema,
+    ProductCategorySchema,
+  } from "$lib/domain/domainTypes";
   import { categoryLoadingState } from "$lib/api/client/category";
   import { ApiClient } from "$lib/api/client/ApiClient";
   import type { ID, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
 
   // Schemas
   import {
-    SupplierDetailPage_LoadDataSchema,
     type SupplierDetailPage_LoadData,
     type SupplierDetailPage_LoadDataAsync,
   } from "$lib/components/domain/suppliers/supplierDetailPage.types";
   import { assertDefined } from "$lib/utils/assertions";
   import { cascadeDeleteAssignments, type CompositeID } from "$lib/api/client/cascadeDelete";
   import { stringsToNumbers } from "$lib/utils/typeConversions";
+  import { safeParseFirstN, zodErrorToErrorRecord } from "$lib/domain/domainTypes.utils";
+  import { stringifyForHtml } from "$lib/utils/formatUtils";
+  import { error } from "@sveltejs/kit";
+  import type { ValidationErrors } from "$lib/components/validation/validation.types";
 
   // === PROPS ====================================================================================
 
@@ -37,7 +47,7 @@
 
   let resolvedData = $state<SupplierDetailPage_LoadData | null>(null);
   let isLoading = $state(true);
-  let loadingError = $state<{ message: string; status?: number } | null>(null);
+  const errors = $state<Record<string, ValidationErrors>>({});
   const isCreateMode = $derived(!resolvedData?.supplier);
   const allowForceCascadingDelte = $state(true);
 
@@ -50,7 +60,6 @@
     const processPromises = async () => {
       // 1. Reset state for each new load.
       isLoading = true;
-      loadingError = null;
       resolvedData = null;
 
       try {
@@ -63,33 +72,33 @@
 
         if (aborted) return;
 
-        // 3. Assemble the data object for validation.
-        const dataToValidate = {
-          supplier,
-          assignedCategories,
-          availableCategories,
-        };
+        const supplierVal = WholesalerSchema.nullable().safeParse(supplier);
+        const assignedCategoriesVal = safeParseFirstN(ProductCategorySchema, assignedCategories, 3);
+        const availableCategoriesVal = safeParseFirstN(ProductCategorySchema, availableCategories, 3);
 
-        // 4. Validate the resolved data against the Zod schema.
-        const validationResult = SupplierDetailPage_LoadDataSchema.safeParse(dataToValidate);
-
-        if (!validationResult.success) {
-          log.error("Zod validation failed", validationResult.error.issues);
-          // Treat a validation failure as a loading error.
-          throw new Error("SupplierDetailPage: Received invalid data structure from the API.");
+        if (supplierVal.error) {
+          errors.supplier = zodErrorToErrorRecord(supplierVal.error);
+          log.error("Supplier validation failed", errors.supplier);
+        }
+        if (assignedCategoriesVal.error) {
+          errors.assignedCategories = zodErrorToErrorRecord(assignedCategoriesVal.error);
+          log.error("Assigned categories validation failed", errors.assignedCategories);
+        }
+        if (availableCategoriesVal.error) {
+          errors.availableCategories = zodErrorToErrorRecord(availableCategoriesVal.error);
+          log.error("Available categories validation failed", errors.availableCategories);
         }
 
         // 5. On success, populate the state with the validated, resolved data.
-        resolvedData = validationResult.data;
+        resolvedData = { ...data, supplier, assignedCategories, availableCategories };
+        //
       } catch (rawError: any) {
+        // Throw error for severe problems!
         if (aborted) return;
-        // 6. Handle any error from fetching or validation.
         const status = rawError.status ?? 500;
-        const message = rawError.message || "Failed to load supplier details.";
-        loadingError = { message, status };
-        log.error("Promise processing failed", {
-          rawError,
-        });
+        const message = rawError.message || "Failed to load order details.";
+        log.error("Promise processing failed", { rawError });
+        throw error(status, message);
       } finally {
         if (!aborted) {
           // 7. Always end the loading state.
@@ -234,65 +243,6 @@
   }
 
   /**
-   * Executes the deletion process for category assignments.
-   */
-  // async function handleCategoryDelete_old(ids: ID[]): Promise<void> {
-  //   if (!resolvedData?.supplier) {
-  //     const msg = "Cannot delete catagory in create mode or when supplier not yet loaded.";
-  //     addNotification(msg, "error");
-  //     throw new Error(msg);
-  //   }
-
-  //   // The logic for this function remains complex and is unchanged.
-  //   // It correctly uses the client-side API.
-  //   let dataChanged = false;
-  //   for (const id of ids) {
-  //     const [supplierIdStr, categoryIdStr] = String(id).split("-");
-  //     const supplierId = Number(supplierIdStr);
-  //     const categoryId = Number(categoryIdStr);
-  //     if (isNaN(supplierId) || isNaN(categoryId)) continue;
-
-  //     const initialResult = await supplierApi.removeCategoryFromSupplier({
-  //       supplierId,
-  //       categoryId,
-  //       cascade: false,
-  //     });
-
-  //     if (initialResult.success) {
-  //       addNotification(`Category assignment removed.`, "success");
-  //       dataChanged = true;
-  //     } else if ("cascade_available" in initialResult && initialResult.cascade_available) {
-  //       const offeringCount = (initialResult.dependencies as any)?.offering_count ?? 0;
-  //       const confirmed = await requestConfirmation(
-  //         `This category has ${offeringCount} offerings for this supplier. Remove the assignment and all these offerings?`,
-  //         "Confirm Cascade Delete",
-  //       );
-  //       if (confirmed.confirmed) {
-  //         const cascadeResult = await supplierApi.removeCategoryFromSupplier({
-  //           supplierId,
-  //           categoryId,
-  //           cascade: true,
-  //         });
-  //         if (cascadeResult.success) {
-  //           addNotification("Category assignment and its offerings removed.", "success");
-  //           dataChanged = true;
-  //         } else {
-  //           addNotification(cascadeResult.message || "Failed to remove assignment.", "error");
-  //         }
-  //       }
-  //     } else {
-  //       addNotification(initialResult.message || "Could not remove assignment.", "error");
-  //     }
-  //   }
-
-  //   if (dataChanged) {
-  //     goto(`/suppliers/${resolvedData.supplier.wholesaler_id}`, {
-  //       invalidateAll: true,
-  //     });
-  //   }
-  // }
-
-  /**
    * Navigates to the next hierarchy level (offerings for a category).
    */
   function handleCategorySelect(category: WholesalerCategory_Category) {
@@ -309,10 +259,10 @@
 </script>
 
 <!-- TEMPLATE  with conditional rendering based on loading state -->
-{#if loadingError}
+{#if Object.keys(errors).length > 0}
   <div class="component-error-boundary">
-    <h3>Error Loading Supplier (Status: {loadingError.status})</h3>
-    <p>{loadingError.message}</p>
+    <h3>Errors</h3>
+    <p>{@html stringifyForHtml(errors)}</p>
   </div>
 {:else if isLoading || !resolvedData}
   <div class="detail-page-layout">Loading supplier details...</div>

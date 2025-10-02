@@ -9,7 +9,7 @@
 		RuntimeHierarchyItem
 	} from './HierarchySidebar.types';
 	// Step 1: Import validation utilities
-	import { validateTree } from '$lib/components/sidebarAndNav/hierarchyUtils';
+	import { validateHierarchies, validateTree } from '$lib/components/sidebarAndNav/hierarchyUtils';
 	import ValidationWrapper from '$lib/components/validation/ValidationWrapper.svelte';
     import type { ValidationError } from '../validation/validation.types';
 
@@ -89,6 +89,8 @@ function flattenTreeNode(
 
 	const flattenedItems = $derived(flattenHierarchy(hierarchy));
 
+	const validateAllHierarchies = validateHierarchies(hierarchy); 
+	
 	/**
 	 * Validates the incoming hierarchy prop and transforms errors into the format
 	 * expected by the ValidationWrapper component. Returns null if there are no errors.

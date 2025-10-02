@@ -25,12 +25,13 @@
   import { getOrderItemApi } from "$lib/api/client/orderItem";
   import { getSupplierApi } from "$lib/api/client/supplier";
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
-  import { safeParseFirstN, toErrorRecord, type ValErrorRecord } from "$lib/domain/domainTypes.utils";
+  import { safeParseFirstN, zodErrorToErrorRecord } from "$lib/domain/domainTypes.utils";
   import { assertDefined } from "$lib/utils/assertions";
   import { stringifyForHtml } from "$lib/utils/formatUtils";
   import { stringsToNumbers } from "$lib/utils/typeConversions";
   import { error } from "@sveltejs/kit";
   import OrderForm from "./OrderForm.svelte";
+    import type { ValidationErrors } from "$lib/components/validation/validation.types";
 
   // === PROPS ====================================================================================
 
@@ -53,7 +54,7 @@
   let orderItems = $state<OrderItem_ProdDef_Category[] | null>(null);
   let availableWholesalers = $state<Wholesaler[]>([]);
   let isLoading = $state(true);
-  const errors = $state<Record<string, ValErrorRecord>>({});
+  const errors = $state<Record<string, ValidationErrors>>({});
   const allowForceCascadingDelte = $state(true);
 
   // === API =====================================================================================
@@ -79,7 +80,7 @@
         availableWholesalers = await supplierApi.loadSuppliers();
         const wholesalersValidationResult = safeParseFirstN(WholesalerSchema, availableWholesalers, 3);
         if (wholesalersValidationResult.error) {
-          errors.wholesalers = toErrorRecord(wholesalersValidationResult.error);
+          errors.wholesalers = zodErrorToErrorRecord(wholesalersValidationResult.error);
           log.error(`Error validating wholesalers:`, errors.wholesalers);
         }
 
@@ -94,11 +95,11 @@
           const orderValidationResult = OrderSchema.safeParse(order);
           const orderItemsValidationResult = safeParseFirstN(OrderItem_ProdDef_Category_Schema, orderItems, 3);
           if (orderValidationResult.error) {
-            errors.order = toErrorRecord(orderValidationResult.error);
+            errors.order = zodErrorToErrorRecord(orderValidationResult.error);
             log.error(`Error validating order:`, errors.order);
           }
           if (orderItemsValidationResult.error) {
-            errors.orderItems = toErrorRecord(orderItemsValidationResult.error);
+            errors.orderItems = zodErrorToErrorRecord(orderItemsValidationResult.error);
             log.error(`Error validating order items:`, errors.orderItems);
           }
         }

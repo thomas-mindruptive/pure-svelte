@@ -7,8 +7,9 @@
  * of the client-side data fetching strategy.
  */
 
-import { type ValidationErrors, type QueryRequest } from '../api.types';
+import { type QueryRequest } from '../api.types';
 import type { QueryPayload } from '$lib/backendQueries/queryGrammar';
+import type { ValidationErrors } from '$lib/components/validation/validation.types';
 
 /**
  * A custom client-side error class that extends the native Error.

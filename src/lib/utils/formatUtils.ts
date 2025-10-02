@@ -70,7 +70,10 @@ export function sanitizeHtml(input: string): string {
  */
 export function convertToHtml(str: string | undefined) {
     if (!str) return "undefined";
-    const res= sanitizeHtml(str.replace(/\n/g, "<br>"));
+    // NOTE: Use this only if you need more than keeping whitespaces, newlines etc.:
+    //   const replaced = str.replace(/\n/g, "<br>")
+    // "<pre>" keeps whitespaces, tabs, and newlines.
+    const res= `<pre>${sanitizeHtml(str)}</pre>`;
     return res;
 }
 

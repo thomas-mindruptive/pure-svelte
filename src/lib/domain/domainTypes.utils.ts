@@ -3,6 +3,7 @@
 import { log } from "$lib/utils/logger";
 import z from "zod";
 import { AllBrandedSchemas } from "./domainTypes";
+import type { ValidationErrors } from "$lib/components/validation/validation.types";
 
 // ===== TYPE DEFINITIONS FOR BRANDED SCHEMAS =====
 
@@ -286,8 +287,6 @@ export function isTableInBrandedSchemas(tableName: string): boolean {
 
 // ===== VALIDATION UTILS =====
 
-export type ValErrorRecord = Record<string, string[]>;
-
 export type ValidationResultFor<S extends z.ZodTypeAny> =
   | {
       isValid: true;
@@ -296,7 +295,7 @@ export type ValidationResultFor<S extends z.ZodTypeAny> =
     }
   | {
       isValid: false;
-      errors: ValErrorRecord;
+      errors: ValidationErrors;
       sanitized: undefined;
     };
 
@@ -353,7 +352,7 @@ export function validateEntity<S extends z.ZodTypeAny>(schema: S, data: unknown)
  * @param zodParseResult - Raw result from `schema.safeParse()`
  * @returns Structured validation result with discriminated union type safety
  *
- * @see {@link toErrorRecord} for error formatting details
+ * @see {@link zodErrorToErrorRecord} for error formatting details
  */
 export function toValidationResult<S extends z.ZodTypeAny>(zodParseResult: z.ZodSafeParseResult<z.output<S>>): ValidationResultFor<S> {
   if (zodParseResult.success) {
@@ -363,7 +362,7 @@ export function toValidationResult<S extends z.ZodTypeAny>(zodParseResult: z.Zod
       sanitized: zodParseResult.data,
     };
   }
-  const errors = toErrorRecord(zodParseResult.error);
+  const errors = zodErrorToErrorRecord(zodParseResult.error);
   return {
     isValid: false,
     errors,
@@ -403,7 +402,7 @@ export function toValidationResult<S extends z.ZodTypeAny>(zodParseResult: z.Zod
  * }
  * ```
  */
-export function toErrorRecord(error: z.ZodError): ValErrorRecord {
+export function zodErrorToErrorRecord(error: z.ZodError): ValidationErrors {
   const { fieldErrors, formErrors } = z.flattenError(error);
 
   // Ensure we only keep fields that actually have messages

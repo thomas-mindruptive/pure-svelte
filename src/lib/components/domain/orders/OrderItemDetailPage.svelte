@@ -19,10 +19,11 @@
   import { getOrderApi } from "$lib/api/client/order";
   import { getOrderItemApi, orderItemLoadingState } from "$lib/api/client/orderItem";
   import { getSupplierApi } from "$lib/api/client/supplier";
-  import { toErrorRecord, type ValErrorRecord } from "$lib/domain/domainTypes.utils";
+  import { zodErrorToErrorRecord } from "$lib/domain/domainTypes.utils";
   import { stringifyForHtml } from "$lib/utils/formatUtils";
   import { error } from "@sveltejs/kit";
   import OrderItemForm from "./OrderItemForm.svelte";
+    import type { ValidationErrors } from "$lib/components/validation/validation.types";
 
   // === PROPS ====================================================================================
 
@@ -46,7 +47,7 @@
   let orderItem = $state<OrderItem_ProdDef_Category | null>(null);
   let availableOfferings = $state<WholesalerItemOffering_ProductDef_Category_Supplier_Nested[]>([]);
   let isLoading = $state(true);
-  const errors = $state<Record<string, ValErrorRecord>>({});
+  const errors = $state<Record<string, ValidationErrors>>({});
 
   // === API =====================================================================================
 
@@ -71,7 +72,7 @@
         order = await orderApi.loadOrder(data.orderId);
         const orderValidationResult = OrderSchema.safeParse(order);
         if (orderValidationResult.error) {
-          errors.order = toErrorRecord(orderValidationResult.error);
+          errors.order = zodErrorToErrorRecord(orderValidationResult.error);
           log.error(`Error validating order:`, errors.order);
         }
 
@@ -82,7 +83,7 @@
           orderItem = await orderItemApi.loadOrderItem(data.orderItemId!);
           const orderItemValidationResult = OrderItem_ProdDef_Category_Schema.safeParse(orderItem);
           if (orderItemValidationResult.error) {
-            errors.orderItem = toErrorRecord(orderItemValidationResult.error);
+            errors.orderItem = zodErrorToErrorRecord(orderItemValidationResult.error);
             log.error(`Error validating order item:`, errors.orderItem);
           }
         }

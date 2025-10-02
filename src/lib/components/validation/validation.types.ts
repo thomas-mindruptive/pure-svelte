@@ -4,3 +4,6 @@ export type ValidationError = {
   message: string;
   code?: string;
 };
+
+
+export type ValidationErrors = Record<string, string[]>;

@@ -15,6 +15,14 @@ import {
 } from '$lib/domain/domainTypes';
 import type { PromisifyComplex } from '$lib/utils/typeUtils';
 
+// --- Types ---
+
+/**
+ * We render the page with different datagrids depending on the path we are on.
+ */
+  const ChildRelationshipsArray = ["categories", "orders"] as const;
+  export type ChildRelationships = typeof ChildRelationshipsArray[number];
+
 // --- Zod Schema ---
 
 /**
@@ -38,10 +46,13 @@ export const SupplierDetailPage_LoadDataSchema = SupplierDetail_LoadDataSchema.e
 	assignedCategories: z.array(WholesalerCategory_CategorySchema),
 
 	// The list of categories available for assignment to this supplier. 
-	availableCategories: z.array(ProductCategorySchema)
+	availableCategories: z.array(ProductCategorySchema),
+
+	// We render the page with different datagrids depending on the path we are on.
+	activeChildPath: z.enum(ChildRelationshipsArray)
 });
 
-// --- TypeScript Type Exports ---
+// --- ZOD => TypeScript Type Exports ---
 
 /**
  * The type representing the final, resolved data structure for the page.

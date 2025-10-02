@@ -1,6 +1,7 @@
 // src/lib/api/api.types.ts
 
 import type { QueryPayload } from "$lib/backendQueries/queryGrammar";
+import type { ValidationErrors } from "$lib/components/validation/validation.types";
 
 /**
  * @file Common API Types - ORGANIZED GENERIC TYPE SYSTEM
@@ -27,7 +28,6 @@ export const HTTP_STATUS = {
 } as const;
 
 export type HttpStatusCode = (typeof HTTP_STATUS)[keyof typeof HTTP_STATUS];
-export type ValidationErrors = Record<string, string[]>;
 
 export interface ApiMeta {
   timestamp: string;

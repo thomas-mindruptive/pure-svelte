@@ -7,7 +7,7 @@ import { getSupplierApi } from "$lib/api/client/supplier";
 import { getOfferingApi } from "$lib/api/client/offering";
 import { buildBreadcrumb } from "$lib/components/sidebarAndNav/buildBreadcrumb";
 import type { RuntimeHierarchyTree, RuntimeHierarchyTreeNode } from "$lib/components/sidebarAndNav/HierarchySidebar.types";
-import { getAppHierarchies } from "./navHierarchyConfig";
+import { getAppHierarchies } from "../../lib/routes/navHierarchyConfig";
 import {
   convertToRuntimeTree,
   updateDisabledStates,
@@ -47,6 +47,7 @@ function initializeAndCacheHierarchies(): RuntimeHierarchyTree[] {
   const staticHierarchies = getAppHierarchies();
 
   // Check if tree names are unique.
+  // NOTE: The tree itself is validated in convertToRuntimeTree() belpw.
   const uniqueNameValRes = validateUniqueHierarchyNames(staticHierarchies);
   if (!uniqueNameValRes.isValid) {
     const msg = `Navigation tree names must be unique. ${JSON.stringify(uniqueNameValRes.errors, null, 4)}`;
@@ -234,10 +235,10 @@ export async function load({ url, params: urlParamsFromLoadEvent, depends, fetch
 
   log.debug(`nodesOnPath found by findNodesAnParamValuesForPath:`, nodesOnPath);
 
-  // Disable inactive tree
+  // Disable inactive trees
   for (const tree of allHierarchies) {
     if (tree.name === activeTree.name) {
-      // Für den active tree: USe logic based on consvered context navPath.
+      // For active tree: Use logic based on conserved context navPath.
       updateDisabledStates(tree, nodesOnPath);
     } else {
       // For inactive trees: Use logic with their own conserved navPath.

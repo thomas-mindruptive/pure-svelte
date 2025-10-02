@@ -352,7 +352,7 @@ export function validateEntity<S extends z.ZodTypeAny>(schema: S, data: unknown)
  * @param zodParseResult - Raw result from `schema.safeParse()`
  * @returns Structured validation result with discriminated union type safety
  *
- * @see {@link zodErrorToErrorRecord} for error formatting details
+ * @see {@link zodToValidationErrors} for error formatting details
  */
 export function toValidationResult<S extends z.ZodTypeAny>(zodParseResult: z.ZodSafeParseResult<z.output<S>>): ValidationResultFor<S> {
   if (zodParseResult.success) {
@@ -362,7 +362,7 @@ export function toValidationResult<S extends z.ZodTypeAny>(zodParseResult: z.Zod
       sanitized: zodParseResult.data,
     };
   }
-  const errors = zodErrorToErrorRecord(zodParseResult.error);
+  const errors = zodToValidationErrors(zodParseResult.error);
   return {
     isValid: false,
     errors,
@@ -402,7 +402,7 @@ export function toValidationResult<S extends z.ZodTypeAny>(zodParseResult: z.Zod
  * }
  * ```
  */
-export function zodErrorToErrorRecord(error: z.ZodError): ValidationErrors {
+export function zodToValidationErrors(error: z.ZodError): ValidationErrors {
   const { fieldErrors, formErrors } = z.flattenError(error);
 
   // Ensure we only keep fields that actually have messages

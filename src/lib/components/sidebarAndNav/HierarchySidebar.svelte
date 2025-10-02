@@ -89,8 +89,6 @@ function flattenTreeNode(
 
 	const flattenedItems = $derived(flattenHierarchy(hierarchy));
 
-	const validateAllHierarchies = validateHierarchies(hierarchy); 
-	
 	/**
 	 * Validates the incoming hierarchy prop and transforms errors into the format
 	 * expected by the ValidationWrapper component. Returns null if there are no errors.

@@ -34,7 +34,7 @@
   import { assertDefined } from "$lib/utils/assertions";
   import { cascadeDeleteAssignments, type CompositeID } from "$lib/api/client/cascadeDelete";
   import { stringsToNumbers } from "$lib/utils/typeConversions";
-  import { safeParseFirstN, zodErrorToErrorRecord } from "$lib/domain/domainTypes.utils";
+  import { safeParseFirstN, zodToValidationErrors } from "$lib/domain/domainTypes.utils";
   import { stringifyForHtml } from "$lib/utils/formatUtils";
   import { error } from "@sveltejs/kit";
   import type { ValidationErrors } from "$lib/components/validation/validation.types";
@@ -77,15 +77,15 @@
         const availableCategoriesVal = safeParseFirstN(ProductCategorySchema, availableCategories, 3);
 
         if (supplierVal.error) {
-          errors.supplier = zodErrorToErrorRecord(supplierVal.error);
+          errors.supplier = zodToValidationErrors(supplierVal.error);
           log.error("Supplier validation failed", errors.supplier);
         }
         if (assignedCategoriesVal.error) {
-          errors.assignedCategories = zodErrorToErrorRecord(assignedCategoriesVal.error);
+          errors.assignedCategories = zodToValidationErrors(assignedCategoriesVal.error);
           log.error("Assigned categories validation failed", errors.assignedCategories);
         }
         if (availableCategoriesVal.error) {
-          errors.availableCategories = zodErrorToErrorRecord(availableCategoriesVal.error);
+          errors.availableCategories = zodToValidationErrors(availableCategoriesVal.error);
           log.error("Available categories validation failed", errors.availableCategories);
         }
 

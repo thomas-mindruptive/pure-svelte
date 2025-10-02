@@ -12,6 +12,7 @@ import {
   type RuntimeHierarchyTreeNode,
 } from "./HierarchySidebar.types";
 import { NavigationError } from "./navigationError";
+import type { ValidationErrorTree } from "../validation/validation.types";
 
 // === TYPE ALIASES FOR STRICT TYPING ============================================================
 

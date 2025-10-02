@@ -3,7 +3,7 @@
 import { log } from "$lib/utils/logger";
 import z from "zod";
 import { AllBrandedSchemas } from "./domainTypes";
-import type { ValidationErrors } from "$lib/components/validation/validation.types";
+import type { ValidationErrors, ValidationErrorTree } from "$lib/components/validation/validation.types";
 
 // ===== TYPE DEFINITIONS FOR BRANDED SCHEMAS =====
 
@@ -415,6 +415,62 @@ export function zodToValidationErrors(error: z.ZodError): ValidationErrors {
   if (formErrors.length) errors._root = formErrors;
 
   return errors;
+}
+
+/**
+ * Converts a Zod error into a tree structure with nested error objects.
+ *
+ * This function transforms Zod's `treeifyError()` output into our ValidationErrorTree format.
+ * - Zod's `errors` arrays → our `errors` (only if non-empty)
+ * - Zod's `properties` → direct fields
+ * - Zod's `items` (arrays) → numeric string keys ("0", "1", ...)
+ *
+ * Empty `errors` arrays are omitted for cleaner JSON.stringify() output.
+ *
+ * @param error - ZodError from a failed validation
+ * @returns Tree structure with errors arrays at each level (only when present)
+ *
+ * @example
+ * ```typescript
+ * const result = OrderSchema.safeParse(invalidData);
+ * if (!result.success) {
+ *   const tree = zodToValidationErrorTree(result.error);
+ *   // Access: tree.shipping_address?.city?.errors
+ *   console.log(JSON.stringify(tree, null, 2)); // Clean output, no empty errors arrays
+ * }
+ * ```
+ */
+export function zodToValidationErrorTree_(error: z.ZodError): ValidationErrorTree {
+  const zodTree = z.treeifyError(error);
+
+  function convertNode(node: unknown): ValidationErrorTree {
+    if (!node || typeof node !== 'object') return {};
+
+    const result: ValidationErrorTree = {};
+
+    // errors only if non-empty
+    if ('errors' in node && Array.isArray(node.errors) && node.errors.length > 0) {
+      result.errors = node.errors as string[];
+    }
+
+    // Zod's "properties" → direct fields
+    if ('properties' in node && node.properties && typeof node.properties === 'object') {
+      for (const [key, value] of Object.entries(node.properties)) {
+        result[key] = convertNode(value);
+      }
+    }
+
+    // Zod's "items" (Array) → numeric string keys
+    if ('items' in node && Array.isArray(node.items)) {
+      for (let i = 0; i < node.items.length; i++) {
+        result[i.toString()] = convertNode(node.items[i]);
+      }
+    }
+
+    return result;
+  }
+
+  return convertNode(zodTree);
 }
 
 /**

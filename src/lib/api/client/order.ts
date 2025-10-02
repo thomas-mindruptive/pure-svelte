@@ -176,7 +176,7 @@ export function getOrderApi(client: ApiClient) {
     // ===== 1:N =====
 
     /**
-     * Loads exactly one supplier <-> categories assignment.
+     * Loads order items for order.
      */
     async loadOrderItemsForOrder(orderId: number): Promise<OrderItem_ProdDef_Category[]> {
       const operationId = `loadOrderItemsForOrder-${orderId}`;

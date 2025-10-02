@@ -16,8 +16,8 @@
   import { page } from "$app/state";
   import { getOrderApi, orderLoadingState } from "$lib/api/client/order";
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
-    import { safeParseFirstN } from "$lib/domain/domainTypes.utils";
-    import { convertToHtml } from "$lib/utils/formatUtils";
+  import { safeParseFirstN } from "$lib/domain/domainTypes.utils";
+  import { convertToHtml } from "$lib/utils/formatUtils";
 
   // === PROPS ====================================================================================
 
@@ -65,8 +65,8 @@
           resolvedOrders = await orderApi.loadOrders();
           const valResult = safeParseFirstN(Order_Wholesaler_Schema, resolvedOrders, 4);
           if (!valResult.success) {
-            const msg = `Cannot validate orders: ${convertToHtml(JSON.stringify(valResult.error.issues))}`
-            loadingOrValidationError = {message: msg, status: 500};
+            const msg = `Cannot validate orders: ${convertToHtml(JSON.stringify(valResult.error.issues))}`;
+            loadingOrValidationError = { message: msg, status: 500 };
             log.error(msg);
           }
           log.debug(`Orders promise resolved successfully.`, resolvedOrders);
@@ -133,13 +133,13 @@
     goto(`${page.url.pathname}/new`);
   }
 
-  // === DATAGRID DATA =====
+  // === DATAGRID DATA ============================================================================
 
   const columns: ColumnDefBase<typeof Order_Wholesaler_Schema>[] = [{ key: "order_id", header: "ID", accessor: null, sortable: true }];
 
   const getId = (r: Order_Wholesaler) => r.order_id;
 
-  // ===== DATAGRID STRATEGIES =====
+  // ===== DATAGRID STRATEGIES ====================================================================
 
   const deleteStrategy: DeleteStrategy<Order_Wholesaler> = {
     execute: handleOrderDelete,
@@ -150,7 +150,7 @@
   };
 </script>
 
-<!----- TEMPLATE ----->
+<!--- TEMPLATE ----------------------------------------------------------------------------------->
 
 <div class="list-page-content-wrapper">
   <h1>Orders</h1>

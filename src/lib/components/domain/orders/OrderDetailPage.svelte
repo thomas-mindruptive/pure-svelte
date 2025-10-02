@@ -3,20 +3,20 @@
   import { goto } from "$app/navigation";
   import { addNotification } from "$lib/stores/notifications";
   import { log } from "$lib/utils/logger";
-  // Component Imports
+// Component Imports
   import "$lib/components/styles/assignment-section.css";
   import "$lib/components/styles/detail-page-layout.css";
   import "$lib/components/styles/grid-section.css";
-  // API & Type Imports
+// API & Type Imports
   import { ApiClient } from "$lib/api/client/ApiClient";
   import type { ColumnDefBase, DeleteStrategy, ID, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
   import {
-    OrderItem_ProdDef_Category_Schema,
-    OrderSchema,
-    WholesalerSchema,
-    type Order_Wholesaler,
-    type OrderItem_ProdDef_Category,
-    type Wholesaler,
+      OrderItem_ProdDef_Category_Schema,
+      OrderSchema,
+      WholesalerSchema,
+      type Order_Wholesaler,
+      type OrderItem_ProdDef_Category,
+      type Wholesaler,
   } from "$lib/domain/domainTypes";
 
   import { page } from "$app/state";
@@ -289,7 +289,7 @@
             rows={orderItems!}
             {columns}
             {getId}
-            loading={isLoading || $orderLoadingState}
+            loading={isLoading}
             gridId="orderItems"
             entity="orderItem"
             {deleteStrategy}

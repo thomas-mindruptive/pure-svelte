@@ -59,7 +59,7 @@ export const queryConfig: QueryConfig = {
         },
       ],
     },
-    category_offerings: {
+    category_offerings_proddef: {
       from: { table: "dbo.product_categories", alias: "pc" },
       joins: [
         {

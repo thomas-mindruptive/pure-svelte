@@ -7,38 +7,40 @@
  * context-aware ApiClient instance.
  */
 
-import { log } from "$lib/utils/logger";
 import {
   ComparisonOperator,
   LogicalOperator,
   type QueryPayload,
   type SortDescriptor,
+  type WhereCondition,
   type WhereConditionGroup,
 } from "$lib/backendQueries/queryGrammar";
 import {
-  type Wholesaler,
-  type WholesalerCategoryWithCount,
+  Order_Wholesaler_Schema,
+  WholesalerItemOffering_ProductDef_Category_Supplier_NestedSchema,
+  type Order_Wholesaler,
   type ProductCategory,
+  type Wholesaler,
   type WholesalerCategory,
   type WholesalerCategory_Category,
-  type WholesalerItemOffering_ProductDef_Category_Supplier_Nested,
-  WholesalerItemOffering_ProductDef_Category_Supplier_NestedSchema,
+  type WholesalerCategoryWithCount,
+  type WholesalerItemOffering_ProductDef_Category_Supplier_Nested
 } from "$lib/domain/domainTypes";
+import { log } from "$lib/utils/logger";
 
-import type { ApiClient } from "./ApiClient";
-import { createJsonBody, createJsonAndWrapInPayload, getErrorMessage } from "./common";
 import type {
+  AssignmentRequest,
+  AssignmentSuccessData,
   PredefinedQueryRequest,
   QueryResponseData,
-  AssignmentRequest,
   RemoveAssignmentRequest,
-  AssignmentSuccessData,
 } from "$lib/api/api.types";
 import type { DeleteSupplierApiResponse, RemoveCategoryApiResponse } from "$lib/api/app/appSpecificTypes";
-import { LoadingState } from "./loadingState";
-import { genTypedQualifiedColumns } from "$lib/domain/domainTypes.utils";
 import { transformToNestedObjects } from "$lib/backendQueries/recordsetTransformer";
-
+import { genTypedQualifiedColumns } from "$lib/domain/domainTypes.utils";
+import type { ApiClient } from "./ApiClient";
+import { createJsonAndWrapInPayload, createJsonBody, getErrorMessage } from "./common";
+import { LoadingState } from "./loadingState";
 
 // Loading state managers remain global as they are a client-side concern.
 const supplierLoadingManager = new LoadingState();
@@ -104,7 +106,10 @@ export function getSupplierApi(client: ApiClient) {
      * @param orderBy
      * @returns
      */
-    async loadSuppliersWithWhereAndOrder(where: WhereConditionGroup<Wholesaler> | null, orderBy: SortDescriptor<Wholesaler>[] | null): Promise<Wholesaler[]> {
+    async loadSuppliersWithWhereAndOrder(
+      where: WhereConditionGroup<Wholesaler> | null,
+      orderBy: SortDescriptor<Wholesaler>[] | null,
+    ): Promise<Wholesaler[]> {
       const queryPartial: Partial<QueryPayload<Wholesaler>> = {};
       if (where) {
         queryPartial.where = where;
@@ -409,7 +414,7 @@ export function getSupplierApi(client: ApiClient) {
         // Transform flat recordset to nested objects
         const transformed = transformToNestedObjects(
           responseData.results as Record<string, unknown>[],
-          WholesalerItemOffering_ProductDef_Category_Supplier_NestedSchema
+          WholesalerItemOffering_ProductDef_Category_Supplier_NestedSchema,
         );
         return transformed;
       } catch (err) {
@@ -419,6 +424,68 @@ export function getSupplierApi(client: ApiClient) {
         supplierLoadingOperations.finish(operationId);
       }
     },
+
+    // ===== ORDERS =================================================================================
+
+    /**
+     * Loads order items for order.
+     */
+    async loadOrdersForSupplier(
+      supplierId: number,
+      where?: WhereConditionGroup<Order_Wholesaler> | null,
+      orderBy?: SortDescriptor<Order_Wholesaler>[] | null,
+    ): Promise<Order_Wholesaler[]> {
+      const operationId = `loadOrdersForSupplier-${supplierId}`;
+      supplierLoadingOperations.start(operationId);
+      try {
+        const supplierFilterWhere = {
+          key: "w.wholesaler_id" as const,
+          whereCondOp: ComparisonOperator.EQUALS,
+          val: supplierId,
+        };
+
+        let completeWhereGroup: WhereCondition<Order_Wholesaler> | WhereConditionGroup<Order_Wholesaler> 
+        if (where) {
+          completeWhereGroup = {
+            whereCondOp: "AND",
+            conditions: [supplierFilterWhere, where]
+          } 
+        } else{
+          completeWhereGroup = supplierFilterWhere;
+        } 
+
+        const defaultOrderBy: SortDescriptor<Order_Wholesaler>[] = [{ key: "ord.created_at", direction: "desc" }];
+        const completeOrderBy: SortDescriptor<Order_Wholesaler>[] = [];
+        completeOrderBy.push(...defaultOrderBy);
+        if (orderBy) completeOrderBy.push(...orderBy);
+
+        const request: PredefinedQueryRequest<Order_Wholesaler> = {
+          namedQuery: "order->wholesaler",
+          payload: {
+            where: completeWhereGroup,
+            orderBy: completeOrderBy,
+          },
+        };
+        const responseData = await client.apiFetch<QueryResponseData<Order_Wholesaler>>(
+          "/api/query",
+          { method: "POST", body: createJsonBody(request) },
+          { context: operationId },
+        );
+        if (responseData.results && responseData.results.length > 0) {
+          // Transform flat recordset to nested objects
+          const transformed = transformToNestedObjects(responseData.results as Record<string, unknown>[], Order_Wholesaler_Schema);
+          return transformed;
+        } else {
+          return [];
+        }
+      } catch (err) {
+        log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
+        throw err;
+      } finally {
+        supplierLoadingOperations.finish(operationId);
+      }
+    },
   };
+
   return api;
 }

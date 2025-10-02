@@ -3,38 +3,42 @@
   import { goto } from "$app/navigation";
   import { addNotification } from "$lib/stores/notifications";
   import { log } from "$lib/utils/logger";
-  // Component Imports
+// Component Imports
   import CategoryAssignment from "$lib/components/domain/suppliers/CategoryAssignment.svelte";
   import SupplierCategoriesGrid from "$lib/components/domain/suppliers/SupplierCategoriesGrid.svelte";
   import SupplierForm from "$lib/components/domain/suppliers/SupplierForm.svelte";
   import "$lib/components/styles/assignment-section.css";
   import "$lib/components/styles/detail-page-layout.css";
   import "$lib/components/styles/grid-section.css";
-  // API & Type Imports
+// API & Type Imports
   import { ApiClient } from "$lib/api/client/ApiClient";
   import { categoryLoadingState } from "$lib/api/client/category";
   import { getSupplierApi, supplierLoadingState } from "$lib/api/client/supplier";
-  import type { DeleteStrategy, ID, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
+  import type { ColumnDefBase, DeleteStrategy, ID, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
   import {
-    type ProductCategory,
-    ProductCategorySchema,
-    type Wholesaler,
-    type WholesalerCategory,
-    type WholesalerCategory_Category,
-    WholesalerSchema,
+      type Order,
+      type Order_Wholesaler,
+      Order_Wholesaler_Schema,
+      OrderSchema,
+      type ProductCategory,
+      ProductCategorySchema,
+      type Wholesaler,
+      type WholesalerCategory,
+      type WholesalerCategory_Category,
+      WholesalerSchema,
   } from "$lib/domain/domainTypes";
-  // Schemas
+// Schemas
+  import { page } from "$app/state";
   import { cascadeDeleteAssignments, type CompositeID } from "$lib/api/client/cascadeDelete";
+  import Datagrid from "$lib/components/grids/Datagrid.svelte";
   import type { ValidationErrorTree } from "$lib/components/validation/validation.types";
   import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
   import { safeParseFirstN, zodToValidationErrorTree } from "$lib/domain/domainTypes.utils";
   import { assertDefined } from "$lib/utils/assertions";
   import { stringsToNumbers } from "$lib/utils/typeConversions";
   import { error } from "@sveltejs/kit";
-  import { page } from "$app/state";
 
-
-  // ===== TYPES ===================================================================================
+  // === TYPES ====================================================================================
 
   // TODO: Validate through typing, derived from navigationHierarchieConfig.
   export type ChildRelationships = "categories" | "orders";
@@ -58,6 +62,7 @@
   let supplier = $state<Wholesaler | null>(null);
   let assignedCategories = $state<WholesalerCategory_Category[]>([]);
   let availableCategories = $state<ProductCategory[]>([]);
+  let orders = $state<Order_Wholesaler[]>([]);
 
   //let resolvedData = $state<SupplierDetailPage_LoadData | null>(null);
   let isLoading = $state(true);
@@ -85,38 +90,45 @@
       //resolvedData = null;
 
       try {
-        // 2. Resolve all promises in parallel.
-        // const [supplier, assignedCategories, availableCategories] = await Promise.all([
-        //   data.supplier,
-        //   data.assignedCategories,
-        //   data.availableCategories,
-        // ]);
-
         supplier = await supplierApi.loadSupplier(data.supplierId);
-        ((assignedCategories = await supplierApi.loadCategoriesForSupplier(data.supplierId)),
-          (availableCategories = await supplierApi.loadAvailableCategoriesForSupplier(data.supplierId)));
-
         if (aborted) return;
-
         const supplierVal = WholesalerSchema.nullable().safeParse(supplier);
-        const assignedCategoriesVal = safeParseFirstN(ProductCategorySchema, assignedCategories, 3);
-        const availableCategoriesVal = safeParseFirstN(ProductCategorySchema, availableCategories, 3);
-
         if (supplierVal.error) {
           errors.supplier = zodToValidationErrorTree(supplierVal.error);
           log.error("Supplier validation failed", errors.supplier);
         }
-        if (assignedCategoriesVal.error) {
-          errors.assignedCategories = zodToValidationErrorTree(assignedCategoriesVal.error);
-          log.error("Assigned categories validation failed", errors.assignedCategories);
-        }
-        if (availableCategoriesVal.error) {
-          errors.availableCategories = zodToValidationErrorTree(availableCategoriesVal.error);
-          log.error("Available categories validation failed", errors.availableCategories);
+
+        // === Categories path=================================================
+        if ("categories" === data.activeChildPath) {
+          assignedCategories = await supplierApi.loadCategoriesForSupplier(data.supplierId);
+          if (aborted) return;
+          availableCategories = await supplierApi.loadAvailableCategoriesForSupplier(data.supplierId);
+          if (aborted) return;
+          const assignedCategoriesVal = safeParseFirstN(ProductCategorySchema, assignedCategories, 3);
+          const availableCategoriesVal = safeParseFirstN(ProductCategorySchema, availableCategories, 3);
+          if (assignedCategoriesVal.error) {
+            errors.assignedCategories = zodToValidationErrorTree(assignedCategoriesVal.error);
+            log.error("Assigned categories validation failed", errors.assignedCategories);
+          }
+          if (availableCategoriesVal.error) {
+            errors.availableCategories = zodToValidationErrorTree(availableCategoriesVal.error);
+            log.error("Available categories validation failed", errors.availableCategories);
+          }
+
+          // === Orders path=================================================
+        } else if ("orders" === data.activeChildPath) {
+          orders = await supplierApi.loadOrdersForSupplier(data.supplierId);
+          const ordersVal = safeParseFirstN(Order_Wholesaler_Schema, orders, 3);
+          if (ordersVal.error) {
+            errors.orders = zodToValidationErrorTree(ordersVal.error);
+            log.error("Order validation failed", errors.orders);
+          }
+        } else {
+          const msg = `Invalid data.activeChildPath: ${data.activeChildPath}`;
+          errors.activeChildPath = { errors: [msg] };
+          log.error(msg);
         }
 
-        // 5. On success, populate the state with the validated, resolved data.
-        //resolvedData = { ...data, supplier, assignedCategories, availableCategories };
         //
       } catch (rawError: any) {
         // Throw error for severe problems!
@@ -185,7 +197,7 @@
     log.debug(`Form changed`);
   }
 
-  // ===== HELPERS =====
+  // ===== HELPERS ================================================================================
 
   /**
    * Reload categories and set them into the state.
@@ -205,7 +217,7 @@
     log.info("Local state updated. UI will refresh seamlessly.");
   }
 
-  // ===== BUSINESS LOGIC =====
+  // ===== BUSINESS LOGIC =========================================================================
 
   /**
    * Handles the assignment of a new category.
@@ -291,18 +303,17 @@
     click: handleCategorySelect,
   };
 
-  // === SNIPPETS =================================================================================
+  // === DATAGRID DATA ============================================================================
 
-  /**
-   * Renders the assigned categories grid section
-   */
+  const ordersColumns: ColumnDefBase<typeof OrderSchema>[] = [{ key: "order_id", header: "ID", accessor: null, sortable: true }];
+  const getOrdersRowId = (o: Order) => o.order_id;
 </script>
 
 <!------------------------------------------------------------------------------------------------
   SNIPPETS 
   ------------------------------------------------------------------------------------------------>
 
-<!-- CATEGORY GRID-------------------------------------------------------------------------------->
+<!-- CATEGORIES GRID ----------------------------------------------------------------------------->
 {#snippet categoryGridSection()}
   <div class="grid-section">
     {#if data.isCreateMode}
@@ -315,6 +326,30 @@
         loading={$categoryLoadingState}
         {deleteStrategy}
         {rowActionStrategy}
+      />
+    {/if}
+  </div>
+{/snippet}
+
+<!-- ORDERS GRID---------------------------------------------------------------------------------->
+{#snippet ordersGridSection()}
+  <div class="grid-section">
+    {#if data.isCreateMode}
+      <p>Assigned orders will be available after supplier has been saved.</p>
+    {:else}
+      <h2>Orders</h2>
+      <Datagrid
+        parentId={data.supplierId}
+        rows={orders}
+        columns={ordersColumns}
+        getId={getOrdersRowId}
+        loading={isLoading}
+        gridId="orders"
+        entity="order"
+        {deleteStrategy}
+        {rowActionStrategy}
+        apiLoadFunc={supplierApi.loadOrdersForSupplier}
+        maxBodyHeight="550px"
       />
     {/if}
   </div>
@@ -360,7 +395,7 @@
       {#if (data.activeChildPath = "categories")}
         {@render categoryGridSection()}
       {:else if (data.activeChildPath = "orders")}
-        <h1>TODO - Orders</h1>
+        {@render ordersGridSection()}
       {:else}
         <div class="component-error-boundary">
           Invalid child path: {data.activeChildPath}

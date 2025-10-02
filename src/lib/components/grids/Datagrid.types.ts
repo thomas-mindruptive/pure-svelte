@@ -95,4 +95,6 @@ export type DeleteStrategy<T = unknown> = {
  */
 export type ApiLoadFunc<T> = (where: WhereConditionGroup<T> | null, sort: SortDescriptor<T>[] | null) => Promise<T[]>;
 
+export type ApiLoadFuncWithId<T> = (id: number, where: WhereConditionGroup<T> | null, sort: SortDescriptor<T>[] | null) => Promise<T[]>;
+
 

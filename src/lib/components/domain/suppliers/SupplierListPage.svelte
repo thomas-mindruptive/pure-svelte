@@ -21,9 +21,13 @@
 
   // === PROPS ====================================================================================
 
+  export interface SupplierListPageProps {
+     suppliers: Promise<Wholesaler[]>
+  }
+
   // 1. The `data` prop receives the promise streamed from the non-blocking `load` function.
   //    It is NOT the resolved array of suppliers, but the promise that will resolve to it.
-  let { data }: { data: { suppliers: Promise<Wholesaler[]> } } = $props();
+  let { data }: { data:  SupplierListPageProps}  = $props();
 
   // === STATE ====================================================================================
 

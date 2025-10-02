@@ -20,13 +20,22 @@
   import { requestConfirmation } from "$lib/stores/confirmation";
   import { fade } from "svelte/transition";
   import "$lib/components/styles/grid.css";
-  import type { ID, ColumnDef, DeleteStrategy, RowActionStrategy, DryRunResult, ConfirmResult, ApiLoadFunc } from "./Datagrid.types";
+  import type {
+    ID,
+    ColumnDef,
+    DeleteStrategy,
+    RowActionStrategy,
+    DryRunResult,
+    ConfirmResult,
+    ApiLoadFunc,
+    ApiLoadFuncWithId,
+  } from "./Datagrid.types";
 
   import "$lib/components/styles/loadingIndicator.css";
   import type { SortDescriptor } from "$lib/backendQueries/queryGrammar";
   import { assertDefined } from "$lib/utils/assertions";
   import { addNotification } from "$lib/stores/notifications";
-    import type { AllQualifiedColumns } from "$lib/domain/domainTypes.utils";
+  import type { AllQualifiedColumns } from "$lib/domain/domainTypes.utils";
 
   // ===== PROP TYPES =====
 
@@ -34,6 +43,9 @@
     // ID and entity name
     gridId?: string;
     entity?: string;
+
+    // Option parent id, e.g. for 1:n grids.
+    parentId?: number | undefined;
 
     // Layout
     maxBodyHeight?: string | undefined;
@@ -43,7 +55,7 @@
     rows: any[];
 
     // Data API if grid should load its own data, e.g. for sorting.
-    apiLoadFunc?: ApiLoadFunc<T> | undefined;
+    apiLoadFunc?: ApiLoadFunc<T> | ApiLoadFuncWithId<T> | undefined;
 
     // Columns and row ids.
     columns: ColumnDef<any>[];
@@ -57,6 +69,7 @@
     deleteStrategy: DeleteStrategy<any>;
     rowActionStrategy?: RowActionStrategy<any> | undefined | null;
 
+    // Snippets
     toolbar?: Snippet<[ToolbarSnippetProps]>;
     cell?: Snippet<[CellSnippetProps]>;
     rowActions?: Snippet<[RowActionsSnippetProps]>;
@@ -92,32 +105,27 @@
   // ===== COMPONENT PROPS =====
 
   const {
-    // Metadata
-    gridId = "grid", // Unique identifier for this grid instance
-    entity = "item", // Human-readable entity name for messages
+    gridId = "grid",
+    entity = "item",
+
+    parentId,
 
     maxBodyHeight,
 
-    // Core data
     rows = [] as any[],
     columns = [] as ColumnDef<any>[],
     getId,
 
-    // Selection behavior
     selection = "multiple" as "none" | "single" | "multiple", // Row selection mode
     canDelete = (_row: any) => true, // Function to determine if a row can be deleted
 
-    // State
     loading = false, // Whether grid is in loading state
 
-    // API
     apiLoadFunc,
 
-    // Strategies
     deleteStrategy,
     rowActionStrategy,
 
-    // Customization snippets (all optional)
     toolbar, // Custom toolbar content
     cell, // Custom cell rendering
     rowActions, // Custom row action buttons
@@ -524,7 +532,12 @@
         addNotification(msg, "info");
         log.warn(msg);
       } else {
-        const sortedRows = await apiLoadFunc(null, sortState);
+        let sortedRows = [];
+        if (parentId) {
+          sortedRows = await (apiLoadFunc as ApiLoadFuncWithId<T>)(parentId, null, sortState);
+        } else {
+          sortedRows = await (apiLoadFunc as ApiLoadFunc<T>)(null, sortState);
+        }
         internalRows = sortedRows;
         addNotification(`Succesfully sorted - ${JSON.stringify(sortState)}`, "success");
       }
@@ -761,21 +774,16 @@
    * Logs grid configuration for debugging and validates required props.
    */
   $effect(() => {
-    // Diese Funktion wird einmal nach dem ersten Rendern ausgeführt,
-    // genau wie onMount.
     try {
       const multiselect = selection === "multiple";
-      log.info(
-        "Grid mounted (via $effect)", // Geänderte Log-Nachricht zur Überprüfung
-        {
-          component: "DataGrid",
-          gridId,
-          entity,
-          selection,
-          multiselect,
-          columns: (columns as ColumnDef<any>[]).map((c: ColumnDef<any>) => c.key),
-        },
-      );
+      log.info("Grid mounted (via $effect)", {
+        component: "DataGrid",
+        gridId,
+        entity,
+        selection,
+        multiselect,
+        columns: (columns as ColumnDef<any>[]).map((c: ColumnDef<any>) => c.key),
+      });
 
       if (!deleteStrategy || typeof deleteStrategy.execute !== "function") {
         log.warn({ component: "DataGrid", gridId, entity }, "deleteStrategy.execute missing; delete actions will be disabled");
@@ -794,8 +802,9 @@
   Uses .pc-grid classes from global grid.css for consistent styling
   The pc-grid--comfortable variant provides adequate padding for data-heavy grids
 -->
-<div class="pc-grid pc-grid--comfortable pc-grid--scroll-body"
-     style={maxBodyHeight ? `--pc-grid-body-max-height:${maxBodyHeight};` : ""}
+<div
+  class="pc-grid pc-grid--comfortable pc-grid--scroll-body"
+  style={maxBodyHeight ? `--pc-grid-body-max-height:${maxBodyHeight};` : ""}
 >
   <!-- 
     TOOLBAR SECTION
@@ -839,7 +848,7 @@
         class="pc-grid__btn"
         disabled={sortState.length === 0 || loading || isSorting}
         onclick={() => {
-          log.debug(`Clearing all sortings: ${JSON.stringify(sortState)}`)
+          log.debug(`Clearing all sortings: ${JSON.stringify(sortState)}`);
           sortState = [];
         }}
         title={`Clear all sortings: ${JSON.stringify(sortState)}`}

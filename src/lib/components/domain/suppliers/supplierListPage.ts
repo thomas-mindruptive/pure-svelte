@@ -6,6 +6,7 @@ import { type LoadEvent } from '@sveltejs/kit';
 // Import the new dependencies
 import { ApiClient } from '$lib/api/client/ApiClient';
 import { getSupplierApi } from '$lib/api/client/supplier';
+import type { SupplierListPageProps } from './SupplierListPage.svelte';
 
 /**
  * Loads the data required for the Supplier List Page.
@@ -16,7 +17,7 @@ import { getSupplierApi } from '$lib/api/client/supplier';
  * => We return the promise, the respective "shell" component MUST handle the error.
  * ⚠️⚠️⚠️
  */
-export function load({ fetch }: LoadEvent) {
+export function load({ fetch }: LoadEvent): SupplierListPageProps {
   log.info(`Kicking of promise for loading suppliers...`);
 
   // 1. Create an ApiClient instance with the context-aware `fetch`.

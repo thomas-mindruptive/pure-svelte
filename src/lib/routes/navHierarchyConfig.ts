@@ -1,5 +1,5 @@
 import { createHierarchyNode, type HierarchyTree, type Hierarchy } from "$lib/components/sidebarAndNav/HierarchySidebar.types";
-import { validateHierarchies } from "$lib/components/sidebarAndNav/hierarchyUtils";
+import { validateHierarchiesAsTree } from "$lib/components/sidebarAndNav/hierarchyUtils";
 import { log } from "$lib/utils/logger";
 import { error } from "@sveltejs/kit";
 
@@ -227,9 +227,9 @@ export function getHierarchyByName(name: string): HierarchyTree | undefined {
 
 function validateHierarchyNames(): boolean {
   const hierarchies = getAppHierarchies();
-  const validationResult = validateHierarchies(hierarchies);
-  if (!validationResult.isValid) {
-    const msg = `The hierarchy config is invalid: ${JSON.stringify(validationResult, null, 4)}`
+  const validationResult = validateHierarchiesAsTree(hierarchies);
+  if (validationResult) {
+    const msg = `The hierarchy config is invalid: ${JSON.stringify(validationResult, null, 2)}`
     throw error(500, msg);
   }
   return true;

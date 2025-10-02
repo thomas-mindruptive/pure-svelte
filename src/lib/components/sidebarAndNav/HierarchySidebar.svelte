@@ -5,9 +5,9 @@
   import { log } from "$lib/utils/logger";
   import type { RuntimeHierarchyTree, RuntimeHierarchyTreeNode, RuntimeHierarchyItem } from "./HierarchySidebar.types";
   // Step 1: Import validation utilities
-  import { validateHierarchies, validateTree } from "$lib/components/sidebarAndNav/hierarchyUtils";
+  import { validateHierarchiesAsTree } from "$lib/components/sidebarAndNav/hierarchyUtils";
   import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
-  import type { ValidationError } from "../validation/validation.types";
+  import type { ValidationErrorTree } from "../validation/validation.types";
 
   // === TYPES ====================================================================================
 
@@ -83,47 +83,21 @@
   const flattenedItems = $derived(flattenHierarchy(hierarchy));
 
   /**
-   * Validates the incoming hierarchy prop and transforms errors into the format
-   * expected by the ValidationWrapper component. Returns null if there are no errors.
+   * Validates the incoming hierarchy prop using ValidationErrorTree structure.
+   * Returns null if there are no errors.
    */
-  const validationErrors = $derived.by(() => {
-
-	// !!!!! Hier soll validateHierarchies() her statt dem bisherigen code: 
-	
-	
+  const validationErrors = $derived.by((): ValidationErrorTree | null => {
     if (!hierarchy || hierarchy.length === 0) {
       return null;
     }
 
-    const allErrors: ValidationError[] = [];
+    const errors = validateHierarchiesAsTree(hierarchy);
 
-    for (const tree of hierarchy) {
-      const result = validateTree(tree);
-      if (!result.isValid) {
-        // Transform the string errors into the structured error object
-        for (const errorString of result.errors) {
-          const parts = errorString.split(": ");
-          if (parts.length === 2) {
-            allErrors.push({
-              path: parts[0].split("."),
-              message: parts[1],
-            });
-          } else {
-            // Fallback for unexpected error format
-            allErrors.push({
-              path: ["Unknown"],
-              message: errorString,
-            });
-          }
-        }
-      }
+    if (errors) {
+      log.error(`Hierarchy validation errors:`, errors);
     }
 
-    if (allErrors.length > 0) {
-      log.error(`Validation error: `, allErrors);
-    }
-
-    return allErrors.length > 0 ? allErrors : null;
+    return errors;
   });
 
   // === EVENT HANDLERS ===========================================================================

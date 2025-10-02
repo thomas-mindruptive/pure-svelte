@@ -1,5 +1,5 @@
 /** The expected structure for a single validation error */
-export type ValidationError = {
+export type ZodLikeValidationError = {
   path: (string | symbol | number)[];
   message: string;
   code?: string;

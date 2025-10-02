@@ -2,11 +2,12 @@
 <script lang="ts">
   import { log } from "$lib/utils/logger";
   import type { Snippet } from "svelte";
-  import type { ValidationError } from "./validation.types";
+  import type { ZodLikeValidationError, ValidationErrorTree } from "./validation.types";
+    import { stringifyForHtml } from "$lib/utils/formatUtils";
 
   interface Props {
     renderChildrenInCaseOfErrors?: Boolean | undefined;
-    errors: ValidationError[] | null | undefined;
+    errors: ZodLikeValidationError[] | ValidationErrorTree |  null | undefined;
     children: Snippet;
   }
   let { renderChildrenInCaseOfErrors = true, errors, children }: Props = $props();
@@ -16,9 +17,7 @@
 {#if errors}
   <div class="component-error-boundary">
     <h3>Error</h3>
-    {#each errors as error}
-      <p>{error.path.join(".")}: {error.message}</p>
-    {/each}
+    {@html stringifyForHtml(errors)}
   </div>
 {/if}
 {#if !errors || renderChildrenInCaseOfErrors}

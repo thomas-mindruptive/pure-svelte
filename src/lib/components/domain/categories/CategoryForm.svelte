@@ -15,8 +15,8 @@
   import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
   import { assertDefined } from "$lib/utils/assertions";
   import { getCategoryApi } from "$lib/api/client/category";
+    import type { ValidationErrors } from "$lib/components/validation/validation.types";
 
-  type ValidationErrors = Record<string, string[]>;
 
   // === PROPS ====================================================================================
 

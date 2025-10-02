@@ -57,12 +57,12 @@ function initializeAndCacheHierarchies(): RuntimeHierarchyTree[] {
     throw new Error(msg);
   }
 
-  // Create runtime trees. 
+  // Create runtime trees.
   const initialRuntimeHierarchies: RuntimeHierarchyTree[] = [];
   for (const staticTree of staticHierarchies) {
     const runtimeTreeResult = convertToRuntimeTree(staticTree);
-    if (!runtimeTreeResult.isValid) {
-      const msg = `Runtime tree ${staticTree.name} is invalid: ${JSON.stringify(runtimeTreeResult.errors, null, 4)}`
+    if (runtimeTreeResult.errors) {
+      const msg = `Runtime tree ${staticTree.name} is invalid: ${JSON.stringify(runtimeTreeResult.errors, null, 2)}`
       log.error(msg);
       throw error(500, msg);
     }

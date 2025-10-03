@@ -533,6 +533,63 @@ const payload: QueryPayload<Wholesaler> = {
 };
 ```
 
+#### Unified Error Structure: ValidationErrorTree
+
+The application uses a unified, hierarchical error structure for both Zod validation errors and custom validation logic (e.g., hierarchy validation).
+
+**Core Type Definition:**
+```typescript
+// In src/lib/components/validation/validation.types.ts
+export type ValidationErrorTree = {
+  errors?: string[];  // Errors at this level
+  [key: string]: ValidationErrorTree | string[] | undefined;  // Nested errors
+};
+```
+
+**Conversion Functions:**
+
+1. **Zod Error Conversion** - `zodToValidationErrorTree()`:
+```typescript
+// In src/lib/domain/domainTypes.utils.ts
+import { zodToValidationErrorTree } from '$lib/domain/domainTypes.utils';
+
+const result = SomeSchema.safeParse(data);
+if (!result.success) {
+  const errorTree = zodToValidationErrorTree(result.error);
+  // errorTree is now in unified ValidationErrorTree format
+}
+```
+
+2. **Custom Validation** - `validateTreeAsTree()`, `validateHierarchiesAsTree()`:
+```typescript
+// In src/lib/components/sidebarAndNav/hierarchyUtils.ts
+const errors = validateTreeAsTree(hierarchyTree);
+// Returns ValidationErrorTree | null
+```
+
+**Benefits:**
+- ✅ Unified error format across all validation domains
+- ✅ Hierarchical structure matches data structure
+- ✅ Easy to display with nested components (ValidationWrapper)
+- ✅ JSON-serializable for logging and debugging
+- ✅ Properties only present when errors exist (clean JSON.stringify output)
+
+**Usage Pattern:**
+```typescript
+const errors = $state<Record<string, ValidationErrorTree>>({});
+
+// Zod validation
+const supplierVal = WholesalerSchema.safeParse(supplier);
+if (supplierVal.error) {
+  errors.supplier = zodToValidationErrorTree(supplierVal.error);
+}
+
+// Display with ValidationWrapper
+<ValidationWrapper {errors}>
+  <!-- Component content -->
+</ValidationWrapper>
+```
+
 #### **Server-Side Validation in API Endpoints**
 
 Instead of a custom validator, each API endpoint imports the required Zod schema directly and applies schema methods to adapt it for the specific use case. This pattern is explicit, type-safe, and avoids unnecessary abstractions.
@@ -576,11 +633,108 @@ The frontend follows a **Domain-Driven file structure** combined with a **Page D
 - `src/lib/components/domain/suppliers/supplierListPage.ts` (Domain load logic)
 - `src/lib/components/domain/suppliers/SupplierListPage.svelte` (Domain UI component)
 
-**Note (Detail Pages):** For complex detail pages with nested data loading (e.g., OrderDetailPage), the pattern has evolved:
-- Load function extracts **only** URL params, route context, and `loadEventFetch`
-- Component's `$effect` handles **all async data loading** with proper cleanup
-- No Promise-based validation in load function
-- Reference: `OrderDetailPage.svelte:70`, `orderDetailPage.ts:8`
+#### Component-Based Data Loading Pattern (Detail Pages)
+
+For complex detail pages with nested data loading, the architecture has evolved from Promise-based loading to component-based loading:
+
+**Philosophy:** Since components must use `async/await` in `$effect` anyway (the Shell/Async pattern already requires this), we can simplify by doing ALL data loading directly in the component.
+
+**Pattern:**
+1. **Load function returns ONLY metadata:**
+   - IDs extracted from URL params
+   - `loadEventFetch` for SSR-safe API calls
+   - Route context (flags like `isCreateMode`, `activeChildPath`)
+   - **CRITICAL:** Explicit return type annotation (see Type Safety section below)
+
+2. **Component loads ALL data in `$effect`:**
+   - Creates `ApiClient` with `loadEventFetch`
+   - Performs all async API calls directly
+   - Handles loading states, errors, and cleanup
+
+3. **Runtime validation of critical props:**
+   - Components validate required props (like `loadEventFetch`) at mount
+   - Throws `error()` if validation fails - crashes early with clear message
+
+**Example:**
+```typescript
+// supplierDetailPage.ts - ONLY metadata
+export function load({ params, fetch }): SupplierDetailPageProps {
+  return {
+    supplierId: Number(params.id),
+    isCreateMode: params.id === 'new',
+    activeChildPath: extractPath(url),
+    loadEventFetch: fetch,
+    params
+  };
+}
+
+// SupplierDetailPage.svelte - ALL data loading
+const client = new ApiClient(data.loadEventFetch);
+const supplierApi = getSupplierApi(client);
+
+$effect(() => {
+  let aborted = false;
+
+  const processPromises = async () => {
+    isLoading = true;
+    try {
+      supplier = await supplierApi.loadSupplier(data.supplierId);
+      if (aborted) return;
+
+      assignedCategories = await supplierApi.loadCategoriesForSupplier(data.supplierId);
+      if (aborted) return;
+
+      // ... more loading
+    } finally {
+      if (!aborted) isLoading = false;
+    }
+  };
+
+  processPromises();
+  return () => { aborted = true; };
+});
+```
+
+**Type Safety Through Explicit Return Types:**
+
+**CRITICAL PATTERN:** Load functions MUST use explicit return type annotations to ensure type errors appear at the source.
+
+**Why this matters with Route Delegation:**
+- Domain file (`supplierDetailPage.ts`) contains the `load()` function
+- Route file (`+page.ts`) delegates: `export { load } from '$lib/.../supplierDetailPage'`
+- **Problem:** Svelte's magic means type errors in `load()` don't show up there
+- **Problem:** Instead, errors appear in `+page.svelte` at `let { data } = $props()` - far from the actual bug
+
+**Solution:**
+```typescript
+// ❌ WRONG - Error shows in +page.svelte, hard to debug
+export function load({ params, fetch }) {
+  return {
+    supplierId: Number(params.id),
+    wrongProp: "oops"  // Bug! But error appears elsewhere
+  };
+}
+
+// ✅ CORRECT - Error shows HERE in supplierDetailPage.ts
+export function load({ params, fetch }): SupplierDetailPageProps {
+  return {
+    supplierId: Number(params.id),
+    wrongProp: "oops"  // TypeScript error shows immediately!
+  };
+}
+```
+
+**Benefits:**
+- ✅ Type errors appear at source (supplierDetailPage.ts), not in route delegation
+- ✅ Immediate feedback during development
+- ✅ Props interface serves as explicit contract
+- ✅ Refactoring is safer - breaking changes caught immediately
+
+**Reference Examples:**
+- `SupplierDetailPage.svelte:74-152` (Component loading pattern)
+- `OrderDetailPage.svelte:70` (Component loading pattern)
+- `supplierDetailPage.ts:8` (Metadata-only load with explicit return type)
+- `orderDetailPage.ts:8` (Metadata-only load with explicit return type)
 
 ### Client-side deletion helpers 
 To handle different deletion scenarios in a type-safe manner, the generic `cascadeDelete` helper has been refactored into two specialized functions:
@@ -1000,6 +1154,54 @@ The primary difference lies in how complex computations are handled.
   });
   ```
 In this pattern, the entire object `{ validatedData, errors }` is recomputed and its properties are destructured into reactive variables whenever `initialData` changes.
+
+### Loading State Management: Local vs. Global
+
+**Rule:** DetailPage components should use **local `isLoading` state** for their own data loading lifecycle, NOT global LoadingState stores.
+
+**Why:**
+- Local `isLoading` reflects the SPECIFIC component's loading state
+- Set to `true` at start of `$effect`, `false` in `finally` block
+- Scoped to exactly what the component is doing
+
+**Wrong Pattern:**
+```typescript
+// ❌ WRONG - Using global loading state in DetailPage
+<Datagrid loading={isLoading || $supplierLoadingState} ... />
+```
+
+**Problem with Global LoadingState:**
+- `$supplierLoadingState` shows when ANY supplier API call happens ANYWHERE in the app
+- Not scoped to this specific component's operations
+- Can show false loading indicators
+- Creates coupling between unrelated components
+
+**Correct Pattern:**
+```typescript
+// ✅ CORRECT - Use only local state
+let isLoading = $state(true);
+
+$effect(() => {
+  isLoading = true;
+  try {
+    // ... load data
+  } finally {
+    isLoading = false;
+  }
+});
+
+// Use ONLY local state
+<Datagrid loading={isLoading} ... />
+```
+
+**When to use Global LoadingState:**
+- Grid components that trigger their own API calls via `apiLoadFunc`
+- Shared UI components that need to show "API in progress" globally
+- NOT for DetailPage component lifecycle management
+
+**Reference Examples:**
+- `SupplierDetailPage.svelte:68,143,346` (Local isLoading only)
+- `OrderDetailPage.svelte` (Local isLoading only)
 
 ### The "Global Magic Chaos" and Type Safety
 SvelteKit's `PageData` object, which merges data from all parent layouts, is powerful but can create implicit dependencies, making errors hard to trace. This is especially challenging with generic components like `FormShell.svelte`.

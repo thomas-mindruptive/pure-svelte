@@ -37,7 +37,7 @@
   import { assertDefined } from "$lib/utils/assertions";
   import { stringsToNumbers } from "$lib/utils/typeConversions";
   import { error } from "@sveltejs/kit";
-    import { getOrderApi } from "$lib/api/client/order";
+  import { getOrderApi } from "$lib/api/client/order";
 
   // === TYPES ====================================================================================
 
@@ -154,7 +154,7 @@
     };
   });
 
-  // === EVENTS & STRATEGIES ======================================================================
+  // === FORM HANDLING ============================================================================
 
   async function handleFormSubmitted(info: { data: Wholesaler; result: unknown }) {
     addNotification(`Supplier saved successfully.`, "success");
@@ -198,18 +198,6 @@
 
   async function handleFormChanged(event: { data: Record<string, any> }) {
     log.debug(`Form changed`);
-  }
-
-  // ===== SORT HANDLERS ==========================================================================
-
-  async function handleCategoriesSort(sortState: SortDescriptor<WholesalerCategory_Category>[] | null) {
-    assertDefined(supplier, "supplier");
-    assignedCategories = await supplierApi.loadCategoriesForSupplier(supplier.wholesaler_id, null, sortState);
-  }
-
-  async function handleOrdersSort(sortState: SortDescriptor<Order_Wholesaler>[] | null) {
-    assertDefined(supplier, "supplier");
-    orders = await supplierApi.loadOrdersForSupplier(supplier.wholesaler_id, null, sortState);
   }
 
   // ===== HELPERS ================================================================================
@@ -269,7 +257,7 @@
     }
   }
 
-  // === CATEGORIES DATA AND FUNCTIONS ==============================================================
+  // === CATEGORIES GRID FUNCTIONS ================================================================
 
   async function handleCategoryDelete(ids: ID[]): Promise<void> {
     log.info(`Deleting categories`, { ids });
@@ -321,7 +309,12 @@
     click: handleCategorySelect,
   };
 
-  // === ORDERS DATA AND FUNCTIONS ==============================================================
+  async function handleCategoriesSort(sortState: SortDescriptor<WholesalerCategory_Category>[] | null) {
+    assertDefined(supplier, "supplier");
+    assignedCategories = await supplierApi.loadCategoriesForSupplier(supplier.wholesaler_id, null, sortState);
+  }
+
+  // === ORDERS GRID FUNCTIONS ====================================================================
 
   const ordersColumns: ColumnDefBase<typeof Order_Wholesaler_Schema>[] = [
     { key: "order_id", header: "ID", accessor: null, sortable: true },
@@ -370,6 +363,11 @@
   const ordersRowActionStrategy: RowActionStrategy<Order_Wholesaler> = {
     click: handleOrderSelect,
   };
+
+  async function handleOrdersSort(sortState: SortDescriptor<Order_Wholesaler>[] | null) {
+    assertDefined(supplier, "supplier");
+    orders = await supplierApi.loadOrdersForSupplier(supplier.wholesaler_id, null, sortState);
+  }
 </script>
 
 <!------------------------------------------------------------------------------------------------

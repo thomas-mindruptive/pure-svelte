@@ -45,16 +45,8 @@ export function load(loadEvent: LoadEvent): SupplierDetailPageProps {
   }
 
   const activeChildPath: ChildRelationships = (urlSegments[2] as ChildRelationships) || defaultChild;
+  log.debug(`Extracted child path:`, {activeChildPath, urlSegments});
 
-  // ===== API ====================================================================================
-
-  // log.info(`Kicking off non-blocking load for supplierId: ${supplierId}`);
-
-  // // Create an ApiClient instance with the context-aware `fetch`.
-  // const client = new ApiClient(loadEventFetch);
-
-  // // Get the supplier-specific API methods from the factory.
-  // const supplierApi = getSupplierApi(client);
 
   // ===== RETURN PAGE DATA =======================================================================
 
@@ -65,30 +57,4 @@ export function load(loadEvent: LoadEvent): SupplierDetailPageProps {
     activeChildPath, 
     params
   }
-
-  // // ⚠️ Return the promises directly without `await`.
-  // //    The page component will handle resolving and error states.
-
-  // // EDIT mode
-  // if (supplierId) {
-  //   const loadDataAsync: SupplierDetailPage_LoadDataAsync = {
-  //     supplier: supplierApi.loadSupplier(supplierId),
-  //     assignedCategories: supplierApi.loadCategoriesForSupplier(supplierId),
-  //     availableCategories: supplierApi.loadAvailableCategoriesForSupplier(supplierId),
-  //     activeChildPath,
-  //     isCreateMode
-  //   };
-  //   return loadDataAsync;
-  // }
-  // // CREATE mode
-  // else {
-  //   const loadDataAsync: SupplierDetailPage_LoadDataAsync = {
-  //     supplier: Promise.resolve(null),
-  //     assignedCategories: Promise.resolve([]),
-  //     availableCategories: Promise.resolve([]),
-  //     activeChildPath,
-  //     isCreateMode
-  //   };
-  //   return loadDataAsync;
-  // }
 }

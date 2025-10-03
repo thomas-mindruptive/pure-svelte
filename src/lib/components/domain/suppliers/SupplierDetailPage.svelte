@@ -20,7 +20,6 @@
     type Order,
     type Order_Wholesaler,
     Order_Wholesaler_Schema,
-    OrderSchema,
     type ProductCategory,
     ProductCategorySchema,
     type Wholesaler,
@@ -84,6 +83,7 @@
   // This is the core of the async pattern. It runs whenever the `data` prop changes.
   $effect(() => {
     let aborted = false;
+    log.debug(`SupplierDetailPage data props:`, data);
 
     const processPromises = async () => {
       // 1. Reset state for each new load.
@@ -318,7 +318,10 @@
 
   // === DATAGRID DATA ============================================================================
 
-  const ordersColumns: ColumnDefBase<typeof OrderSchema>[] = [{ key: "order_id", header: "ID", accessor: null, sortable: true }];
+  const ordersColumns: ColumnDefBase<typeof Order_Wholesaler_Schema>[] = [
+    { key: "order_id", header: "ID", accessor: null, sortable: true },
+    { key: "w.name", header: "ID", accessor: (order) => order.wholesaler.name, sortable: true }
+  ];
   const getOrdersRowId = (o: Order) => o.order_id;
 </script>
 
@@ -405,9 +408,9 @@
       </div>
 
       <!-- Section 3: Grid of assigned categories -->
-      {#if (data.activeChildPath = "categories")}
+      {#if "categories" === data.activeChildPath}
         {@render categoryGridSection()}
-      {:else if (data.activeChildPath = "orders")}
+      {:else if "orders" === data.activeChildPath}
         {@render ordersGridSection()}
       {:else}
         <div class="component-error-boundary">

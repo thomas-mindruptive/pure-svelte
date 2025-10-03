@@ -29,7 +29,7 @@
   } from "$lib/domain/domainTypes";
   // Schemas
   import { page } from "$app/state";
-  import { cascadeDeleteAssignments, type CompositeID } from "$lib/api/client/cascadeDelete";
+  import { cascadeDelete, cascadeDeleteAssignments, type CompositeID } from "$lib/api/client/cascadeDelete";
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
   import type { ValidationErrorTree } from "$lib/components/validation/validation.types";
   import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
@@ -37,6 +37,7 @@
   import { assertDefined } from "$lib/utils/assertions";
   import { stringsToNumbers } from "$lib/utils/typeConversions";
   import { error } from "@sveltejs/kit";
+    import { getOrderApi } from "$lib/api/client/order";
 
   // === TYPES ====================================================================================
 
@@ -67,7 +68,7 @@
   //let resolvedData = $state<SupplierDetailPage_LoadData | null>(null);
   let isLoading = $state(true);
   const errors = $state<Record<string, ValidationErrorTree>>({});
-  const allowForceCascadingDelte = $state(true);
+  const allowForceCascadingDelete = $state(true);
 
   // === API =====================================================================================
 
@@ -77,6 +78,7 @@
   }
   const client = new ApiClient(data.loadEventFetch);
   const supplierApi = getSupplierApi(client);
+  const orderApi = getOrderApi(client);
 
   // === LOAD =====================================================================================
 
@@ -267,13 +269,16 @@
     }
   }
 
+  // === CATEGORIES DATA AND FUNCTIONS ==============================================================
+
   async function handleCategoryDelete(ids: ID[]): Promise<void> {
     log.info(`Deleting categories`, { ids });
+    assertDefined(ids, "ids");
     let dataChanged = false;
 
     if (data.isCreateMode) {
       log.error("Cannot delete category in create mode.");
-      addNotification("Cannot delte category in create mode.", "error");
+      addNotification("Cannot delete category in create mode.", "error");
       return;
     }
 
@@ -291,7 +296,7 @@
         hardDepInfo: "Category has hard dependencies. Delete?",
         softDepInfo: "Category has soft dependencies. Delete?",
       },
-      allowForceCascadingDelte,
+      allowForceCascadingDelete,
     );
 
     if (dataChanged) {
@@ -308,21 +313,63 @@
   }
 
   // Strategy objects for the CategoryGrid component.
-  const deleteStrategy: DeleteStrategy<WholesalerCategory_Category> = {
+  const categoriesDeleteStrategy: DeleteStrategy<WholesalerCategory_Category> = {
     execute: handleCategoryDelete,
   };
 
-  const rowActionStrategy: RowActionStrategy<WholesalerCategory_Category> = {
+  const categoriesRowActionStrategy: RowActionStrategy<WholesalerCategory_Category> = {
     click: handleCategorySelect,
   };
 
-  // === DATAGRID DATA ============================================================================
+  // === ORDERS DATA AND FUNCTIONS ==============================================================
 
   const ordersColumns: ColumnDefBase<typeof Order_Wholesaler_Schema>[] = [
     { key: "order_id", header: "ID", accessor: null, sortable: true },
-    { key: "w.name", header: "ID", accessor: (order) => order.wholesaler.name, sortable: true }
+    { key: "w.name", header: "Wholesaler", accessor: (order) => order.wholesaler.name, sortable: true },
   ];
   const getOrdersRowId = (o: Order) => o.order_id;
+
+  async function handleOrderDelete(ids: ID[]): Promise<void> {
+    log.info(`Deleting orders`, { ids });
+    assertDefined(ids, "ids");
+    let dataChanged = false;
+
+    if (data.isCreateMode) {
+      log.error("Cannot delete in create mode.");
+      addNotification("Cannot delete in create mode.", "error");
+      return;
+    }
+
+    assertDefined(supplier, "supplier");
+    const idsAsNumber = stringsToNumbers(ids);
+    dataChanged = await cascadeDelete(
+      idsAsNumber,
+      orderApi.deleteOrder,
+      {
+        domainObjectName: "Order",
+        hardDepInfo: "Order has hard dependencies. Delete?",
+        softDepInfo: "Order has soft dependencies. Delete?",
+      },
+      allowForceCascadingDelete,
+    );
+
+    if (dataChanged) {
+      // Reload and change state.
+      reloadCategories();
+    }
+  }
+
+  function handleOrderSelect(order: Order_Wholesaler) {
+    goto(`${page.url.pathname}/orders/${order.order_id}`);
+  }
+
+  const ordersDeleteStrategy: DeleteStrategy<Order_Wholesaler> = {
+    execute: handleOrderDelete,
+  };
+
+  const ordersRowActionStrategy: RowActionStrategy<Order_Wholesaler> = {
+    click: handleOrderSelect,
+  };
 </script>
 
 <!------------------------------------------------------------------------------------------------
@@ -340,8 +387,8 @@
       <SupplierCategoriesGrid
         rows={assignedCategories}
         loading={$categoryLoadingState}
-        {deleteStrategy}
-        {rowActionStrategy}
+        deleteStrategy={categoriesDeleteStrategy}
+        rowActionStrategy={categoriesRowActionStrategy}
         onSort={handleCategoriesSort}
       />
     {/if}
@@ -362,8 +409,8 @@
         loading={isLoading}
         gridId="orders"
         entity="order"
-        {deleteStrategy}
-        {rowActionStrategy}
+        deleteStrategy={ordersDeleteStrategy}
+        rowActionStrategy={ordersRowActionStrategy}
         onSort={handleOrdersSort}
         maxBodyHeight="550px"
       />

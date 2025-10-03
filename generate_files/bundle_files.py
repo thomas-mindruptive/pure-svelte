@@ -68,10 +68,10 @@ INCLUDE_PATTERNS: List[str] = [
     "src/lib/components/domain/orders/**",
     "src/lib/components/grids/**",
     "src/lib/routes/**",
-    "src/routes/api/suppliers/**",
-    "src/routes/api/orders/**",
-    "src/routes/(browser)/suppliers/**",
-    "src/routes/(browser)/orders/**",
+    # "src/routes/api/suppliers/**",
+    # "src/routes/api/orders/**",
+    # "src/routes/(browser)/suppliers/**",
+    # "src/routes/(browser)/orders/**",
 ]
 
 # =========================

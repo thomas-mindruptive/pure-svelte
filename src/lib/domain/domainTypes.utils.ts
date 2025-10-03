@@ -41,7 +41,7 @@ export type QualifiedColumnsFromBrandedSchema<T extends BrandedSchema> =
 
 /**
  * Generate qualified columns for schema with branded nested objects (JOIN scenario)
- * This is the main type used by genTypedQualifiedColumns
+ * This is the main type used by genTypedQualifiedColumns.
  */
 export type QualifiedColumnsFromBrandedSchemaWithJoins<T extends z.ZodObject<z.ZodRawShape>> =
   T extends z.ZodObject<infer Shape>

@@ -177,8 +177,8 @@
 
   // ===== SORT HANDLERS =====
 
-  async function handleOrderItemsSort(sortState: SortDescriptor<OrderItem_ProdDef_Category>[]) {
-    if (!order) return;
+  async function handleOrderItemsSort(sortState: SortDescriptor<OrderItem_ProdDef_Category>[] | null) {
+    assertDefined(order, "order");
     orderItems = await orderApi.loadOrderItemsForOrder(order.order_id, null, sortState);
   }
 

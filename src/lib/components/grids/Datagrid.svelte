@@ -20,15 +20,7 @@
   import { log } from "$lib/utils/logger";
   import type { Snippet } from "svelte";
   import { fade } from "svelte/transition";
-  import type {
-      ColumnDef,
-      ConfirmResult,
-      DeleteStrategy,
-      DryRunResult,
-      ID,
-      RowActionStrategy,
-      SortFunc,
-  } from "./Datagrid.types";
+  import type { ColumnDef, ConfirmResult, DeleteStrategy, DryRunResult, ID, RowActionStrategy, SortFunc } from "./Datagrid.types";
 
   import type { SortDescriptor } from "$lib/backendQueries/queryGrammar";
   import "$lib/components/styles/loadingIndicator.css";
@@ -512,7 +504,7 @@
           throw new Error(`Invalid sort direction in current sort descriptor: ${JSON.stringify(descriptor)}`);
         }
       }
-      //await delay(1000);
+
       log.debug(`Sorting - Calling onSort - sortState: ${JSON.stringify(sortState)}`);
 
       if (!onSort) {
@@ -520,7 +512,13 @@
         addNotification(msg, "info");
         log.warn(msg);
       } else {
-        await onSort(sortState);
+        // Set state to null when sortState is empty.
+        // => Prevent side effects, even if QueryBuilder handles empty "ORDER BY" correctly.
+        if (sortState.length == 0) {
+          await onSort(null);
+        } else {
+          await onSort(sortState);
+        }
         addNotification(`Successfully sorted - ${JSON.stringify(sortState)}`, "success");
       }
     } finally {

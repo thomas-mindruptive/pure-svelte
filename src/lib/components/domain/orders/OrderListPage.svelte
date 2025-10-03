@@ -134,7 +134,7 @@
     goto(`${page.url.pathname}/new`);
   }
 
-  async function handleSort(sortState: SortDescriptor<Order_Wholesaler>[]) {
+  async function handleSort(sortState: SortDescriptor<Order_Wholesaler>[] | null) {
     resolvedOrders = await orderApi.loadOrdersWithWhereAndOrder(null, sortState);
   }
 

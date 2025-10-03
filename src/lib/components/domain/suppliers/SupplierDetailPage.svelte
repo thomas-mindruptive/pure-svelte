@@ -200,13 +200,13 @@
 
   // ===== SORT HANDLERS ==========================================================================
 
-  async function handleCategoriesSort(sortState: SortDescriptor<WholesalerCategory_Category>[]) {
-    if (!supplier) return;
+  async function handleCategoriesSort(sortState: SortDescriptor<WholesalerCategory_Category>[] | null) {
+    assertDefined(supplier, "supplier");
     assignedCategories = await supplierApi.loadCategoriesForSupplier(supplier.wholesaler_id, null, sortState);
   }
 
-  async function handleOrdersSort(sortState: SortDescriptor<Order_Wholesaler>[]) {
-    if (!supplier) return;
+  async function handleOrdersSort(sortState: SortDescriptor<Order_Wholesaler>[] | null) {
+    assertDefined(supplier, "supplier");
     orders = await supplierApi.loadOrdersForSupplier(supplier.wholesaler_id, null, sortState);
   }
 

@@ -122,7 +122,7 @@
     goto(`${$page.url.pathname}/new`);
   }
 
-  async function handleSort(sortState: SortDescriptor<ProductCategory>[]) {
+  async function handleSort(sortState: SortDescriptor<ProductCategory>[] | null) {
     resolvedCategories = await categoryApi.loadCategoriesWithWhereAndOrder(null, sortState);
   }
 

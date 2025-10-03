@@ -97,4 +97,9 @@ export type ApiLoadFunc<T> = (where: WhereConditionGroup<T> | null, sort: SortDe
 
 export type ApiLoadFuncWithId<T> = (id: number, where: WhereConditionGroup<T> | null, sort: SortDescriptor<T>[] | null) => Promise<T[]>;
 
+/**
+ * Sort callback for the DataGrid.
+ */
+export type SortFunc<T> = (sortState: SortDescriptor<T>[]) => void | Promise<void>;
+
 

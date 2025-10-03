@@ -14,6 +14,7 @@
 
   // Types for the strategy pattern used by the generic DataGrid component.
   import type { ID, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
+  import type { SortDescriptor } from "$lib/backendQueries/queryGrammar";
   import { page } from "$app/stores";
   
   import { stringsToNumbers } from "$lib/utils/typeConversions";
@@ -138,6 +139,10 @@
     goto(`${$page.url.pathname}/new`);
   }
 
+  async function handleSort(sortState: SortDescriptor<Wholesaler>[]) {
+    resolvedSuppliers = await supplierApi.loadSuppliersWithWhereAndOrder(null, sortState);
+  }
+
   // ===== GRID STRATEGIES =====
 
   const deleteStrategy: DeleteStrategy<Wholesaler> = {
@@ -179,7 +184,7 @@
         loading={isLoading || $supplierLoadingState}
         {deleteStrategy}
         {rowActionStrategy}
-        apiLoadFunc={supplierApi.loadSuppliersWithWhereAndOrder}
+        onSort={handleSort}
       />
     </div>
   {/if}

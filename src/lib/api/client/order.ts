@@ -7,7 +7,7 @@
  * context-aware ApiClient instance.
  */
 
-import { type QueryPayload, type SortDescriptor, type WhereConditionGroup } from "$lib/backendQueries/queryGrammar";
+import { type QueryPayload, type SortDescriptor, type WhereCondition, type WhereConditionGroup, ComparisonOperator } from "$lib/backendQueries/queryGrammar";
 import {
   type Order,
   type Order_Wholesaler,
@@ -178,15 +178,40 @@ export function getOrderApi(client: ApiClient) {
     /**
      * Loads order items for order.
      */
-    async loadOrderItemsForOrder(orderId: number): Promise<OrderItem_ProdDef_Category[]> {
+    async loadOrderItemsForOrder(
+      orderId: number,
+      where?: WhereConditionGroup<OrderItem_ProdDef_Category> | null,
+      orderBy?: SortDescriptor<OrderItem_ProdDef_Category>[] | null,
+    ): Promise<OrderItem_ProdDef_Category[]> {
       const operationId = `loadOrderItemsForOrder-${orderId}`;
       orderLoadingOperations.start(operationId);
       try {
+        const orderFilterWhere = {
+          key: "ord.order_id" as const,
+          whereCondOp: ComparisonOperator.EQUALS,
+          val: orderId,
+        };
+
+        let completeWhereGroup: WhereCondition<OrderItem_ProdDef_Category> | WhereConditionGroup<OrderItem_ProdDef_Category>;
+        if (where) {
+          completeWhereGroup = {
+            whereCondOp: "AND",
+            conditions: [orderFilterWhere, where]
+          };
+        } else {
+          completeWhereGroup = orderFilterWhere;
+        }
+
+        const defaultOrderBy: SortDescriptor<OrderItem_ProdDef_Category>[] = [{ key: "pc.name", direction: "asc" }];
+        const completeOrderBy: SortDescriptor<OrderItem_ProdDef_Category>[] = [];
+        if (orderBy) completeOrderBy.push(...orderBy);
+        completeOrderBy.push(...defaultOrderBy);
+
         const request: PredefinedQueryRequest<OrderItem_ProdDef_Category> = {
           namedQuery: "order->order_items->product_def->category",
           payload: {
-            where: { key: "ord.order_id", whereCondOp: "=", val: orderId },
-            orderBy: [{ key: "pc.name", direction: "asc" }],
+            where: completeWhereGroup,
+            orderBy: completeOrderBy,
           },
         };
         const responseData = await client.apiFetch<QueryResponseData<OrderItem_ProdDef_Category>>(

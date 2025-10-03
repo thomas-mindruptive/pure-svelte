@@ -5,6 +5,7 @@
   import { log } from "$lib/utils/logger";
   import { ApiClient } from "$lib/api/client/ApiClient";
   import type { ID, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
+  import type { SortDescriptor } from "$lib/backendQueries/queryGrammar";
   import { page } from "$app/stores";
   import type { ProductCategory } from "$lib/domain/domainTypes";
   import { categoryLoadingState, getCategoryApi } from "$lib/api/client/category";
@@ -121,6 +122,10 @@
     goto(`${$page.url.pathname}/new`);
   }
 
+  async function handleSort(sortState: SortDescriptor<ProductCategory>[]) {
+    resolvedCategories = await categoryApi.loadCategoriesWithWhereAndOrder(null, sortState);
+  }
+
   // === GRID STRATEGIES ==========================================================================
 
   const deleteStrategy: DeleteStrategy<ProductCategory> = {
@@ -160,7 +165,7 @@
         loading={isLoading || $categoryLoadingState}
         {deleteStrategy}
         {rowActionStrategy}
-        apiLoadFunc={categoryApi.loadCategoriesWithWhereAndOrder}
+        onSort={handleSort}
       />
     </div>
   {/if}

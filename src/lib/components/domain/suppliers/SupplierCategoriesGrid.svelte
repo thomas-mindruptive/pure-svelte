@@ -8,6 +8,7 @@
     ColumnDefWithAccessor,
     ColumnDefDirect,
     ColumnDef,
+    SortFunc,
   } from "$lib/components/grids/Datagrid.types";
 
   import type { WholesalerCategory_Category } from "$lib/domain/domainTypes";
@@ -20,9 +21,10 @@
     showOfferingCount?: boolean;
     deleteStrategy: DeleteStrategy<WholesalerCategory_Category>;
     rowActionStrategy?: RowActionStrategy<WholesalerCategory_Category>;
+    onSort?: SortFunc<WholesalerCategory_Category> | undefined;
   };
 
-  const { rows, loading = false, showOfferingCount = true, deleteStrategy, rowActionStrategy }: SupplierCategoriesGridProps = $props();
+  const { rows, loading = false, showOfferingCount = true, deleteStrategy, rowActionStrategy, onSort }: SupplierCategoriesGridProps = $props();
 
   // === COLUMNS ==================================================================================
 
@@ -57,6 +59,7 @@
   entity="category"
   {deleteStrategy}
   {rowActionStrategy}
+  {onSort}
   maxBodyHeight="350px"
 />
 

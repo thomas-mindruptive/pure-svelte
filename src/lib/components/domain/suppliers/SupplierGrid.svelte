@@ -3,7 +3,7 @@
 <script lang="ts">
   // Thin wrapper around Datagrid for wholesalers
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
-  import type { DeleteStrategy, RowActionStrategy, ColumnDef, ApiLoadFunc } from "$lib/components/grids/Datagrid.types";
+  import type { DeleteStrategy, RowActionStrategy, ColumnDef, SortFunc } from "$lib/components/grids/Datagrid.types";
   import type { Wholesaler } from "$lib/domain/domainTypes";
 
   // === PROPS ====================================================================================
@@ -13,10 +13,10 @@
     loading?: boolean;
     deleteStrategy: DeleteStrategy<Wholesaler>;
     rowActionStrategy?: RowActionStrategy<Wholesaler>;
-    apiLoadFunc?: ApiLoadFunc<Wholesaler>;
+    onSort?: SortFunc<Wholesaler> | undefined;
   };
 
-  const { rows, loading = false, deleteStrategy, rowActionStrategy, apiLoadFunc }: SupplierGridProps = $props();
+  const { rows, loading = false, deleteStrategy, rowActionStrategy, onSort }: SupplierGridProps = $props();
 
   // === COLUMNS ==================================================================================
 
@@ -47,7 +47,7 @@
   entity="wholesaler"
   {deleteStrategy}
   {rowActionStrategy}
-  {apiLoadFunc}
+  {onSort}
   maxBodyHeight="550px"
 />
 

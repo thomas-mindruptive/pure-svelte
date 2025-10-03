@@ -15,27 +15,26 @@
   // - Robust exception handling with structured logging
   // - CSS-based styling via global grid.css classes
 
-  import type { Snippet } from "svelte";
-  import { log } from "$lib/utils/logger";
-  import { requestConfirmation } from "$lib/stores/confirmation";
-  import { fade } from "svelte/transition";
   import "$lib/components/styles/grid.css";
+  import { requestConfirmation } from "$lib/stores/confirmation";
+  import { log } from "$lib/utils/logger";
+  import type { Snippet } from "svelte";
+  import { fade } from "svelte/transition";
   import type {
-    ID,
-    ColumnDef,
-    DeleteStrategy,
-    RowActionStrategy,
-    DryRunResult,
-    ConfirmResult,
-    ApiLoadFunc,
-    ApiLoadFuncWithId,
+      ColumnDef,
+      ConfirmResult,
+      DeleteStrategy,
+      DryRunResult,
+      ID,
+      RowActionStrategy,
+      SortFunc,
   } from "./Datagrid.types";
 
-  import "$lib/components/styles/loadingIndicator.css";
   import type { SortDescriptor } from "$lib/backendQueries/queryGrammar";
-  import { assertDefined } from "$lib/utils/assertions";
-  import { addNotification } from "$lib/stores/notifications";
+  import "$lib/components/styles/loadingIndicator.css";
   import type { AllQualifiedColumns } from "$lib/domain/domainTypes.utils";
+  import { addNotification } from "$lib/stores/notifications";
+  import { assertDefined } from "$lib/utils/assertions";
 
   // ===== PROP TYPES =====
 
@@ -44,9 +43,6 @@
     gridId?: string;
     entity?: string;
 
-    // Option parent id, e.g. for 1:n grids.
-    parentId?: number | undefined;
-
     // Layout
     maxBodyHeight?: string | undefined;
 
@@ -54,8 +50,8 @@
     loading?: boolean;
     rows: any[];
 
-    // Data API if grid should load its own data, e.g. for sorting.
-    apiLoadFunc?: ApiLoadFunc<T> | ApiLoadFuncWithId<T> | undefined;
+    // Callback when sort state changes - parent loads data
+    onSort?: SortFunc<T> | undefined;
 
     // Columns and row ids.
     columns: ColumnDef<any>[];
@@ -108,8 +104,6 @@
     gridId = "grid",
     entity = "item",
 
-    parentId,
-
     maxBodyHeight,
 
     rows = [] as any[],
@@ -121,7 +115,7 @@
 
     loading = false, // Whether grid is in loading state
 
-    apiLoadFunc,
+    onSort,
 
     deleteStrategy,
     rowActionStrategy,
@@ -143,13 +137,7 @@
 
   // Sorting
   let sortState = $state<SortDescriptor<T>[]>([]);
-  let internalRows = $state<T[]>(rows);
   let isSorting = $state(false); // Loading indicator for sorting operation
-
-  // We need to use the internal rows, because we trigger data loading after sort.
-  $effect(() => {
-    internalRows = rows;
-  });
 
   // ===== UTILITY FUNCTIONS =====
 
@@ -499,7 +487,7 @@
    * This component does NOT sort the data itself.
    * @param key The key of the column header that was clicked.
    */
-  async function handleSortRequest(key: AllQualifiedColumns) {
+  async function handleSort(key: AllQualifiedColumns) {
     assertDefined(key, "key");
 
     isSorting = true;
@@ -525,21 +513,15 @@
         }
       }
       //await delay(1000);
-      log.debug(`Sorting - Calling apiLoadFunc - sortState: ${JSON.stringify(sortState)}`);
+      log.debug(`Sorting - Calling onSort - sortState: ${JSON.stringify(sortState)}`);
 
-      if (!apiLoadFunc) {
-        const msg = `Missing apiLoadFunc for ${JSON.stringify(descriptor)}`;
+      if (!onSort) {
+        const msg = `Missing onSort callback for ${JSON.stringify(descriptor)}`;
         addNotification(msg, "info");
         log.warn(msg);
       } else {
-        let sortedRows = [];
-        if (parentId) {
-          sortedRows = await (apiLoadFunc as ApiLoadFuncWithId<T>)(parentId, null, sortState);
-        } else {
-          sortedRows = await (apiLoadFunc as ApiLoadFunc<T>)(null, sortState);
-        }
-        internalRows = sortedRows;
-        addNotification(`Succesfully sorted - ${JSON.stringify(sortState)}`, "success");
+        await onSort(sortState);
+        addNotification(`Successfully sorted - ${JSON.stringify(sortState)}`, "success");
       }
     } finally {
       isSorting = false;
@@ -913,7 +895,7 @@
                 <!-- Sortable header is a button for accessibility -->
                 <button
                   class="pc-grid__sort-btn"
-                  onclick={() => handleSortRequest(String(col.key) as AllQualifiedColumns)}
+                  onclick={() => handleSort(String(col.key) as AllQualifiedColumns)}
                 >
                   <span>{col.header}</span>
                   <!-- Sort indicator icon -->
@@ -968,7 +950,7 @@
         {:else}
           <!-- DATA ROWS - one row per data object -->
 
-          {#each internalRows as row, i (keyForRow(row, i))}
+          {#each rows as row, i (keyForRow(row, i))}
             <tr
               data-deleting={rowIsDeleting(row) ? "true" : undefined}
               aria-selected={rowIsSelected(row) ? "true" : undefined}

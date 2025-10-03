@@ -3,31 +3,32 @@
   import { goto } from "$app/navigation";
   import { addNotification } from "$lib/stores/notifications";
   import { log } from "$lib/utils/logger";
-// Component Imports
+  // Component Imports
   import CategoryAssignment from "$lib/components/domain/suppliers/CategoryAssignment.svelte";
   import SupplierCategoriesGrid from "$lib/components/domain/suppliers/SupplierCategoriesGrid.svelte";
   import SupplierForm from "$lib/components/domain/suppliers/SupplierForm.svelte";
   import "$lib/components/styles/assignment-section.css";
   import "$lib/components/styles/detail-page-layout.css";
   import "$lib/components/styles/grid-section.css";
-// API & Type Imports
+  // API & Type Imports
   import { ApiClient } from "$lib/api/client/ApiClient";
   import { categoryLoadingState } from "$lib/api/client/category";
   import { getSupplierApi, supplierLoadingState } from "$lib/api/client/supplier";
   import type { ColumnDefBase, DeleteStrategy, ID, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
+  import type { SortDescriptor } from "$lib/backendQueries/queryGrammar";
   import {
-      type Order,
-      type Order_Wholesaler,
-      Order_Wholesaler_Schema,
-      OrderSchema,
-      type ProductCategory,
-      ProductCategorySchema,
-      type Wholesaler,
-      type WholesalerCategory,
-      type WholesalerCategory_Category,
-      WholesalerSchema,
+    type Order,
+    type Order_Wholesaler,
+    Order_Wholesaler_Schema,
+    OrderSchema,
+    type ProductCategory,
+    ProductCategorySchema,
+    type Wholesaler,
+    type WholesalerCategory,
+    type WholesalerCategory_Category,
+    WholesalerSchema,
   } from "$lib/domain/domainTypes";
-// Schemas
+  // Schemas
   import { page } from "$app/state";
   import { cascadeDeleteAssignments, type CompositeID } from "$lib/api/client/cascadeDelete";
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
@@ -197,6 +198,18 @@
     log.debug(`Form changed`);
   }
 
+  // ===== SORT HANDLERS ==========================================================================
+
+  async function handleCategoriesSort(sortState: SortDescriptor<WholesalerCategory_Category>[]) {
+    if (!supplier) return;
+    assignedCategories = await supplierApi.loadCategoriesForSupplier(supplier.wholesaler_id, null, sortState);
+  }
+
+  async function handleOrdersSort(sortState: SortDescriptor<Order_Wholesaler>[]) {
+    if (!supplier) return;
+    orders = await supplierApi.loadOrdersForSupplier(supplier.wholesaler_id, null, sortState);
+  }
+
   // ===== HELPERS ================================================================================
 
   /**
@@ -326,6 +339,7 @@
         loading={$categoryLoadingState}
         {deleteStrategy}
         {rowActionStrategy}
+        onSort={handleCategoriesSort}
       />
     {/if}
   </div>
@@ -339,7 +353,6 @@
     {:else}
       <h2>Orders</h2>
       <Datagrid
-        parentId={data.supplierId}
         rows={orders}
         columns={ordersColumns}
         getId={getOrdersRowId}
@@ -348,7 +361,7 @@
         entity="order"
         {deleteStrategy}
         {rowActionStrategy}
-        apiLoadFunc={supplierApi.loadOrdersForSupplier}
+        onSort={handleOrdersSort}
         maxBodyHeight="550px"
       />
     {/if}

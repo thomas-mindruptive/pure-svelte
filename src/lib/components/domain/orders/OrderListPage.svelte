@@ -10,6 +10,7 @@
   // --- API & Strategy Imports ---
   import { ApiClient } from "$lib/api/client/ApiClient";
   import type { ID, DeleteStrategy, RowActionStrategy, ColumnDefBase } from "$lib/components/grids/Datagrid.types";
+  import type { SortDescriptor } from "$lib/backendQueries/queryGrammar";
 
   import { stringsToNumbers } from "$lib/utils/typeConversions";
   import { cascadeDelete } from "$lib/api/client/cascadeDelete";
@@ -133,6 +134,10 @@
     goto(`${page.url.pathname}/new`);
   }
 
+  async function handleSort(sortState: SortDescriptor<Order_Wholesaler>[]) {
+    resolvedOrders = await orderApi.loadOrdersWithWhereAndOrder(null, sortState);
+  }
+
   // === DATAGRID DATA ============================================================================
 
   const columns: ColumnDefBase<typeof Order_Wholesaler_Schema>[] = [{ key: "order_id", header: "ID", accessor: null, sortable: true }];
@@ -179,7 +184,7 @@
         entity="order"
         {deleteStrategy}
         {rowActionStrategy}
-        apiLoadFunc={orderApi.loadOrdersWithWhereAndOrder}
+        onSort={handleSort}
         maxBodyHeight="550px"
       />
     </div>

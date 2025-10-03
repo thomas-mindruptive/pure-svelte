@@ -10,6 +10,7 @@
 // API & Type Imports
   import { ApiClient } from "$lib/api/client/ApiClient";
   import type { ColumnDefBase, DeleteStrategy, ID, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
+  import type { SortDescriptor } from "$lib/backendQueries/queryGrammar";
   import {
       OrderItem_ProdDef_Category_Schema,
       OrderSchema,
@@ -174,6 +175,13 @@
     log.debug(`Form changed`);
   }
 
+  // ===== SORT HANDLERS =====
+
+  async function handleOrderItemsSort(sortState: SortDescriptor<OrderItem_ProdDef_Category>[]) {
+    if (!order) return;
+    orderItems = await orderApi.loadOrderItemsForOrder(order.order_id, null, sortState);
+  }
+
   // ===== HELPERS =====
 
   /**
@@ -294,6 +302,7 @@
             entity="orderItem"
             {deleteStrategy}
             {rowActionStrategy}
+            onSort={handleOrderItemsSort}
             maxBodyHeight="550px"
           />
         </div>

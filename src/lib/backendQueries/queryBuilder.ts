@@ -309,7 +309,7 @@ export function buildQuery<T>(payload: Partial<QueryPayload<T>> | undefined, con
   }
   const selectClause = select.join(", ");
   const whereClause = where ? `WHERE ${buildWhereClause(where, ctx)}` : "";
-  const orderByClause = orderBy ? `ORDER BY ${orderBy.map((s: SortDescriptor<T>) => `${String(s.key)} ${s.direction}`).join(", ")}` : "";
+  const orderByClause = orderBy && orderBy.length > 0 ? `ORDER BY ${orderBy.map((s: SortDescriptor<T>) => `${String(s.key)} ${s.direction}`).join(", ")}` : "";
   const limitClause = limit && limit > 0 ? `OFFSET ${offset || 0} ROWS FETCH NEXT ${limit} ROWS ONLY` : "";
 
   // --- 5. Assemble Final Query ---

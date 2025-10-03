@@ -204,19 +204,41 @@ export function getSupplierApi(client: ApiClient) {
     /**
      * Loads categories assigned to a supplier.
      */
-    async loadCategoriesForSupplier(supplierId: number): Promise<WholesalerCategoryWithCount[]> {
+    async loadCategoriesForSupplier(
+      supplierId: number,
+      where?: WhereConditionGroup<WholesalerCategoryWithCount> | null,
+      orderBy?: SortDescriptor<WholesalerCategoryWithCount>[] | null,
+    ): Promise<WholesalerCategoryWithCount[]> {
       const operationId = `loadCategoriesForSupplier-${supplierId}`;
       supplierLoadingOperations.start(operationId);
       try {
+        const supplierFilterWhere = {
+          key: "w.wholesaler_id" as const,
+          whereCondOp: ComparisonOperator.EQUALS,
+          val: supplierId,
+        };
+
+        let completeWhereGroup: WhereCondition<WholesalerCategoryWithCount> | WhereConditionGroup<WholesalerCategoryWithCount>;
+        if (where) {
+          completeWhereGroup = {
+            whereCondOp: "AND",
+            conditions: [supplierFilterWhere, where]
+          };
+        } else {
+          completeWhereGroup = supplierFilterWhere;
+        }
+
+        const defaultOrderBy: SortDescriptor<WholesalerCategoryWithCount>[] = [{ key: "pc.name", direction: "asc" }];
+        const completeOrderBy: SortDescriptor<WholesalerCategoryWithCount>[] = [];
+        if (orderBy) completeOrderBy.push(...orderBy);
+        completeOrderBy.push(...defaultOrderBy);
+
         const request: PredefinedQueryRequest<WholesalerCategoryWithCount> = {
           namedQuery: "supplier_categories",
           payload: {
             select: ["w.wholesaler_id", "wc.category_id", "pc.name AS category_name", "wc.comment", "wc.link"],
-            where: {
-              whereCondOp: LogicalOperator.AND,
-              conditions: [{ key: "w.wholesaler_id", whereCondOp: ComparisonOperator.EQUALS, val: supplierId }],
-            },
-            orderBy: [{ key: "pc.name", direction: "asc" }],
+            where: completeWhereGroup,
+            orderBy: completeOrderBy,
           },
         };
         const responseData = await client.apiFetch<QueryResponseData<WholesalerCategoryWithCount>>(
@@ -456,8 +478,8 @@ export function getSupplierApi(client: ApiClient) {
 
         const defaultOrderBy: SortDescriptor<Order_Wholesaler>[] = [{ key: "ord.created_at", direction: "desc" }];
         const completeOrderBy: SortDescriptor<Order_Wholesaler>[] = [];
-        completeOrderBy.push(...defaultOrderBy);
         if (orderBy) completeOrderBy.push(...orderBy);
+        completeOrderBy.push(...defaultOrderBy);
 
         const request: PredefinedQueryRequest<Order_Wholesaler> = {
           namedQuery: "order->wholesaler",

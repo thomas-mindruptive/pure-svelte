@@ -4,7 +4,7 @@
 >
   import FormShell from "$lib/components/forms/FormShell.svelte";
   import { log } from "$lib/utils/logger";
-  import { OrderSchema, type Order, type Order_Wholesaler, type Wholesaler } from "$lib/domain/domainTypes";
+  import { Order_Wholesaler_Schema, type Order, type Order_Wholesaler, type Wholesaler } from "$lib/domain/domainTypes";
   import "$lib/components/styles/form.css";
   import "$lib/components/styles/grid.css";
   import { ApiClient } from "$lib/api/client/ApiClient";
@@ -79,9 +79,9 @@
   // === VALIDATE =================================================================================
 
   let { schemaValidationErrors } = $derived.by(() => {
-    const result = OrderSchema.nullable().safeParse(initial);
+    const result = Order_Wholesaler_Schema.nullable().safeParse(initial);
     if (result.error) {
-      log.error(`Validation of supplier data to OrderSchema failed.`, result.error);
+      log.error(`Validation to OrderSchema failed.`, result.error);
     }
     return {
       schemaValidationErrors: result.success ? null : result.error.issues,

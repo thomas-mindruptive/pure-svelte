@@ -7,13 +7,20 @@
  * context-aware ApiClient instance.
  */
 
-import { type QueryPayload, type SortDescriptor, type WhereCondition, type WhereConditionGroup, ComparisonOperator } from "$lib/backendQueries/queryGrammar";
+import {
+  type QueryPayload,
+  type SortDescriptor,
+  type WhereCondition,
+  type WhereConditionGroup,
+  ComparisonOperator,
+} from "$lib/backendQueries/queryGrammar";
 import {
   type Order,
   type Order_Wholesaler,
   type OrderItem_ProdDef_Category,
   Order_Wholesaler_Schema,
-  OrderItem_ProdDef_Category_Schema
+  OrderItem_ProdDef_Category_Schema,
+  OrderSchema,
 } from "$lib/domain/domainTypes";
 import { log } from "$lib/utils/logger";
 
@@ -23,6 +30,8 @@ import type { ApiClient } from "./ApiClient";
 import { createJsonBody, getErrorMessage } from "./common";
 import { LoadingState } from "./loadingState";
 import { transformToNestedObjects } from "$lib/backendQueries/recordsetTransformer";
+import { safeParseFirstN } from "$lib/domain/domainTypes.utils";
+import { error } from "@sveltejs/kit";
 
 // Loading state managers remain global as they are a client-side concern.
 const orderLoadingManager = new LoadingState();
@@ -60,12 +69,63 @@ export function getOrderApi(client: ApiClient) {
           { context: operationId },
         );
         log.info(`Load successful.`, responseData);
+        // TODO: Validate the return objects in all APIs!
+        const valRes = safeParseFirstN(Order_Wholesaler_Schema, responseData.res, 3);
+        if (!valRes.success) {
+          const msg = `loadOrders: Validation failed: ${Order_Wholesaler_Schema.description} - ${JSON.stringify(valRes.error.issues, null, 4)}`;
+          throw error(500, msg);
+        }
         // Transform flat recordset to nested objects
-        const transformed = transformToNestedObjects(
-          responseData.results as Record<string, unknown>[],
-          Order_Wholesaler_Schema
-        );
+        const transformed = transformToNestedObjects(responseData.results as Record<string, unknown>[], Order_Wholesaler_Schema);
         return transformed;
+      } catch (err) {
+        log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
+        throw err;
+      } finally {
+        orderLoadingOperations.finish(operationId);
+      }
+    },
+
+    /**
+     * Load order joined with wholesaler Order_Wholesaler.
+     * @param orderId
+     * @returns
+     */
+    async loadOrderWholesaler(orderId: number): Promise<Order_Wholesaler> {
+      const operationId = "loadOrderWholesaler";
+      orderLoadingOperations.start(operationId);
+      try {
+        const predefQuery: PredefinedQueryRequest<Order_Wholesaler> = {
+          namedQuery: "order->wholesaler",
+          payload: { where: { key: "order_id", whereCondOp: "=", val: orderId } },
+        };
+        const responseData = await client.apiFetch<QueryResponseData<Order_Wholesaler>>(
+          "/api/query",
+          { method: "POST", body: createJsonBody(predefQuery) },
+          { context: operationId },
+        );
+        log.info(`Load successful.`, responseData);
+        // Transform flat recordset to nested objects
+        if (responseData.results.length !== 1) {
+          throw error(500, {
+            message: "API should return exactly one Order_Wholesaler",
+            code: "API_ERROR",
+            suggestion: "Please check API endpoint and if the order->wholesaler join is working correctly.",
+          });
+        }
+        const transformed = transformToNestedObjects(responseData.results as Record<string, unknown>[], Order_Wholesaler_Schema);
+        const order = transformed[0];
+        // TODO: Validate the return objects in all APIs!
+        const valRes = Order_Wholesaler_Schema.safeParse(order);
+        if (!valRes.success) {
+          throw error(500, {
+            message: "Order validation failed",
+            code: "VALIDATION_ERROR",
+            details: valRes.error.issues,
+            suggestion: "The order data from the API is incomplete. Please check if the order->wholesaler join is working correctly.",
+          });
+        }
+        return order;
       } catch (err) {
         log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
         throw err;
@@ -92,13 +152,19 @@ export function getOrderApi(client: ApiClient) {
         queryPartial.orderBy = orderBy;
       }
       const res = api.loadOrders(queryPartial);
+      // TODO: Validate the return objects in all APIs!
+      const valRes = safeParseFirstN(Order_Wholesaler_Schema, res, 3);
+      if (!valRes.success) {
+        const msg = `loadOrdersWithWhereAndOrder: Validation failed: ${Order_Wholesaler_Schema.description} - ${JSON.stringify(valRes.error.issues, null, 4)}`;
+        throw error(500, msg);
+      }
       return res;
     },
 
     /**
-     * Loads a single, complete supplier object by its ID.
+     * Loads a single, complete Order object by its ID.
      */
-    async loadOrder(orderId: number): Promise<Order_Wholesaler> {
+    async loadOrder(orderId: number): Promise<Order> {
       const operationId = `loadOrder-${orderId}`;
       orderLoadingOperations.start(operationId);
       try {
@@ -107,6 +173,16 @@ export function getOrderApi(client: ApiClient) {
           { method: "GET" },
           { context: operationId },
         );
+        // TODO: Validate the return objects in all APIs!
+        const valRes = OrderSchema.safeParse(responseData.order);
+        if (!valRes.success) {
+          throw error(500, {
+            message: "Order validation failed",
+            code: "VALIDATION_ERROR",
+            details: valRes.error.issues,
+            suggestion: "The order data from the API is incomplete. Please check if the order->wholesaler join is working correctly.",
+          });
+        }
         return responseData.order;
       } catch (err) {
         log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
@@ -196,7 +272,7 @@ export function getOrderApi(client: ApiClient) {
         if (where) {
           completeWhereGroup = {
             whereCondOp: "AND",
-            conditions: [orderFilterWhere, where]
+            conditions: [orderFilterWhere, where],
           };
         } else {
           completeWhereGroup = orderFilterWhere;
@@ -223,7 +299,7 @@ export function getOrderApi(client: ApiClient) {
           // Transform flat recordset to nested objects
           const transformed = transformToNestedObjects(
             responseData.results as Record<string, unknown>[],
-            OrderItem_ProdDef_Category_Schema
+            OrderItem_ProdDef_Category_Schema,
           );
           return transformed;
         } else {

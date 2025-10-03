@@ -9,8 +9,8 @@
   import "$lib/components/styles/grid-section.css";
 // API & Type Imports
   import { ApiClient } from "$lib/api/client/ApiClient";
-  import type { ColumnDefBase, DeleteStrategy, ID, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
   import type { SortDescriptor } from "$lib/backendQueries/queryGrammar";
+  import type { ColumnDefBase, DeleteStrategy, ID, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
   import {
       OrderItem_ProdDef_Category_Schema,
       OrderSchema,
@@ -33,6 +33,7 @@
   import { stringsToNumbers } from "$lib/utils/typeConversions";
   import { error } from "@sveltejs/kit";
   import OrderForm from "./OrderForm.svelte";
+    import { convertAppErrorToValTree, isAppError } from "$lib/utils/errorUtils";
 
   // === PROPS ====================================================================================
 
@@ -62,7 +63,7 @@
 
   // The following code is executed only ONCE whe the component is mounted => this is OK.
   if (!data.loadEventFetch) {
-    throw error(500, `OrderDetailPage: data.loadEventFetch must be defined.`)
+    throw error(500, `OrderDetailPage: data.loadEventFetch must be defined.`);
   }
   const client = new ApiClient(data.loadEventFetch);
   const orderApi = getOrderApi(client);
@@ -96,7 +97,7 @@
           /**
            * NOTE: We collect validation errors but we throw in case of other errors, see "catch".
            */
-          [order, orderItems] = await Promise.all([orderApi.loadOrder(data.orderId), orderApi.loadOrderItemsForOrder(data.orderId)]);
+          [order, orderItems] = await Promise.all([orderApi.loadOrderWholesaler(data.orderId), orderApi.loadOrderItemsForOrder(data.orderId)]);
           const orderValidationResult = OrderSchema.safeParse(order);
           const orderItemsValidationResult = safeParseFirstN(OrderItem_ProdDef_Category_Schema, orderItems, 3);
           if (orderValidationResult.error) {
@@ -109,13 +110,27 @@
           }
         }
         if (aborted) return;
-      } catch (rawError: any) {
-        // Throw error for severe problems!
+      } catch (rawError: unknown) {
+        // ⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️
+        // We process the promises async! 
+        // => Do not throw error here because it ends up in Nirwana.
+        // Instead, add them to the validation errors, which will be shown in the UI.
+        // ⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️
         if (aborted) return;
-        const status = rawError.status ?? 500;
-        const message = rawError.message || "Failed to load order details.";
-        log.error("Promise processing failed", { rawError });
-        throw error(status, message);
+
+        // Type-safe error handling with App.Error
+        if (isAppError(rawError)) {
+          const errorTree = convertAppErrorToValTree(rawError);
+          errors.loadError = errorTree;
+          log.error("Promise processing failed", errorTree);
+        } else {
+          // Fallback for non-App.Error errors
+          const fallbackMsg = rawError instanceof Error ? rawError.message : "Failed to load order details.";
+          errors.loadError = {
+            errors: [fallbackMsg],
+          };
+          log.error("Promise processing failed", { rawError });
+        }
       } finally {
         if (!aborted) {
           isLoading = false;

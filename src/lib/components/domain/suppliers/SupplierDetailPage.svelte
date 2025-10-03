@@ -353,7 +353,7 @@
   }
 
   function handleOrderSelect(order: Order_Wholesaler) {
-    goto(`${page.url.pathname}/orders/${order.order_id}`);
+    goto(`${page.url.pathname}/${order.order_id}`);
   }
 
   const ordersDeleteStrategy: DeleteStrategy<Order_Wholesaler> = {

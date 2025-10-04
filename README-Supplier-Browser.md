@@ -906,6 +906,7 @@ When implementing a new entity (e.g., Orders), follow this comprehensive checkli
 ### 3. API Endpoints (5-endpoint structure)
 - [ ] `POST /api/entity` - List queries with QueryPayload
 - [ ] `GET /api/entity/[id]` - Single entity read
+- [ ] **TODO:** All `GET /api/entity/[id]` endpoints must validate retrieved DB records with `validateEntity()` before returning (see `src/routes/api/offerings/[id]/+server.ts:60-74` for reference implementation)
 - [ ] `POST /api/entity/[id]` - Flexible single query
 - [ ] `POST /api/entity/new` - Create new entity
 - [ ] `PUT /api/entity/[id]` - Update entity

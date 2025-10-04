@@ -9,7 +9,7 @@ import { json, error, type RequestHandler } from "@sveltejs/kit";
 import { db } from "$lib/backendQueries/db";
 import { log } from "$lib/utils/logger";
 import { buildUnexpectedError, validateIdUrlParam } from "$lib/backendQueries/entityOperations";
-import { WholesalerItemOfferingSchema, type WholesalerItemOffering, type WholesalerItemOffering_ProductDef_Category_Supplier } from "$lib/domain/domainTypes";
+import { WholesalerItemOfferingSchema, WholesalerItemOffering_ProductDef_Category_SupplierSchema, type WholesalerItemOffering, type WholesalerItemOffering_ProductDef_Category_Supplier } from "$lib/domain/domainTypes";
 import { validateEntity } from "$lib/domain/domainTypes.utils";
 import { v4 as uuidv4 } from "uuid";
 import type {
@@ -37,7 +37,7 @@ export const GET: RequestHandler = async ({ params }) => {
     if (errorResponse) {
       return errorResponse;
     }
-    // This query now correctly joins all necessary tables to build the
+    // This query joins all necessary tables to build the
     // WholesalerItemOffering_ProductDef_Category type.
     const result = await db.request().input("id", id).query(`
                 SELECT 
@@ -57,7 +57,23 @@ export const GET: RequestHandler = async ({ params }) => {
       throw error(404, `Offering with ID ${id} not found.`);
     }
 
-    const offering = result.recordset[0] as WholesalerItemOffering_ProductDef_Category_Supplier;
+
+    // TODO: all GET <path>/id entpoints should validate retrieved record.
+    const validation = validateEntity(WholesalerItemOffering_ProductDef_Category_SupplierSchema, result.recordset[0]);
+    if (!validation.isValid) {
+      const errRes: ApiErrorResponse = {
+        success: false,
+        message: "Data validation failed for retrieved offering record.",
+        status_code: 500,
+        error_code: "INTERNAL_SERVER_ERROR",
+        errors: validation.errors,
+        meta: { timestamp: new Date().toISOString() },
+      };
+      log.error(`[${operationId}] FN_FAILURE: Database record validation failed.`, { errors: validation.errors });
+      return json(errRes, { status: 500 });
+    }
+
+    const offering = validation.sanitized as WholesalerItemOffering_ProductDef_Category_Supplier;
 
     // The response now correctly wraps the data in an 'offering' property.
     const response: ApiSuccessResponse<{ offering: WholesalerItemOffering_ProductDef_Category_Supplier }> = {

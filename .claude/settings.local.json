@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Read(//c/dev/pureenergyworks/pureenergy-schema/**)"
+      "Read(//c/dev/pureenergyworks/pureenergy-schema/**)",
+      "Bash(ls:*)"
     ],
     "deny": [],
     "ask": []

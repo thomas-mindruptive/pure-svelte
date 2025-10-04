@@ -28,7 +28,7 @@ export const supplierHierarchyConfig: HierarchyTree = {
           children: [
             // Category List - Visible categories list. Displayed on SupplierDetailPage.
             createHierarchyNode({
-              item: { key: "categories", type: "list", href: "/suppliers/[supplierId]", label: "Categories", urlParamName: "supplierId" },
+              item: { key: "categories", type: "list", href: "/suppliers/[supplierId]/categories", label: "Categories", urlParamName: "supplierId" },
               children: [
                 // Category Object - Hidden, represents the selected category. Has urlParamName.
                 createHierarchyNode({
@@ -37,7 +37,7 @@ export const supplierHierarchyConfig: HierarchyTree = {
                   children: [
                     // Offering List - Visible offerings list. Displayed on CategoryDetailPage.
                     createHierarchyNode({
-                      item: { key: "offerings", type: "list", href: "/suppliers/[supplierId]/categories/[categoryId]", label: "Offerings", urlParamName: "offeringId" },
+                      item: { key: "offerings", type: "list", href: "/suppliers/[supplierId]/categories/[categoryId]/offerings", label: "Offerings", urlParamName: "offeringId" },
                       children: [
                         // Offering Object - Hidden, represents the selected offering. Has urlParamName.
                         createHierarchyNode({
@@ -71,7 +71,7 @@ export const supplierHierarchyConfig: HierarchyTree = {
                   children: [
                     // OrderItem List - Visible order items list. Displayed on OrderDetailPage.
                     createHierarchyNode({
-                      item: { key: "orderitems", type: "list", href: "/suppliers/[supplierId]/orders/[orderId]", label: "Order Items", urlParamName: "orderId" },
+                      item: { key: "orderitems", type: "list", href: "/suppliers/[supplierId]/orders/[orderId]/orderitems", label: "Order Items", urlParamName: "orderId" },
                       children: [
                         // OrderItem Object - Hidden, represents the selected order item. Has urlParamName.
                         createHierarchyNode({
@@ -112,7 +112,7 @@ export const productCategoriesHierarchyConfig: HierarchyTree = {
           children: [
             // ProductDef List - Visible product definitions list. Displayed on CategoryDetailPage.
             createHierarchyNode({
-              item: { key: "productdefinitions", type: "list", href: "/categories/[categoryId]/", label: "Product Definitions", urlParamName: "categoryId" },
+              item: { key: "productdefinitions", type: "list", href: "/categories/[categoryId]/productdefinitions", label: "Product Definitions", urlParamName: "categoryId" },
               children: [
                 // ProductDef Object - Hidden, represents the selected product definition. Has urlParamName.
                 createHierarchyNode({
@@ -120,7 +120,7 @@ export const productCategoriesHierarchyConfig: HierarchyTree = {
                   children: [
                     // Offering List - Visible offerings list for product definition.
                     createHierarchyNode({
-                      item: { key: "offerings", type: "list", href: "/categories/[categoryId]/productdefinitions/[productDefId]", label: "Offerings", urlParamName: "offeringId" },
+                      item: { key: "offerings", type: "list", href: "/categories/[categoryId]/productdefinitions/[productDefId]/offerings", label: "Offerings", urlParamName: "offeringId" },
                       children: [
                         // Offering Object - Hidden, represents the selected offering. Has urlParamName.
                         createHierarchyNode({
@@ -186,7 +186,7 @@ export const ordersHierarchyConfig: HierarchyTree = {
           children: [
             // OrderItem List - Visible order items list. Displayed on OrderDetailPage.
             createHierarchyNode({
-              item: { key: "orderitems", type: "list", href: "/orders/[orderId]", label: "Order Items", urlParamName: "orderId" },
+              item: { key: "orderitems", type: "list", href: "/orders/[orderId]/orderitems", label: "Order Items", urlParamName: "orderId" },
               children: [
                 // OrderItem Object - Hidden, represents the selected order item. Has urlParamName.
                 createHierarchyNode({

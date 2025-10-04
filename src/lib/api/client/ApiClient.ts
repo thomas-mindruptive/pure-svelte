@@ -79,12 +79,12 @@ export class ApiClient {
 				throw err;
 			}
 
-		} catch (error) {
+		} catch (e) {
 			// ROBUSTES CATCH-HANDLING
-			if (error instanceof ApiError) {
-				throw error; // Wichtige ApiError-Details weiterreichen, nicht neu verpacken.
+			if (e instanceof ApiError) {
+				throw e; // Wichtige ApiError-Details weiterreichen, nicht neu verpacken.
 			}
-			const errorMessage = error instanceof Error ? error.message : String(error);
+			const errorMessage = e instanceof Error ? e.message : String(e);
 			log.error(`API Fetch failed: ${context}`, { url, error: errorMessage });
 			throw new ApiError(`Network or parsing error: ${errorMessage}`, 0); // Andere Fehler standardisieren.
 		} finally {
@@ -141,12 +141,12 @@ export class ApiClient {
 				errorData
 			);
 
-		} catch (error) {
+		} catch (e) {
 			// ROBUSTES CATCH-HANDLING (identisch zu apiFetch)
-			if (error instanceof ApiError) {
-				throw error; // Wichtige ApiError-Details weiterreichen.
+			if (e instanceof ApiError) {
+				throw e; // Wichtige ApiError-Details weiterreichen.
 			}
-			const errorMessage = error instanceof Error ? error.message : String(error);
+			const errorMessage = e instanceof Error ? e.message : String(e);
 			log.error(`API Union Fetch failed: ${context}`, { url, error: errorMessage });
 			throw new ApiError(`Network or parsing error: ${errorMessage}`, 0); // Andere Fehler standardisieren.
 		} finally {

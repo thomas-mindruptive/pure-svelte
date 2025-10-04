@@ -9,15 +9,15 @@ import { json, error, type RequestHandler } from "@sveltejs/kit";
 import { db } from "$lib/backendQueries/db";
 import { log } from "$lib/utils/logger";
 import { buildUnexpectedError, validateIdUrlParam } from "$lib/backendQueries/entityOperations";
-import { WholesalerItemOfferingSchema, WholesalerItemOffering_ProductDef_Category_SupplierSchema, type WholesalerItemOffering, type WholesalerItemOffering_ProductDef_Category_Supplier } from "$lib/domain/domainTypes";
+import {
+  WholesalerItemOfferingSchema,
+  WholesalerItemOffering_ProductDef_Category_SupplierSchema,
+  type WholesalerItemOffering,
+  type WholesalerItemOffering_ProductDef_Category_Supplier,
+} from "$lib/domain/domainTypes";
 import { validateEntity } from "$lib/domain/domainTypes.utils";
 import { v4 as uuidv4 } from "uuid";
-import type {
-  ApiErrorResponse,
-  ApiSuccessResponse,
-  DeleteConflictResponse,
-  DeleteRequest
-} from "$lib/api/api.types";
+import type { ApiErrorResponse, ApiSuccessResponse, DeleteConflictResponse, DeleteRequest } from "$lib/api/api.types";
 import { checkOfferingDependencies } from "$lib/dataModel/dependencyChecks";
 import type { DeleteOfferingSuccessResponse } from "$lib/api/app/appSpecificTypes";
 import { deleteOffering } from "$lib/backendQueries/cascadingDeleteOperations";
@@ -57,10 +57,17 @@ export const GET: RequestHandler = async ({ params }) => {
       throw error(404, `Offering with ID ${id} not found.`);
     }
 
+    const serialized = JSON.parse(JSON.stringify(result.recordset[0]));
 
-    // TODO: all GET <path>/id entpoints should validate retrieved record.
-    const validation = validateEntity(WholesalerItemOffering_ProductDef_Category_SupplierSchema, result.recordset[0]);
-    if (!validation.isValid) {
+    // Serialize and deserialize object to ensure validation is the same as on client.
+    // If not: validation fails, because record contains "date" object whereas schema "string".
+    // Changing schema to date does not help, because JSON serialization converts it to string anyway
+    // => Client always receives iso-string.
+
+    // TODO: all GET <path>/id endpoints should validate retrieved record.
+    const validation = validateEntity(WholesalerItemOffering_ProductDef_Category_SupplierSchema, serialized);
+    const debugError = true;
+    if (!validation.isValid || debugError) {
       const errRes: ApiErrorResponse = {
         success: false,
         message: "Data validation failed for retrieved offering record.",
@@ -223,7 +230,7 @@ export const DELETE: RequestHandler = async ({ params, request }): Promise<Respo
 
     const body: DeleteRequest<WholesalerItemOffering> = await request.json();
     const cascade = body.cascade || false;
-    const forceCascade = body.forceCascade || false; 
+    const forceCascade = body.forceCascade || false;
     log.debug(`[${operationId}] Parsed request body`, { id, cascade, forceCascade });
 
     const transaction = db.transaction();
@@ -231,7 +238,6 @@ export const DELETE: RequestHandler = async ({ params, request }): Promise<Respo
     log.info(`[${operationId}] Transaction started for offering deletion.`);
 
     try {
-
       // === CHECK DEPENDENCIES =====================================================================
 
       const { hard, soft } = await checkOfferingDependencies(id, transaction);
@@ -272,7 +278,6 @@ export const DELETE: RequestHandler = async ({ params, request }): Promise<Respo
       };
       log.info(`[${operationId}] FN_SUCCESS: Offering deleted.`, { responseData: response.data });
       return json(response);
-
     } catch (err) {
       await transaction.rollback();
       log.error(`[${operationId}] FN_EXCEPTION: Transaction failed, rolling back.`, { error: err });

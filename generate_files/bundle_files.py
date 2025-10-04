@@ -66,14 +66,16 @@ INCLUDE_PATTERNS: List[str] = [
     # "src/lib/api/client/order.ts",
     "src/lib/components/domain/suppliers/**",
     "src/lib/components/domain/orders/**",
+    "src/lib/components/domain/offerings/**",
     "src/lib/components/sidebarAndNav/**",
     "src/lib/routes/**",
     "src/routes/api/suppliers/**",
     "src/routes/api/orders/**",
+    "src/routes/api/offerings/**",
     "src/routes/(browser)/suppliers/**",
     "src/routes/(browser)/orders/**",
     "src/routes/(browser)/+layout.ts",
-    "README*.*"
+    "README*.*",
 ]
 
 # =========================

@@ -53,7 +53,7 @@ function initializeAndCacheHierarchies(): RuntimeHierarchyTree[] {
     const msg = `Navigation tree names must be unique. ${JSON.stringify(uniqueNameValRes.errors, null, 4)}`;
     log.errorLn(`!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!`);
     log.error(msg);
-    log.error(`!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!`)
+    log.error(`!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!`);
     throw new Error(msg);
   }
 
@@ -62,7 +62,7 @@ function initializeAndCacheHierarchies(): RuntimeHierarchyTree[] {
   for (const staticTree of staticHierarchies) {
     const runtimeTreeResult = convertToRuntimeTree(staticTree);
     if (runtimeTreeResult.errors) {
-      const msg = `Runtime tree ${staticTree.name} is invalid: ${JSON.stringify(runtimeTreeResult.errors, null, 2)}`
+      const msg = `Runtime tree ${staticTree.name} is invalid: ${JSON.stringify(runtimeTreeResult.errors, null, 2)}`;
       log.error(msg);
       throw error(500, msg);
     }
@@ -265,40 +265,70 @@ export async function load({ url, params: urlParamsFromLoadEvent, depends, fetch
   const entityNameMap = new Map<string, string>();
   const promises = [];
 
-  for (const node of nodesOnPath) {
+ for (const node of nodesOnPath) {
     if (node.item.type === "object" && node.item.urlParamName) {
       const paramName = node.item.urlParamName;
       const entityId = node.item.urlParamValue;
 
       if (entityId && typeof entityId === "number") {
         let apiPromise;
+
+        // --- Supplier Promise ---
         if (paramName === "supplierId") {
           apiPromise = getSupplierApi(client)
             .loadSupplier(entityId)
             .then((s) => s?.name);
+        
+        // --- Category Promise ---
         } else if (paramName === "categoryId") {
           apiPromise = getCategoryApi(client)
             .loadCategory(entityId)
             .then((c) => c?.name);
+        
+        // --- Offering Promise (mit dem Experiment) ---
         } else if (paramName === "offeringId") {
+          // =============================================================
+          // START DES EXPERIMENTS
+          // =============================================================
+          log.warn("!!!!!!!!!!!!!! STARTING EXPERIMENT for offeringId !!!!!!!!!!!!!!");
           apiPromise = getOfferingApi(client)
             .loadOffering(entityId)
-            .then((o) => o?.product_def_title);
+            .then(o => o?.product_def_title) // Das .then() gehört logisch hierher
+            .catch(err => {
+              log.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+              log.error(" EXPERIMENT CATCH BLOCK TRIGGERED! THE CRASH IS PREVENTED! ");
+              log.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!", err);
+              // Wir geben einen Wert zurück, der im nachfolgenden .then() verarbeitet werden kann,
+              // ohne einen Fehler zu verursachen (z.B. null oder undefined).
+              return null; 
+            });
+          // =============================================================
+          // ENDE DES EXPERIMENTS
+          // =============================================================
         }
 
+        // --- Push to promises array ---
         if (apiPromise) {
           promises.push(
+            // Diese Kette verarbeitet das Ergebnis des apiPromise
             apiPromise
               .then((name) => {
-                if (name) entityNameMap.set(paramName, name);
+                // Wenn name `null` ist (vom catch-Block oben), passiert hier einfach nichts.
+                if (name) {
+                  entityNameMap.set(paramName, name);
+                }
               })
-              .catch((err) => log.warn(`API call failed for ${paramName}=${entityId}`, err)),
           );
         }
       }
     }
   }
-  await Promise.all(promises);
+
+  try {
+    await Promise.all(promises);
+  } catch (e) {
+    log.error(`+layout.ts: Promise.all failed!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!`, e);
+  }
 
   // --- 5. Final Data Assembly  ---
   const breadcrumbItems = buildBreadcrumb({

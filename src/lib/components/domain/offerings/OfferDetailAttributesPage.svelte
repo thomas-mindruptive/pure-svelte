@@ -85,7 +85,7 @@
         const status = rawError.status ?? 500;
         const message = rawError.message || "Failed to load or validate offering details.";
         loadingError = { message, status };
-        log.error("Promise processing failed", { rawError });
+        log.error("***************** Promise processing failed", { rawError });
       } finally {
         if (!aborted) {
           isLoading = false;

@@ -352,6 +352,11 @@
     }
   }
 
+  function handleOrderCreate() {
+    log.info(`Going to DetailPage with "new"`);
+    goto(`${page.url.pathname}/new`);
+  }
+
   function handleOrderSelect(order: Order_Wholesaler) {
     goto(`${page.url.pathname}/${order.order_id}`);
   }
@@ -395,11 +400,17 @@
 
 <!-- ORDERS GRID---------------------------------------------------------------------------------->
 {#snippet ordersGridSection()}
+  <h2>Orders</h2>
   <div class="grid-section">
     {#if data.isCreateMode}
       <p>Assigned orders will be available after supplier has been saved.</p>
     {:else}
-      <h2>Orders</h2>
+      <button
+        class="pc-grid__createbtn"
+        onclick={handleOrderCreate}
+      >
+        Create Order
+      </button>
       <Datagrid
         rows={orders}
         columns={ordersColumns}

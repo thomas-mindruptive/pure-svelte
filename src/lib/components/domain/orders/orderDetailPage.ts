@@ -9,6 +9,7 @@ import { error, type LoadEvent } from "@sveltejs/kit";
  * @returns An object where each property is a promise for the required data.
  */
 export function load({ url, params, fetch: loadEventFetch }: LoadEvent) {
+  log.debug(`orderDetailPage::load`, {url, params});
   const orderId = Number(params.orderId);
   let isCreateMode = false;
   let isOrdersRoute = false;

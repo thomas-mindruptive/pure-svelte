@@ -1,7 +1,7 @@
 // src/lib/api/api.types.ts
 
 import type { QueryPayload } from "$lib/backendQueries/queryGrammar";
-import type { ValidationErrors } from "$lib/components/validation/validation.types";
+import type { ValidationErrors, ValidationErrorTree } from "$lib/components/validation/validation.types";
 
 /**
  * @file Common API Types - ORGANIZED GENERIC TYPE SYSTEM
@@ -195,7 +195,7 @@ export type DeleteApiResponse<TDeletedResource, TDependencies> =
   | DeleteConflictResponse<TDependencies>
   | ApiErrorResponse;
 
-// ===== 6. TYPE GUARDS =====
+// ===== 6. API TYPE GUARDS =====
 
 export function isApiError(response: unknown): response is ApiErrorResponse {
   const res = response as Record<string, unknown> | null;
@@ -222,3 +222,16 @@ export function isDeleteConflict(
         'dependencies' in res
     );
 }
+
+// ===== API CLIENT ERRORS =====/
+
+export type ApiValidationError = {valTree: ValidationErrorTree}
+
+export function isApiValidationError(err: unknown): err is ApiValidationError {
+    if (typeof err !== "object" || err === null) return false;
+    const e = err as Record<string, unknown>;
+    return (
+      typeof e.valTree === "object" &&
+      e.valTree !== null
+    );
+  }

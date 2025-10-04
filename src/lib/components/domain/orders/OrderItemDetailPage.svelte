@@ -24,6 +24,8 @@
   import { stringifyForHtml } from "$lib/utils/formatUtils";
   import { error } from "@sveltejs/kit";
   import OrderItemForm from "./OrderItemForm.svelte";
+  import { getParentPath, parseUrlSegments } from "$lib/utils/url";
+  import { page } from "$app/state";
 
   // === PROPS ====================================================================================
 
@@ -127,9 +129,9 @@
       const newOrderItemId = info.data?.order_item_id;
 
       if (newOrderItemId) {
-        // Navigate back to order detail page
-        const orderDetailUrl = `/orders/${data.orderId}`;
-        await goto(orderDetailUrl, { invalidateAll: true });
+        // Navigate to edit mode.
+        const newUrl = `${getParentPath(page.url)}/${newOrderItemId}`;
+        await goto(newUrl, { invalidateAll: true });
       } else {
         log.error("Could not redirect after create: new order_item_id is missing from response.", { data: info.data });
         addNotification("Could not redirect, returning to order detail.", "error");
@@ -148,8 +150,9 @@
   async function handleFormCancelled(info: { data: OrderItem; reason?: string }) {
     log.debug(`Form cancelled`);
     addNotification(`Form cancelled.`, "info");
-    // Navigate back to order detail page
-    await goto(`/orders/${data.orderId}`);
+    // Navigate back to parent
+    const newUrl = getParentPath(page.url);
+    await goto(newUrl, { invalidateAll: true });
   }
 
   async function handleFormChanged(event: { data: Record<string, any> }) {

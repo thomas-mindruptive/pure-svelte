@@ -18,17 +18,19 @@ import {
 import {
   Order_Wholesaler_Schema,
   WholesalerItemOffering_ProductDef_Category_Supplier_NestedSchema,
+  WholesalerSchema,
   type Order_Wholesaler,
   type ProductCategory,
   type Wholesaler,
   type WholesalerCategory,
   type WholesalerCategory_Category,
   type WholesalerCategoryWithCount,
-  type WholesalerItemOffering_ProductDef_Category_Supplier_Nested
+  type WholesalerItemOffering_ProductDef_Category_Supplier_Nested,
 } from "$lib/domain/domainTypes";
 import { log } from "$lib/utils/logger";
 
 import type {
+  ApiValidationError,
   AssignmentRequest,
   AssignmentSuccessData,
   PredefinedQueryRequest,
@@ -37,7 +39,7 @@ import type {
 } from "$lib/api/api.types";
 import type { DeleteSupplierApiResponse, RemoveCategoryApiResponse } from "$lib/api/app/appSpecificTypes";
 import { transformToNestedObjects } from "$lib/backendQueries/recordsetTransformer";
-import { genTypedQualifiedColumns } from "$lib/domain/domainTypes.utils";
+import { genTypedQualifiedColumns, zodToValidationErrorTree } from "$lib/domain/domainTypes.utils";
 import type { ApiClient } from "./ApiClient";
 import { createJsonAndWrapInPayload, createJsonBody, getErrorMessage } from "./common";
 import { LoadingState } from "./loadingState";
@@ -133,6 +135,14 @@ export function getSupplierApi(client: ApiClient) {
           { method: "GET" },
           { context: operationId },
         );
+        const valRes = WholesalerSchema.safeParse(responseData.supplier);
+        if (!valRes.success) {
+          const message = `loadOrderWholesaler: Validation failed: ${WholesalerSchema.description}`;
+          const valTree = zodToValidationErrorTree(valRes.error);
+          valTree.errors = [message];
+          const err: ApiValidationError = { valTree };
+          throw err;
+        }
         return responseData.supplier;
       } catch (err) {
         log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
@@ -222,7 +232,7 @@ export function getSupplierApi(client: ApiClient) {
         if (where) {
           completeWhereGroup = {
             whereCondOp: "AND",
-            conditions: [supplierFilterWhere, where]
+            conditions: [supplierFilterWhere, where],
           };
         } else {
           completeWhereGroup = supplierFilterWhere;
@@ -466,15 +476,15 @@ export function getSupplierApi(client: ApiClient) {
           val: supplierId,
         };
 
-        let completeWhereGroup: WhereCondition<Order_Wholesaler> | WhereConditionGroup<Order_Wholesaler> 
+        let completeWhereGroup: WhereCondition<Order_Wholesaler> | WhereConditionGroup<Order_Wholesaler>;
         if (where) {
           completeWhereGroup = {
             whereCondOp: "AND",
-            conditions: [supplierFilterWhere, where]
-          } 
-        } else{
+            conditions: [supplierFilterWhere, where],
+          };
+        } else {
           completeWhereGroup = supplierFilterWhere;
-        } 
+        }
 
         const defaultOrderBy: SortDescriptor<Order_Wholesaler>[] = [{ key: "ord.created_at", direction: "desc" }];
         const completeOrderBy: SortDescriptor<Order_Wholesaler>[] = [];

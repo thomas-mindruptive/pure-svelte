@@ -24,14 +24,14 @@ import {
 } from "$lib/domain/domainTypes";
 import { log } from "$lib/utils/logger";
 
-import type { PredefinedQueryRequest, QueryResponseData } from "$lib/api/api.types";
+import type { ApiValidationError, PredefinedQueryRequest, QueryResponseData } from "$lib/api/api.types";
 import type { DeleteSupplierApiResponse } from "$lib/api/app/appSpecificTypes";
 import type { ApiClient } from "./ApiClient";
 import { createJsonBody, getErrorMessage } from "./common";
 import { LoadingState } from "./loadingState";
 import { transformToNestedObjects } from "$lib/backendQueries/recordsetTransformer";
-import { safeParseFirstN } from "$lib/domain/domainTypes.utils";
-import { error } from "@sveltejs/kit";
+import { safeParseFirstN, zodToValidationErrorTree } from "$lib/domain/domainTypes.utils";
+import { assertDefined } from "$lib/utils/assertions";
 
 // Loading state managers remain global as they are a client-side concern.
 const orderLoadingManager = new LoadingState();
@@ -55,7 +55,7 @@ export function getOrderApi(client: ApiClient) {
     /**
      * Load a list.
      */
-    async loadOrders(query: Partial<QueryPayload<Order_Wholesaler>> = {}): Promise<Order_Wholesaler[]> {
+    async loadOrderWholesalers(query: Partial<QueryPayload<Order_Wholesaler>> = {}): Promise<Order_Wholesaler[]> {
       const operationId = "loadOrders";
       orderLoadingOperations.start(operationId);
       try {
@@ -69,15 +69,72 @@ export function getOrderApi(client: ApiClient) {
           { context: operationId },
         );
         log.info(`Load successful.`, responseData);
-        // TODO: Validate the return objects in all APIs!
-        const valRes = safeParseFirstN(Order_Wholesaler_Schema, responseData.res, 3);
-        if (!valRes.success) {
-          const msg = `loadOrders: Validation failed: ${Order_Wholesaler_Schema.description} - ${JSON.stringify(valRes.error.issues, null, 4)}`;
-          throw error(500, msg);
-        }
+
         // Transform flat recordset to nested objects
         const transformed = transformToNestedObjects(responseData.results as Record<string, unknown>[], Order_Wholesaler_Schema);
+
+        // TODO: Validate the return objects in all APIs!
+        const valRes = safeParseFirstN(Order_Wholesaler_Schema, transformed, 3);
+        if (!valRes.success) {
+          const message = `loadOrders: Validation failed: ${Order_Wholesaler_Schema.description} - Details see "valTree"`;
+          const valTree = zodToValidationErrorTree(valRes.error);
+          valTree.errors = [message];
+          const err: ApiValidationError = { valTree };
+          throw err;
+        }
         return transformed;
+      } catch (err) {
+        log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
+        throw err;
+      } finally {
+        orderLoadingOperations.finish(operationId);
+      }
+    },
+
+    /**
+     * Loads based on "where" and "orderBy".
+     * @param where
+     * @param orderBy
+     * @returns
+     */
+    async loadOrderWholesalersWithWhereAndOrder(
+      where: WhereConditionGroup<Order_Wholesaler> | null,
+      orderBy: SortDescriptor<Order_Wholesaler>[] | null,
+    ): Promise<Order_Wholesaler[]> {
+      const queryPartial: Partial<QueryPayload<Order_Wholesaler>> = {};
+      if (where) {
+        queryPartial.where = where;
+      }
+      if (orderBy) {
+        queryPartial.orderBy = orderBy;
+      }
+      const res = api.loadOrderWholesalers(queryPartial);
+      // NOTE: loadOrders validates to schema.
+      return res;
+    },
+
+    /**
+     * Loads a single, complete Order object by its ID.
+     */
+    async loadOrder(orderId: number): Promise<Order> {
+      const operationId = `loadOrder-${orderId}`;
+      orderLoadingOperations.start(operationId);
+      try {
+        const responseData = await client.apiFetch<{ order: Order_Wholesaler }>(
+          `/api/orders/${orderId}`,
+          { method: "GET" },
+          { context: operationId },
+        );
+        // TODO: Validate the return objects in all APIs!
+        const valRes = OrderSchema.safeParse(responseData.order);
+        if (!valRes.success) {
+          const message = `loadOrder: Validation failed: ${OrderSchema.description}`;
+          const valTree = zodToValidationErrorTree(valRes.error);
+          valTree.errors = [message];
+          const err: ApiValidationError = { valTree };
+          throw err;
+        }
+        return responseData.order;
       } catch (err) {
         log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
         throw err;
@@ -105,25 +162,23 @@ export function getOrderApi(client: ApiClient) {
           { context: operationId },
         );
         log.info(`Load successful.`, responseData);
-        // Transform flat recordset to nested objects
         if (responseData.results.length !== 1) {
-          throw error(500, {
-            message: "API should return exactly one Order_Wholesaler",
-            code: "API_ERROR",
-            suggestion: "Please check API endpoint and if the order->wholesaler join is working correctly.",
-          });
+          const message = `loadOrderWholesaler: Only one element in responseData.results expected but was ${responseData.results.length}`;
+          const err: ApiValidationError = { valTree: { errors: [message] } };
+          throw err;
         }
+
+        // Transform flat recordset to nested objects
         const transformed = transformToNestedObjects(responseData.results as Record<string, unknown>[], Order_Wholesaler_Schema);
         const order = transformed[0];
         // TODO: Validate the return objects in all APIs!
         const valRes = Order_Wholesaler_Schema.safeParse(order);
         if (!valRes.success) {
-          throw error(500, {
-            message: "Order validation failed",
-            code: "VALIDATION_ERROR",
-            details: valRes.error.issues,
-            suggestion: "The order data from the API is incomplete. Please check if the order->wholesaler join is working correctly.",
-          });
+          const message = `loadOrderWholesaler: Validation failed: ${Order_Wholesaler_Schema.description}`;
+          const valTree = zodToValidationErrorTree(valRes.error);
+          valTree.errors = [message];
+          const err: ApiValidationError = { valTree };
+          throw err;
         }
         return order;
       } catch (err) {
@@ -135,78 +190,36 @@ export function getOrderApi(client: ApiClient) {
     },
 
     /**
-     * Loads based on "where" and "orderBy".
-     * @param where
-     * @param orderBy
+     * Remove the the wholesaler from the OrderWholesaler, e.g. for clean API calls.
+     * @param orderWs
      * @returns
      */
-    async loadOrdersWithWhereAndOrder(
-      where: WhereConditionGroup<Order_Wholesaler> | null,
-      orderBy: SortDescriptor<Order_Wholesaler>[] | null,
-    ): Promise<Order_Wholesaler[]> {
-      const queryPartial: Partial<QueryPayload<Order_Wholesaler>> = {};
-      if (where) {
-        queryPartial.where = where;
-      }
-      if (orderBy) {
-        queryPartial.orderBy = orderBy;
-      }
-      const res = api.loadOrders(queryPartial);
-      // TODO: Validate the return objects in all APIs!
-      const valRes = safeParseFirstN(Order_Wholesaler_Schema, res, 3);
-      if (!valRes.success) {
-        const msg = `loadOrdersWithWhereAndOrder: Validation failed: ${Order_Wholesaler_Schema.description} - ${JSON.stringify(valRes.error.issues, null, 4)}`;
-        throw error(500, msg);
-      }
-      return res;
+    stripWholesalerFromOrderWholesaler(orderWs: Partial<Order_Wholesaler>): Partial<Order> {
+      assertDefined(orderWs, "orderWs");
+      // Strip wholesaler.
+      const { wholesaler, ...order } = orderWs;
+      void wholesaler;
+      return order;
     },
 
     /**
-     * Loads a single, complete Order object by its ID.
+     * Creates a new order from an Order_Wholesaler.
      */
-    async loadOrder(orderId: number): Promise<Order> {
-      const operationId = `loadOrder-${orderId}`;
+    async createOrderFromOrderWholesaler(orderWholesaler: Partial<Omit<Order_Wholesaler, "wholesaler_id">>): Promise<Order_Wholesaler> {
+      const operationId = "createOrder";
       orderLoadingOperations.start(operationId);
       try {
-        const responseData = await client.apiFetch<{ order: Order_Wholesaler }>(
-          `/api/orders/${orderId}`,
-          { method: "GET" },
-          { context: operationId },
-        );
-        // TODO: Validate the return objects in all APIs!
-        const valRes = OrderSchema.safeParse(responseData.order);
-        if (!valRes.success) {
-          throw error(500, {
-            message: "Order validation failed",
-            code: "VALIDATION_ERROR",
-            details: valRes.error.issues,
-            suggestion: "The order data from the API is incomplete. Please check if the order->wholesaler join is working correctly.",
-          });
-        }
-        return responseData.order;
-      } catch (err) {
-        log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
-        throw err;
-      } finally {
-        orderLoadingOperations.finish(operationId);
-      }
-    },
-
-    /**
-     * Creates a new supplier.
-     */
-    async createOrder(orderData: Partial<Omit<Order, "wholesaler_id">>): Promise<Order> {
-      const operationId = "createSupplier";
-      orderLoadingOperations.start(operationId);
-      try {
+        const order = this.stripWholesalerFromOrderWholesaler(orderWholesaler);
         const responseData = await client.apiFetch<{ order: Order }>(
           "/api/orders/new",
-          { method: "POST", body: createJsonBody(orderData) },
+          { method: "POST", body: createJsonBody(order) },
           { context: operationId },
         );
-        return responseData.order;
+        // We need to return a joined Order_Wholesaler => reload the join.
+        const updatedOrderWholesaler = await this.loadOrderWholesaler(responseData.order.order_id);
+        return updatedOrderWholesaler;
       } catch (err) {
-        log.error(`[${operationId}] Failed.`, { supplierData: orderData, error: getErrorMessage(err) });
+        log.error(`[${operationId}] Failed.`, { orderData: orderWholesaler, error: getErrorMessage(err) });
         throw err;
       } finally {
         orderLoadingOperations.finish(operationId);
@@ -214,18 +227,21 @@ export function getOrderApi(client: ApiClient) {
     },
 
     /**
-     * Updates an existing supplier.
+     * Updates an existing order from an Order_Wholesaler.
      */
-    async updateOrder(orderId: number, updates: Partial<Order>): Promise<Order> {
+    async updateOrderFromOrderWholesaler(orderId: number, updates: Partial<Order_Wholesaler>): Promise<Order_Wholesaler> {
       const operationId = `updateOrder-${orderId}`;
       orderLoadingOperations.start(operationId);
       try {
+        const orderUpdates = this.stripWholesalerFromOrderWholesaler(updates);
         const responseData = await client.apiFetch<{ order: Order }>(
           `/api/orders/${orderId}`,
-          { method: "PUT", body: createJsonBody(updates) },
+          { method: "PUT", body: createJsonBody(orderUpdates) },
           { context: operationId },
         );
-        return responseData.order;
+        // We need to return a joined Order_Wholesaler => reload the join.
+        const updatedOrderWholesaler = await this.loadOrderWholesaler(responseData.order.order_id);
+        return updatedOrderWholesaler;
       } catch (err) {
         log.error(`[${operationId}] Failed.`, { updates, error: getErrorMessage(err) });
         throw err;

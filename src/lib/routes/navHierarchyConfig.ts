@@ -67,6 +67,7 @@ export const supplierHierarchyConfig: HierarchyTree = {
                 // Order Object - Hidden, represents the selected order. Has urlParamName.
                 createHierarchyNode({
                   item: { key: "order", type: "object", href: "/suppliers/[supplierId]/orders/[orderId]", label: "Order", display: false, urlParamName: "orderId" },
+                  defaultChild: "orderitems",
                   children: [
                     // OrderItem List - Visible order items list. Displayed on OrderDetailPage.
                     createHierarchyNode({
@@ -225,7 +226,7 @@ export function getHierarchyByName(name: string): HierarchyTree | undefined {
 // DEVELOPMENT VALIDATION (Unchanged)
 // ================================================================================================
 
-function validateHierarchyNames(): boolean {
+function validateHierarchies(): boolean {
   const hierarchies = getAppHierarchies();
   const validationResult = validateHierarchiesAsTree(hierarchies);
   if (validationResult) {
@@ -235,5 +236,5 @@ function validateHierarchyNames(): boolean {
   return true;
 }
 
-validateHierarchyNames();
+validateHierarchies();
 log.info("✅ Initial hierarchy configuration validation passed");

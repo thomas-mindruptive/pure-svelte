@@ -63,7 +63,7 @@
 
       try {
         if (!aborted) {
-          resolvedOrders = await orderApi.loadOrders();
+          resolvedOrders = await orderApi.loadOrderWholesalers();
           const valResult = safeParseFirstN(Order_Wholesaler_Schema, resolvedOrders, 4);
           if (!valResult.success) {
             const msg = `Cannot validate orders: ${convertToHtml(JSON.stringify(valResult.error.issues))}`;
@@ -125,7 +125,7 @@
 
     if (dataChanged) {
       // Reload and change state.
-      resolvedOrders = await orderApi.loadOrders();
+      resolvedOrders = await orderApi.loadOrderWholesalers();
     }
   }
 
@@ -135,7 +135,7 @@
   }
 
   async function handleSort(sortState: SortDescriptor<Order_Wholesaler>[] | null) {
-    resolvedOrders = await orderApi.loadOrdersWithWhereAndOrder(null, sortState);
+    resolvedOrders = await orderApi.loadOrderWholesalersWithWhereAndOrder(null, sortState);
   }
 
   // === DATAGRID DATA ============================================================================

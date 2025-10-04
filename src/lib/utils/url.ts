@@ -36,3 +36,18 @@ export function parseUrlSegments(url: URL | string): string[] {
     return [];
   }
 }
+
+/**
+ * Returns the parent path by removing the last segment.
+ * @param url - URL object or pathname string
+ * @returns Parent path (always starts with '/')
+ * @example
+ * getParentPath('/suppliers/1/orders/new') // '/suppliers/1/orders'
+ * getParentPath('/orders') // '/'
+ * getParentPath('/') // '/'
+ */
+export function getParentPath(url: URL | string): string {
+  const pathname = typeof url === "string" ? url : url.pathname;
+  const parent = pathname.replace(/\/[^\/]+$/, '');
+  return parent || '/';
+}

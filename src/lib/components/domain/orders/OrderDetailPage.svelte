@@ -3,24 +3,25 @@
   import { goto } from "$app/navigation";
   import { addNotification } from "$lib/stores/notifications";
   import { log } from "$lib/utils/logger";
-// Component Imports
+  // Component Imports
   import "$lib/components/styles/assignment-section.css";
   import "$lib/components/styles/detail-page-layout.css";
   import "$lib/components/styles/grid-section.css";
-// API & Type Imports
+  // API & Type Imports
   import { ApiClient } from "$lib/api/client/ApiClient";
   import type { SortDescriptor } from "$lib/backendQueries/queryGrammar";
   import type { ColumnDefBase, DeleteStrategy, ID, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
   import {
-      OrderItem_ProdDef_Category_Schema,
-      OrderSchema,
-      WholesalerSchema,
-      type Order_Wholesaler,
-      type OrderItem_ProdDef_Category,
-      type Wholesaler,
+    OrderItem_ProdDef_Category_Schema,
+    OrderSchema,
+    WholesalerSchema,
+    type Order_Wholesaler,
+    type OrderItem_ProdDef_Category,
+    type Wholesaler,
   } from "$lib/domain/domainTypes";
 
   import { page } from "$app/state";
+  import { isApiValidationError } from "$lib/api/api.types";
   import { cascadeDelete } from "$lib/api/client/cascadeDelete";
   import { getOrderApi, orderLoadingState } from "$lib/api/client/order";
   import { getOrderItemApi } from "$lib/api/client/orderItem";
@@ -33,7 +34,7 @@
   import { stringsToNumbers } from "$lib/utils/typeConversions";
   import { error } from "@sveltejs/kit";
   import OrderForm from "./OrderForm.svelte";
-    import { convertAppErrorToValTree, isAppError } from "$lib/utils/errorUtils";
+  import { getParentPath, parseUrlSegments } from "$lib/utils/url";
 
   // === PROPS ====================================================================================
 
@@ -55,6 +56,7 @@
   let order = $state<Order_Wholesaler | null>(null);
   let orderItems = $state<OrderItem_ProdDef_Category[] | null>(null);
   let availableWholesalers = $state<Wholesaler[]>([]);
+  let wholeSalerOfSuppliersRoute = $state<Wholesaler | null>(null);
   let isLoading = $state(true);
   const errors = $state<Record<string, ValidationErrorTree>>({});
   const allowForceCascadingDelte = $state(true);
@@ -74,7 +76,7 @@
 
   // This is the core of the async pattern. It runs whenever the `data` prop changes.
   $effect(() => {
-    log.info("$effect triggered", { orderId: data.orderId, isCreateMode: data.isCreateMode });
+    log.info("$effect triggered", { data });
     let aborted = false;
 
     const processPromises = async () => {
@@ -93,11 +95,26 @@
         if (data.isCreateMode) {
           order = null;
           orderItems = [];
+
+          // Suppliers route => User cannot use the "suppliers" combobox,
+          // because supplier id is given by URL param.
+          // => Load the supplier from the URL param.
+          if (data.isSuppliersRoute) {
+            const supplierId = Number(data.params.supplierId);
+            if (isNaN(supplierId)) {
+              errors.params = { supplierId: { errors: [`URL param "supplierId" must be set if "isSuppliersRoute"`] } };
+            } else {
+              wholeSalerOfSuppliersRoute = await supplierApi.loadSupplier(supplierId);
+            }
+          }
         } else {
           /**
            * NOTE: We collect validation errors but we throw in case of other errors, see "catch".
            */
-          [order, orderItems] = await Promise.all([orderApi.loadOrderWholesaler(data.orderId), orderApi.loadOrderItemsForOrder(data.orderId)]);
+          [order, orderItems] = await Promise.all([
+            orderApi.loadOrderWholesaler(data.orderId),
+            orderApi.loadOrderItemsForOrder(data.orderId),
+          ]);
           const orderValidationResult = OrderSchema.safeParse(order);
           const orderItemsValidationResult = safeParseFirstN(OrderItem_ProdDef_Category_Schema, orderItems, 3);
           if (orderValidationResult.error) {
@@ -112,17 +129,18 @@
         if (aborted) return;
       } catch (rawError: unknown) {
         // ⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️
-        // We process the promises async! 
+        // We process the promises async!
         // => Do not throw error here because it ends up in Nirwana.
         // Instead, add them to the validation errors, which will be shown in the UI.
+        //
+        // TODO: Change other pages, too!
         // ⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️
         if (aborted) return;
 
         // Type-safe error handling with App.Error
-        if (isAppError(rawError)) {
-          const errorTree = convertAppErrorToValTree(rawError);
-          errors.loadError = errorTree;
-          log.error("Promise processing failed", errorTree);
+        if (isApiValidationError(rawError)) {
+          errors.loadError = rawError.valTree;
+          log.error("Promise processing failed", rawError);
         } else {
           // Fallback for non-App.Error errors
           const fallbackMsg = rawError instanceof Error ? rawError.message : "Failed to load order details.";
@@ -157,16 +175,16 @@
       const newOrderId = info.data?.order_id;
 
       if (newOrderId) {
-        // Build the new "edit mode" URL.
-        const newUrl = `/orders/${newOrderId}`;
-
-        // Navigate to the new URL to switch to edit mode.
-        // invalidateAll is crucial to re-run the load function with the new ID.
+        // Go to edit mode
+        // We are in <path>/orders/[orderId]
+        let pathSegments = parseUrlSegments(page.url);
+        pathSegments = pathSegments.slice(0, pathSegments.length - 1);
+        const newUrl = `${getParentPath(page.url)}/${newOrderId}`; 
         await goto(newUrl, { invalidateAll: true });
       } else {
         // This is a fallback case in case the API response was malformed.
         log.error("Could not redirect after create: new order_id is missing from response.", { data: info.data });
-        addNotification("Could not redirect to edit page, returning to list.", "error");
+        addNotification("Could not redirect to edit page, newOrderId is not set.", "error");
         // Do not go to orders because we are in an invalid state.
       }
     } else {
@@ -184,10 +202,19 @@
   async function handleFormCancelled(info: { data: Order_Wholesaler; reason?: string }) {
     log.debug(`Form cancelled`);
     addNotification(`Form cancelled.`, "info");
+    const newUrl = getParentPath(page.url);
+    await goto(newUrl, { invalidateAll: true });
   }
 
   async function handleFormChanged(event: { data: Record<string, any> }) {
     log.debug(`Form changed`);
+  }
+
+  /**
+   * Navigates to the next hierarchy level.
+   */
+  function handleOrderItemSelect(orderItem: OrderItem_ProdDef_Category) {
+    goto(`${page.url.pathname}/orderitems/${orderItem.order_item_id}`);
   }
 
   // ===== SORT HANDLERS =====
@@ -237,13 +264,6 @@
     }
   }
 
-  /**
-   * Navigates to the next hierarchy level.
-   */
-  function handleOrderItemSelect(orderItem: OrderItem_ProdDef_Category) {
-    goto(`${page.url.pathname}/orderitems/${orderItem.order_item_id}`);
-  }
-
   // === DATAGRID DATA =====
 
   const columns: ColumnDefBase<typeof OrderItem_ProdDef_Category_Schema>[] = [
@@ -283,6 +303,7 @@
       <OrderForm
         isCreateMode={data.isCreateMode}
         initial={order}
+        wholeSalerOfOrder={wholeSalerOfSuppliersRoute}
         {availableWholesalers}
         isOrdersRoute={data.isOrdersRoute}
         isSuppliersRoute={data.isSuppliersRoute}

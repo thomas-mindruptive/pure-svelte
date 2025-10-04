@@ -4,7 +4,7 @@
 >
   import FormShell from "$lib/components/forms/FormShell.svelte";
   import { log } from "$lib/utils/logger";
-  import { Order_Wholesaler_Schema, type Order, type Order_Wholesaler, type Wholesaler } from "$lib/domain/domainTypes";
+  import { Order_Wholesaler_Schema, type Order_Wholesaler, type Wholesaler } from "$lib/domain/domainTypes";
   import "$lib/components/styles/form.css";
   import "$lib/components/styles/grid.css";
   import { ApiClient } from "$lib/api/client/ApiClient";
@@ -19,13 +19,16 @@
   import { assertDefined } from "$lib/utils/assertions";
   import { getOrderApi } from "$lib/api/client/order";
   import { formatDateForInput, formatDateForApi } from "$lib/utils/formatUtils";
+    import type { ValidationErrors, ValidationErrorTree } from "$lib/components/validation/validation.types";
+    import { zodToValidationErrorTree } from "$lib/domain/domainTypes.utils";
 
-  type ValidationErrors = Record<string, string[]>;
 
   // === PROPS ====================================================================================
 
   export type Props = {
-    initial?: Order | undefined | null;
+    initial?: Order_Wholesaler | undefined | null;
+    // Only needed for create mode inorder to show wholesaler info, e.g. name.
+    wholeSalerOfOrder?: Wholesaler | undefined | null;
     isCreateMode: boolean;
     availableWholesalers: Wholesaler[];
     isOrdersRoute: boolean;
@@ -41,6 +44,7 @@
 
   const {
     initial,
+    wholeSalerOfOrder,
     isCreateMode,
     availableWholesalers,
     isOrdersRoute,
@@ -54,10 +58,31 @@
   // Silence tsc:
   isSuppliersRoute;
 
-  // === LOG ======================================================================================
+  // === STATE ====================================================================================
+
+  const errors = $state<Record<string, ValidationErrorTree>>({});
+
+  // === INIT =====================================================================================
 
   $effect(() => {
     log.debug(`Props: `, allProps);
+    if (isCreateMode) {
+      if (isSuppliersRoute) {
+         if (!wholeSalerOfOrder) {
+          const msg = `if createMode and isSuppliersRoute => wholesaler must be set.`;
+          log.error(msg);
+          errors.props = {wholeSalerOfOrder: [msg]}
+         }
+      }
+    }
+
+    const result = Order_Wholesaler_Schema.nullable().safeParse(initial);
+    if (result.error) {
+      log.error(`Validation to OrderSchema failed.`, result.error);
+    }
+    if (result.error) {
+      errors.orderWholesaler = zodToValidationErrorTree(result.error);
+    }
   });
 
   // === DEFAULTS =================================================================================
@@ -65,10 +90,18 @@
   // Apply default values
   const initialWithDefaults = $derived.by(() => {
     const base = initial || {};
-    return {
+    const result: Partial<Order_Wholesaler> = {
       ...base,
       status: (base as Order_Wholesaler).status ?? "pending",
-    } as Order;
+    };
+
+    // Only use wholeSalerOfOrder in CREATE mode
+    if (isCreateMode && wholeSalerOfOrder) {
+      result.wholesaler = wholeSalerOfOrder;
+      result.wholesaler_id = wholeSalerOfOrder.wholesaler_id;
+    }
+
+    return result as Order_Wholesaler;
   });
 
   // === API ======================================================================================
@@ -78,23 +111,26 @@
 
   // === VALIDATE =================================================================================
 
-  let { schemaValidationErrors } = $derived.by(() => {
-    const result = Order_Wholesaler_Schema.nullable().safeParse(initial);
-    if (result.error) {
-      log.error(`Validation to OrderSchema failed.`, result.error);
-    }
-    return {
-      schemaValidationErrors: result.success ? null : result.error.issues,
-      isValid: result.success,
-    };
-  });
+  //let { schemaValidationErrors } = $derived.by(() => {
+    // const result = Order_Wholesaler_Schema.nullable().safeParse(initial);
+    // if (result.error) {
+    //   log.error(`Validation to OrderSchema failed.`, result.error);
+    // }
+    // if (result.error) {
+    //   errors.orderWholesaler = zodToValidationErrorTree(result.error);
+    // }
+    // return {
+    //   schemaValidationErrors: result.success  ? null : result.error.issues,
+    //   isValid: result.success,
+    // };
+ // });
 
   // === STATE ====================================================================================
 
   // === BUSINESS FUNCTIONALITY ===================================================================
 
   function validateOrder(raw: Record<string, any>): ValidateResult {
-    const order = raw as Order;
+    const order = raw as Order_Wholesaler;
     const errors: ValidationErrors = {};
 
     if (order.order_date) {
@@ -123,14 +159,14 @@
 
   async function submitOrder(raw: Record<string, any>) {
     log.debug(`Submitting wholesaler`, raw);
-    const data = raw as Order;
+    const data = raw as Order_Wholesaler;
     const isUpdate = !isCreateMode;
     try {
       if (isUpdate) {
         assertDefined(data, "order_id is required for update", ["order_id"]);
-        return await orderApi.updateOrder(data.order_id, data);
+        return await orderApi.updateOrderFromOrderWholesaler(data.order_id, data);
       } else {
-        return await orderApi.createOrder(data);
+        return await orderApi.createOrderFromOrderWholesaler(data);
       }
     } catch (e) {
       log.error({ component: "OrderForm", error: String(e) }, "SUBMIT_FAILED");
@@ -155,7 +191,7 @@
   }
 </script>
 
-<ValidationWrapper errors={schemaValidationErrors}>
+<ValidationWrapper errors={errors}>
   <FormShell
     entity="Order"
     initial={initialWithDefaults as Order_Wholesaler}
@@ -179,7 +215,7 @@
           {#if isCreateMode}
             <h3>{order.order_number || "New Order (True Faith)"}</h3>
           {:else}
-            <h3>{order.order_number || "Unnamed Order"}</h3>
+            <h3>{order.order_number || "<No order number defined>"}</h3>
             <span class="field-hint">ID: {order.order_id}</span>
           {/if}
         </div>
@@ -280,7 +316,7 @@
               name="status"
               value={getS("status") ?? "pending"}
               class:invalid={errors.status}
-              onchange={(e) => set(["status"], (e.currentTarget as HTMLSelectElement).value as Order["status"])}
+              onchange={(e) => set(["status"], (e.currentTarget as HTMLSelectElement).value as Order_Wholesaler["status"])}
               onblur={() => markTouched("status")}
               required
             >
@@ -346,7 +382,7 @@
 
         <div class="form-row-grid">
           <!-- Notes (uses span-3 for wider textarea) -->
-          <div class="form-group span-3">
+          <div class="form-group span-4">
             <label for="order-notes">Notes</label>
             <textarea
               id="order-notes"

@@ -115,13 +115,21 @@ export function loadOfferingDetailBasisData({
     return asyncLoadData;
   } else {
     // --- EDIT MODE -----
+
+    const offeringPromise = offeringApi.loadOffering(offeringId!).catch((err) => {
+      // Wenn der ApiClient einen SvelteKit-`error` wirft, ist `err` eine `Response`-Instanz.
+      // Wir loggen es und werfen es erneut, damit SvelteKit seine Fehlerseite anzeigen kann.
+      log.error(`SSR Load failed, re-throwing SvelteKit error for page display.`, err);
+      //throw err; // Wichtig: Den SvelteKit-Fehler erneut werfen!
+    });
+
     log.info(`Kicking off promises for EDIT mode: offeringId: ${offeringId}, categoryId: ${categoryId}, supplierId: ${supplierId}`);
     const asyncLoadData: OfferingDetail_LoadDataAsync = {
       urlPathName: url.pathname,
       supplierId,
       categoryId,
       productDefId,
-      offering: offeringApi.loadOffering(offeringId!), // We made sure above that we only enter "CREATE" mode, if offeringId is invalid.
+      offering: offeringPromise as any,
       isCreateMode,
       isSuppliersRoute,
       isCategoriesRoute,

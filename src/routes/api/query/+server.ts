@@ -6,11 +6,11 @@
  * It validates the request and then delegates to the secure query builder.
  */
 
-import { json, error, type RequestHandler } from "@sveltejs/kit";
+import { json, type RequestHandler } from "@sveltejs/kit";
 import { log } from "$lib/utils/logger";
 import { buildQuery, executeQuery } from "$lib/backendQueries/queryBuilder";
 import { queryConfig } from "$lib/backendQueries/queryConfig";
-import { mssqlErrorMapper } from "$lib/backendQueries/mssqlErrorMapper";
+import { buildUnexpectedError } from "$lib/backendQueries/entityOperations";
 import type { ApiErrorResponse, QueryRequest, PredefinedQueryRequest, QuerySuccessResponse } from "$lib/api/api.types";
 import { v4 as uuidv4 } from "uuid";
 import { isTableInBrandedSchemas } from "$lib/domain/domainTypes.utils";
@@ -146,8 +146,7 @@ export const POST: RequestHandler = async (event) => {
     };
     return json(errRes, { status: 400 });
   } catch (err: unknown) {
-    const { status, message } = mssqlErrorMapper.mapToHttpError(err);
-    log.error(`[${operationId}] FN_EXCEPTION: Unhandled error during generic query execution.`, { error: err });
-    throw error(status, message);
+    log.error(`[${operationId}] FN_EXCEPTION: Error during generic query execution.`, { error: err });
+    return buildUnexpectedError(err, `Query operation ${operationId}`);
   }
 };

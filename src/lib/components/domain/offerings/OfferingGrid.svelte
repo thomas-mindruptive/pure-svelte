@@ -8,16 +8,16 @@
   // strategy objects, making it a pure presentation component consistent with other grids.
 
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
-  import type { DeleteStrategy, RowActionStrategy, ColumnDef } from "$lib/components/grids/Datagrid.types";
-  import type { WholesalerItemOffering_ProductDef_Category_Supplier } from "$lib/domain/domainTypes";
+  import type { DeleteStrategy, RowActionStrategy, ColumnDefBase } from "$lib/components/grids/Datagrid.types";
+  import type { WholesalerItemOffering_ProductDef_Category_Supplier_Nested, WholesalerItemOffering_ProductDef_Category_Supplier_NestedSchema } from "$lib/domain/domainTypes";
 
   // === PROPS  ===================================================================================
 
   export type OfferingGridProps = {
-    rows: WholesalerItemOffering_ProductDef_Category_Supplier[];
+    rows: WholesalerItemOffering_ProductDef_Category_Supplier_Nested[];
     loading?: boolean;
-    deleteStrategy: DeleteStrategy<WholesalerItemOffering_ProductDef_Category_Supplier>;
-    rowActionStrategy?: RowActionStrategy<WholesalerItemOffering_ProductDef_Category_Supplier>;
+    deleteStrategy: DeleteStrategy<WholesalerItemOffering_ProductDef_Category_Supplier_Nested>;
+    rowActionStrategy?: RowActionStrategy<WholesalerItemOffering_ProductDef_Category_Supplier_Nested>;
   }
 
   const {
@@ -32,13 +32,13 @@
 
   // === COLUMNS  =================================================================================
 
-  const columns: ColumnDef<WholesalerItemOffering_ProductDef_Category_Supplier>[] = [
+  const columns: ColumnDefBase<typeof WholesalerItemOffering_ProductDef_Category_Supplier_NestedSchema>[] = [
     {
-      key: "product_def_title",
+      key: "pd.title",
       header: "Product",
       sortable: true,
       width: "3fr",
-      accessor: (offering) => offering.product_def_title || "Unnamed Product",
+      accessor: (offering) => offering.product_def.title || "Unnamed Product",
     },
     {
       key: "price",
@@ -71,7 +71,7 @@
     },
   ];
 
-  const getId = (offering: WholesalerItemOffering_ProductDef_Category_Supplier) => offering.offering_id;
+  const getId = (offering: WholesalerItemOffering_ProductDef_Category_Supplier_Nested) => offering.offering_id;
 </script>
 
 <Datagrid

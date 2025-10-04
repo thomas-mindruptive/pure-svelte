@@ -72,7 +72,7 @@ export const queryConfig: QueryConfig = {
           },
         },
         {
-          type: JoinType.INNER, // oder LEFT, falls ein Offering ohne Product Definition existieren könnte
+          type: JoinType.INNER, 
           table: "dbo.product_definitions",
           alias: "pd",
           on: {

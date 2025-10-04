@@ -8,12 +8,13 @@
 
 import { log } from "$lib/utils/logger";
 import { type QueryPayload } from "$lib/backendQueries/queryGrammar";
-import { WholesalerItemOffering_ProductDef_Category_SupplierSchema, type ProductDefinition, type WholesalerItemOffering_ProductDef_Category_Supplier } from "$lib/domain/domainTypes";
+import { WholesalerItemOffering_ProductDef_Category_Supplier_NestedSchema, type ProductDefinition, type WholesalerItemOffering_ProductDef_Category_Supplier_Nested } from "$lib/domain/domainTypes";
 import type { ApiClient } from "./ApiClient";
 import { createJsonBody, createJsonAndWrapInPayload, getErrorMessage } from "./common";
 import type { DeleteApiResponse, DeleteRequest, PredefinedQueryRequest, QueryResponseData } from "$lib/api/api.types";
 import { LoadingState } from "./loadingState";
 import { genTypedQualifiedColumns } from "$lib/domain/domainTypes.utils";
+import { transformToNestedObjects } from "$lib/backendQueries/recordsetTransformer";
 
 
 // Create a dedicated loading state manager for this entity.
@@ -166,12 +167,12 @@ export function getProductDefinitionApi(client: ApiClient) {
      * @param productDefId The ID of the product definition.
      * @returns A promise that resolves to an array of offerings with details.
      */
-    async loadOfferingsForProductDefinition(productDefId: number): Promise<WholesalerItemOffering_ProductDef_Category_Supplier[]> {
+    async loadOfferingsForProductDefinition(productDefId: number): Promise<WholesalerItemOffering_ProductDef_Category_Supplier_Nested[]> {
       const operationId = `loadOfferingsForProductDefinition-${productDefId}`;
       productDefinitionLoadingManager.start(operationId);
       try {
-        const cols = genTypedQualifiedColumns(WholesalerItemOffering_ProductDef_Category_SupplierSchema);
-        const payload: QueryPayload<WholesalerItemOffering_ProductDef_Category_Supplier> = {
+        const cols = genTypedQualifiedColumns(WholesalerItemOffering_ProductDef_Category_Supplier_NestedSchema, true);
+        const payload: QueryPayload<WholesalerItemOffering_ProductDef_Category_Supplier_Nested> = {
           select: cols,
           where: {
             whereCondOp: "AND",
@@ -180,17 +181,21 @@ export function getProductDefinitionApi(client: ApiClient) {
           orderBy: [{ key: "w.name", direction: "asc" }],
         };
 
-        const request: PredefinedQueryRequest<WholesalerItemOffering_ProductDef_Category_Supplier> = {
+        const request: PredefinedQueryRequest<WholesalerItemOffering_ProductDef_Category_Supplier_Nested> = {
           namedQuery: "product_definition_offerings",
           payload: payload,
         };
 
-        const responseData = await client.apiFetch<QueryResponseData<WholesalerItemOffering_ProductDef_Category_Supplier>>(
+        const responseData = await client.apiFetch<QueryResponseData<WholesalerItemOffering_ProductDef_Category_Supplier_Nested>>(
           "/api/query",
           { method: "POST", body: createJsonBody(request) },
           { context: operationId },
         );
-        return responseData.results as WholesalerItemOffering_ProductDef_Category_Supplier[];
+        const transformed = transformToNestedObjects(
+          responseData.results as Record<string, unknown>[],
+          WholesalerItemOffering_ProductDef_Category_Supplier_NestedSchema,
+        );
+        return transformed;
       } catch (err) {
         log.error(`[${operationId}] Failed.`, { productDefId, error: getErrorMessage(err) });
         throw err;

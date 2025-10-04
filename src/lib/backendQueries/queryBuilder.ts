@@ -269,6 +269,9 @@ export function buildQuery<T>(payload: Partial<QueryPayload<T>> | undefined, con
     // If all checks pass, construct the final FROM clause string for the SQL query.
     fromClause = `${table} ${alias}`;
     fromTableForMetadata = table;
+
+    // Assign JOINs from payload to realJoins (same as PATH 1)
+    realJoins = joins || [];
   }
 
   // --- 2. Validate SELECT columns against Branded Schema definitions ---

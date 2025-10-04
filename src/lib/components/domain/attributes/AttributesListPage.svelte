@@ -6,7 +6,7 @@
   import { log } from "$lib/utils/logger";
   import { ApiClient } from "$lib/api/client/ApiClient";
   import type { ID, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
-  import { page } from "$app/stores";
+  import { page } from "$app/state";
   import { cascadeDelete } from "$lib/api/client/cascadeDelete";
   import { stringsToNumbers } from "$lib/utils/typeConversions";
   import "$lib/components/styles/list-page-layout.css";
@@ -64,9 +64,7 @@
 
   function handleAttributeSelect(attribute: Attribute): void {
     log.info(`(AttributeListPage) Navigating to detail for attributeId: ${attribute.attribute_id}`);
-    // NOTE: The detail page for attributes is not yet defined in the provided files.
-    // We assume a future route like `/attributes/[id]`.
-    goto(`/attributes/${attribute.attribute_id}`);
+    goto(`${page.url.pathname}/${attribute.attribute_id}`);
   }
 
   async function handleAttributeDelete(ids: ID[]): Promise<void> {
@@ -94,7 +92,7 @@
   function handleAttributeCreate() {
     log.info(`Going to AttributeDetailPage with "new"`);
     // We assume a future route like `/attributes/new`.
-    goto(`${$page.url.pathname}/new`);
+    goto(`${page.url.pathname}/new`);
   }
 
   // === GRID STRATEGIES ==========================================================================

@@ -27,6 +27,7 @@
   import { assertDefined } from "$lib/utils/assertions";
     import { cascadeDelete } from "$lib/api/client/cascadeDelete";
     import { stringsToNumbers } from "$lib/utils/typeConversions";
+  import { buildChildUrl } from "$lib/utils/url";
 
   // ========================================================================
   // PROPS
@@ -115,12 +116,12 @@
 
   function handleOfferingCreate(): void {
     log.info(`(CategoryDetailPage) Navigating to create new offering page.`);
-    goto(`${page.url.pathname}/offerings/new`);
+    goto(buildChildUrl(page.url.pathname, "offerings", "new"));
   }
 
   function handleOfferingSelect(offering: WholesalerItemOffering_ProductDef_Category_Supplier): void {
     log.info(`(CategoryDetailPage) Navigating to offering detail for offeringId: ${offering.offering_id}`);
-    goto(`${page.url.pathname}/offerings/${offering.offering_id}`);
+    goto(buildChildUrl(page.url.pathname, "offerings", offering.offering_id));
   }
 
   async function handleOfferingDelete(ids: ID[]): Promise<void> {

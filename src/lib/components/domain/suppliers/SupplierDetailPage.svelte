@@ -38,6 +38,7 @@
   import { stringsToNumbers } from "$lib/utils/typeConversions";
   import { error } from "@sveltejs/kit";
   import { getOrderApi } from "$lib/api/client/order";
+  import { buildChildUrl, buildSiblingUrl } from "$lib/utils/url";
 
   // === TYPES ====================================================================================
 
@@ -168,7 +169,7 @@
 
       if (newSupplierId) {
         // Build the new "edit mode" URL.
-        const newUrl = `/suppliers/${newSupplierId}`;
+        const newUrl = buildSiblingUrl(page.url.pathname, newSupplierId);
 
         // Navigate to the new URL to switch to edit mode.
         // invalidateAll is crucial to re-run the load function with the new ID.
@@ -297,7 +298,7 @@
    * Navigates to the next hierarchy level (offerings for a category).
    */
   function handleCategorySelect(category: WholesalerCategory_Category) {
-    goto(`${page.url.pathname}/categories/${category.category_id}`);
+    goto(buildChildUrl(page.url.pathname, "categories", category.category_id));
   }
 
   // Strategy objects for the CategoryGrid component.
@@ -354,11 +355,11 @@
 
   function handleOrderCreate() {
     log.info(`Going to DetailPage with "new"`);
-    goto(`${page.url.pathname}/new`);
+    goto(buildChildUrl(page.url.pathname, "orders", "new"));
   }
 
   function handleOrderSelect(order: Order_Wholesaler) {
-    goto(`${page.url.pathname}/${order.order_id}`);
+    goto(buildChildUrl(page.url.pathname, "orders", order.order_id));
   }
 
   const ordersDeleteStrategy: DeleteStrategy<Order_Wholesaler> = {

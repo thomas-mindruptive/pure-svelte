@@ -15,8 +15,8 @@
   // Types for the strategy pattern used by the generic DataGrid component.
   import type { ID, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
   import type { SortDescriptor } from "$lib/backendQueries/queryGrammar";
-  import { page } from "$app/stores";
-  
+  import { page } from "$app/state";
+
   import { stringsToNumbers } from "$lib/utils/typeConversions";
   import { cascadeDelete } from "$lib/api/client/cascadeDelete";
 
@@ -109,7 +109,7 @@
 
   function handleSupplierSelect(supplier: Wholesaler): void {
     log.info(`(SupplierListPage) Navigating to detail for supplierId: ${supplier.wholesaler_id}`);
-    goto(`/suppliers/${supplier.wholesaler_id}`);
+    goto(`${page.url.pathname}/${supplier.wholesaler_id}`);
   }
 
   async function handleSupplierDelete(ids: ID[]): Promise<void> {
@@ -136,7 +136,7 @@
 
   function handleSupplierCreate() {
     log.info(`Going to SupplierDetailPage with "new"`);
-    goto(`${$page.url.pathname}/new`);
+    goto(`${page.url.pathname}/new`);
   }
 
   async function handleSort(sortState: SortDescriptor<Wholesaler>[] | null) {

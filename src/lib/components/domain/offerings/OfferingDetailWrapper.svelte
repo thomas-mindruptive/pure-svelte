@@ -4,19 +4,19 @@
 
   import type { Snippet } from "svelte";
 
+  import { goto } from "$app/navigation";
+  import type {
+      OfferingDetailAttributes_LoadData,
+      OfferingDetailLinks_LoadData,
+  } from "$lib/components/domain/offerings/offeringDetail.types";
   import "$lib/components/styles/detail-page-layout.css";
   import "$lib/components/styles/grid-section.css";
-  import { log } from "$lib/utils/logger";
   import { addNotification } from "$lib/stores/notifications";
-  import OfferingForm from "./OfferingForm.svelte";
-  import type {
-    OfferingDetailAttributes_LoadData,
-    OfferingDetailLinks_LoadData,
-  } from "$lib/components/domain/offerings/offeringDetail.types";
   import { assertDefined } from "$lib/utils/assertions";
-  import { goto } from "$app/navigation";
   import { coerceErrorMessage } from "$lib/utils/errorUtils";
-  import { parseUrlSegments } from "$lib/utils/url";
+  import { log } from "$lib/utils/logger";
+  import { buildSiblingUrl } from "$lib/utils/url";
+  import OfferingForm from "./OfferingForm.svelte";
 
   // ===== PROPS =====
 
@@ -48,11 +48,7 @@
     if (isCreateMode) {
       // Defensive: Ensure ids.
       if (p.data.offering_id && p.data.wholesaler_id && p.data.category_id && p.data.product_def_id) {
-        // DO NOT USE page.url.pathName. svelte5/svelte kit does not pass it on to nested components!!!
-        const urlSegments = parseUrlSegments(initialLoadedData.urlPathName);
-        log.debug(`urlSegments:`, urlSegments);
-        const parentPathUrlSegments = urlSegments.slice(0, urlSegments.length - 1);
-        const newUrl = `/${parentPathUrlSegments.join("/")}/${p.data.offering_id}`;
+        const newUrl = buildSiblingUrl(initialLoadedData.urlPathName, p.data.offering_id);
         await goto(newUrl, { invalidateAll: true });
       } else {
         log.error("Could not redirect after create: Missing IDs.", {

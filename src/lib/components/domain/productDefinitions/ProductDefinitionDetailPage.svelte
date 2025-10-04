@@ -26,6 +26,7 @@
     import { page } from "$app/state";
     import { cascadeDelete } from "$lib/api/client/cascadeDelete";
     import { stringsToNumbers } from "$lib/utils/typeConversions";
+  import { buildChildUrl, buildSiblingUrl } from "$lib/utils/url";
 
   // === PROPS ====================================================================================
   
@@ -106,14 +107,14 @@
 
   function handleOfferingCreate(): void {
     log.info(`Navigating to create new offering.`);
-    goto(`${page.url.pathname}/offerings/new`);
+    goto(buildChildUrl(page.url.pathname, "offerings", "new"));
   }
 
   function handleOfferingSelect(offering: WholesalerItemOffering_ProductDef_Category_Supplier) {
     log.info(`Selected offering: `, offering);
     const { wholesaler_id, category_id, offering_id, product_def_id } = offering;
     if (wholesaler_id && category_id && offering_id & product_def_id) {
-      const targetUrl = `/categories/${category_id}/productdefinitions/${product_def_id}/offerings/${offering_id}`;
+      const targetUrl = buildChildUrl(page.url.pathname, "offerings", offering_id);
       log.debug(`Going to: ${targetUrl}`);
       goto(targetUrl);
     } else {
@@ -158,7 +159,7 @@
       const newId = event.data?.product_def_id;
       if (newId) {
         // Redirect to the new edit page
-        goto(`/categories/${resolvedData?.categoryId}/productdefinitions/${newId}`, { invalidateAll: true }); // categoryId is a placeholder
+        goto(buildSiblingUrl(page.url.pathname, newId), { invalidateAll: true });
       } else {
         addNotification("Could not redirect to edit page, ID is missing.", "error");
       }

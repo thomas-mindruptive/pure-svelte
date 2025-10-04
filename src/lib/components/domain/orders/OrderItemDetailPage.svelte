@@ -3,29 +3,29 @@
   import { goto } from "$app/navigation";
   import { addNotification } from "$lib/stores/notifications";
   import { log } from "$lib/utils/logger";
-  // Component Imports
+// Component Imports
   import "$lib/components/styles/detail-page-layout.css";
   // API & Type Imports
   import { ApiClient } from "$lib/api/client/ApiClient";
   import {
-    OrderItem_ProdDef_Category_Schema,
-    OrderSchema,
-    type Order,
-    type OrderItem,
-    type OrderItem_ProdDef_Category,
-    type WholesalerItemOffering_ProductDef_Category_Supplier_Nested,
+      OrderItem_ProdDef_Category_Schema,
+      OrderSchema,
+      type Order,
+      type OrderItem,
+      type OrderItem_ProdDef_Category,
+      type WholesalerItemOffering_ProductDef_Category_Supplier_Nested,
   } from "$lib/domain/domainTypes";
 
+  import { page } from "$app/state";
   import { getOrderApi } from "$lib/api/client/order";
   import { getOrderItemApi, orderItemLoadingState } from "$lib/api/client/orderItem";
   import { getSupplierApi } from "$lib/api/client/supplier";
   import type { ValidationErrorTree } from "$lib/components/validation/validation.types";
   import { zodToValidationErrorTree } from "$lib/domain/domainTypes.utils";
   import { stringifyForHtml } from "$lib/utils/formatUtils";
+  import { buildSiblingUrl, getParentPath } from "$lib/utils/url";
   import { error } from "@sveltejs/kit";
   import OrderItemForm from "./OrderItemForm.svelte";
-  import { getParentPath, parseUrlSegments } from "$lib/utils/url";
-  import { page } from "$app/state";
 
   // === PROPS ====================================================================================
 
@@ -130,7 +130,7 @@
 
       if (newOrderItemId) {
         // Navigate to edit mode.
-        const newUrl = `${getParentPath(page.url)}/${newOrderItemId}`;
+        const newUrl = buildSiblingUrl(page.url.pathname, newOrderItemId);
         await goto(newUrl, { invalidateAll: true });
       } else {
         log.error("Could not redirect after create: new order_item_id is missing from response.", { data: info.data });

@@ -3,21 +3,21 @@
   import { goto } from "$app/navigation";
   import { addNotification } from "$lib/stores/notifications";
   import { log } from "$lib/utils/logger";
-  // Component Imports
+// Component Imports
   import "$lib/components/styles/assignment-section.css";
   import "$lib/components/styles/detail-page-layout.css";
   import "$lib/components/styles/grid-section.css";
-  // API & Type Imports
+// API & Type Imports
   import { ApiClient } from "$lib/api/client/ApiClient";
   import type { SortDescriptor } from "$lib/backendQueries/queryGrammar";
   import type { ColumnDefBase, DeleteStrategy, ID, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
   import {
-    OrderItem_ProdDef_Category_Schema,
-    OrderSchema,
-    WholesalerSchema,
-    type Order_Wholesaler,
-    type OrderItem_ProdDef_Category,
-    type Wholesaler,
+      OrderItem_ProdDef_Category_Schema,
+      OrderSchema,
+      WholesalerSchema,
+      type Order_Wholesaler,
+      type OrderItem_ProdDef_Category,
+      type Wholesaler,
   } from "$lib/domain/domainTypes";
 
   import { page } from "$app/state";
@@ -32,9 +32,9 @@
   import { assertDefined } from "$lib/utils/assertions";
   import { stringifyForHtml } from "$lib/utils/formatUtils";
   import { stringsToNumbers } from "$lib/utils/typeConversions";
+  import { buildChildUrl, buildSiblingUrl, getParentPath } from "$lib/utils/url";
   import { error } from "@sveltejs/kit";
   import OrderForm from "./OrderForm.svelte";
-  import { getParentPath, parseUrlSegments } from "$lib/utils/url";
 
   // === PROPS ====================================================================================
 
@@ -176,10 +176,7 @@
 
       if (newOrderId) {
         // Go to edit mode
-        // We are in <path>/orders/[orderId]
-        let pathSegments = parseUrlSegments(page.url);
-        pathSegments = pathSegments.slice(0, pathSegments.length - 1);
-        const newUrl = `${getParentPath(page.url)}/${newOrderId}`; 
+        const newUrl = buildSiblingUrl(page.url.pathname, newOrderId);
         await goto(newUrl, { invalidateAll: true });
       } else {
         // This is a fallback case in case the API response was malformed.
@@ -214,7 +211,7 @@
    * Navigates to the next hierarchy level.
    */
   function handleOrderItemSelect(orderItem: OrderItem_ProdDef_Category) {
-    goto(`${page.url.pathname}/orderitems/${orderItem.order_item_id}`);
+    goto(buildChildUrl(page.url.pathname, "orderitems", orderItem.order_item_id));
   }
 
   // ===== SORT HANDLERS =====
@@ -239,7 +236,7 @@
 
   async function handleOrderItemCreate() {
     log.info(`Navigating to create new order item.`);
-    goto(`${page.url.pathname}/orderitems/new`);
+    goto(buildChildUrl(page.url.pathname, "orderitems", "new"));
   }
 
   async function handleOrderItemsDelete(ids: ID[]): Promise<void> {

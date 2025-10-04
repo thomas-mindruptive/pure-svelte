@@ -6,7 +6,7 @@
   import { ApiClient } from "$lib/api/client/ApiClient";
   import type { ID, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
   import type { SortDescriptor } from "$lib/backendQueries/queryGrammar";
-  import { page } from "$app/stores";
+  import { page } from "$app/state";
   import type { ProductCategory } from "$lib/domain/domainTypes";
   import { categoryLoadingState, getCategoryApi } from "$lib/api/client/category";
   import { stringsToNumbers } from "$lib/utils/typeConversions";
@@ -93,7 +93,7 @@
 
   function handleCategorySelect(category: ProductCategory): void {
     log.info(`Navigating to detail for categoryId: ${category.category_id}`);
-    goto(`/categories/${category.category_id}`);
+    goto(`${page.url.pathname}/${category.category_id}`);
   }
 
   async function handleCategoryDelete(ids: ID[]): Promise<void> {
@@ -119,7 +119,7 @@
 
   function handleCategoryCreate() {
     log.info(`Going to CategloryDetailPage with "new"`);
-    goto(`${$page.url.pathname}/new`);
+    goto(`${page.url.pathname}/new`);
   }
 
   async function handleSort(sortState: SortDescriptor<ProductCategory>[] | null) {

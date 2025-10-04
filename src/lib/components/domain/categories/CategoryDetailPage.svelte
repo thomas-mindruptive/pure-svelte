@@ -29,6 +29,7 @@
   import { cascadeDelete } from "$lib/api/client/cascadeDelete";
   import { stringsToNumbers } from "$lib/utils/typeConversions";
     import { error } from "@sveltejs/kit";
+  import { buildChildUrl, buildSiblingUrl } from "$lib/utils/url";
 
   // === PROPS ====================================================================================
 
@@ -121,7 +122,7 @@
 
       if (newCategoryId) {
         // Build the new "edit mode" URL.
-        const newUrl = `/categories/${newCategoryId}`;
+        const newUrl = buildSiblingUrl(page.url.pathname, newCategoryId);
 
         // Navigate to the new URL to switch to edit mode.
         // invalidateAll is crucial to re-run the load function with the new ID.
@@ -174,7 +175,7 @@
 
   function handleProductDefCreate(): void {
     log.info(`Navigating to create new product def page.`);
-    goto(`${page.url.pathname}/productdefinitions/new`);
+    goto(buildChildUrl(page.url.pathname, "productdefinitions", "new"));
   }
 
   /**
@@ -211,7 +212,7 @@
    * Navigates to the next hierarchy level (offerings for a category).
    */
   function handleProductDefSelect(pd: ProductDefinition) {
-    goto(`/categories/${pd.category_id}/productdefinitions/${pd.product_def_id}`);
+    goto(buildChildUrl(page.url.pathname, "productdefinitions", pd.product_def_id));
   }
 
   // ===== ROW STRATEGIES =====

@@ -18,7 +18,7 @@
   import { getOrderApi, orderLoadingState } from "$lib/api/client/order";
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
   import { safeParseFirstN } from "$lib/domain/domainTypes.utils";
-  import { convertToHtml } from "$lib/utils/formatUtils";
+  import { convertToHtml, isoDateStringToLocale } from "$lib/utils/formatUtils";
 
   // === PROPS ====================================================================================
 
@@ -140,7 +140,11 @@
 
   // === DATAGRID DATA ============================================================================
 
-  const columns: ColumnDefBase<typeof Order_Wholesaler_Schema>[] = [{ key: "order_id", header: "ID", accessor: null, sortable: true }];
+  const columns: ColumnDefBase<typeof Order_Wholesaler_Schema>[] = [
+    { key: "w.name", header: "Wholesaler", accessor: (order) => order.wholesaler.name, sortable: true },
+    { key: "order_id", header: "ID", accessor: null, sortable: true },
+    { key: "order_date", header: "Date", accessor: (order) => isoDateStringToLocale(order.order_date), sortable: true },
+  ];
 
   const getId = (r: Order_Wholesaler) => r.order_id;
 

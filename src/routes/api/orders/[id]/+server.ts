@@ -25,6 +25,7 @@ import type {
 } from "$lib/api/api.types";
 import { deleteOrder } from "$lib/backendQueries/cascadingDeleteOperations";
 import { buildUnexpectedError, validateAndUpdateEntity, validateIdUrlParam } from "$lib/backendQueries/entityOperations";
+import { rollbackTransaction } from "$lib/backendQueries/transactionWrapper";
 
 /**
  * GET /api/orders/[id] - Get a single, complete order record.
@@ -132,7 +133,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
  */
 export const PUT: RequestHandler = async ({ params, request }) => {
   const operationId = uuidv4();
-  const info = `PUT /api/orders/${params.id} - ${operationId}`
+  const info = `PUT /api/orders/${params.id} - ${operationId}`;
   log.infoHeader(info);
 
   try {
@@ -221,11 +222,7 @@ export const DELETE: RequestHandler = async ({ params, request }) => {
       });
       return json(response);
     } catch (err) {
-      try {
-        await transaction.rollback();
-      } catch (e) {
-        log.error(`Cannot rollback transaction. Already rollbacked?`);
-      }
+      await rollbackTransaction(transaction);
       log.error(`[${operationId}] FN_EXCEPTION: Transaction failed and was rolled back.`, { error: err });
       throw err;
     }

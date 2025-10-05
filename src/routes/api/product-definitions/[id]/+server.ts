@@ -15,6 +15,7 @@ import { ProductDefinitionSchema, type ProductDefinition } from "$lib/domain/dom
 import { v4 as uuidv4 } from "uuid";
 import type { ApiSuccessResponse, DeleteConflictResponse, DeleteRequest, DeleteSuccessResponse } from "$lib/api/api.types";
 import { deleteProductDefinition } from "$lib/backendQueries/cascadingDeleteOperations";
+import { rollbackTransaction } from "$lib/backendQueries/transactionWrapper";
 
 /**
  * GET /api/product-definitions/[id]
@@ -151,11 +152,7 @@ export const DELETE: RequestHandler = async ({ request, params }) => {
     if ((err as { status?: number })?.status === 404) {
       throw err;
     }
-    try {
-      await transaction.rollback();
-    } catch (e) {
-      log.error(`Cannot rollback transaction. Already rollbacked?`);
-    }
+    await rollbackTransaction(transaction);
     return buildUnexpectedError(err, info);
   }
 };

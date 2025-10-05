@@ -25,6 +25,7 @@ import type {
   RemoveAssignmentRequest,
 } from "$lib/api/api.types";
 import type { DeletedSupplierCategoryData } from "$lib/api/app/appSpecificTypes";
+import { rollbackTransaction } from "$lib/backendQueries/transactionWrapper";
 
 /**
  * POST /api/supplier-categories
@@ -176,7 +177,7 @@ export const DELETE: RequestHandler = async ({ request }) => {
       // If we have soft dependencies without cascade
       // or we have hard dependencies without forceCascade => Return error code.
       if ((soft.length > 0 && !cascade) || (hard.length > 0 && !forceCascade)) {
-        await transaction.rollback();
+        await rollbackTransaction(transaction);
         const conflictResponse: DeleteConflictResponse<string[]> = {
           success: false,
           message: "Cannot remove assignment: dependencies exist.",
@@ -217,11 +218,7 @@ export const DELETE: RequestHandler = async ({ request }) => {
       return json(response);
     } catch (err) {
       log.error(`[${operationId}] FN_EXCEPTION: Transaction failed, rolling back.`, { error: err });
-      try {
-        await transaction.rollback();
-      } catch (e) {
-        log.error(`[${operationId}] Cannot rollback transaction. Already rollbacked?`, { error: e });
-      }
+      await rollbackTransaction(transaction);
       throw err; // Re-throw to be caught by the outer catch block
     }
   } catch (err: unknown) {

@@ -7,18 +7,22 @@
  * pattern by enforcing the database table name on the server.
  */
 
-import { json, error, type RequestHandler } from '@sveltejs/kit';
-import { log } from '$lib/utils/logger';
-import { buildQuery, executeQuery } from '$lib/backendQueries/queryBuilder';
-import { queryConfig } from '$lib/backendQueries/queryConfig';
-import { buildUnexpectedError } from '$lib/backendQueries/entityOperations';
-import { WholesalerItemOfferingForCreateSchema, type WholesalerItemOffering, type WholesalerItemOffering_ProductDef_Category_Supplier } from '$lib/domain/domainTypes';
+import { json, error, type RequestHandler } from "@sveltejs/kit";
+import { log } from "$lib/utils/logger";
+import { buildQuery, executeQuery } from "$lib/backendQueries/queryBuilder";
+import { queryConfig } from "$lib/backendQueries/queryConfig";
+import { buildUnexpectedError } from "$lib/backendQueries/entityOperations";
+import {
+  WholesalerItemOfferingForCreateSchema,
+  type WholesalerItemOffering,
+  type WholesalerItemOffering_ProductDef_Category_Supplier,
+} from "$lib/domain/domainTypes";
 import { validateEntity } from "$lib/domain/domainTypes.utils";
-import type { ApiErrorResponse, ApiSuccessResponse } from '$lib/api/api.types';
-import { v4 as uuidv4 } from 'uuid';
-import type { QueryPayload } from '$lib/backendQueries/queryGrammar';
-import { db } from '$lib/backendQueries/db';
-
+import type { ApiErrorResponse, ApiSuccessResponse } from "$lib/api/api.types";
+import { v4 as uuidv4 } from "uuid";
+import type { QueryPayload } from "$lib/backendQueries/queryGrammar";
+import { db } from "$lib/backendQueries/db";
+import { rollbackTransaction } from "$lib/backendQueries/transactionWrapper";
 
 /**
  * @description Creates a new offering.
@@ -38,7 +42,7 @@ export const POST: RequestHandler = async ({ request }) => {
     log.info(`[${operationId}] Parsed request body`, { fields: Object.keys(offering) });
 
     // 2. Validate the incoming data in 'create' mode.
-    const validation = validateEntity (WholesalerItemOfferingForCreateSchema, offering);
+    const validation = validateEntity(WholesalerItemOfferingForCreateSchema, offering);
     if (!validation.isValid) {
       const errRes: ApiErrorResponse = {
         success: false,
@@ -189,11 +193,7 @@ export const POST: RequestHandler = async ({ request }) => {
     log.info(`[${operationId}] FN_SUCCESS: Offering created with ID ${newOffering.offering_id}.`);
     return json(response, { status: 201 });
   } catch (err: unknown) {
-      try {
-        await transaction.rollback();
-      } catch (e) {
-        log.error(`Cannot rollback transaction. Already rollbacked?`);
-      }
+    await rollbackTransaction(transaction);
     return buildUnexpectedError(err, info);
   }
 };

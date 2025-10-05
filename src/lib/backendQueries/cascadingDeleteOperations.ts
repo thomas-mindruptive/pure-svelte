@@ -537,27 +537,34 @@ export async function deleteOffering(
         SET NOCOUNT ON;
 
         DECLARE
+          @deletedOrderItems  INT = 0,
           @deletedLinks       INT = 0,
           @deletedAttributes  INT = 0,
           @deletedOfferings   INT = 0;
 
-        -- 1) Delete dependencies: links
+        -- 1) Delete order_items (HARD dependency - historical transaction data, must come first as leaf nodes)
+        DELETE FROM dbo.order_items
+        WHERE offering_id = @${offeringIdParam};
+        SET @deletedOrderItems = @@ROWCOUNT;
+
+        -- 2) Delete dependencies: links
         DELETE FROM dbo.wholesaler_offering_links
         WHERE offering_id = @${offeringIdParam};
         SET @deletedLinks = @@ROWCOUNT;
 
-        -- 2) Delete dependencies: attributes
+        -- 3) Delete dependencies: attributes
         DELETE FROM dbo.wholesaler_offering_attributes
         WHERE offering_id = @${offeringIdParam};
         SET @deletedAttributes = @@ROWCOUNT;
 
-        -- 3) Finally, delete the offering itself
+        -- 4) Finally, delete the offering itself
         DELETE FROM dbo.wholesaler_item_offerings
         WHERE offering_id = @${offeringIdParam};
         SET @deletedOfferings = @@ROWCOUNT;
 
         -- Return deletion stats
         SELECT
+          @deletedOrderItems AS deletedOrderItems,
           @deletedLinks      AS deletedLinks,
           @deletedAttributes AS deletedAttributes,
           @deletedOfferings  AS deletedOfferings;
@@ -567,14 +574,14 @@ export async function deleteOffering(
 
       if (res?.recordset?.[0]) {
         stats = res.recordset[0];
-        stats.total = (stats.deletedLinks ?? 0) + (stats.deletedAttributes ?? 0);
+        stats.total = (stats.deletedOrderItems ?? 0) + (stats.deletedLinks ?? 0) + (stats.deletedAttributes ?? 0);
       } else {
-        stats = { total: 0, deletedLinks: 0, deletedAttributes: 0, deletedOfferings: 0 };
+        stats = { total: 0, deletedOrderItems: 0, deletedLinks: 0, deletedAttributes: 0, deletedOfferings: 0 };
       }
 
       log.debug(
         `(delete) Cascade stats for Offering ${id}: ` +
-          `links=${stats.deletedLinks}, attrs=${stats.deletedAttributes}, offerings=${stats.deletedOfferings}`,
+          `orderItems=${stats.deletedOrderItems}, links=${stats.deletedLinks}, attrs=${stats.deletedAttributes}, offerings=${stats.deletedOfferings}`,
       );
     } else {
       log.debug(`(delete) Executing NON-CASCADE delete for Offering ID: ${id}`);

@@ -20,6 +20,7 @@ import type { ApiSuccessResponse, DeleteConflictResponse, DeleteRequest, QueryRe
 import { deleteSupplier } from "$lib/backendQueries/cascadingDeleteOperations";
 import type { DeleteSupplierSuccessResponse } from "$lib/api/app/appSpecificTypes";
 import { buildUnexpectedError, validateAndUpdateEntity, validateIdUrlParam } from "$lib/backendQueries/entityOperations";
+import { rollbackTransaction } from "$lib/backendQueries/transactionWrapper";
 
 /**
  * GET /api/suppliers/[id] - Get a single, complete supplier record.
@@ -225,11 +226,7 @@ export const DELETE: RequestHandler = async ({ params, request }) => {
       });
       return json(response);
     } catch (err) {
-      try {
-        await transaction.rollback();
-      } catch (e: unknown) {
-        log.error(`[${operationId}] Rollback failed. Already rolled back?`, { error: e });
-      }
+      await rollbackTransaction(transaction);
       log.error(`[${operationId}] FN_EXCEPTION: Transaction failed and was rolled back.`, { error: err });
       throw err;
     }

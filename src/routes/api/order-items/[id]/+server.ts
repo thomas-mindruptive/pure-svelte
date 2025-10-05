@@ -15,6 +15,7 @@ import type { ApiSuccessResponse, DeleteSuccessResponse, DeleteConflictResponse,
 import { buildUnexpectedError, validateAndUpdateEntity, validateIdUrlParam } from "$lib/backendQueries/entityOperations";
 import { checkOrderItemDependencies } from "$lib/dataModel/dependencyChecks";
 import { deleteOrderItem } from "$lib/backendQueries/cascadingDeleteOperations";
+import { rollbackTransaction } from "$lib/backendQueries/transactionWrapper";
 
 /**
  * GET /api/order-items/[id] - Get a single order item record.
@@ -151,11 +152,7 @@ export const DELETE: RequestHandler = async ({ params, request }) => {
       });
       return json(response);
     } catch (err) {
-      try {
-        await transaction.rollback();
-      } catch (e) {
-        log.error(`Cannot rollback transaction. Already rollbacked?`);
-      }
+      await rollbackTransaction(transaction);
       log.error(`[${operationId}] FN_EXCEPTION: Transaction failed and was rolled back.`, { error: err });
       throw err;
     }

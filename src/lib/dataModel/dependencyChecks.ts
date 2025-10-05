@@ -269,37 +269,55 @@ export async function checkProductDefinitionDependencies(
 }
 
 /**
- * Check offering dependencies (attributes and links)
+ * Checks for offering dependencies.
+ * Distinguishes between "hard" dependencies (order_items - historical transaction data) and
+ * "soft" dependencies (offering attributes and links) that can be cascaded.
+ * @param offeringId The ID of the offering to check.
+ * @param transaction The active database transaction object.
+ * @returns An object containing lists of hard and soft dependencies.
  */
 export async function checkOfferingDependencies(
   offeringId: number,
   transaction: Transaction | null,
 ): Promise<{ hard: string[]; soft: string[] }> {
-  const dependencies: string[] = [];
+  const hardDependencies: string[] = [];
+  const softDependencies: string[] = [];
+  log.info("(dependencyChecks) Checking offering dependencies for", { offeringId });
 
   const transWrapper = new TransWrapper(transaction, null);
   transWrapper.begin();
 
   try {
-    // Check offering attributes
-    const attributesCheck = await db.request().input("offeringId", offeringId).query(`
-            SELECT COUNT(*) as count 
-            FROM dbo.wholesaler_offering_attributes 
-            WHERE offering_id = @offeringId
-        `);
+    // HARD Dependency: order_items (historical transaction data)
+    const orderItemsCheck = await transWrapper.request().input("offeringId", offeringId).query`
+      SELECT COUNT(*) as count
+      FROM dbo.order_items
+      WHERE offering_id = @offeringId
+    `;
+    if (orderItemsCheck.recordset[0].count > 0) {
+      hardDependencies.push(`${orderItemsCheck.recordset[0].count} order items`);
+    }
 
+    // SOFT Dependencies: offering metadata
+
+    // Check offering attributes
+    const attributesCheck = await transWrapper.request().input("offeringId", offeringId).query`
+      SELECT COUNT(*) as count
+      FROM dbo.wholesaler_offering_attributes
+      WHERE offering_id = @offeringId
+    `;
     if (attributesCheck.recordset[0].count > 0) {
-      dependencies.push(`${attributesCheck.recordset[0].count} offering attributes`);
+      softDependencies.push(`${attributesCheck.recordset[0].count} offering attributes`);
     }
 
     // Check offering links
-    const linksCheck = await db.request().input("offeringId", offeringId).query(`
-            SELECT COUNT(*) as count 
-            FROM dbo.wholesaler_offering_links 
-            WHERE offering_id = @offeringId
-        `);
+    const linksCheck = await transWrapper.request().input("offeringId", offeringId).query`
+      SELECT COUNT(*) as count
+      FROM dbo.wholesaler_offering_links
+      WHERE offering_id = @offeringId
+    `;
     if (linksCheck.recordset[0].count > 0) {
-      dependencies.push(`${linksCheck.recordset[0].count} offering links`);
+      softDependencies.push(`${linksCheck.recordset[0].count} offering links`);
     }
 
     transWrapper.commit();
@@ -307,8 +325,8 @@ export async function checkOfferingDependencies(
     transWrapper.rollback();
   }
 
-  // Offerings do not have hard dependencies that would prevent a cascade.
-  return { hard: [], soft: dependencies };
+  log.info("(dependencyChecks) Found offering dependencies", { hard: hardDependencies, soft: softDependencies });
+  return { hard: hardDependencies, soft: softDependencies };
 }
 
 /**

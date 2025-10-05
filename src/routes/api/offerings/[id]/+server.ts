@@ -21,6 +21,7 @@ import type { ApiErrorResponse, ApiSuccessResponse, DeleteConflictResponse, Dele
 import { checkOfferingDependencies } from "$lib/dataModel/dependencyChecks";
 import type { DeleteOfferingSuccessResponse } from "$lib/api/app/appSpecificTypes";
 import { deleteOffering } from "$lib/backendQueries/cascadingDeleteOperations";
+import { rollbackTransaction } from "$lib/backendQueries/transactionWrapper";
 
 /**
  * GET /api/offerings/[id]
@@ -244,7 +245,7 @@ export const DELETE: RequestHandler = async ({ params, request }): Promise<Respo
       log.info(`Offering has dependent objects:`, { hard, soft });
 
       if ((soft.length > 0 && !cascade) || (hard.length > 0 && !forceCascade)) {
-        await transaction.rollback();
+        await rollbackTransaction(transaction);
         const conflictResponse: DeleteConflictResponse<string[]> = {
           success: false,
           message: "Cannot delete offering: It is still in use by other entities.",
@@ -279,11 +280,7 @@ export const DELETE: RequestHandler = async ({ params, request }): Promise<Respo
       log.info(`[${operationId}] FN_SUCCESS: Offering deleted.`, { responseData: response.data });
       return json(response);
     } catch (err) {
-      try {
-        await transaction.rollback();
-      } catch (e) {
-        log.error(`Cannot rollback transaction. Already rollbacked?`);
-      }
+      await rollbackTransaction(transaction);
       log.error(`[${operationId}] FN_EXCEPTION: Transaction failed, rolling back.`, { error: err });
       throw err;
     }

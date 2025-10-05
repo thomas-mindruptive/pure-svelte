@@ -60,3 +60,18 @@ export class TransWrapper {
     }
   }
 }
+
+/**
+ * Helper for rollback.
+ * Reason: DB can automatically rollback depending on settings.
+ * => Only log rollback error to prevent swallowing of main error if "rollback" fails.
+ * @param trans 
+ */
+export async function rollbackTransaction(trans: Transaction) {
+  assertDefined(trans, "trans");
+  try {
+    await trans.rollback();
+  } catch (e) {
+    log.error(`Cannot rollback. Already rollbacked?`, e);
+  }
+}

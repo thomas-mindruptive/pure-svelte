@@ -18,6 +18,7 @@ import { v4 as uuidv4 } from "uuid";
 import type { ApiSuccessResponse, DeleteConflictResponse, DeleteRequest } from "$lib/api/api.types";
 import type { DeleteCategorySuccessResponse } from "$lib/api/app/appSpecificTypes";
 import { deleteProductCategory } from "$lib/backendQueries/cascadingDeleteOperations";
+import { rollbackTransaction } from "$lib/backendQueries/transactionWrapper";
 
 /**
  * GET /api/categories/[id]
@@ -152,11 +153,7 @@ export const DELETE: RequestHandler = async ({ params, request, url }): Promise<
       log.info(`[${operationId}] FN_SUCCESS: Category deleted.`, { responseData: response.data });
       return json(response);
     } catch (err) {
-      try {
-        await transaction.rollback();
-      } catch (e) {
-        log.error(`Cannot rollback transaction. Already rollbacked?`);
-      }
+      await rollbackTransaction(transaction);
       log.error(`[${operationId}] FN_EXCEPTION: Transaction failed, rolling back.`, { error: err });
       throw err; // Re-throw to be caught by the outer catch block
     }

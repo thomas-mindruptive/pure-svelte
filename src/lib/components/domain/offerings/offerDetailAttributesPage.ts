@@ -5,7 +5,7 @@ import { getOfferingApi } from "$lib/api/client/offering";
 import { log } from "$lib/utils/logger";
 import { type LoadEvent } from "@sveltejs/kit";
 import type { OfferingDetail_LoadDataAsync, OfferingDetailAttributes_LoadDataAsync } from "./offeringDetail.types";
-import { loadOfferingDetailBasisData } from "./offeringDetailBasisLoads";
+import { loadOfferingDetailBasisData } from "./offeringDetailBaseLoads";
 
 /**
  * Lädt alle Daten für die Angebots-Detailseite (Attribute).

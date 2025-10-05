@@ -148,7 +148,13 @@ export class MssqlErrorMapper implements DbErrorMapper {
     if (fkMatch) {
       return this.humanizeConstraintName(fkMatch[1]);
     }
-    
+
+    // Pattern for reference constraint: "conflicted with the REFERENCE constraint \"FK_order_items_offering\""
+    const refMatch = message.match(/REFERENCE constraint "([^"]+)"/i);
+    if (refMatch) {
+      return this.humanizeConstraintName(refMatch[1]);
+    }
+
     return 'database constraint';
   }
 
@@ -248,20 +254,25 @@ export class MssqlErrorMapper implements DbErrorMapper {
         };
       }
 
-      case MSSQL_ERROR_CODES.CHECK_CONSTRAINT_VIOLATION: {
+      case 547: {
+        // Error 547 is BOTH CHECK constraint AND FK constraint!
+        // We must analyze the message to distinguish them.
+        const message = error.message.toLowerCase();
         const constraintName = this.extractConstraintName(error);
-        return {
-          status: 400,
-          message: `Invalid value for ${constraintName}. Please check the allowed values.`
-        };
-      }
 
-      case MSSQL_ERROR_CODES.FOREIGN_KEY_VIOLATION: {
-        const constraintName = this.extractConstraintName(error);
-        return {
-          status: 400,
-          message: `Invalid reference for ${constraintName}. The referenced record may not exist.`
-        };
+        if (message.includes('reference constraint') || message.includes('foreign key')) {
+          // FK constraint violation
+          return {
+            status: 409,
+            message: `Cannot delete: This record is still referenced by ${constraintName}.`
+          };
+        } else {
+          // CHECK constraint violation
+          return {
+            status: 400,
+            message: `Invalid value for ${constraintName}. Please check the allowed values.`
+          };
+        }
       }
 
       case MSSQL_ERROR_CODES.NOT_NULL_VIOLATION: {

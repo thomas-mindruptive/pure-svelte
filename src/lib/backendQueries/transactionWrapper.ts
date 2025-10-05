@@ -33,30 +33,30 @@ export class TransWrapper {
   /**
    * Begin only if we do not have an external transaction.
    */
-  public begin() {
+  public async begin() {
     if (!this._externalTrans) {
       log.debug(`No external transaction => begin own one.`);
-      this.trans.begin();
+      await this.trans.begin();
     }
   }
 
   /**
    * Commit only if we do not have an external transaction.
    */
-  public commit() {
+  public async commit() {
     if (!this._externalTrans) {
       log.debug(`No external transaction => commit own one.`);
-      this.trans.commit();
+      await this.trans.commit();
     }
   }
 
   /**
    * Rollback only if we do not have an external transaction.
    */
-  public rollback() {
+  public async rollback() {
     if (!this._externalTrans) {
       log.debug(`No external transaction => rollback own one.`);
-      this.trans.rollback();
+      await this.trans.rollback();
     }
   }
 }

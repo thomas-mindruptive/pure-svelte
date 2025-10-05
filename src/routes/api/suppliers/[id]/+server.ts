@@ -16,13 +16,7 @@ import { LogicalOperator, ComparisonOperator, type QueryPayload, type WhereCondi
 import { WholesalerSchema, type Wholesaler } from "$lib/domain/domainTypes";
 import { v4 as uuidv4 } from "uuid";
 
-import type {
-  ApiSuccessResponse,
-  DeleteConflictResponse,
-  DeleteRequest,
-  QueryRequest,
-  QuerySuccessResponse,
-} from "$lib/api/api.types";
+import type { ApiSuccessResponse, DeleteConflictResponse, DeleteRequest, QueryRequest, QuerySuccessResponse } from "$lib/api/api.types";
 import { deleteSupplier } from "$lib/backendQueries/cascadingDeleteOperations";
 import type { DeleteSupplierSuccessResponse } from "$lib/api/app/appSpecificTypes";
 import { buildUnexpectedError, validateAndUpdateEntity, validateIdUrlParam } from "$lib/backendQueries/entityOperations";
@@ -139,7 +133,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
  */
 export const PUT: RequestHandler = async ({ params, request }) => {
   const operationId = uuidv4();
-  const info = `PUT /api/suppliers/${params.id} - ${operationId}`
+  const info = `PUT /api/suppliers/${params.id} - ${operationId}`;
   log.infoHeader(info);
 
   try {
@@ -231,7 +225,11 @@ export const DELETE: RequestHandler = async ({ params, request }) => {
       });
       return json(response);
     } catch (err) {
-      await transaction.rollback();
+      try {
+        await transaction.rollback();
+      } catch (e: unknown) {
+        log.error(`[${operationId}] Rollback failed. Already rolled back?`, { error: e });
+      }
       log.error(`[${operationId}] FN_EXCEPTION: Transaction failed and was rolled back.`, { error: err });
       throw err;
     }

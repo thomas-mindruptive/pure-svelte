@@ -1,7 +1,8 @@
 <script lang="ts">
   import { default as confirmationStore, type ConfirmationOption } from "$lib/stores/confirmation";
   import { fade } from "svelte/transition";
-  import { stringifyForHtml } from "$lib/utils/formatUtils";
+  import { convertToHtml } from "$lib/utils/formatUtils";
+    import { log } from "$lib/utils/logger";
 
   let dialog: HTMLDialogElement;
 
@@ -9,8 +10,9 @@
 
   const formattedMessage = $derived.by(() => {
     const messageFromStore = $confirmationStore.message;
-    const sanitizedMessage = stringifyForHtml(messageFromStore);
-    return sanitizedMessage;
+    const sanitizedHtml = convertToHtml(messageFromStore);
+    log.debug(`formatted store message:`, sanitizedHtml)
+    return sanitizedHtml;
   });
 
   // Reagiert auf Änderungen im Store

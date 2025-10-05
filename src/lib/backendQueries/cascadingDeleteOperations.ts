@@ -3,13 +3,17 @@
 import { assertDefined } from "$lib/utils/assertions";
 import { log } from "$lib/utils/logger";
 import type { Transaction } from "mssql";
-import type {DeletedAttributeData, DeletedCategoryData, DeletedOfferingData, DeletedProductDefinitonData, DeletedSupplierData} from  "$lib/api/app/appSpecificTypes";
+import type {
+  DeletedAttributeData,
+  DeletedCategoryData,
+  DeletedOfferingData,
+  DeletedProductDefinitonData,
+  DeletedSupplierData,
+} from "$lib/api/app/appSpecificTypes";
 
 /**
  * The shapes of the data returned after a successful deletion.
  */
-
-
 
 /**
  * Deletes a Product Definition, with an option to cascade and delete all its dependencies.
@@ -34,10 +38,7 @@ export async function deleteProductDefinition(
   const productDefIdParam = "productDefId";
 
   // 1) Read product definition first (existence check + data for return)
-  const selectResult = await transaction
-    .request()
-    .input(productDefIdParam, id)
-    .query<DeletedProductDefinitonData>(`
+  const selectResult = await transaction.request().input(productDefIdParam, id).query<DeletedProductDefinitonData>(`
       SELECT product_def_id, title
       FROM dbo.product_definitions
       WHERE product_def_id = @${productDefIdParam};
@@ -113,10 +114,7 @@ export async function deleteProductDefinition(
     if (res?.recordset?.[0]) {
       stats = res.recordset[0];
       // "total" = sum of children (not including the master row)
-      stats.total =
-        (stats.deletedLinks ?? 0) +
-        (stats.deletedAttributes ?? 0) +
-        (stats.deletedOfferings ?? 0);
+      stats.total = (stats.deletedLinks ?? 0) + (stats.deletedAttributes ?? 0) + (stats.deletedOfferings ?? 0);
     } else {
       stats = {
         total: 0,
@@ -135,25 +133,18 @@ export async function deleteProductDefinition(
   } else {
     log.debug(`(delete) Executing NON-CASCADE delete for ProductDefinition ID: ${id}`);
     try {
-      const res = await transaction
-        .request()
-        .input(productDefIdParam, id)
-        .query(`
+      const res = await transaction.request().input(productDefIdParam, id).query(`
           DELETE FROM dbo.product_definitions
           WHERE product_def_id = @${productDefIdParam};
         `);
 
-      const affected = Array.isArray(res.rowsAffected)
-        ? res.rowsAffected.reduce((a, b) => a + b, 0)
-        : (res.rowsAffected ?? 0);
+      const affected = Array.isArray(res.rowsAffected) ? res.rowsAffected.reduce((a, b) => a + b, 0) : (res.rowsAffected ?? 0);
 
       log.debug(`(delete) Non-cascade delete affected rows: ${affected}`);
       // NOTE: Do NOT populate stats here; keep it empty to match the supplier example contract.
     } catch (err: any) {
       if (err && (err.number === 547 || err.code === "EREQUEST")) {
-        throw new Error(
-          `Cannot delete ProductDefinition ID ${id} without cascade: dependent rows exist (offerings, links, attributes).`,
-        );
+        throw new Error(`Cannot delete ProductDefinition ID ${id} without cascade: dependent rows exist (offerings, links, attributes).`);
       }
       throw err;
     }
@@ -185,110 +176,110 @@ export async function deleteSupplier(
 
   const supplierIdParam = "supplierId";
 
-  // 1) Read supplier first (existence check + data for return)
-  const selectResult = await transaction.request().input(supplierIdParam, id).query<DeletedSupplierData>(`
-      SELECT wholesaler_id, name
-      FROM dbo.wholesalers
-      WHERE wholesaler_id = @${supplierIdParam};
-    `);
+  try {
+    // 1) Read supplier first (existence check + data for return)
+    const selectResult = await transaction.request().input(supplierIdParam, id).query<DeletedSupplierData>(`
+        SELECT wholesaler_id, name
+        FROM dbo.wholesalers
+        WHERE wholesaler_id = @${supplierIdParam};
+      `);
 
-  if (selectResult.recordset.length === 0) {
-    throw new Error(`Supplier with ID ${id} not found.`);
-  }
-  const deletedSupplierData = selectResult.recordset[0];
-  log.debug(`(delete) Found supplier to delete: "${deletedSupplierData.name}" (ID: ${id})`);
-
-  let stats: Record<string, number> = {};
-
-  // 2) Execute the appropriate delete path
-  if (cascade) {
-    log.debug(`(delete) Executing CASCADE delete (manual) for Supplier ID: ${id}`);
-
-    // One batch, deterministic ordering, returns per-step row counts for logging.
-    const cascadeDeleteQuery = `
-      SET XACT_ABORT ON;
-      SET NOCOUNT ON;
-
-      -- Use a temp table (not a CTE) because we need the set across multiple DELETE statements.
-      IF OBJECT_ID('tempdb..#OfferingsToDelete') IS NOT NULL DROP TABLE #OfferingsToDelete;
-      CREATE TABLE #OfferingsToDelete (offering_id INT NOT NULL PRIMARY KEY);
-
-      -- Lock the target offerings to prevent concurrent inserts until we finish deleting dependents.
-      INSERT INTO #OfferingsToDelete (offering_id)
-      SELECT o.offering_id
-      FROM dbo.wholesaler_item_offerings AS o WITH (UPDLOCK, HOLDLOCK)
-      WHERE o.wholesaler_id = @${supplierIdParam};
-
-      DECLARE
-        @deletedLinks        INT = 0,
-        @deletedAttributes   INT = 0,
-        @deletedOfferings    INT = 0,
-        @deletedWhCat        INT = 0,
-        @deletedSupplier     INT = 0;
-
-      -- 1) Delete indirect dependencies: links
-      DELETE L
-      FROM dbo.wholesaler_offering_links AS L
-      JOIN #OfferingsToDelete AS O ON O.offering_id = L.offering_id;
-      SET @deletedLinks = @@ROWCOUNT;
-
-      -- 2) Delete indirect dependencies: attributes
-      DELETE A
-      FROM dbo.wholesaler_offering_attributes AS A
-      JOIN #OfferingsToDelete AS O ON O.offering_id = A.offering_id;
-      SET @deletedAttributes = @@ROWCOUNT;
-
-      -- 3) Delete direct dependencies: offerings
-      DELETE O
-      FROM dbo.wholesaler_item_offerings AS O
-      WHERE O.wholesaler_id = @${supplierIdParam};
-      SET @deletedOfferings = @@ROWCOUNT;
-
-      -- 4) Delete direct dependencies: wholesaler-category assignments
-      DELETE C
-      FROM dbo.wholesaler_categories AS C
-      WHERE C.wholesaler_id = @${supplierIdParam};
-      SET @deletedWhCat = @@ROWCOUNT;
-
-      -- 5) Finally, delete the supplier
-      DELETE W
-      FROM dbo.wholesalers AS W
-      WHERE W.wholesaler_id = @${supplierIdParam};
-      SET @deletedSupplier = @@ROWCOUNT;
-
-      -- Return deletion stats for logging
-      SELECT
-        @deletedLinks      AS deletedLinks,
-        @deletedAttributes AS deletedAttributes,
-        @deletedOfferings  AS deletedOfferings,
-        @deletedWhCat      AS deletedWholesalerCategories,
-        @deletedSupplier   AS deletedSuppliers;
-    `;
-
-    const res = await transaction.request().input(supplierIdParam, id).query(cascadeDeleteQuery);
-
-    if (res?.recordset?.[0]) {
-      stats = res.recordset[0];
-      stats.total = stats.deletedLinks + stats.deletedAttributes + stats.deletedOfferings + stats.deletedWholesalerCategories;
-    } else {
-      stats = {
-        total: 0,
-        deletedLinks: 0,
-        deletedAttributes: 0,
-        deletedOfferings: 0,
-        deletedWholesalerCategories: 0,
-        deletedSuppliers: 0,
-      };
+    if (selectResult.recordset.length === 0) {
+      throw new Error(`Supplier with ID ${id} not found.`);
     }
+    const deletedSupplierData = selectResult.recordset[0];
+    log.debug(`(delete) Found supplier to delete: "${deletedSupplierData.name}" (ID: ${id})`);
 
-    log.debug(
-      `(delete) Cascade stats for Supplier ${id}: ` +
-        `links=${stats.deletedLinks}, attrs=${stats.deletedAttributes}, ` +
-        `offerings=${stats.deletedOfferings}, whCat=${stats.deletedWholesalerCategories}, suppliers=${stats.deletedSuppliers}`,
-    );
-  } else {
-    log.debug(`(delete) Executing NON-CASCADE delete for Supplier ID: ${id}`);
-    try {
+    let stats: Record<string, number> = {};
+
+    // 2) Execute the appropriate delete path
+    if (cascade) {
+      log.debug(`(delete) Executing CASCADE delete (manual) for Supplier ID: ${id}`);
+
+      // One batch, deterministic ordering, returns per-step row counts for logging.
+      const cascadeDeleteQuery = `
+        SET XACT_ABORT ON;
+        SET NOCOUNT ON;
+
+        -- Use a temp table (not a CTE) because we need the set across multiple DELETE statements.
+        IF OBJECT_ID('tempdb..#OfferingsToDelete') IS NOT NULL DROP TABLE #OfferingsToDelete;
+        CREATE TABLE #OfferingsToDelete (offering_id INT NOT NULL PRIMARY KEY);
+
+        -- Lock the target offerings to prevent concurrent inserts until we finish deleting dependents.
+        INSERT INTO #OfferingsToDelete (offering_id)
+        SELECT o.offering_id
+        FROM dbo.wholesaler_item_offerings AS o WITH (UPDLOCK, HOLDLOCK)
+        WHERE o.wholesaler_id = @${supplierIdParam};
+
+        DECLARE
+          @deletedLinks        INT = 0,
+          @deletedAttributes   INT = 0,
+          @deletedOfferings    INT = 0,
+          @deletedWhCat        INT = 0,
+          @deletedSupplier     INT = 0;
+
+        -- 1) Delete indirect dependencies: links
+        DELETE L
+        FROM dbo.wholesaler_offering_links AS L
+        JOIN #OfferingsToDelete AS O ON O.offering_id = L.offering_id;
+        SET @deletedLinks = @@ROWCOUNT;
+
+        -- 2) Delete indirect dependencies: attributes
+        DELETE A
+        FROM dbo.wholesaler_offering_attributes AS A
+        JOIN #OfferingsToDelete AS O ON O.offering_id = A.offering_id;
+        SET @deletedAttributes = @@ROWCOUNT;
+
+        -- 3) Delete direct dependencies: offerings
+        DELETE O
+        FROM dbo.wholesaler_item_offerings AS O
+        WHERE O.wholesaler_id = @${supplierIdParam};
+        SET @deletedOfferings = @@ROWCOUNT;
+
+        -- 4) Delete direct dependencies: wholesaler-category assignments
+        DELETE C
+        FROM dbo.wholesaler_categories AS C
+        WHERE C.wholesaler_id = @${supplierIdParam};
+        SET @deletedWhCat = @@ROWCOUNT;
+
+        -- 5) Finally, delete the supplier
+        DELETE W
+        FROM dbo.wholesalers AS W
+        WHERE W.wholesaler_id = @${supplierIdParam};
+        SET @deletedSupplier = @@ROWCOUNT;
+
+        -- Return deletion stats for logging
+        SELECT
+          @deletedLinks      AS deletedLinks,
+          @deletedAttributes AS deletedAttributes,
+          @deletedOfferings  AS deletedOfferings,
+          @deletedWhCat      AS deletedWholesalerCategories,
+          @deletedSupplier   AS deletedSuppliers;
+      `;
+
+      const res = await transaction.request().input(supplierIdParam, id).query(cascadeDeleteQuery);
+
+      if (res?.recordset?.[0]) {
+        stats = res.recordset[0];
+        stats.total = stats.deletedLinks + stats.deletedAttributes + stats.deletedOfferings + stats.deletedWholesalerCategories;
+      } else {
+        stats = {
+          total: 0,
+          deletedLinks: 0,
+          deletedAttributes: 0,
+          deletedOfferings: 0,
+          deletedWholesalerCategories: 0,
+          deletedSuppliers: 0,
+        };
+      }
+
+      log.debug(
+        `(delete) Cascade stats for Supplier ${id}: ` +
+          `links=${stats.deletedLinks}, attrs=${stats.deletedAttributes}, ` +
+          `offerings=${stats.deletedOfferings}, whCat=${stats.deletedWholesalerCategories}, suppliers=${stats.deletedSuppliers}`,
+      );
+    } else {
+      log.debug(`(delete) Executing NON-CASCADE delete for Supplier ID: ${id}`);
       const res = await transaction.request().input(supplierIdParam, id).query(`
           DELETE FROM dbo.wholesalers
           WHERE wholesaler_id = @${supplierIdParam};
@@ -296,22 +287,25 @@ export async function deleteSupplier(
 
       const affected = Array.isArray(res.rowsAffected) ? res.rowsAffected.reduce((a, b) => a + b, 0) : (res.rowsAffected ?? 0);
       log.debug(`(delete) Non-cascade delete affected rows: ${affected}`);
-    } catch (err: any) {
-      // Helpful message when FK constraints block the delete
-      if (err && (err.number === 547 || err.code === "EREQUEST")) {
-        // 547 = FK violation in SQL Server; EREQUEST is the generic mssql error code
-        throw new Error(
-          `Cannot delete Supplier ID ${id} without cascade: dependent rows exist (offerings, links, attributes, or category assignments).`,
-        );
-      }
-      throw err;
     }
+
+    log.info(`(delete) Delete operation for Supplier ID: ${id} completed successfully.`);
+
+    // 3) Return the data of the now-deleted resource.
+    return { deleted: deletedSupplierData, stats };
+  } catch (err: any) {
+    // Self-contained error logging for both CASCADE and NON-CASCADE paths
+    if (err.number === 547) {
+      log.error(`(delete) FK constraint prevented delete of Supplier ${id}`, {
+        message: err.message,
+        cascade,
+        constraint: err.message?.match(/FK_[\w]+/)?.[0],
+      });
+    } else {
+      log.error(`(delete) Unexpected error deleting Supplier ${id}`, { error: err, cascade });
+    }
+    throw err; // Re-throw for parent to handle
   }
-
-  log.info(`(delete) Delete operation for Supplier ID: ${id} completed successfully.`);
-
-  // 3) Return the data of the now-deleted resource.
-  return { deleted: deletedSupplierData, stats };
 }
 
 export async function deleteProductCategory(
@@ -325,10 +319,7 @@ export async function deleteProductCategory(
   const categoryIdParam = "categoryId";
 
   // 1) Read product category first (existence check + data for return)
-  const selectResult = await transaction
-    .request()
-    .input(categoryIdParam, id)
-    .query<DeletedCategoryData>(`
+  const selectResult = await transaction.request().input(categoryIdParam, id).query<DeletedCategoryData>(`
       SELECT category_id, name
       FROM dbo.product_categories
       WHERE category_id = @${categoryIdParam};
@@ -447,17 +438,12 @@ export async function deleteProductCategory(
   } else {
     log.debug(`(delete) Executing NON-CASCADE delete for ProductCategory ID: ${id}`);
     try {
-      const res = await transaction
-        .request()
-        .input(categoryIdParam, id)
-        .query(`
+      const res = await transaction.request().input(categoryIdParam, id).query(`
           DELETE FROM dbo.product_categories
           WHERE category_id = @${categoryIdParam};
         `);
 
-      const affected = Array.isArray(res.rowsAffected)
-        ? res.rowsAffected.reduce((a, b) => a + b, 0)
-        : (res.rowsAffected ?? 0);
+      const affected = Array.isArray(res.rowsAffected) ? res.rowsAffected.reduce((a, b) => a + b, 0) : (res.rowsAffected ?? 0);
 
       log.debug(`(delete) Non-cascade delete affected rows: ${affected}`);
     } catch (err: any) {
@@ -498,10 +484,7 @@ export async function deleteOffering(
   const offeringIdParam = "offeringId";
 
   // 1) Read offering first (existence check + data for return)
-  const selectResult = await transaction
-    .request()
-    .input(offeringIdParam, id)
-    .query<DeletedOfferingData>(`
+  const selectResult = await transaction.request().input(offeringIdParam, id).query<DeletedOfferingData>(`
       SELECT offering_id
       FROM dbo.wholesaler_item_offerings
       WHERE offering_id = @${offeringIdParam};
@@ -566,23 +549,16 @@ export async function deleteOffering(
   } else {
     log.debug(`(delete) Executing NON-CASCADE delete for Offering ID: ${id}`);
     try {
-      const res = await transaction
-        .request()
-        .input(offeringIdParam, id)
-        .query(`
+      const res = await transaction.request().input(offeringIdParam, id).query(`
           DELETE FROM dbo.wholesaler_item_offerings
           WHERE offering_id = @${offeringIdParam};
         `);
 
-      const affected = Array.isArray(res.rowsAffected)
-        ? res.rowsAffected.reduce((a, b) => a + b, 0)
-        : (res.rowsAffected ?? 0);
+      const affected = Array.isArray(res.rowsAffected) ? res.rowsAffected.reduce((a, b) => a + b, 0) : (res.rowsAffected ?? 0);
       log.debug(`(delete) Non-cascade delete affected rows: ${affected}`);
     } catch (err: any) {
       if (err && (err.number === 547 || err.code === "EREQUEST")) {
-        throw new Error(
-          `Cannot delete Offering ID ${id} without cascade: dependent rows exist (links or attributes).`,
-        );
+        throw new Error(`Cannot delete Offering ID ${id} without cascade: dependent rows exist (links or attributes).`);
       }
       throw err;
     }
@@ -614,10 +590,7 @@ export async function deleteAttribute(
   const attributeIdParam = "attributeId";
 
   // 1) Read attribute first (existence check + data for return)
-  const selectResult = await transaction
-    .request()
-    .input(attributeIdParam, id)
-    .query<DeletedAttributeData>(`
+  const selectResult = await transaction.request().input(attributeIdParam, id).query<DeletedAttributeData>(`
       SELECT attribute_id, name
       FROM dbo.attributes
       WHERE attribute_id = @${attributeIdParam};
@@ -663,30 +636,24 @@ export async function deleteAttribute(
 
     if (res?.recordset?.[0]) {
       stats = res.recordset[0];
-      stats.total = (stats.deletedAssignments ?? 0);
+      stats.total = stats.deletedAssignments ?? 0;
     } else {
       stats = { total: 0, deletedAssignments: 0, deletedAttributes: 0 };
     }
 
     log.debug(
-      `(delete) Cascade stats for Attribute ${id}: ` +
-        `assignments=${stats.deletedAssignments}, attributes=${stats.deletedAttributes}`,
+      `(delete) Cascade stats for Attribute ${id}: ` + `assignments=${stats.deletedAssignments}, attributes=${stats.deletedAttributes}`,
     );
   } else {
     log.debug(`(delete) Executing NON-CASCADE delete for Attribute ID: ${id}`);
     try {
-      await transaction
-        .request()
-        .input(attributeIdParam, id)
-        .query(`
+      await transaction.request().input(attributeIdParam, id).query(`
           DELETE FROM dbo.attributes
           WHERE attribute_id = @${attributeIdParam};
         `);
     } catch (err: any) {
       if (err && (err.number === 547 || err.code === "EREQUEST")) {
-        throw new Error(
-          `Cannot delete Attribute ID ${id} without cascade: it is assigned to one or more offerings.`,
-        );
+        throw new Error(`Cannot delete Attribute ID ${id} without cascade: it is assigned to one or more offerings.`);
       }
       throw err;
     }
@@ -717,10 +684,7 @@ export async function deleteOrder(
   const orderIdParam = "orderId";
 
   // 1) Read order first (existence check + data for return)
-  const selectResult = await transaction
-    .request()
-    .input(orderIdParam, id)
-    .query<{ order_id: number; order_number: string | null }>(`
+  const selectResult = await transaction.request().input(orderIdParam, id).query<{ order_id: number; order_number: string | null }>(`
       SELECT order_id, order_number
       FROM dbo.orders
       WHERE order_id = @${orderIdParam};
@@ -775,10 +739,7 @@ export async function deleteOrder(
       };
     }
 
-    log.debug(
-      `(delete) Cascade stats for Order ${id}: ` +
-        `orderItems=${stats.deletedOrderItems}, orders=${stats.deletedOrders}`,
-    );
+    log.debug(`(delete) Cascade stats for Order ${id}: ` + `orderItems=${stats.deletedOrderItems}, orders=${stats.deletedOrders}`);
   } else {
     log.debug(`(delete) Executing NON-CASCADE delete for Order ID: ${id}`);
     try {
@@ -793,9 +754,7 @@ export async function deleteOrder(
       if (err.number === 547) {
         // FK constraint violation
         log.warn(`(delete) FK constraint prevented non-cascade delete of Order ID: ${id}`, { error: err.message });
-        throw new Error(
-          `Cannot delete Order ${id}: it has dependent order items. Use cascade=true to delete them as well.`,
-        );
+        throw new Error(`Cannot delete Order ${id}: it has dependent order items. Use cascade=true to delete them as well.`);
       }
       throw err;
     }
@@ -825,10 +784,7 @@ export async function deleteOrderItem(
   const orderItemIdParam = "orderItemId";
 
   // 1) Read order item first (existence check + data for return)
-  const selectResult = await transaction
-    .request()
-    .input(orderItemIdParam, id)
-    .query<{ order_item_id: number }>(`
+  const selectResult = await transaction.request().input(orderItemIdParam, id).query<{ order_item_id: number }>(`
       SELECT order_item_id
       FROM dbo.order_items
       WHERE order_item_id = @${orderItemIdParam};

@@ -66,7 +66,7 @@ export const GET: RequestHandler = async ({ params }) => {
 
     // TODO: all GET <path>/id endpoints should validate retrieved record.
     const validation = validateEntity(WholesalerItemOffering_ProductDef_Category_SupplierSchema, serialized);
-    const debugError = true;
+    const debugError = false; // ONLY FOR DEBUG!
     if (!validation.isValid || debugError) {
       const errRes: ApiErrorResponse = {
         success: false,

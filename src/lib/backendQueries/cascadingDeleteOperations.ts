@@ -218,37 +218,51 @@ export async function deleteSupplier(
         WHERE o.wholesaler_id = @${supplierIdParam};
 
         DECLARE
+          @deletedOrderItems   INT = 0,
+          @deletedOrders       INT = 0,
           @deletedLinks        INT = 0,
           @deletedAttributes   INT = 0,
           @deletedOfferings    INT = 0,
           @deletedWhCat        INT = 0,
           @deletedSupplier     INT = 0;
 
-        -- 1) Delete indirect dependencies: links
+        -- 1) Delete order_items (indirect via offerings) - must come first as leaf nodes
+        DELETE OI
+        FROM dbo.order_items AS OI
+        JOIN #OfferingsToDelete AS O ON O.offering_id = OI.offering_id;
+        SET @deletedOrderItems = @@ROWCOUNT;
+
+        -- 2) Delete orders (direct FK to wholesaler)
+        DELETE ORD
+        FROM dbo.orders AS ORD
+        WHERE ORD.wholesaler_id = @${supplierIdParam};
+        SET @deletedOrders = @@ROWCOUNT;
+
+        -- 3) Delete offering links
         DELETE L
         FROM dbo.wholesaler_offering_links AS L
         JOIN #OfferingsToDelete AS O ON O.offering_id = L.offering_id;
         SET @deletedLinks = @@ROWCOUNT;
 
-        -- 2) Delete indirect dependencies: attributes
+        -- 4) Delete offering attributes
         DELETE A
         FROM dbo.wholesaler_offering_attributes AS A
         JOIN #OfferingsToDelete AS O ON O.offering_id = A.offering_id;
         SET @deletedAttributes = @@ROWCOUNT;
 
-        -- 3) Delete direct dependencies: offerings
+        -- 5) Delete offerings
         DELETE O
         FROM dbo.wholesaler_item_offerings AS O
         WHERE O.wholesaler_id = @${supplierIdParam};
         SET @deletedOfferings = @@ROWCOUNT;
 
-        -- 4) Delete direct dependencies: wholesaler-category assignments
+        -- 6) Delete wholesaler-category assignments
         DELETE C
         FROM dbo.wholesaler_categories AS C
         WHERE C.wholesaler_id = @${supplierIdParam};
         SET @deletedWhCat = @@ROWCOUNT;
 
-        -- 5) Finally, delete the supplier
+        -- 7) Finally, delete the supplier
         DELETE W
         FROM dbo.wholesalers AS W
         WHERE W.wholesaler_id = @${supplierIdParam};
@@ -256,6 +270,8 @@ export async function deleteSupplier(
 
         -- Return deletion stats for logging
         SELECT
+          @deletedOrderItems AS deletedOrderItems,
+          @deletedOrders     AS deletedOrders,
           @deletedLinks      AS deletedLinks,
           @deletedAttributes AS deletedAttributes,
           @deletedOfferings  AS deletedOfferings,
@@ -267,10 +283,12 @@ export async function deleteSupplier(
 
       if (res?.recordset?.[0]) {
         stats = res.recordset[0];
-        stats.total = stats.deletedLinks + stats.deletedAttributes + stats.deletedOfferings + stats.deletedWholesalerCategories;
+        stats.total = stats.deletedOrderItems + stats.deletedOrders + stats.deletedLinks + stats.deletedAttributes + stats.deletedOfferings + stats.deletedWholesalerCategories;
       } else {
         stats = {
           total: 0,
+          deletedOrderItems: 0,
+          deletedOrders: 0,
           deletedLinks: 0,
           deletedAttributes: 0,
           deletedOfferings: 0,
@@ -281,6 +299,7 @@ export async function deleteSupplier(
 
       log.debug(
         `(delete) Cascade stats for Supplier ${id}: ` +
+          `orderItems=${stats.deletedOrderItems}, orders=${stats.deletedOrders}, ` +
           `links=${stats.deletedLinks}, attrs=${stats.deletedAttributes}, ` +
           `offerings=${stats.deletedOfferings}, whCat=${stats.deletedWholesalerCategories}, suppliers=${stats.deletedSuppliers}`,
       );

@@ -37,51 +37,77 @@ export async function checkWholesalerDependencies(
   wholesalerId: number,
   transaction: Transaction,
 ): Promise<{ hard: string[]; soft: string[] }> {
-  const dependencies: string[] = [];
+  const hardDependencies: string[] = [];
+  const softDependencies: string[] = [];
   log.info(`(dependencyChecks) Checking master dependencies for wholesalerId: ${wholesalerId}`);
 
   const transWrapper = new TransWrapper(transaction, null);
   transWrapper.begin();
 
   try {
+    // HARD Dependencies - these prevent cascade delete (must use forceCascade)
+
+    // Check for orders (direct FK to wholesaler)
+    const ordersCheck = await transWrapper.request().input("wholesalerId", wholesalerId).query`
+      SELECT COUNT(*) as count
+      FROM dbo.orders
+      WHERE wholesaler_id = @wholesalerId
+    `;
+    if (ordersCheck.recordset[0].count > 0) {
+      hardDependencies.push(`${ordersCheck.recordset[0].count} orders`);
+    }
+
+    // Check for order_items (indirect via offerings)
+    const orderItemsCheck = await transWrapper.request().input("wholesalerId", wholesalerId).query`
+      SELECT COUNT(*) as count
+      FROM dbo.order_items oi
+      INNER JOIN dbo.wholesaler_item_offerings wio ON oi.offering_id = wio.offering_id
+      WHERE wio.wholesaler_id = @wholesalerId
+    `;
+    if (orderItemsCheck.recordset[0].count > 0) {
+      hardDependencies.push(`${orderItemsCheck.recordset[0].count} order items`);
+    }
+
+    // SOFT Dependencies - these can be cascade deleted with cascade=true
+
     const categoriesCheck = await transWrapper.request().input("wholesalerId", wholesalerId).query`
-      SELECT COUNT(*) as count 
-      FROM dbo.wholesaler_categories 
+      SELECT COUNT(*) as count
+      FROM dbo.wholesaler_categories
       WHERE wholesaler_id = @wholesalerId
     `;
     if (categoriesCheck.recordset[0].count > 0) {
-      dependencies.push(`${categoriesCheck.recordset[0].count} assigned categories`);
+      softDependencies.push(`${categoriesCheck.recordset[0].count} assigned categories`);
     }
 
     const offeringsCheck = await transWrapper.request().input("wholesalerId", wholesalerId).query`
-      SELECT COUNT(*) as count 
-      FROM dbo.wholesaler_item_offerings 
+      SELECT COUNT(*) as count
+      FROM dbo.wholesaler_item_offerings
       WHERE wholesaler_id = @wholesalerId
     `;
     if (offeringsCheck.recordset[0].count > 0) {
-      dependencies.push(`${offeringsCheck.recordset[0].count} product offerings`);
+      softDependencies.push(`${offeringsCheck.recordset[0].count} product offerings`);
     }
 
     // Note: The following checks could be considered redundant if offerings are a hard dependency,
     // but are included for completeness as per the original file.
     const linksCheck = await transWrapper.request().input("wholesalerId", wholesalerId).query`
-      SELECT COUNT(*) as count 
+      SELECT COUNT(*) as count
       FROM dbo.wholesaler_offering_links wol
       INNER JOIN dbo.wholesaler_item_offerings wio ON wol.offering_id = wio.offering_id
       WHERE wio.wholesaler_id = @wholesalerId
     `;
     if (linksCheck.recordset[0].count > 0) {
-      dependencies.push(`${linksCheck.recordset[0].count} offering links`);
+      softDependencies.push(`${linksCheck.recordset[0].count} offering links`);
     }
 
     const attributesCheck = await transWrapper.request().input("wholesalerId", wholesalerId).query`
-      SELECT COUNT(*) as count 
+      SELECT COUNT(*) as count
       FROM dbo.wholesaler_offering_attributes woa
       INNER JOIN dbo.wholesaler_item_offerings wio ON woa.offering_id = wio.offering_id
       WHERE wio.wholesaler_id = @wholesalerId
     `;
     if (attributesCheck.recordset[0].count > 0) {
-      dependencies.push(`${attributesCheck.recordset[0].count} offering attributes`);
+      softDependencies.push(`${attributesCheck.recordset[0].count} offering attributes`);
     }
 
     transWrapper.commit();
@@ -89,8 +115,8 @@ export async function checkWholesalerDependencies(
     transWrapper.rollback();
   }
 
-  log.info(`(dependencyChecks) Found dependencies for wholesalerId: ${wholesalerId}`, { dependencies });
-  return { soft: dependencies, hard: [] };
+  log.info(`(dependencyChecks) Found dependencies for wholesalerId: ${wholesalerId}`, { hard: hardDependencies, soft: softDependencies });
+  return { hard: hardDependencies, soft: softDependencies };
 }
 
 /**

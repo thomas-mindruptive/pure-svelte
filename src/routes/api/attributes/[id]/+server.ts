@@ -222,9 +222,12 @@ export const DELETE: RequestHandler = async ({ params, request }) => {
       };
       log.info(`[${operationId}] FN_SUCCESS: Attribute deleted.`, { responseData: response.data });
       return json(response);
-
     } catch (err) {
-      await transaction.rollback();
+      try {
+        await transaction.rollback();
+      } catch (e) {
+        log.error(`Cannot rollback transaction. Already rollbacked?`);
+      }
       log.error(`[${operationId}] FN_EXCEPTION: Transaction failed, rolling back.`, { error: err });
       throw err;
     }

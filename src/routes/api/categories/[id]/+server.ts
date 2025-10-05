@@ -151,9 +151,12 @@ export const DELETE: RequestHandler = async ({ params, request, url }): Promise<
       };
       log.info(`[${operationId}] FN_SUCCESS: Category deleted.`, { responseData: response.data });
       return json(response);
-
     } catch (err) {
-      await transaction.rollback();
+      try {
+        await transaction.rollback();
+      } catch (e) {
+        log.error(`Cannot rollback transaction. Already rollbacked?`);
+      }
       log.error(`[${operationId}] FN_EXCEPTION: Transaction failed, rolling back.`, { error: err });
       throw err; // Re-throw to be caught by the outer catch block
     }

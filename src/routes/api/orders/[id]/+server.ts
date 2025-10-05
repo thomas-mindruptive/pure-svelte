@@ -221,7 +221,11 @@ export const DELETE: RequestHandler = async ({ params, request }) => {
       });
       return json(response);
     } catch (err) {
-      await transaction.rollback();
+      try {
+        await transaction.rollback();
+      } catch (e) {
+        log.error(`Cannot rollback transaction. Already rollbacked?`);
+      }
       log.error(`[${operationId}] FN_EXCEPTION: Transaction failed and was rolled back.`, { error: err });
       throw err;
     }

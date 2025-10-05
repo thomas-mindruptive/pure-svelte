@@ -189,7 +189,11 @@ export const POST: RequestHandler = async ({ request }) => {
     log.info(`[${operationId}] FN_SUCCESS: Offering created with ID ${newOffering.offering_id}.`);
     return json(response, { status: 201 });
   } catch (err: unknown) {
-    await transaction.rollback();
+      try {
+        await transaction.rollback();
+      } catch (e) {
+        log.error(`Cannot rollback transaction. Already rollbacked?`);
+      }
     return buildUnexpectedError(err, info);
   }
 };

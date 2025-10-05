@@ -13,12 +13,7 @@ import { buildUnexpectedError, validateIdUrlParam, validateAndUpdateEntity } fro
 import { checkProductDefinitionDependencies } from "$lib/dataModel/dependencyChecks";
 import { ProductDefinitionSchema, type ProductDefinition } from "$lib/domain/domainTypes";
 import { v4 as uuidv4 } from "uuid";
-import type {
-  ApiSuccessResponse,
-  DeleteConflictResponse,
-  DeleteRequest,
-  DeleteSuccessResponse,
-} from "$lib/api/api.types";
+import type { ApiSuccessResponse, DeleteConflictResponse, DeleteRequest, DeleteSuccessResponse } from "$lib/api/api.types";
 import { deleteProductDefinition } from "$lib/backendQueries/cascadingDeleteOperations";
 
 /**
@@ -156,7 +151,11 @@ export const DELETE: RequestHandler = async ({ request, params }) => {
     if ((err as { status?: number })?.status === 404) {
       throw err;
     }
-    await transaction.rollback();
+    try {
+      await transaction.rollback();
+    } catch (e) {
+      log.error(`Cannot rollback transaction. Already rollbacked?`);
+    }
     return buildUnexpectedError(err, info);
-  } 
+  }
 };

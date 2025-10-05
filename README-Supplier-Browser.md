@@ -10,7 +10,7 @@ The SupplierBrowser suppliers/wholesalers. Its primary purpose is to provide a f
 
 ### The 5 Levels of the Hierarchy
 
-The application's logic is built around a clear, five-level data model. Understanding the distinction between **Master Data**, **Hierarchical Real Objects**, and **Relationships** is critical.
+The application's logic is built around hierarchical data model. Understanding the distinction between **Master Data**, **Hierarchical Real Objects**, and **Relationships** is critical.
 
 #### Level 1: Suppliers (Master Data)
 - **Entity**: `dbo.wholesalers`
@@ -632,6 +632,18 @@ The frontend follows a **Domain-Driven file structure** combined with a **Page D
 - `src/routes/(browser)/suppliers/+page.ts` (Route delegation)
 - `src/lib/components/domain/suppliers/supplierListPage.ts` (Domain load logic)
 - `src/lib/components/domain/suppliers/SupplierListPage.svelte` (Domain UI component)
+
+#### 2 Choices for  "DetailPages" displaying "1:n children"
+In our usecases, a DetailPage displays not only the respective master data, like "Supplier". It also displays 1:n child relationships, e.g. "Supplier->Product Categories". <br>
+Since there can be several 1:n child relationships, we have to provide a UI that easily enables switsching between them.
+
+**Option A** - Page per 1:n child
+* Create a page for each relationship: Each page contains the masterdata (preferably as reusable component) and the relationship chosen in the hierary sidebar.
+* Create a route delegator for each page, e.g. for `/suppliers/[id]/productcategories` and `/suppliers/[id]/orders` delegate to the "SupplierProductCatagories" and "SupplierOrders" page.
+
+**Option B** - Dynamic page and conditional rendering
+* Create **one** page containing the master data and conditionally render the chil-relationship selected in the hierary sidebar. One can use snippets to render the respective child blocks.
+* Create a route delegator which always points to this one page, e.g. "SupplierPage".
 
 #### Component-Based Data Loading Pattern (Detail Pages)
 

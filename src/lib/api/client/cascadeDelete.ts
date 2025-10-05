@@ -131,7 +131,6 @@ export async function cascadeDelete<TDeletedResource>(
       addNotification(`${info.domainObjectName} deleted successfully.`, "success");
       dataChanged = true;
     }
-    // CORRECTED: Use the type guard to ensure we have a DeleteConflictResponse
     else if (isDeleteConflict(initialResult)) {
       const confirmedAndDeleted = await _handleDeletionConflict(
         initialResult,

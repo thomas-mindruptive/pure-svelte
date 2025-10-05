@@ -121,7 +121,7 @@ export function getOfferingApi(client: ApiClient) {
     /**
      * Deletes an offering.
      */
-    async deleteOffering(offeringId: number, cascade = false): Promise<DeleteOfferingApiResponse> {
+    async deleteOffering(offeringId: number, cascade = false, forceCascade = false): Promise<DeleteOfferingApiResponse> {
       assertDefined(offeringId, "offeringId");
       const operationId = `deleteOffering-${offeringId}`;
       offeringLoadingManager.start(operationId);
@@ -131,6 +131,7 @@ export function getOfferingApi(client: ApiClient) {
         const removeRequest: DeleteRequest<WholesalerItemOffering> = {
           id: offeringId,
           cascade,
+          forceCascade,
         };
         const body = createJsonBody(removeRequest);
         return await client.apiFetchUnion<DeleteOfferingApiResponse>(url, { method: "DELETE", body }, { context: operationId });

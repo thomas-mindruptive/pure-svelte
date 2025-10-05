@@ -116,12 +116,25 @@ export function loadOfferingDetailBasisData({
   } else {
     // --- EDIT MODE -----
 
+    // ⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️
+    // This is the svelte kit way to prevent unhandled promise rejections during SSR.
+    // => The data of promises is streamed to the client through an open IP-connection.
+    // => Client does not need to call an API after hydration.
+    // => Faster than client api call. => better SEO.
+    //
+    // TODO: Change 
+    // a) to component based loading or 
+    // b) "pure" svelte kit way: promise must not fail, but return a composite object like 
+    //    {result: offering | null, error: ....} 
+    //
     const offeringPromise = offeringApi.loadOffering(offeringId!).catch((err) => {
       // Wenn der ApiClient einen SvelteKit-`error` wirft, ist `err` eine `Response`-Instanz.
       // Wir loggen es und werfen es erneut, damit SvelteKit seine Fehlerseite anzeigen kann.
       log.error(`SSR Load failed, re-throwing SvelteKit error for page display.`, err);
-      //throw err; // Wichtig: Den SvelteKit-Fehler erneut werfen!
+      return null;
+      // DO NOT: throw err; 
     });
+    // ⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️
 
     log.info(`Kicking off promises for EDIT mode: offeringId: ${offeringId}, categoryId: ${categoryId}, supplierId: ${supplierId}`);
     const asyncLoadData: OfferingDetail_LoadDataAsync = {

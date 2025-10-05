@@ -23,22 +23,26 @@
   } from "./productDefinitionDetailPage.types";
   import { assertDefined } from "$lib/utils/assertions";
   import { getProductDefinitionApi } from "$lib/api/client/productDefinition";
-    import { page } from "$app/state";
-    import { cascadeDelete } from "$lib/api/client/cascadeDelete";
-    import { stringsToNumbers } from "$lib/utils/typeConversions";
+  import { page } from "$app/state";
+  import { cascadeDelete } from "$lib/api/client/cascadeDelete";
+  import { stringsToNumbers } from "$lib/utils/typeConversions";
   import { buildChildUrl, buildSiblingUrl } from "$lib/utils/url";
+  import type { ValidationErrorTree } from "$lib/components/validation/validation.types";
+  import { zodToValidationErrorTree } from "$lib/domain/domainTypes.utils";
+  import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
 
   // === PROPS ====================================================================================
-  
+
   let { data }: { data: ProductDefinitionDetailPage_LoadDataAsync } = $props();
 
   // === STATE ====================================================================================
 
   let resolvedData = $state<ProductDefinitionDetailPage_LoadData | null>(null);
   let isLoading = $state(true);
-  let loadingError = $state<{ message: string; status?: number } | null>(null);
+  const errors = $state<Record<string, ValidationErrorTree>>({});
+  //let loadingError = $state<{ message: string; status?: number } | null>(null);
   const allowForceCascadingDelte = $state(true);
-  
+
   // === LOAD DATA ================================================================================
 
   $effect(() => {
@@ -46,12 +50,11 @@
     let aborted = false;
     const processPromises = async () => {
       isLoading = true;
-      loadingError = null;
       resolvedData = null;
 
       try {
         const [productDefinition, offerings] = await Promise.all([data.productDefinition, data.offerings]);
-        log.debug(`Promised resolved.`, {productDefinition, offerings});
+        log.debug(`Promised resolved.`, { productDefinition, offerings });
 
         if (aborted) return;
 
@@ -60,19 +63,19 @@
           ...data,
           productDefinition,
           offerings,
-        }
+        };
         const validationResult = ProductDefinitionDetailPage_LoadDataSchema.safeParse(dataToValidate);
         if (!validationResult.success) {
           log.error("Zod validation failed for ProductDefinitionDetailPage", validationResult.error.issues);
-          throw new Error(`ProductDefinitionDetailPage: Received invalid data structure from the API. ${JSON.stringify(validationResult.error.issues)}`);
+          errors.productDefinitionLoadData = zodToValidationErrorTree(validationResult.error);
+        } else {
+          resolvedData = validationResult.data;
         }
-        resolvedData = validationResult.data;
-
       } catch (rawError: any) {
         if (aborted) return;
         const status = rawError.status ?? 500;
         const message = rawError.message || "Failed to load product definition details.";
-        loadingError = { message, status };
+        errors.unexpectedError = { message, status };
         log.error("Promise processing failed in ProductDefinitionDetailPage", { rawError });
       } finally {
         if (!aborted) {
@@ -133,7 +136,7 @@
       {
         domainObjectName: "Product Definition",
         softDepInfo: "Product Definition has soft dependencies.",
-        hardDepInfo: "Product Definition has har dependencies.", 
+        hardDepInfo: "Product Definition has hard dependencies.",
       },
       allowForceCascadingDelte,
     );
@@ -184,50 +187,47 @@
   }
 </script>
 
-{#if loadingError}
-  <div class="component-error-boundary">
-    <h3>Error Loading Product Definition (Status: {loadingError.status})</h3>
-    <p>{loadingError.message}</p>
-  </div>
-{:else if isLoading || !resolvedData}
-  <div class="detail-page-layout">Loading details...</div>
-{:else}
-  <div class="detail-page-layout">
-    <!-- Section 1: Product Definition Form -->
-    <div class="form-section">
-      <ProductDefinitionForm
-        categoryId={resolvedData.categoryId}
-        isCreateMode={resolvedData.isCreateMode}
-        initial={resolvedData.productDefinition}
-        onSubmitted={handleFormSubmitted}
-        onSubmitError={handleFormSubmitError}
-        onCancelled={handleFormCancelled}
-        onChanged={handleFormChanged}
-      />
-    </div>
-
-    <!-- Section 2: Grid of associated Offerings -->
-    <div class="grid-section">
-      {#if !resolvedData.isCreateMode}
-        <h2>Offerings for this Product</h2>
-        <button
-          class="pc-grid__createbtn"
-          onclick={handleOfferingCreate}
-        >
-          Create Offering
-        </button>
-        <OfferingGrid
-          rows={resolvedData.offerings}
-          loading={$offeringLoadingState}
-          {deleteStrategy}
-          {rowActionStrategy}
+<ValidationWrapper {errors}>
+  {#if isLoading || !resolvedData}
+    <div class="detail-page-layout">Loading details...</div>
+  {:else}
+    <div class="detail-page-layout">
+      <!-- Section 1: Product Definition Form -->
+      <div class="form-section">
+        <ProductDefinitionForm
+          categoryId={resolvedData.categoryId}
+          isCreateMode={resolvedData.isCreateMode}
+          initial={resolvedData.productDefinition}
+          onSubmitted={handleFormSubmitted}
+          onSubmitError={handleFormSubmitError}
+          onCancelled={handleFormCancelled}
+          onChanged={handleFormChanged}
         />
-      {:else}
-        <p>Offerings will be displayed here after the product definition has been saved.</p>
-      {/if}
+      </div>
+
+      <!-- Section 2: Grid of associated Offerings -->
+      <div class="grid-section">
+        {#if !resolvedData.isCreateMode}
+          <h2>Offerings for this Product</h2>
+          <button
+            class="pc-grid__createbtn"
+            onclick={handleOfferingCreate}
+          >
+            Create Offering
+          </button>
+          <OfferingGrid
+            rows={resolvedData.offerings}
+            loading={$offeringLoadingState}
+            {deleteStrategy}
+            {rowActionStrategy}
+          />
+        {:else}
+          <p>Offerings will be displayed here after the product definition has been saved.</p>
+        {/if}
+      </div>
     </div>
-  </div>
-{/if}
+  {/if}
+</ValidationWrapper>
 
 <style>
   .form-section {

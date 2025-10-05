@@ -9,6 +9,7 @@ import type {
   DeletedOfferingData,
   DeletedProductDefinitonData,
   DeletedSupplierData,
+  DeletedSupplierCategoryData,
 } from "$lib/api/app/appSpecificTypes";
 
 /**
@@ -872,6 +873,173 @@ export async function deleteOrderItem(
       });
     } else {
       log.error(`(delete) Unexpected error deleting OrderItem ${id}`, { error: err });
+    }
+    throw err;
+  }
+}
+
+/**
+ * Deletes a Supplier-Category Assignment, with an option to cascade and delete all dependent offerings.
+ * @param wholesalerId The ID of the supplier.
+ * @param categoryId The ID of the category.
+ * @param cascade If true, performs a cascade delete of all dependent offerings and their children.
+ * @param transaction The active MSSQL transaction object.
+ * @returns A promise that resolves with the data of the deleted assignment and deletion stats.
+ * @throws An error if the assignment with the given IDs is not found.
+ */
+export async function deleteSupplierCategoryAssignment(
+  wholesalerId: number,
+  categoryId: number,
+  cascade: boolean,
+  transaction: Transaction,
+): Promise<{
+  deleted: DeletedSupplierCategoryData;
+  stats: Record<string, number>;
+}> {
+  assertDefined(wholesalerId, `wholesalerId must be defined for deleteSupplierCategoryAssignment`);
+  assertDefined(categoryId, `categoryId must be defined for deleteSupplierCategoryAssignment`);
+  log.info(`(delete) Preparing to delete Supplier-Category Assignment: Supplier ${wholesalerId}, Category ${categoryId} with cascade=${cascade}`);
+
+  const wholesalerIdParam = "wholesalerId";
+  const categoryIdParam = "categoryId";
+
+  try {
+    // 1) Read assignment first (existence check + data for return)
+    const selectResult = await transaction
+      .request()
+      .input(wholesalerIdParam, wholesalerId)
+      .input(categoryIdParam, categoryId).query<DeletedSupplierCategoryData>(`
+        SELECT
+          wc.wholesaler_id,
+          wc.category_id,
+          pc.name AS category_name
+        FROM dbo.wholesaler_categories wc
+        INNER JOIN dbo.product_categories pc ON wc.category_id = pc.category_id
+        WHERE wc.wholesaler_id = @${wholesalerIdParam} AND wc.category_id = @${categoryIdParam};
+      `);
+
+    if (selectResult.recordset.length === 0) {
+      throw new Error(`Supplier-Category Assignment (Supplier ${wholesalerId}, Category ${categoryId}) not found.`);
+    }
+    const deletedAssignmentData = selectResult.recordset[0];
+    log.debug(
+      `(delete) Found assignment to delete: Category "${deletedAssignmentData.category_name}" (wholesaler_id: ${deletedAssignmentData.wholesaler_id}, category_id: ${deletedAssignmentData.category_id})`,
+    );
+
+    let stats: Record<string, number> = {};
+
+    // 2) Execute delete path
+    if (cascade) {
+      log.debug(`(delete) Executing CASCADE delete for Supplier-Category Assignment`);
+
+      const cascadeDeleteQuery = `
+        SET XACT_ABORT ON;
+        SET NOCOUNT ON;
+
+        DECLARE
+          @deletedOrderItems   INT = 0,
+          @deletedAttributes   INT = 0,
+          @deletedLinks        INT = 0,
+          @deletedOfferings    INT = 0,
+          @deletedAssignments  INT = 0;
+
+        -- 1) Delete order_items (indirect via offerings - must come first as leaf nodes)
+        DELETE oi
+        FROM dbo.order_items oi
+        INNER JOIN dbo.wholesaler_item_offerings wio ON oi.offering_id = wio.offering_id
+        WHERE wio.wholesaler_id = @${wholesalerIdParam} AND wio.category_id = @${categoryIdParam};
+        SET @deletedOrderItems = @@ROWCOUNT;
+
+        -- 2) Delete offering_attributes
+        DELETE woa
+        FROM dbo.wholesaler_offering_attributes woa
+        INNER JOIN dbo.wholesaler_item_offerings wio ON woa.offering_id = wio.offering_id
+        WHERE wio.wholesaler_id = @${wholesalerIdParam} AND wio.category_id = @${categoryIdParam};
+        SET @deletedAttributes = @@ROWCOUNT;
+
+        -- 3) Delete offering_links
+        DELETE wol
+        FROM dbo.wholesaler_offering_links wol
+        INNER JOIN dbo.wholesaler_item_offerings wio ON wol.offering_id = wio.offering_id
+        WHERE wio.wholesaler_id = @${wholesalerIdParam} AND wio.category_id = @${categoryIdParam};
+        SET @deletedLinks = @@ROWCOUNT;
+
+        -- 4) Delete offerings
+        DELETE FROM dbo.wholesaler_item_offerings
+        WHERE wholesaler_id = @${wholesalerIdParam} AND category_id = @${categoryIdParam};
+        SET @deletedOfferings = @@ROWCOUNT;
+
+        -- 5) Finally, delete the assignment
+        DELETE FROM dbo.wholesaler_categories
+        WHERE wholesaler_id = @${wholesalerIdParam} AND category_id = @${categoryIdParam};
+        SET @deletedAssignments = @@ROWCOUNT;
+
+        -- Return deletion stats
+        SELECT
+          @deletedOrderItems  AS deletedOrderItems,
+          @deletedAttributes  AS deletedAttributes,
+          @deletedLinks       AS deletedLinks,
+          @deletedOfferings   AS deletedOfferings,
+          @deletedAssignments AS deletedAssignments;
+      `;
+
+      const res = await transaction
+        .request()
+        .input(wholesalerIdParam, wholesalerId)
+        .input(categoryIdParam, categoryId)
+        .query(cascadeDeleteQuery);
+
+      if (res?.recordset?.[0]) {
+        stats = res.recordset[0];
+        stats.total = stats.deletedOrderItems + stats.deletedAttributes + stats.deletedLinks + stats.deletedOfferings;
+      } else {
+        stats = {
+          total: 0,
+          deletedOrderItems: 0,
+          deletedAttributes: 0,
+          deletedLinks: 0,
+          deletedOfferings: 0,
+          deletedAssignments: 0,
+        };
+      }
+
+      log.debug(
+        `(delete) Cascade stats for Supplier-Category Assignment: ` +
+          `orderItems=${stats.deletedOrderItems}, attrs=${stats.deletedAttributes}, ` +
+          `links=${stats.deletedLinks}, offerings=${stats.deletedOfferings}, assignments=${stats.deletedAssignments}`,
+      );
+    } else {
+      log.debug(`(delete) Executing NON-CASCADE delete for Supplier-Category Assignment`);
+      const res = await transaction
+        .request()
+        .input(wholesalerIdParam, wholesalerId)
+        .input(categoryIdParam, categoryId)
+        .query(`
+          DELETE FROM dbo.wholesaler_categories
+          WHERE wholesaler_id = @${wholesalerIdParam} AND category_id = @${categoryIdParam};
+        `);
+
+      const affected = Array.isArray(res.rowsAffected) ? res.rowsAffected.reduce((a, b) => a + b, 0) : (res.rowsAffected ?? 0);
+      log.debug(`(delete) Non-cascade delete affected rows: ${affected}`);
+    }
+
+    log.info(`(delete) Delete operation for Supplier-Category Assignment completed successfully.`);
+
+    // 3) Return the data of the now-deleted resource + stats
+    return { deleted: deletedAssignmentData, stats };
+  } catch (err: any) {
+    // Error 547 is BOTH CHECK constraint AND FK constraint - analyze message to distinguish
+    if (err.number === 547) {
+      log.error(`(delete) FK constraint prevented delete of Supplier-Category Assignment (Supplier ${wholesalerId}, Category ${categoryId})`, {
+        message: err.message,
+        cascade,
+        constraint: err.message?.match(/FK_[\w]+/)?.[0],
+      });
+    } else {
+      log.error(`(delete) Unexpected error deleting Supplier-Category Assignment (Supplier ${wholesalerId}, Category ${categoryId})`, {
+        error: err,
+        cascade,
+      });
     }
     throw err;
   }

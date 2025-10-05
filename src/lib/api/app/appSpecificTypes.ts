@@ -40,7 +40,7 @@ export type DeleteSupplierApiResponse = DeleteSupplierSuccessResponse | DeleteSu
 // =================================================================
 
 /** The shape of the `deleted_resource` payload on successful category assignment removal. */
-type DeletedSupplierCategoryData = Pick<WholesalerCategory_Category, "wholesaler_id" | "category_id" | "category_name">;
+export type DeletedSupplierCategoryData = Pick<WholesalerCategory_Category, "wholesaler_id" | "category_id" | "category_name">;
 
 /** The exact success response for removing a category assignment. */
 export type RemoveCategorySuccessResponse = DeleteSuccessResponse<DeletedSupplierCategoryData>;

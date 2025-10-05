@@ -12,6 +12,7 @@ import { db } from "$lib/backendQueries/db";
 import { log } from "$lib/utils/logger";
 import { mssqlErrorMapper } from "$lib/backendQueries/mssqlErrorMapper";
 import { checkSupplierCategoryDependencies } from "$lib/dataModel/dependencyChecks";
+import { deleteSupplierCategoryAssignment } from "$lib/backendQueries/cascadingDeleteOperations";
 import type { ProductCategory, Wholesaler, WholesalerCategory } from "$lib/domain/domainTypes";
 import { v4 as uuidv4 } from "uuid";
 
@@ -23,6 +24,7 @@ import type {
   DeleteSuccessResponse,
   RemoveAssignmentRequest,
 } from "$lib/api/api.types";
+import type { DeletedSupplierCategoryData } from "$lib/api/app/appSpecificTypes";
 
 /**
  * POST /api/supplier-categories
@@ -143,8 +145,8 @@ export const DELETE: RequestHandler = async ({ request }) => {
 
   try {
     const body = (await request.json()) as RemoveAssignmentRequest<Wholesaler, ProductCategory>;
-    const { parent1Id: supplierId, parent2Id: categoryId, cascade = false } = body;
-    log.info(`[${operationId}] Parsed request body`, { supplierId, categoryId, cascade });
+    const { parent1Id: supplierId, parent2Id: categoryId, cascade = false, forceCascade = false } = body;
+    log.info(`[${operationId}] Parsed request body`, { supplierId, categoryId, cascade, forceCascade });
 
     if (!supplierId || !categoryId) {
       const errRes: ApiErrorResponse = {
@@ -163,99 +165,62 @@ export const DELETE: RequestHandler = async ({ request }) => {
     log.info(`[${operationId}] Transaction started.`);
 
     try {
-      const dependencies = await checkSupplierCategoryDependencies(supplierId, categoryId, transaction);
-      const dependencyCount = dependencies.length;
+      // === CHECK DEPENDENCIES =====================================================================
 
-      if (dependencyCount > 0 && !cascade) {
+      const { hard, soft } = await checkSupplierCategoryDependencies(supplierId, categoryId, transaction);
+      let cascade_available = true;
+      if (hard.length > 0) {
+        cascade_available = false;
+      }
+
+      // If we have soft dependencies without cascade
+      // or we have hard dependencies without forceCascade => Return error code.
+      if ((soft.length > 0 && !cascade) || (hard.length > 0 && !forceCascade)) {
         await transaction.rollback();
         const conflictResponse: DeleteConflictResponse<string[]> = {
           success: false,
-          message: `Cannot remove assignment: ${dependencyCount} dependent offerings exist.`,
+          message: "Cannot remove assignment: dependencies exist.",
           status_code: 409,
           error_code: "DEPENDENCY_CONFLICT",
-          dependencies: { soft: dependencies, hard: [] },
-          cascade_available: true,
+          dependencies: { soft, hard },
+          cascade_available,
           meta: { timestamp: new Date().toISOString() },
         };
-        log.warn(`[${operationId}] FN_FAILURE: Removal blocked by dependencies. Transaction rolled back.`, { dependencyCount });
+        log.warn(`[${operationId}] FN_FAILURE: Removal blocked by dependencies.`, { hard, soft });
         return json(conflictResponse, { status: 409 });
       }
 
-      if (cascade && dependencyCount > 0) {
-        log.info(`[${operationId}] Performing cascade delete of ${dependencyCount} offerings.`);
-        await transaction
-          .request()
-          .input("supplierId", supplierId)
-          .input("categoryId", categoryId)
-          .query(
-            "DELETE FROM dbo.wholesaler_offering_attributes WHERE offering_id IN (SELECT offering_id FROM dbo.wholesaler_item_offerings WHERE wholesaler_id = @supplierId AND category_id = @categoryId)",
-          );
-        await transaction
-          .request()
-          .input("supplierId", supplierId)
-          .input("categoryId", categoryId)
-          .query(
-            "DELETE FROM dbo.wholesaler_offering_links WHERE offering_id IN (SELECT offering_id FROM dbo.wholesaler_item_offerings WHERE wholesaler_id = @supplierId AND category_id = @categoryId)",
-          );
-        await transaction
-          .request()
-          .input("supplierId", supplierId)
-          .input("categoryId", categoryId)
-          .query("DELETE FROM dbo.wholesaler_item_offerings WHERE wholesaler_id = @supplierId AND category_id = @categoryId");
-      }
+      // === DELETE =================================================================================
 
-      const namesResult = await transaction
-        .request()
-        .input("supplierId", supplierId)
-        .input("categoryId", categoryId)
-        .query(
-          `SELECT (SELECT name FROM dbo.wholesalers WHERE wholesaler_id = @supplierId) as supplier_name, (SELECT name FROM dbo.product_categories WHERE category_id = @categoryId) as category_name;`,
-        );
-      const { supplier_name, category_name } = namesResult.recordset[0] ?? {};
-
-      const deleteResult = await transaction
-        .request()
-        .input("supplierId", supplierId)
-        .input("categoryId", categoryId)
-        .query("DELETE FROM dbo.wholesaler_categories WHERE wholesaler_id = @supplierId AND category_id = @categoryId");
+      const deletedAssignmentStats = await deleteSupplierCategoryAssignment(supplierId, categoryId, cascade || forceCascade, transaction);
       await transaction.commit();
       log.info(`[${operationId}] Transaction committed.`);
 
-      if (deleteResult.rowsAffected[0] === 0) {
-        const errRes: ApiErrorResponse = {
-          success: false,
-          message: "Assignment not found to delete.",
-          status_code: 404,
-          error_code: "NOT_FOUND",
-          meta: { timestamp: new Date().toISOString() },
-        };
-        log.warn(`[${operationId}] FN_FAILURE: Assignment not found during delete.`, { supplierId, categoryId });
-        return json(errRes, { status: 404 });
-      }
+      // === RETURN RESPONSE ========================================================================
 
-      const response: DeleteSuccessResponse<{ supplier_id: number; category_id: number; supplier_name: string; category_name: string }> = {
+      const response: DeleteSuccessResponse<DeletedSupplierCategoryData> = {
         success: true,
-        message: `Category assignment removed successfully.`,
+        message: `Category assignment "${deletedAssignmentStats.deleted.category_name}" removed successfully.`,
         data: {
-          deleted_resource: {
-            supplier_id: supplierId,
-            category_id: categoryId,
-            supplier_name: String(supplier_name),
-            category_name: String(category_name),
-          },
-          cascade_performed: cascade,
-          dependencies_cleared: dependencyCount,
+          deleted_resource: deletedAssignmentStats.deleted,
+          cascade_performed: cascade || forceCascade,
+          dependencies_cleared: deletedAssignmentStats.stats.total,
         },
         meta: { timestamp: new Date().toISOString() },
       };
-      log.info(`[${operationId}] FN_SUCCESS: Assignment removed.`, { responseData: response.data });
+      log.info(`[${operationId}] FN_SUCCESS: Assignment removed.`, {
+        supplierId,
+        categoryId,
+        cascade,
+        forceCascade,
+      });
       return json(response);
     } catch (err) {
       log.error(`[${operationId}] FN_EXCEPTION: Transaction failed, rolling back.`, { error: err });
       try {
         await transaction.rollback();
       } catch (e) {
-        log.error(`Cannot rollback transaction. Already rollbacked?`);
+        log.error(`[${operationId}] Cannot rollback transaction. Already rollbacked?`, { error: e });
       }
       throw err; // Re-throw to be caught by the outer catch block
     }

@@ -11,20 +11,69 @@ import type { Transaction } from "mssql";
  * @param wholesalerId The ID of the supplier.
  * @param categoryId The ID of the category.
  * @param transaction The active database transaction object.
- * @returns The number of dependent offerings found.
+ * @returns Object with hard dependencies (order items) and soft dependencies (offerings, links, attributes).
  */
 export async function checkSupplierCategoryDependencies(
   wholesalerId: number,
   categoryId: number,
   transaction: Transaction,
-): Promise<string[]> {
+): Promise<{ hard: string[]; soft: string[] }> {
+  const hardDependencies: string[] = [];
+  const softDependencies: string[] = [];
   log.info("(dependencyChecks) Checking assignment dependencies for", { wholesalerId, categoryId });
-  const result = await transaction.request().input("wholesalerId", wholesalerId).input("categoryId", categoryId).query`
-      SELECT COUNT(*) as count 
+
+  const transWrapper = new TransWrapper(transaction, null);
+  await transWrapper.begin();
+
+  try {
+    // HARD Dependency: order_items (indirect via offerings - historical transaction data)
+    const orderItemsCheck = await transWrapper.request().input("wholesalerId", wholesalerId).input("categoryId", categoryId).query`
+      SELECT COUNT(*) as count
+      FROM dbo.order_items oi
+      INNER JOIN dbo.wholesaler_item_offerings wio ON oi.offering_id = wio.offering_id
+      WHERE wio.wholesaler_id = @wholesalerId AND wio.category_id = @categoryId
+    `;
+    if (orderItemsCheck.recordset[0].count > 0) {
+      hardDependencies.push(`${orderItemsCheck.recordset[0].count} order items`);
+    }
+
+    // SOFT Dependencies: offerings and their children
+    const offeringsCheck = await transWrapper.request().input("wholesalerId", wholesalerId).input("categoryId", categoryId).query`
+      SELECT COUNT(*) as count
       FROM dbo.wholesaler_item_offerings
       WHERE wholesaler_id = @wholesalerId AND category_id = @categoryId
     `;
-  return [`${result.recordset[0].count} offerings`];
+    if (offeringsCheck.recordset[0].count > 0) {
+      softDependencies.push(`${offeringsCheck.recordset[0].count} offerings`);
+    }
+
+    const linksCheck = await transWrapper.request().input("wholesalerId", wholesalerId).input("categoryId", categoryId).query`
+      SELECT COUNT(*) as count
+      FROM dbo.wholesaler_offering_links wol
+      INNER JOIN dbo.wholesaler_item_offerings wio ON wol.offering_id = wio.offering_id
+      WHERE wio.wholesaler_id = @wholesalerId AND wio.category_id = @categoryId
+    `;
+    if (linksCheck.recordset[0].count > 0) {
+      softDependencies.push(`${linksCheck.recordset[0].count} offering links`);
+    }
+
+    const attributesCheck = await transWrapper.request().input("wholesalerId", wholesalerId).input("categoryId", categoryId).query`
+      SELECT COUNT(*) as count
+      FROM dbo.wholesaler_offering_attributes woa
+      INNER JOIN dbo.wholesaler_item_offerings wio ON woa.offering_id = wio.offering_id
+      WHERE wio.wholesaler_id = @wholesalerId AND wio.category_id = @categoryId
+    `;
+    if (attributesCheck.recordset[0].count > 0) {
+      softDependencies.push(`${attributesCheck.recordset[0].count} offering attributes`);
+    }
+
+    await transWrapper.commit();
+  } catch {
+    await transWrapper.rollback();
+  }
+
+  log.info("(dependencyChecks) Found assignment dependencies", { hard: hardDependencies, soft: softDependencies });
+  return { hard: hardDependencies, soft: softDependencies };
 }
 
 /**

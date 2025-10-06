@@ -46,7 +46,7 @@
   /**
    * Props passed to the fields snippet - includes form data and manipulation methods
    */
-  interface FieldsProps<T> {
+  export interface FieldsProps<T> {
     data: FormData<T>;
 
     // Path-based setters/getters for nested data

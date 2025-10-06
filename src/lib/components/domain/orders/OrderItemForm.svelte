@@ -167,7 +167,8 @@
         <h4 class="form-section-title">Order Item Information</h4>
 
         <div class="form-row-grid">
-          <!-- Offering -->
+          <!---->
+          <!--- OFFERING ------------------------------------------------------------------------->
           <div class="form-group span-2">
             <label for="offering">Product Offering *</label>
             <select
@@ -201,7 +202,7 @@
             {/if}
           </div>
 
-          <!-- Quantity -->
+          <!--- QUANTITY ------------------------------------------------------------------------->
           <div class="form-group">
             <label for="quantity">Quantity *</label>
             <input
@@ -229,7 +230,7 @@
             {/if}
           </div>
 
-          <!-- Unit Price -->
+          <!--- UNIT PRICE --------------------------------------------------------------------------->
           <div class="form-group">
             <label for="unit_price">Unit Price *</label>
             <input
@@ -255,7 +256,7 @@
             {/if}
           </div>
 
-          <!-- Line Total (calculated, read-only) -->
+          <!--- LINE TOTAL, computed ------------------------------------------------------------->
           <div class="form-group">
             <label for="line_total">Line Total</label>
             <input

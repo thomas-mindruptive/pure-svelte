@@ -3,17 +3,17 @@
   import { goto } from "$app/navigation";
   import { addNotification } from "$lib/stores/notifications";
   import { log } from "$lib/utils/logger";
-// Component Imports
+  // Component Imports
   import "$lib/components/styles/detail-page-layout.css";
   // API & Type Imports
   import { ApiClient } from "$lib/api/client/ApiClient";
   import {
-      OrderItem_ProdDef_Category_Schema,
-      OrderSchema,
-      type Order,
-      type OrderItem,
-      type OrderItem_ProdDef_Category,
-      type WholesalerItemOffering_ProductDef_Category_Supplier_Nested,
+    OrderItem_ProdDef_Category_Schema,
+    OrderSchema,
+    type Order,
+    type OrderItem,
+    type OrderItem_ProdDef_Category,
+    type WholesalerItemOffering_ProductDef_Category_Supplier_Nested,
   } from "$lib/domain/domainTypes";
 
   import { page } from "$app/state";
@@ -72,6 +72,7 @@
       try {
         // Load order to get wholesaler_id (needed in both CREATE and EDIT mode)
         order = await orderApi.loadOrder(data.orderId);
+        if (aborted) return;
         const orderValidationResult = OrderSchema.safeParse(order);
         if (orderValidationResult.error) {
           errors.order = zodToValidationErrorTree(orderValidationResult.error);
@@ -83,6 +84,7 @@
         } else {
           // Load order item in EDIT mode
           orderItem = await orderItemApi.loadOrderItem(data.orderItemId!);
+          if (aborted) return;
           const orderItemValidationResult = OrderItem_ProdDef_Category_Schema.safeParse(orderItem);
           if (orderItemValidationResult.error) {
             errors.orderItem = zodToValidationErrorTree(orderItemValidationResult.error);
@@ -90,13 +92,12 @@
           }
         }
 
-        // Load available offerings for the order's supplier
-        if (order?.wholesaler_id) {
-          availableOfferings = await supplierApi.loadOfferingsForSupplier(order.wholesaler_id);
-          log.info(`Loaded ${availableOfferings.length} offerings for supplier ${order.wholesaler_id}`);
-        }
-
+        // Load available offerings for the order's supplier.
+        // The order was validated above => wholesaler_id is set for sure.
+        availableOfferings = await supplierApi.loadOfferingsForSupplier(order.wholesaler_id);
+        log.info(`Loaded ${availableOfferings.length} offerings for supplier ${order.wholesaler_id}`);
         if (aborted) return;
+        //
       } catch (rawError: any) {
         // Throw error for severe problems!
         if (aborted) return;

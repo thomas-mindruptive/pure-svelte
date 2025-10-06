@@ -1,31 +1,32 @@
 <!-- File: src/lib/components/domain/productDefinitions/ProductDefinitionForm.svelte -->
 
 <script lang="ts">
-  import FormShell from "$lib/components/forms/FormShell.svelte";
-  import { log } from "$lib/utils/logger";
   import { ApiClient } from "$lib/api/client/ApiClient";
   import { getProductDefinitionApi } from "$lib/api/client/productDefinition";
-  import { getMaterialApi } from "$lib/api/client/material";
-  import { getFormApi } from "$lib/api/client/form";
-  import { ProductDefinitionSchema, type ProductDefinition, type Material, type Form } from "$lib/domain/domainTypes";
   import type {
-    SubmittedCallback,
-    SubmitErrorCallback,
     CancelledCallback,
     ChangedCallback,
+    SubmitErrorCallback,
+    SubmittedCallback,
     ValidateResult,
   } from "$lib/components/forms/forms.types";
-  import { assertDefined } from "$lib/utils/assertions";
+  import FormShell, { type FieldsProps } from "$lib/components/forms/FormShell.svelte";
   import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
+  import { ProductDefinitionSchema, type Form, type Material, type ProductDefinition } from "$lib/domain/domainTypes";
+  import { assertDefined } from "$lib/utils/assertions";
+  import { log } from "$lib/utils/logger";
 
   import "$lib/components/styles/form.css";
   import "$lib/components/styles/grid.css";
-  import type { $ZodIssueCustom } from "zod/v4/core";
+  import type { ValidationErrorTree } from "$lib/components/validation/validation.types";
+  import { zodToValidationErrorTree } from "$lib/domain/domainTypes.utils";
 
   // === PROPS ====================================================================================
 
   type ProductDefinitionFormProps = {
     initial: ProductDefinition | null;
+    materials: Material[];
+    forms: Form[];
     disabled?: boolean;
     isCreateMode: boolean;
     categoryId: number | null; // Needed for create-mode.
@@ -37,6 +38,8 @@
 
   const {
     initial,
+    materials,
+    forms,
     disabled = false,
     isCreateMode,
     categoryId,
@@ -46,48 +49,59 @@
     onChanged,
   }: ProductDefinitionFormProps = $props();
 
+  // === STATE ====================================================================================
+
+  //const errors = $state<Record<string, ValidationErrorTree>>({});
+
   // === ZOD VALIDATION OF PROPS =================================================================
 
-  let { validatedInitialData, validationErrors, initialContextForFormshell } = $derived.by(() => {
+  let { validatedInitialData, errors, initialContextForFormshell } = $derived.by(() => {
     log.debug(`Validating initial data:`, initial);
     const result = ProductDefinitionSchema.nullable().safeParse(initial);
-    if (!result.success) {
-      log.error(`Validation of initial prop failed`, result.error);
-    }
-    const validatedInitialData = result.success ? result.data : null;
-    let initialContextForFormshell: ProductDefinition | null = null;
-    let validationErrors = result.success ? null : result.error.issues;
-    if (isCreateMode) {
-      if (!categoryId || isNaN(categoryId)) {
-        log.error(`Validation failed: "categoryId" must be defined if isCreateMode`);
-        validationErrors = validationErrors || [];
-        validationErrors.push({
-          code: "custom",
-          path: ["categoryID"],
-          message: "categoryID must be defined if isCreateMode",
-        } as $ZodIssueCustom);
+
+    const errors: Record<string, ValidationErrorTree> = {};
+    if (result.success) {
+      const validatedInitialData = result.data;
+      let initialContextForFormshell: ProductDefinition | null = null;
+      if (isCreateMode) {
+        if (!categoryId || isNaN(categoryId)) {
+          const msg = `Validation failed: "categoryId" must be defined if isCreateMode`;
+          log.error(msg);
+          errors.categoryId = { errors: [msg] };
+        } else {
+          initialContextForFormshell = { product_def_id: 0, title: "", category_id: categoryId };
+        }
       } else {
-        initialContextForFormshell = { product_def_id: 0, title: "", category_id: categoryId };
+        initialContextForFormshell = result.data;
       }
+      return {
+        validatedInitialData,
+        errors,
+        initialContextForFormshell,
+      };
     } else {
-      initialContextForFormshell = result.success ? result.data : null;
+      errors.productDefintion = zodToValidationErrorTree(result.error);
+      log.error(`Validation of initial prop failed`, result.error);
+      return {
+        validatedInitialData: null,
+        errors,
+        initialContextForFormshell: null,
+      };
     }
-    return {
-      validatedInitialData,
-      validationErrors,
-      initialContextForFormshell,
-    };
   });
 
-  // === STATE & API ==============================================================================
+  // === DERIVED ==================================================================================
 
-  const client = new ApiClient(fetch);
-  const productDefinitionApi = getProductDefinitionApi(client);
   const formTitleInfo = $derived(
     validatedInitialData?.product_def_id
       ? `ID: ${validatedInitialData?.product_def_id} - Category: ${categoryId}`
       : `Category: ${categoryId}`,
   );
+
+  // === API ======================================================================================
+
+  const client = new ApiClient(fetch);
+  const productDefinitionApi = getProductDefinitionApi(client);
 
   // === BUSINESS LOGIC ===========================================================================
 
@@ -120,7 +134,69 @@
   }
 </script>
 
-<ValidationWrapper errors={validationErrors}>
+<!-- SNIPPETS ------------------------------------------------------------------------------------>
+
+<!--
+  -- Render material combo. 
+  -->
+{#snippet materialCombo({ getS, set, errors, markTouched }: FieldsProps<ProductDefinition>)}
+  <label for="offering">Material</label>
+  <select
+    id="material"
+    name="material_id"
+    value={getS("material_id") ?? ""}
+    class:invalid={errors.offering_id}
+    onchange={(e) => {
+      const material_id = parseInt((e.currentTarget as HTMLSelectElement).value);
+      set(["material_id"], material_id);
+    }}
+    onblur={() => markTouched("material_id")}
+    required
+  >
+    <option value="">Select material...</option>
+    {#each materials as material (material.material_id)}
+      <option value={material.material_id}>
+        {material.name}
+      </option>
+    {/each}
+  </select>
+  {#if errors.material_id}
+    <div class="error-text">{errors.material_id[0]}</div>
+  {/if}
+{/snippet}
+
+<!--
+  -- Render form combo. 
+  -->
+{#snippet formCombo({ getS, set, errors, markTouched }: FieldsProps<ProductDefinition>)}
+  <label for="offering">Form</label>
+  <select
+    id="form"
+    name="form_id"
+    value={getS("form_id") ?? ""}
+    class:invalid={errors.offering_id}
+    onchange={(e) => {
+      const form_id = parseInt((e.currentTarget as HTMLSelectElement).value);
+      set(["form_id"], form_id);
+    }}
+    onblur={() => markTouched("form_id")}
+    required
+  >
+    <option value="">Select form...</option>
+    {#each forms as form (form.form_id)}
+      <option value={form.form_id}>
+        {form.name}
+      </option>
+    {/each}
+  </select>
+  {#if errors.form_id}
+    <div class="error-text">{errors.form_id[0]}</div>
+  {/if}
+{/snippet}
+
+<!-- TEMPLATE ------------------------------------------------------------------------------------>
+
+<ValidationWrapper {errors}>
   <FormShell
     entity="ProductDefinition"
     initial={initialContextForFormshell}
@@ -144,10 +220,13 @@
       </div>
     {/snippet}
 
-    {#snippet fields({ getS, set, errors, markTouched })}
+    {#snippet fields(fieldProps)}
+      {@const { getS, set, errors, markTouched } = fieldProps}
       <div class="form-body">
         <div class="form-row-grid">
-          <div class="form-group span-4">
+          <!---->
+          <!--- TITLE -------------------------------------------------------------------------->
+          <div class="form-group span-2">
             <label for="pd-title">Title *</label>
             <input
               id="pd-title"
@@ -164,7 +243,20 @@
             {/if}
           </div>
 
-          <div class="form-group span-4">
+          <!--- MATERIAL ------------------------------------------------------------------------>
+          <div class="form-group span-1">
+            {@render materialCombo(fieldProps)}
+          </div>
+
+          <!--- FORM ---------------------------------------------------------------------------->
+          <div class="form-group span-1">
+            {@render formCombo(fieldProps)}
+          </div>
+        </div>
+
+        <div class="from-row-grid">
+          <!--- DESCRIPTION ---------------------------------------------------------------------->
+          <div class="form-group span-5">
             <label for="pd-description">Description</label>
             <textarea
               id="pd-description"

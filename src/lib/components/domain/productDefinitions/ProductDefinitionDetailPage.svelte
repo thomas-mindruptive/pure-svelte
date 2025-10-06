@@ -6,25 +6,25 @@
   import { getOfferingApi, offeringLoadingState } from "$lib/api/client/offering";
   import type { DeleteStrategy, ID, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
   import {
-      FormSchema,
-      MaterialSchema,
-      ProductDefinitionSchema,
-      Wio_PDef_Cat_Supp_Nested_Schema,
-      type Form,
-      type Material,
-      type ProductDefinition,
-      type WholesalerItemOffering_ProductDef_Category_Supplier_Nested,
-      type Wio_PDef_Cat_Supp
+    FormSchema,
+    MaterialSchema,
+    ProductDefinitionSchema,
+    Wio_PDef_Cat_Supp_Nested_Schema,
+    type Form,
+    type Material,
+    type ProductDefinition,
+    type WholesalerItemOffering_ProductDef_Category_Supplier_Nested,
+    type Wio_PDef_Cat_Supp,
   } from "$lib/domain/domainTypes";
   import { addNotification } from "$lib/stores/notifications";
   import { log } from "$lib/utils/logger";
-// Component Imports
+  // Component Imports
   import OfferingGrid from "$lib/components/domain/offerings/OfferingGrid.svelte";
   import ProductDefinitionForm from "./ProductDefinitionForm.svelte";
-// The new form component
+  // The new form component
   import "$lib/components/styles/detail-page-layout.css";
   import "$lib/components/styles/grid-section.css";
-// Type and Schema Imports
+  // Type and Schema Imports
   import { page } from "$app/state";
   import { cascadeDelete } from "$lib/api/client/cascadeDelete";
   import { getFormApi } from "$lib/api/client/form";
@@ -228,16 +228,18 @@
 </script>
 
 <ValidationWrapper {errors}>
-  {#if isLoading }
+  {#if isLoading}
     <div class="detail-page-layout">Loading details...</div>
   {:else}
     <div class="detail-page-layout">
       <!-- Section 1: Product Definition Form -->
       <div class="form-section">
         <ProductDefinitionForm
-          categoryId={categoryId}
-          isCreateMode={isCreateMode}
+          {categoryId}
+          {isCreateMode}
           initial={productDefinition}
+          {forms}
+          {materials}
           onSubmitted={handleFormSubmitted}
           onSubmitError={handleFormSubmitError}
           onCancelled={handleFormCancelled}

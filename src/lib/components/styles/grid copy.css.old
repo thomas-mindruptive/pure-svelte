@@ -102,20 +102,13 @@
 /* ------------------------------- Table ----------------------------------- */
 .pc-grid__table {
   width: 100%;
-  table-layout: fixed; /* KRITISCH: Erzwingt Spaltenbreiten aus colgroup */
   border-collapse: separate;
   border-spacing: 0;
   font-family: var(--pc-grid-font-family);
   font-size: var(--pc-grid-font-size);
   line-height: var(--pc-grid-line-height);
-  box-sizing: border-box;
 }
 
-.pc-grid__table * {
-  box-sizing: border-box;
-}
-
-/* VEREINFACHT: TH und TD haben identisches Padding im Standard-Mode */
 .pc-grid__thead th {
   position: sticky;
   top: 0;
@@ -123,9 +116,10 @@
   color: var(--pc-grid-muted);
   text-align: left;
   font-weight: 600;
-  padding: var(--pc-grid-cell-py) var(--pc-grid-cell-px);
+  padding: calc(var(--pc-grid-cell-py) + 2px) var(--pc-grid-cell-px);
   border-bottom: 1px solid var(--pc-grid-border-strong);
   z-index: 1;
+  /* ensure above body rows when scrolling */
 }
 
 .pc-grid__tbody td {
@@ -189,16 +183,14 @@
 .pc-grid__actions {
   white-space: nowrap;
   text-align: right;
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 0.5rem;
 }
 
 /* Truncate helper for narrow columns */
 .pc-grid__cell--truncate {
   max-width: 1px;
+  /* enforce shrinkable cell */
   width: 0;
+  /* allow flex/table to shrink */
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -290,33 +282,40 @@
   padding: 2.5rem 1rem !important;
 }
 
-/* Clickable first column button styles */
+/* 
+    CLICKABLE FIRST COLUMN STYLES
+    Makes the first column look and behave like links for navigation
+    Follows system accent color for consistency
+  */
 .pc-grid__link-btn {
   background: none;
   border: none;
-  margin: 0;
-  padding: 0;
+  margin: 0; /* Ensures no default button margin */
+  padding: 0; /* Ensures no padding is added by the button */
   color: var(--pc-grid-accent, #0ea5e9);
   cursor: pointer;
-  text-align: left;
+  text-align: left; /* Aligns the text to the left of the button's container */
   font: inherit;
   text-decoration: none;
-  width: 100%;
+  width: 100%; /* Makes the button fill the parent <td> */
   transition: all 0.2s ease;
 }
 
+/* Hover state for clickable cells */
 .pc-grid__link-btn:hover:not(:disabled) {
   text-decoration: underline;
   color: var(--pc-grid-accent, #0ea5e9);
-  transform: translateX(2px);
+  transform: translateX(2px); /* Subtle movement on hover */
 }
 
+/* Focus state for keyboard navigation */
 .pc-grid__link-btn:focus-visible {
   outline: 2px solid var(--pc-grid-accent, #0ea5e9);
   outline-offset: 2px;
   border-radius: 4px;
 }
 
+/* Disabled state for rows being deleted */
 .pc-grid__link-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
@@ -331,12 +330,11 @@
   gap: 0.5rem;
   width: 100%;
   height: 100%;
-  padding: 0; /* No extra padding to keep alignment clean */
   background: none;
   border: none;
   font: inherit;
   color: inherit;
-  font-weight: 600;
+  font-weight: 600; /* Match original th font-weight */
   cursor: pointer;
   text-align: left;
   white-space: nowrap;
@@ -371,6 +369,13 @@
 }
 
 .pc-grid--scroll-body .pc-grid__scroller {
+  /* 
+  * NOTE: We set the variable through the rendering 
+  * <div
+  *   class="pc-grid pc-grid--comfortable pc-grid--scroll-body"
+  *   style={maxBodyHeight ? `--pc-grid-body-max-height:${maxBodyHeight};` : ""}
+  * > 
+  */
   max-height: var(--pc-grid-body-max-height, 60vh);
   overflow: auto;
 }
@@ -409,10 +414,11 @@
 }
 
 /* -------------------------- Compact Variants ------------------------------ */
-/* CORRECTED: Comfortable mode applies same padding to BOTH TH and TD */
+/* Comfortable (default), Dense, Extra-Dense */
 .pc-grid--comfortable .pc-grid__thead th,
 .pc-grid--comfortable .pc-grid__tbody td {
-  padding: calc(var(--pc-grid-cell-py) + 2px) var(--pc-grid-cell-px);
+  padding-top: calc(var(--pc-grid-cell-py) + 2px);
+  padding-bottom: calc(var(--pc-grid-cell-py) + 2px);
 }
 
 .pc-grid--dense .pc-grid__thead th,
@@ -430,14 +436,13 @@
 
 /* ------------------------------ Helpers ---------------------------------- */
 /* Right/center text alignment helpers for cells/headers */
-/* Higher specificity to override .pc-grid__thead th */
-.pc-grid__thead .pc-grid__th--right,
-.pc-grid__tbody .pc-grid__td--right {
+.pc-grid__td--right,
+.pc-grid__th--right {
   text-align: right;
 }
 
-.pc-grid__thead .pc-grid__th--center,
-.pc-grid__tbody .pc-grid__td--center {
+.pc-grid__td--center,
+.pc-grid__th--center {
   text-align: center;
 }
 

@@ -8,7 +8,7 @@
 import { z } from 'zod';
 import {
 	WholesalerCategory_CategorySchema,
-	WholesalerItemOffering_ProductDef_Category_Supplier_NestedSchema
+	Wio_PDef_Cat_Supp_Nested_Schema
 } from '$lib/domain/domainTypes';
 import type { PromisifyComplex } from '$lib/utils/typeUtils';
 
@@ -29,7 +29,7 @@ export const SupplierCategoryDetailPage_LoadDataSchema = z.object({
 	/**
 	 * The list of offerings for this specific supplier and category.
 	 */
-	offerings: z.array(WholesalerItemOffering_ProductDef_Category_Supplier_NestedSchema)
+	offerings: z.array(Wio_PDef_Cat_Supp_Nested_Schema)
 });
 
 // --- TypeScript Type Exports ---

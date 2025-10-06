@@ -17,7 +17,7 @@ import {
 } from "$lib/backendQueries/queryGrammar";
 import {
   Order_Wholesaler_Schema,
-  WholesalerItemOffering_ProductDef_Category_Supplier_NestedSchema,
+  Wio_PDef_Cat_Supp_Nested_Schema,
   WholesalerSchema,
   type Order_Wholesaler,
   type ProductCategory,
@@ -425,7 +425,7 @@ export function getSupplierApi(client: ApiClient) {
       const operationId = `loadOfferingsForSupplier-${supplierId}`;
       supplierLoadingOperations.start(operationId);
       try {
-        const cols = genTypedQualifiedColumns(WholesalerItemOffering_ProductDef_Category_Supplier_NestedSchema, true);
+        const cols = genTypedQualifiedColumns(Wio_PDef_Cat_Supp_Nested_Schema, true);
         const request: PredefinedQueryRequest<WholesalerItemOffering_ProductDef_Category_Supplier_Nested> = {
           namedQuery: "offering->product_def->category->wholesaler",
           payload: {
@@ -446,7 +446,7 @@ export function getSupplierApi(client: ApiClient) {
         // Transform flat recordset to nested objects
         const transformed = transformToNestedObjects(
           responseData.results as Record<string, unknown>[],
-          WholesalerItemOffering_ProductDef_Category_Supplier_NestedSchema,
+          Wio_PDef_Cat_Supp_Nested_Schema,
         );
         return transformed;
       } catch (err) {

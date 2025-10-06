@@ -9,7 +9,7 @@
 
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
   import type { DeleteStrategy, RowActionStrategy, ColumnDefBase } from "$lib/components/grids/Datagrid.types";
-  import type { WholesalerItemOffering_ProductDef_Category_Supplier_Nested, WholesalerItemOffering_ProductDef_Category_Supplier_NestedSchema } from "$lib/domain/domainTypes";
+  import type { WholesalerItemOffering_ProductDef_Category_Supplier_Nested, Wio_PDef_Cat_Supp_Nested_Schema } from "$lib/domain/domainTypes";
 
   // === PROPS  ===================================================================================
 
@@ -32,7 +32,7 @@
 
   // === COLUMNS  =================================================================================
 
-  const columns: ColumnDefBase<typeof WholesalerItemOffering_ProductDef_Category_Supplier_NestedSchema>[] = [
+  const columns: ColumnDefBase<typeof Wio_PDef_Cat_Supp_Nested_Schema>[] = [
     {
       key: "pd.title",
       header: "Product",

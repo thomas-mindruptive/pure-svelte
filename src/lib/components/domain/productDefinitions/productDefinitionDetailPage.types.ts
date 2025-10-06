@@ -3,7 +3,7 @@
 import { z } from 'zod';
 import {
     ProductDefinitionSchema,
-    WholesalerItemOffering_ProductDef_Category_Supplier_NestedSchema
+    Wio_PDef_Cat_Supp_Nested_Schema
 } from '$lib/domain/domainTypes';
 import type { PromisifyComplex } from '$lib/utils/typeUtils';
 
@@ -28,7 +28,7 @@ export const ProductDefinitionDetailPage_LoadDataSchema = z.object({
   /**
    * The list of all offerings across all suppliers for this specific product definition.
    */
-  offerings: z.array(WholesalerItemOffering_ProductDef_Category_Supplier_NestedSchema),
+  offerings: z.array(Wio_PDef_Cat_Supp_Nested_Schema),
 
   /**
    * Create or edit-mode.

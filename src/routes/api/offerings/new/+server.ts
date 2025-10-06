@@ -15,7 +15,7 @@ import { buildUnexpectedError } from "$lib/backendQueries/entityOperations";
 import {
   WholesalerItemOfferingForCreateSchema,
   type WholesalerItemOffering,
-  type WholesalerItemOffering_ProductDef_Category_Supplier,
+  type Wio_PDef_Cat_Supp,
 } from "$lib/domain/domainTypes";
 import { validateEntity } from "$lib/domain/domainTypes.utils";
 import type { ApiErrorResponse, ApiSuccessResponse } from "$lib/api/api.types";
@@ -141,7 +141,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
     // ===== JOIN QUERY TO RETRIEVE OFFERING + PRODCUT_DEF_TITLE =====
 
-    const queryPayloadOfferingPlusProdDef: QueryPayload<WholesalerItemOffering_ProductDef_Category_Supplier> = {
+    const queryPayloadOfferingPlusProdDef: QueryPayload<Wio_PDef_Cat_Supp> = {
       select: [
         // Select all columns from the offering itself (alias 'wio')
         "wio.offering_id",
@@ -178,7 +178,7 @@ export const POST: RequestHandler = async ({ request }) => {
       throw new Error(`Could not retrieve the newly created offering (ID: ${newOfferingId}) using the predefined query.`);
     }
 
-    const newOfferingFull = fullObjectResult[0] as WholesalerItemOffering_ProductDef_Category_Supplier;
+    const newOfferingFull = fullObjectResult[0] as Wio_PDef_Cat_Supp;
 
     await transaction.commit();
     log.debug(`[${operationId}] Transaction committed successfully.`);

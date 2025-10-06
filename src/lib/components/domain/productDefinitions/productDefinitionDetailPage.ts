@@ -2,9 +2,7 @@
 
 import { log } from "$lib/utils/logger";
 import { error, type LoadEvent } from "@sveltejs/kit";
-import { ApiClient } from "$lib/api/client/ApiClient";
-import { getProductDefinitionApi } from "$lib/api/client/productDefinition";
-import type { ProductDefinitionDetailPage_LoadDataAsync } from "./productDefinitionDetailPage.types";
+import type { ProductDefPageProps } from "./ProductDefinitionDetailPage.svelte";
 
 /**
  * Loads all data for the Product Definition Detail Page using the non-blocking "app shell" pattern.
@@ -14,41 +12,24 @@ import type { ProductDefinitionDetailPage_LoadDataAsync } from "./productDefinit
  * @param loadEventFetch The context-aware fetch function from SvelteKit.
  * @returns An object where each property is a promise for the required data.
  */
-export function load({ params, fetch: loadEventFetch }: LoadEvent): ProductDefinitionDetailPage_LoadDataAsync {
+export function load({ params, fetch: loadEventFetch }: LoadEvent): ProductDefPageProps {
+  log.debug(`load`, {params});
+
   const productDefId = Number(params.productDefId);
-
   const categoryId = Number(params.categoryId);
-  // We must always come from a path like /.../categories/[categoryId]
-  if (isNaN(categoryId) || !params.categoryId) {
-    throw error(400, "categoryId must be passed in params.");
-  }
-
-  // Handle "create new" mode
-  if (params.productDefId?.toLowerCase() === "new") {
-    log.info(`Loading ProductDefinitionDetailPage in CREATE mode.`);
-    return {
-      categoryId,
-      isCreateMode: true,
-      productDefinition: Promise.resolve(null),
-      offerings: Promise.resolve([]),
-    };
-  }
 
   if (isNaN(productDefId) || productDefId <= 0) {
     throw error(400, "Invalid Product Definition ID. Must be a positive number.");
   }
-
-  log.info(`Kicking off non-blocking load for productDefId: ${productDefId}`);
-
-  const client = new ApiClient(loadEventFetch);
-  const productDefinitionApi = getProductDefinitionApi(client);
-
-  // Return the object of promises directly without `await`.
-  // The page component will handle resolving and error states.
+  // We must always come from a path like /.../categories/[categoryId]
+  if (isNaN(categoryId) || !params.categoryId) {
+    throw error(400, "categoryId must be passed in params.");
+  }
+  const isCreateMode = params.productDefId?.toLowerCase() === "new";
   return {
-	categoryId,
-    isCreateMode: false,
-    productDefinition: productDefinitionApi.loadProductDefinition(productDefId),
-    offerings: productDefinitionApi.loadOfferingsForProductDefinition(productDefId),
+    categoryId,
+    productDefId,
+    isCreateMode,
+    loadEventFetch,
   };
 }

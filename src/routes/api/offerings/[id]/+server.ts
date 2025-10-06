@@ -10,10 +10,10 @@ import { db } from "$lib/backendQueries/db";
 import { log } from "$lib/utils/logger";
 import { buildUnexpectedError, validateIdUrlParam } from "$lib/backendQueries/entityOperations";
 import {
-  WholesalerItemOfferingSchema,
-  WholesalerItemOffering_ProductDef_Category_SupplierSchema,
+  Wio_Schema,
+  Wio_PDef_Cat_Supp_Schema,
   type WholesalerItemOffering,
-  type WholesalerItemOffering_ProductDef_Category_Supplier,
+  type Wio_PDef_Cat_Supp,
 } from "$lib/domain/domainTypes";
 import { validateEntity } from "$lib/domain/domainTypes.utils";
 import { v4 as uuidv4 } from "uuid";
@@ -66,7 +66,7 @@ export const GET: RequestHandler = async ({ params }) => {
     // => Client always receives iso-string.
 
     // TODO: all GET <path>/id endpoints should validate retrieved record.
-    const validation = validateEntity(WholesalerItemOffering_ProductDef_Category_SupplierSchema, serialized);
+    const validation = validateEntity(Wio_PDef_Cat_Supp_Schema, serialized);
     const debugError = false; // ONLY FOR DEBUG!
     if (!validation.isValid || debugError) {
       const errRes: ApiErrorResponse = {
@@ -81,10 +81,10 @@ export const GET: RequestHandler = async ({ params }) => {
       return json(errRes, { status: 500 });
     }
 
-    const offering = validation.sanitized as WholesalerItemOffering_ProductDef_Category_Supplier;
+    const offering = validation.sanitized as Wio_PDef_Cat_Supp;
 
     // The response now correctly wraps the data in an 'offering' property.
-    const response: ApiSuccessResponse<{ offering: WholesalerItemOffering_ProductDef_Category_Supplier }> = {
+    const response: ApiSuccessResponse<{ offering: Wio_PDef_Cat_Supp }> = {
       success: true,
       message: "Offering retrieved successfully.",
       data: { offering },
@@ -129,7 +129,7 @@ export const PUT: RequestHandler = async ({ request }) => {
       return json(errRes, { status: 400 });
     }
 
-    const validation = validateEntity(WholesalerItemOfferingSchema, requestData);
+    const validation = validateEntity(Wio_Schema, requestData);
     if (!validation.isValid) {
       const errRes: ApiErrorResponse = {
         success: false,

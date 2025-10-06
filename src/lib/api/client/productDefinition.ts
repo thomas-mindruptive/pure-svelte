@@ -8,7 +8,7 @@
 
 import { log } from "$lib/utils/logger";
 import { type QueryPayload } from "$lib/backendQueries/queryGrammar";
-import { WholesalerItemOffering_ProductDef_Category_Supplier_NestedSchema, type ProductDefinition, type WholesalerItemOffering_ProductDef_Category_Supplier_Nested } from "$lib/domain/domainTypes";
+import { Wio_PDef_Cat_Supp_Nested_Schema, type ProductDefinition, type WholesalerItemOffering_ProductDef_Category_Supplier_Nested } from "$lib/domain/domainTypes";
 import type { ApiClient } from "./ApiClient";
 import { createJsonBody, createJsonAndWrapInPayload, getErrorMessage } from "./common";
 import type { DeleteApiResponse, DeleteRequest, PredefinedQueryRequest, QueryResponseData } from "$lib/api/api.types";
@@ -171,7 +171,7 @@ export function getProductDefinitionApi(client: ApiClient) {
       const operationId = `loadOfferingsForProductDefinition-${productDefId}`;
       productDefinitionLoadingManager.start(operationId);
       try {
-        const cols = genTypedQualifiedColumns(WholesalerItemOffering_ProductDef_Category_Supplier_NestedSchema, true);
+        const cols = genTypedQualifiedColumns(Wio_PDef_Cat_Supp_Nested_Schema, true);
         const payload: QueryPayload<WholesalerItemOffering_ProductDef_Category_Supplier_Nested> = {
           select: cols,
           where: {
@@ -193,7 +193,7 @@ export function getProductDefinitionApi(client: ApiClient) {
         );
         const transformed = transformToNestedObjects(
           responseData.results as Record<string, unknown>[],
-          WholesalerItemOffering_ProductDef_Category_Supplier_NestedSchema,
+          Wio_PDef_Cat_Supp_Nested_Schema,
         );
         return transformed;
       } catch (err) {

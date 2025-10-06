@@ -7,7 +7,7 @@
   // ===== IMPORTS =====
   import FormShell from "$lib/components/forms/FormShell.svelte";
   import { log } from "$lib/utils/logger";
-  import type { WholesalerItemOffering, WholesalerItemOffering_ProductDef_Category_Supplier } from "$lib/domain/domainTypes";
+  import type { WholesalerItemOffering, Wio_PDef_Cat_Supp } from "$lib/domain/domainTypes";
   import { ApiClient } from "$lib/api/client/ApiClient";
   import "$lib/components/styles/form.css";
   import "$lib/components/styles/grid.css";
@@ -81,7 +81,7 @@
           category_id: data.categoryId,
           product_def_id: data.productDefId,
           wholesaler_id: data.supplierId,
-        } as WholesalerItemOffering_ProductDef_Category_Supplier;
+        } as Wio_PDef_Cat_Supp;
       }
     }
 
@@ -112,7 +112,7 @@
   const isCreateMode = $derived(initialLoadedData.isCreateMode);
   const isSuppliersRoute = $derived(initialLoadedData.isSuppliersRoute);
   const isCategoriesRoute = $derived(initialLoadedData.isCategoriesRoute);
-  let formShell: InstanceType<typeof FormShell<WholesalerItemOffering_ProductDef_Category_Supplier>>;
+  let formShell: InstanceType<typeof FormShell<Wio_PDef_Cat_Supp>>;
 
   // ===== API =====
 
@@ -154,7 +154,7 @@
   function validateOfferingForSubmit(raw: Record<string, any>): ValidateResult {
     log.debug(`Validating offering form data`, raw)
     assertDefined(raw, "validateOfferingForSubmit");
-    const data = raw as WholesalerItemOffering_ProductDef_Category_Supplier;
+    const data = raw as Wio_PDef_Cat_Supp;
     const errors: ValidationErrors = {};
 
     // Sample for a complex business rule involving multiple fields ---
@@ -280,7 +280,7 @@
     bind:this={formShell}
     autoValidate="blur"
     entity="Offering"
-    initial={initialValidatedOfferingData as WholesalerItemOffering_ProductDef_Category_Supplier}
+    initial={initialValidatedOfferingData as Wio_PDef_Cat_Supp}
     validate={validateOfferingForSubmit}
     submitCbk={submitOffering}
     {disabled}

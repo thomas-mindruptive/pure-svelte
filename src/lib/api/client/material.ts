@@ -6,11 +6,11 @@
  * This module follows the Factory Pattern to ensure SSR safety.
  */
 
-import { log } from "$lib/utils/logger";
-import type { Material } from "$lib/domain/domainTypes";
-import type { ApiClient } from "./ApiClient";
-import { createJsonAndWrapInPayload, getErrorMessage } from "./common";
 import type { QueryResponseData } from "$lib/api/api.types";
+import type { Material } from "$lib/domain/domainTypes";
+import { log } from "$lib/utils/logger";
+import type { ApiClient } from "./ApiClient";
+import { getErrorMessage } from "./common";
 import { LoadingState } from "./loadingState";
 
 const materialLoadingManager = new LoadingState();

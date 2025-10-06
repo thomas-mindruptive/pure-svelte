@@ -1,6 +1,6 @@
 <!-- src/lib/components/domain/offerings/OfferingDetailWrapper.svelte -->
 <script lang="ts">
-  import type { WholesalerItemOffering_ProductDef_Category_Supplier } from "$lib/domain/domainTypes";
+  import type { Wio_PDef_Cat_Supp } from "$lib/domain/domainTypes";
 
   import type { Snippet } from "svelte";
 
@@ -40,7 +40,7 @@
 
   // ===== EVENT HANDLERS =====
 
-  async function handleFormSubmitted(p: { data: WholesalerItemOffering_ProductDef_Category_Supplier; result: unknown }): Promise<void> {
+  async function handleFormSubmitted(p: { data: Wio_PDef_Cat_Supp; result: unknown }): Promise<void> {
     assertDefined(p, "OfferingFormDetailWrapper.handleFormSubmitted");
     log.info(`Form submitted successfully`, p);
     addNotification("Offering updated successfully.", "success");
@@ -64,19 +64,19 @@
     }
   }
 
-  async function handleSubmitError(info: { data: WholesalerItemOffering_ProductDef_Category_Supplier; error: unknown }): Promise<void> {
+  async function handleSubmitError(info: { data: Wio_PDef_Cat_Supp; error: unknown }): Promise<void> {
     assertDefined(info, "OfferingFormDetailWrapper.handleSubmitError");
     log.info(`Form submission error`, info);
     addNotification(`Form submission error. ${coerceErrorMessage(info.error)}`, "error");
   }
 
-  async function handleCancelled(p: { data: WholesalerItemOffering_ProductDef_Category_Supplier; reason?: string }): Promise<void> {
+  async function handleCancelled(p: { data: Wio_PDef_Cat_Supp; reason?: string }): Promise<void> {
     assertDefined(p, "OfferingFormDetailWrapper.handleCancelled");
     log.info(`Form submission cancelled`, p);
     addNotification("Form submission cancelled.", "info");
   }
 
-  async function handleChanged(info: { data: WholesalerItemOffering_ProductDef_Category_Supplier; dirty: boolean }): Promise<void> {
+  async function handleChanged(info: { data: Wio_PDef_Cat_Supp; dirty: boolean }): Promise<void> {
     assertDefined(info, "OfferingFormDetailWrapper.handleChanged");
     log.info(`Form changed`, info);
   }

@@ -2,75 +2,119 @@
 
 <script lang="ts">
   import { goto } from "$app/navigation";
-  import { log } from "$lib/utils/logger";
-  import { addNotification } from "$lib/stores/notifications";
   import { ApiClient } from "$lib/api/client/ApiClient";
   import { getOfferingApi, offeringLoadingState } from "$lib/api/client/offering";
-  import type { ID, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
-  import type { ProductDefinition, WholesalerItemOffering_ProductDef_Category_Supplier } from "$lib/domain/domainTypes";
-
-  // Component Imports
+  import type { DeleteStrategy, ID, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
+  import {
+      FormSchema,
+      MaterialSchema,
+      ProductDefinitionSchema,
+      Wio_PDef_Cat_Supp_Nested_Schema,
+      type Form,
+      type Material,
+      type ProductDefinition,
+      type WholesalerItemOffering_ProductDef_Category_Supplier_Nested,
+      type Wio_PDef_Cat_Supp
+  } from "$lib/domain/domainTypes";
+  import { addNotification } from "$lib/stores/notifications";
+  import { log } from "$lib/utils/logger";
+// Component Imports
   import OfferingGrid from "$lib/components/domain/offerings/OfferingGrid.svelte";
-  import ProductDefinitionForm from "./ProductDefinitionForm.svelte"; // The new form component
+  import ProductDefinitionForm from "./ProductDefinitionForm.svelte";
+// The new form component
   import "$lib/components/styles/detail-page-layout.css";
   import "$lib/components/styles/grid-section.css";
-
-  // Type and Schema Imports
-  import {
-    ProductDefinitionDetailPage_LoadDataSchema,
-    type ProductDefinitionDetailPage_LoadData,
-    type ProductDefinitionDetailPage_LoadDataAsync,
-  } from "./productDefinitionDetailPage.types";
-  import { assertDefined } from "$lib/utils/assertions";
-  import { getProductDefinitionApi } from "$lib/api/client/productDefinition";
+// Type and Schema Imports
   import { page } from "$app/state";
   import { cascadeDelete } from "$lib/api/client/cascadeDelete";
+  import { getFormApi } from "$lib/api/client/form";
+  import { getMaterialApi } from "$lib/api/client/material";
+  import { getProductDefinitionApi } from "$lib/api/client/productDefinition";
+  import type { ValidationErrorTree } from "$lib/components/validation/validation.types";
+  import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
+  import { safeParseFirstN, zodToValidationErrorTree } from "$lib/domain/domainTypes.utils";
+  import { assertDefined } from "$lib/utils/assertions";
   import { stringsToNumbers } from "$lib/utils/typeConversions";
   import { buildChildUrl, buildSiblingUrl } from "$lib/utils/url";
-  import type { ValidationErrorTree } from "$lib/components/validation/validation.types";
-  import { zodToValidationErrorTree } from "$lib/domain/domainTypes.utils";
-  import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
+  import { error } from "@sveltejs/kit";
 
   // === PROPS ====================================================================================
 
-  let { data }: { data: ProductDefinitionDetailPage_LoadDataAsync } = $props();
+  export type ProductDefPageProps = {
+    productDefId: number;
+    categoryId: number;
+    isCreateMode: boolean;
+    loadEventFetch: typeof fetch;
+  };
+
+  //let { data }: { data: ProductDefinitionDetailPage_LoadDataAsync } = $props();
+  const allProps: ProductDefPageProps = $props();
+  const { productDefId, categoryId, isCreateMode, loadEventFetch } = allProps;
 
   // === STATE ====================================================================================
 
-  let resolvedData = $state<ProductDefinitionDetailPage_LoadData | null>(null);
   let isLoading = $state(true);
   const errors = $state<Record<string, ValidationErrorTree>>({});
-  //let loadingError = $state<{ message: string; status?: number } | null>(null);
   const allowForceCascadingDelte = $state(true);
+  let productDefinition: ProductDefinition | null = $state(null);
+  let offerings: WholesalerItemOffering_ProductDef_Category_Supplier_Nested[] = $state([]);
+  let materials: Material[] = $state([]);
+  let forms: Form[] = $state([]);
+
+  // === API ======================================================================================
+
+  const client = new ApiClient(loadEventFetch);
+  const productDefinitionApi = getProductDefinitionApi(client);
+  const offeringApi = getOfferingApi(client);
+  const materialApi = getMaterialApi(client);
+  const formApi = getFormApi(client);
 
   // === LOAD DATA ================================================================================
 
   $effect(() => {
-    log.debug(`data props:`, data);
+    log.debug(`data props:`, allProps);
+
     let aborted = false;
     const processPromises = async () => {
       isLoading = true;
-      resolvedData = null;
 
       try {
-        const [productDefinition, offerings] = await Promise.all([data.productDefinition, data.offerings]);
-        log.debug(`Promised resolved.`, { productDefinition, offerings });
+        if (isNaN(productDefId) || productDefId < 0) {
+          throw error(400, "Invalid Product Definition ID. Must be a positive number.");
+        }
+        // We must always come from a path like /.../categories/[categoryId]
+        if (isNaN(categoryId) || categoryId < 0) {
+          throw error(400, "categoryId must be passed in params.");
+        }
+        productDefinition = await productDefinitionApi.loadProductDefinition(productDefId);
+        if (aborted) return;
+        const prodDefVal = ProductDefinitionSchema.nullable().safeParse(productDefinition);
+        if (!prodDefVal.success) {
+          errors.productDefintion = zodToValidationErrorTree(prodDefVal.error);
+        }
+        offerings = await productDefinitionApi.loadOfferingsForProductDefinition(productDefId);
+        if (aborted) return;
+        const offeringsVal = safeParseFirstN(Wio_PDef_Cat_Supp_Nested_Schema, offerings, 3);
+        if (!offeringsVal.success) {
+          errors.offerings = zodToValidationErrorTree(offeringsVal.error);
+        }
+        forms = await formApi.loadForms();
+        if (aborted) return;
+        const formsVal = safeParseFirstN(FormSchema, forms, 3);
+        if (!formsVal.success) {
+          errors.forms = zodToValidationErrorTree(formsVal.error);
+        }
+        materials = await materialApi.loadMaterials();
 
         if (aborted) return;
-
-        // Init with all passed load data and overwrite with fulfilled promise data.
-        const dataToValidate: ProductDefinitionDetailPage_LoadData = {
-          ...data,
-          productDefinition,
-          offerings,
-        };
-        const validationResult = ProductDefinitionDetailPage_LoadDataSchema.safeParse(dataToValidate);
-        if (!validationResult.success) {
-          log.error("Zod validation failed for ProductDefinitionDetailPage", validationResult.error.issues);
-          errors.productDefinitionLoadData = zodToValidationErrorTree(validationResult.error);
-        } else {
-          resolvedData = validationResult.data;
+        const materialsVal = safeParseFirstN(MaterialSchema, materials, 3);
+        if (!materialsVal.success) {
+          errors.materials = zodToValidationErrorTree(materialsVal.error);
         }
+
+        log.debug(`Promised resolved.`, { productDefinition, offerings, forms, materials });
+
+        if (aborted) return;
       } catch (rawError: any) {
         if (aborted) return;
         const status = rawError.status ?? 500;
@@ -92,17 +136,13 @@
 
   // === API & STRATEGIES =========================================================================
 
-  const client = new ApiClient(fetch);
-  const productDefinitionApi = getProductDefinitionApi(client);
-  const offeringApi = getOfferingApi(client);
-
   async function reloadOfferings() {
-    assertDefined(resolvedData, "reloadOfferings requires resolvedData", ["productDefinition"]);
-    const productDefId = resolvedData.productDefinition.product_def_id;
+    assertDefined(productDefinition, "productDefinition");
+    assertDefined(productDefId, "productDefId");
 
     log.info(`Re-fetching offerings for productDefId: ${productDefId}`);
     const updatedOfferings = await productDefinitionApi.loadOfferingsForProductDefinition(productDefId);
-    resolvedData.offerings = updatedOfferings;
+    offerings = updatedOfferings;
     log.info("Local state for offerings updated.");
   }
 
@@ -113,7 +153,7 @@
     goto(buildChildUrl(page.url.pathname, "offerings", "new"));
   }
 
-  function handleOfferingSelect(offering: WholesalerItemOffering_ProductDef_Category_Supplier) {
+  function handleOfferingSelect(offering: Wio_PDef_Cat_Supp) {
     log.info(`Selected offering: `, offering);
     const { wholesaler_id, category_id, offering_id, product_def_id } = offering;
     if (wholesaler_id && category_id && offering_id & product_def_id) {
@@ -146,11 +186,11 @@
     }
   }
 
-  const deleteStrategy: DeleteStrategy<WholesalerItemOffering_ProductDef_Category_Supplier> = {
+  const deleteStrategy: DeleteStrategy<Wio_PDef_Cat_Supp> = {
     execute: handleOfferingDelete,
   };
 
-  const rowActionStrategy: RowActionStrategy<WholesalerItemOffering_ProductDef_Category_Supplier> = {
+  const rowActionStrategy: RowActionStrategy<Wio_PDef_Cat_Supp> = {
     click: handleOfferingSelect,
   };
 
@@ -158,7 +198,7 @@
 
   function handleFormSubmitted(event: { data: ProductDefinition; result: unknown }) {
     addNotification("Product Definition saved successfully.", "success");
-    if (resolvedData!.isCreateMode) {
+    if (isCreateMode) {
       const newId = event.data?.product_def_id;
       if (newId) {
         // Redirect to the new edit page
@@ -188,16 +228,16 @@
 </script>
 
 <ValidationWrapper {errors}>
-  {#if isLoading || !resolvedData}
+  {#if isLoading }
     <div class="detail-page-layout">Loading details...</div>
   {:else}
     <div class="detail-page-layout">
       <!-- Section 1: Product Definition Form -->
       <div class="form-section">
         <ProductDefinitionForm
-          categoryId={resolvedData.categoryId}
-          isCreateMode={resolvedData.isCreateMode}
-          initial={resolvedData.productDefinition}
+          categoryId={categoryId}
+          isCreateMode={isCreateMode}
+          initial={productDefinition}
           onSubmitted={handleFormSubmitted}
           onSubmitError={handleFormSubmitError}
           onCancelled={handleFormCancelled}
@@ -207,7 +247,7 @@
 
       <!-- Section 2: Grid of associated Offerings -->
       <div class="grid-section">
-        {#if !resolvedData.isCreateMode}
+        {#if !isCreateMode}
           <h2>Offerings for this Product</h2>
           <button
             class="pc-grid__createbtn"
@@ -216,7 +256,7 @@
             Create Offering
           </button>
           <OfferingGrid
-            rows={resolvedData.offerings}
+            rows={offerings}
             loading={$offeringLoadingState}
             {deleteStrategy}
             {rowActionStrategy}

@@ -10,13 +10,13 @@ import { log } from "$lib/utils/logger";
 import { ComparisonOperator, JoinType, LogicalOperator, type QueryPayload } from "$lib/backendQueries/queryGrammar";
 import type {
   WholesalerItemOffering,
-  WholesalerItemOffering_ProductDef_Category_Supplier,
+  Wio_PDef_Cat_Supp,
   WholesalerOfferingAttribute,
   WholesalerOfferingAttribute_Attribute,
   WholesalerOfferingLink,
   Attribute,
   ProductDefinition,
-  WholesalerItemOffering_ProductDef,
+  Wio_PDef,
 } from "$lib/domain/domainTypes";
 
 import type { ApiClient } from "./ApiClient";
@@ -50,13 +50,13 @@ export function getOfferingApi(client: ApiClient) {
     /**
      * Loads a single offering with all its details by ID.
      */
-    async loadOffering(offeringId: number): Promise<WholesalerItemOffering_ProductDef_Category_Supplier> {
+    async loadOffering(offeringId: number): Promise<Wio_PDef_Cat_Supp> {
       log.info(`API, Loading offering: ${offeringId}`);
       const operationId = `loadOffering-${offeringId}`;
       offeringLoadingManager.start(operationId);
       try {
         const responseData = await client.apiFetch<{
-          offering: WholesalerItemOffering_ProductDef_Category_Supplier;
+          offering: Wio_PDef_Cat_Supp;
         }>(`/api/offerings/${offeringId}`, { method: "GET" }, { context: operationId });
         return responseData.offering;
       } catch (err) {
@@ -70,7 +70,7 @@ export function getOfferingApi(client: ApiClient) {
     /**
      * Creates a new offering.
      */
-    async createOffering(offeringData: Omit<WholesalerItemOffering, "offering_id">): Promise<WholesalerItemOffering_ProductDef> {
+    async createOffering(offeringData: Omit<WholesalerItemOffering, "offering_id">): Promise<Wio_PDef> {
       assertDefined(
         offeringData,
         "offeringData.supplierId and offeringData.categoryId must be defined",
@@ -81,7 +81,7 @@ export function getOfferingApi(client: ApiClient) {
       offeringLoadingManager.start(operationId);
       try {
         const body = createJsonBody(offeringData);
-        const responseData = await client.apiFetch<{ offering: WholesalerItemOffering_ProductDef }>(
+        const responseData = await client.apiFetch<{ offering: Wio_PDef }>(
           "/api/offerings/new",
           { method: "POST", body },
           { context: operationId },

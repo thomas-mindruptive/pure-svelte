@@ -15,7 +15,7 @@
 
   // API & Type Imports
   import { categoryLoadingState, getCategoryApi } from "$lib/api/client/category";
-  import type { WholesalerItemOffering_ProductDef_Category_Supplier } from "$lib/domain/domainTypes";
+  import type { Wio_PDef_Cat_Supp } from "$lib/domain/domainTypes";
   import { ApiClient } from "$lib/api/client/ApiClient";
   import type { ID, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
   import {
@@ -119,7 +119,7 @@
     goto(buildChildUrl(page.url.pathname, "offerings", "new"));
   }
 
-  function handleOfferingSelect(offering: WholesalerItemOffering_ProductDef_Category_Supplier): void {
+  function handleOfferingSelect(offering: Wio_PDef_Cat_Supp): void {
     log.info(`(CategoryDetailPage) Navigating to offering detail for offeringId: ${offering.offering_id}`);
     goto(buildChildUrl(page.url.pathname, "offerings", offering.offering_id));
   }
@@ -148,11 +148,11 @@
   // GRID STRATEGIES
   // ========================================================================
 
-  const deleteStrategy: DeleteStrategy<WholesalerItemOffering_ProductDef_Category_Supplier> = {
+  const deleteStrategy: DeleteStrategy<Wio_PDef_Cat_Supp> = {
     execute: handleOfferingDelete,
   };
 
-  const rowActionStrategy: RowActionStrategy<WholesalerItemOffering_ProductDef_Category_Supplier> = {
+  const rowActionStrategy: RowActionStrategy<Wio_PDef_Cat_Supp> = {
     click: handleOfferingSelect,
   };
 </script>

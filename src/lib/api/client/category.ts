@@ -9,7 +9,7 @@
 import { log } from "$lib/utils/logger";
 import { ComparisonOperator, type QueryPayload, type SortDescriptor, type WhereConditionGroup } from "$lib/backendQueries/queryGrammar";
 import {
-  WholesalerItemOffering_ProductDef_Category_Supplier_NestedSchema,
+  Wio_PDef_Cat_Supp_Nested_Schema,
   type ProductCategory,
   type ProductDefinition,
   type Wholesaler,
@@ -253,7 +253,7 @@ export function getCategoryApi(client: ApiClient) {
       const operationId = `loadOfferingsForSupplierCategory-${supplierId}-${categoryId}`;
       categoryLoadingManager.start(operationId);
       try {
-        const cols = genTypedQualifiedColumns(WholesalerItemOffering_ProductDef_Category_Supplier_NestedSchema, true)
+        const cols = genTypedQualifiedColumns(Wio_PDef_Cat_Supp_Nested_Schema, true)
         const request: PredefinedQueryRequest<WholesalerItemOffering_ProductDef_Category_Supplier_Nested> = {
           namedQuery: "offering->product_def->category->wholesaler",
           payload: {
@@ -275,7 +275,7 @@ export function getCategoryApi(client: ApiClient) {
         );
         const transformed = transformToNestedObjects(
           responseData.results as Record<string, unknown>[],
-          WholesalerItemOffering_ProductDef_Category_Supplier_NestedSchema,
+          Wio_PDef_Cat_Supp_Nested_Schema,
         );
         return transformed;
       } catch (err) {

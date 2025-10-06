@@ -201,7 +201,7 @@ export const WholesalerCategoryWithCountSchema = WholesalerCategory_CategorySche
 
 // ===== WHOLESALER ITEM OFFERING (dbo.wholesaler_item_offerings) =====
 
-const WholesalerItemOfferingSchemaBase = z
+const Wio_BaseSchema = z
   .object({
     offering_id: z.number().int().positive(),
     wholesaler_id: z.number().int().positive(),
@@ -216,7 +216,7 @@ const WholesalerItemOfferingSchemaBase = z
   })
   .describe("WholesalerItemOfferingSchema");
 
-export const WholesalerItemOfferingSchema = createSchemaWithMeta(WholesalerItemOfferingSchemaBase, {
+export const Wio_Schema = createSchemaWithMeta(Wio_BaseSchema, {
   alias: "wio",
   tableName: "wholesaler_item_offerings",
   dbSchema: "dbo",
@@ -226,15 +226,15 @@ export const WholesalerItemOfferingSchema = createSchemaWithMeta(WholesalerItemO
  * Schema for creating a new WholesalerItemOffering.
  * Omits server-generated fields.
  */
-export const WholesalerItemOfferingForCreateSchema = WholesalerItemOfferingSchema.omit({
+export const WholesalerItemOfferingForCreateSchema = Wio_Schema.omit({
   offering_id: true,
   created_at: true,
 }).describe("WholesalerItemOfferingForCreateSchema");
-copyMetaFrom(WholesalerItemOfferingSchema, WholesalerItemOfferingForCreateSchema);
+copyMetaFrom(Wio_Schema, WholesalerItemOfferingForCreateSchema);
 
 // ===== WHOLESALER ITEM OFFERING including join to product_def  =====
 
-export const WholesalerItemOffering_ProductDefSchema = WholesalerItemOfferingSchema.extend({
+export const Wio_PDef_Schema = Wio_Schema.extend({
   product_def_title: z.string().optional(),
   product_def_description: z.string().nullable().optional(),
 }).describe("WholesalerItemOffering_ProductDefSchema");
@@ -246,7 +246,7 @@ export const WholesalerItemOffering_ProductDefSchema = WholesalerItemOfferingSch
  * Use WholesalerItemOffering_ProductDef_Category_Supplier_NestedSchema instead for new code.
  * This schema will be deprecated once all usages are migrated to nested schema.
  */
-export const WholesalerItemOffering_ProductDef_Category_SupplierSchema = WholesalerItemOfferingSchema.extend({
+export const Wio_PDef_Cat_Supp_Schema = Wio_Schema.extend({
   product_def_title: z.string().optional(),
   product_def_description: z.string().nullable().optional(),
   category_name: NameOrTitle.optional(),
@@ -267,12 +267,12 @@ export const WholesalerItemOffering_ProductDef_Category_SupplierSchema = Wholesa
  * // Access: nested[0].product_def.title, nested[0].category.name, nested[0].wholesaler.name
  * ```
  */
-export const WholesalerItemOffering_ProductDef_Category_Supplier_NestedSchema = WholesalerItemOfferingSchema.extend({
+export const Wio_PDef_Cat_Supp_Nested_Schema = Wio_Schema.extend({
   product_def: ProductDefinitionSchema,
   category: ProductCategorySchema,
   wholesaler: WholesalerSchema,
 }).describe("WholesalerItemOffering_ProductDef_Category_Supplier_NestedSchema");
-copyMetaFrom(WholesalerItemOfferingSchema, WholesalerItemOffering_ProductDef_Category_Supplier_NestedSchema);
+copyMetaFrom(Wio_Schema, Wio_PDef_Cat_Supp_Nested_Schema);
 
 // ===== WHOLESALER OFFERING LINK (dbo.wholesaler_offering_links) =====
 
@@ -453,7 +453,7 @@ copyMetaFrom(OrderItemSchema, OrderItemForCreateSchema);
 
 export const OrderItem_ProdDef_Category_Schema = OrderItemSchema.extend({
   order: OrderSchema,
-  offering: WholesalerItemOfferingSchema,
+  offering: Wio_Schema,
   product_def: ProductDefinitionSchema,
   category: ProductCategorySchema,
 });
@@ -468,10 +468,10 @@ export type ProductDefinition = z.infer<typeof ProductDefinitionSchema>;
 export type WholesalerCategory = z.infer<typeof WholesalerCategorySchema>;
 export type WholesalerCategory_Category = z.infer<typeof WholesalerCategory_CategorySchema>;
 export type WholesalerCategoryWithCount = z.infer<typeof WholesalerCategoryWithCountSchema>;
-export type WholesalerItemOffering = z.infer<typeof WholesalerItemOfferingSchema>;
-export type WholesalerItemOffering_ProductDef = z.infer<typeof WholesalerItemOffering_ProductDefSchema>;
-export type WholesalerItemOffering_ProductDef_Category_Supplier = z.infer<typeof WholesalerItemOffering_ProductDef_Category_SupplierSchema>;
-export type WholesalerItemOffering_ProductDef_Category_Supplier_Nested = z.infer<typeof WholesalerItemOffering_ProductDef_Category_Supplier_NestedSchema>;
+export type WholesalerItemOffering = z.infer<typeof Wio_Schema>;
+export type Wio_PDef = z.infer<typeof Wio_PDef_Schema>;
+export type Wio_PDef_Cat_Supp = z.infer<typeof Wio_PDef_Cat_Supp_Schema>;
+export type WholesalerItemOffering_ProductDef_Category_Supplier_Nested = z.infer<typeof Wio_PDef_Cat_Supp_Nested_Schema>;
 export type WholesalerOfferingLink = z.infer<typeof WholesalerOfferingLinkSchema>;
 export type WholesalerOfferingAttribute = z.infer<typeof WholesalerOfferingAttributeSchema>;
 export type WholesalerOfferingAttribute_Attribute = z.infer<typeof WholesalerOfferingAttribute_AttributeSchema>;
@@ -488,7 +488,7 @@ export const AllBrandedSchemas = {
   WholesalerSchema,
   ProductCategorySchema,
   ProductDefinitionSchema,
-  WholesalerItemOfferingSchema,
+  WholesalerItemOfferingSchema: Wio_Schema,
   AttributeSchema,
   WholesalerOfferingLinkSchema,
   WholesalerCategorySchema,

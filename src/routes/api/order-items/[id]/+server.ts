@@ -13,7 +13,7 @@ import { v4 as uuidv4 } from "uuid";
 
 import type { ApiSuccessResponse, DeleteSuccessResponse, DeleteConflictResponse, DeleteRequest } from "$lib/api/api.types";
 import { buildUnexpectedError, validateAndUpdateEntity, validateIdUrlParam } from "$lib/backendQueries/entityOperations";
-import { checkOrderItemDependencies } from "$lib/dataModel/dependencyChecks";
+import { checkOrderItemDependencies } from "$lib/backendQueries/dependencyChecks";
 import { deleteOrderItem } from "$lib/backendQueries/cascadingDeleteOperations";
 import { rollbackTransaction } from "$lib/backendQueries/transactionWrapper";
 

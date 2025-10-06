@@ -26,7 +26,7 @@ import type {
 } from "$lib/api/api.types";
 import type { DeletedAttributeData } from "$lib/api/app/appSpecificTypes";
 import { deleteAttribute } from "$lib/backendQueries/cascadingDeleteOperations";
-import { checkAttributeDependencies } from "$lib/dataModel/dependencyChecks";
+import { checkAttributeDependencies } from "$lib/backendQueries/dependencyChecks";
 import { rollbackTransaction } from "$lib/backendQueries/transactionWrapper";
 
 /**

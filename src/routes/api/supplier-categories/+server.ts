@@ -11,7 +11,7 @@ import { json, error, type RequestHandler } from "@sveltejs/kit";
 import { db } from "$lib/backendQueries/db";
 import { log } from "$lib/utils/logger";
 import { mssqlErrorMapper } from "$lib/backendQueries/mssqlErrorMapper";
-import { checkSupplierCategoryDependencies } from "$lib/dataModel/dependencyChecks";
+import { checkSupplierCategoryDependencies } from "$lib/backendQueries/dependencyChecks";
 import { deleteSupplierCategoryAssignment } from "$lib/backendQueries/cascadingDeleteOperations";
 import type { ProductCategory, Wholesaler, WholesalerCategory } from "$lib/domain/domainTypes";
 import { v4 as uuidv4 } from "uuid";

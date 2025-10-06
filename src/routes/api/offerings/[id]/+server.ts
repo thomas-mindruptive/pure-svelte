@@ -18,7 +18,7 @@ import {
 import { validateEntity } from "$lib/domain/domainTypes.utils";
 import { v4 as uuidv4 } from "uuid";
 import type { ApiErrorResponse, ApiSuccessResponse, DeleteConflictResponse, DeleteRequest } from "$lib/api/api.types";
-import { checkOfferingDependencies } from "$lib/dataModel/dependencyChecks";
+import { checkOfferingDependencies } from "$lib/backendQueries/dependencyChecks";
 import type { DeleteOfferingSuccessResponse } from "$lib/api/app/appSpecificTypes";
 import { deleteOffering } from "$lib/backendQueries/cascadingDeleteOperations";
 import { rollbackTransaction } from "$lib/backendQueries/transactionWrapper";

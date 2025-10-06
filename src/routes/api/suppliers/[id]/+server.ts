@@ -11,7 +11,7 @@ import { db } from "$lib/backendQueries/db";
 import { log } from "$lib/utils/logger";
 import { buildQuery, executeQuery } from "$lib/backendQueries/queryBuilder";
 import { queryConfig } from "$lib/backendQueries/queryConfig";
-import { checkWholesalerDependencies } from "$lib/dataModel/dependencyChecks";
+import { checkWholesalerDependencies } from "$lib/backendQueries/dependencyChecks";
 import { LogicalOperator, ComparisonOperator, type QueryPayload, type WhereCondition } from "$lib/backendQueries/queryGrammar";
 import { WholesalerSchema, type Wholesaler } from "$lib/domain/domainTypes";
 import { v4 as uuidv4 } from "uuid";

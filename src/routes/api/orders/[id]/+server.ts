@@ -10,7 +10,7 @@ import { db } from "$lib/backendQueries/db";
 import { log } from "$lib/utils/logger";
 import { buildQuery, executeQuery } from "$lib/backendQueries/queryBuilder";
 import { queryConfig } from "$lib/backendQueries/queryConfig";
-import { checkOrderDependencies } from "$lib/dataModel/dependencyChecks";
+import { checkOrderDependencies } from "$lib/backendQueries/dependencyChecks";
 import { LogicalOperator, ComparisonOperator, type QueryPayload, type WhereCondition } from "$lib/backendQueries/queryGrammar";
 import { OrderSchema, type Order } from "$lib/domain/domainTypes";
 import { v4 as uuidv4 } from "uuid";

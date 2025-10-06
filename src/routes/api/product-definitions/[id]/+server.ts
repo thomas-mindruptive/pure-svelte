@@ -10,7 +10,7 @@ import { json, error, type RequestHandler } from "@sveltejs/kit";
 import { db } from "$lib/backendQueries/db";
 import { log } from "$lib/utils/logger";
 import { buildUnexpectedError, validateIdUrlParam, validateAndUpdateEntity } from "$lib/backendQueries/entityOperations";
-import { checkProductDefinitionDependencies } from "$lib/dataModel/dependencyChecks";
+import { checkProductDefinitionDependencies } from "$lib/backendQueries/dependencyChecks";
 import { ProductDefinitionSchema, type ProductDefinition } from "$lib/domain/domainTypes";
 import { v4 as uuidv4 } from "uuid";
 import type { ApiSuccessResponse, DeleteConflictResponse, DeleteRequest, DeleteSuccessResponse } from "$lib/api/api.types";

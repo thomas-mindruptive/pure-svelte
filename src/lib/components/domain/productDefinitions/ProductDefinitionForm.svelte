@@ -145,7 +145,7 @@
   <ComboBox
     {fieldProps}
     path={["material_id"]}
-    options={materials}
+    items={materials}
     optionValue="material_id"
     optionLabel="name"
     label="Material"
@@ -172,7 +172,7 @@
   <ComboBox
     {fieldProps}
     path={["form_id"]}
-    options={forms}
+    items={forms}
     optionValue="form_id"
     optionLabel="name"
     label="Form"

@@ -118,6 +118,10 @@ export interface QueryRequest<T> {
   payload: QueryPayload<T>;
 }
 
+export interface QueryRequestWithOptionalPayload<T> {
+  payload?: QueryPayload<T>;
+}
+
 /**
  * Request for predefined named JOIN query
  * Note: TypeScript cannot prevent excess properties in variable assignments due to structural typing.

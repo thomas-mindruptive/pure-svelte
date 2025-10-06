@@ -5,7 +5,9 @@
   import { log } from "$lib/utils/logger";
   import { ApiClient } from "$lib/api/client/ApiClient";
   import { getProductDefinitionApi } from "$lib/api/client/productDefinition";
-  import { ProductDefinitionSchema, type ProductDefinition } from "$lib/domain/domainTypes";
+  import { getMaterialApi } from "$lib/api/client/material";
+  import { getFormApi } from "$lib/api/client/form";
+  import { ProductDefinitionSchema, type ProductDefinition, type Material, type Form } from "$lib/domain/domainTypes";
   import type {
     SubmittedCallback,
     SubmitErrorCallback,

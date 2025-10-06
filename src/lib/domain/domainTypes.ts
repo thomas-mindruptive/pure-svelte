@@ -1,4 +1,4 @@
-// File: src/lib/domain/domainTypes.ts (COMPLETE REWRITE with createSchemaWithMeta)
+// File: src/lib/domain/domainTypes.ts
 
 import { log } from "$lib/utils/logger";
 import { z } from "zod";

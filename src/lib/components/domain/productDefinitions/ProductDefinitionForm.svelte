@@ -20,6 +20,7 @@
   import "$lib/components/styles/grid.css";
   import type { ValidationErrorTree } from "$lib/components/validation/validation.types";
   import { zodToValidationErrorTree } from "$lib/domain/domainTypes.utils";
+  import ComboBox from "$lib/components/forms/ComboBox.svelte";
 
   // === PROPS ====================================================================================
 
@@ -137,9 +138,53 @@
 <!-- SNIPPETS ------------------------------------------------------------------------------------>
 
 <!--
+  -- Render material combo using the reusable FormCombobox component
+  -->
+<!-- prettier-ignore -->
+{#snippet materialCombo(fieldProps: FieldsProps<ProductDefinition>)}
+  <ComboBox
+    {fieldProps}
+    path={["material_id"]}
+    options={materials}
+    optionValue="material_id"
+    optionLabel="name"
+    label="Material"
+    placeholder="Select material..."
+    formatLabel={
+      /*
+       * NOTE: "formatLabel" only defined to show how it works 
+       * in case you need custom label for each combo entry.
+       * If not specified, "optionLabel" will be used
+       */ 
+      (m) => `${m.name}#`
+    }
+    required
+    onChange={(value, material) => {
+      log.debug("Material selected:", material?.name);
+    }}
+  />
+{/snippet}
+
+<!--
+  -- Render form combo using the reusable FormCombobox component
+  -->
+{#snippet formCombo(fieldProps: FieldsProps<ProductDefinition>)}
+  <ComboBox
+    {fieldProps}
+    path={["form_id"]}
+    options={forms}
+    optionValue="form_id"
+    optionLabel="name"
+    label="Form"
+    placeholder="Select form..."
+    required
+  />
+{/snippet}
+
+<!--
   -- Render material combo. 
   -->
-{#snippet materialCombo({ getS, set, errors, markTouched }: FieldsProps<ProductDefinition>)}
+{#snippet materialCombo2({ getS, set, errors, markTouched }: FieldsProps<ProductDefinition>)}
   <label for="offering">Material</label>
   <select
     id="material"
@@ -168,7 +213,7 @@
 <!--
   -- Render form combo. 
   -->
-{#snippet formCombo({ getS, set, errors, markTouched }: FieldsProps<ProductDefinition>)}
+{#snippet formCombo2({ getS, set, errors, markTouched }: FieldsProps<ProductDefinition>)}
   <label for="offering">Form</label>
   <select
     id="form"

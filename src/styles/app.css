@@ -184,15 +184,14 @@ html[data-theme="dark"] {
  */
 
 .component-error-boundary {
-  /* Box-Model: Sorgt für Abstand zum Rest der App */
-  margin: 1.5rem; /* Außenabstand, wie bei deinen anderen Sektionen */
-  padding: 1.5rem; /* Innenabstand für den Inhalt */
+  margin: 1.5rem; 
+  margin-top: 0;
+  padding: 1.5rem; 
 
-  /* Farben: Klare Fehler-Semantik mit sanften Tönen */
   background-color: var(--color-error-boundary-background);
   color: var(--color-error-boundary);
 
-  /* Rahmen: Definiert die "Grenze" der Komponente klar */
+
   border: 2px solid var(--color-error-boundary-border); 
   border-radius: 8px; 
 }

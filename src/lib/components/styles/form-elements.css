@@ -12,6 +12,7 @@ input[type="text"],
 input[type="email"],
 input[type="url"],
 input[type="number"],
+input[type="date"],
 select {
   /* Remove the default boxy appearance */
   border: none;
@@ -98,6 +99,7 @@ input[type="text"]:focus,
 input[type="email"]:focus,
 input[type="url"]:focus,
 input[type="number"]:focus,
+input[type="date"]:focus,
 select:focus {
   border-bottom: 2px solid var(--color-primary, #4f46e5);
   /* Compensate padding to prevent layout shift from the thicker border */
@@ -115,7 +117,11 @@ textarea:focus {
 /* 4. Validation Styles */
 
 /* Style for any field that is currently invalid (unfocused state) */
-input:invalid,
+input[type="text"]:invalid,
+input[type="email"]:invalid,
+input[type="url"]:invalid,
+input[type="number"]:invalid,
+input[type="date"]:invalid,
 select:invalid {
   border-bottom-color: #dc3545;
 }
@@ -125,7 +131,11 @@ textarea:invalid {
 }
 
 /* When an invalid field is focused, it should keep its red color but adopt the thick focus style */
-input:invalid:focus,
+input[type="text"]:invalid:focus,
+input[type="email"]:invalid:focus,
+input[type="url"]:invalid:focus,
+input[type="number"]:invalid:focus,
+input[type="date"]:invalid:focus,
 select:invalid:focus {
   border-bottom: 2px solid #dc3545;
 }

@@ -81,9 +81,9 @@
     if (!data.country?.trim()) {
       errors.country = ["Country is required"];
     }
-    if (!data.status?.trim()) {
-      errors.status = ["Status is required"];
-    }
+    // if (!data.status?.trim()) {
+    //   errors.status = ["Status is required"];
+    // }
 
     return {
       valid: Object.keys(errors).length === 0,
@@ -248,7 +248,6 @@
               class:invalid={errors.status}
               oninput={(e) => set(["status"], (e.currentTarget as HTMLTextAreaElement).value)}
               onblur={() => markTouched("status")}
-              required
             ></textarea>
             {#if errors.status}
               <div class="error-text">{errors.status[0]}</div>

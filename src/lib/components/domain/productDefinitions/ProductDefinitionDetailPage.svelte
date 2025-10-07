@@ -72,49 +72,55 @@
   // === LOAD DATA ================================================================================
 
   $effect(() => {
-    log.debug(`data props:`, allProps);
+    log.debug(`++++ data props:`, { productDefId, categoryId, isCreateMode, loadEventFetch });
 
     let aborted = false;
     const processPromises = async () => {
       isLoading = true;
 
       try {
-        if (isNaN(productDefId) || productDefId < 0) {
-          throw error(400, "Invalid Product Definition ID. Must be a positive number.");
+        if (isCreateMode) {
+          log.debug(`Create Mode`);
+        } else {
+          if (isNaN(productDefId) || productDefId < 0) {
+            throw error(400, "ProductDefintionDetailPage::$effect: Invalid Product Definition ID. Must be a positive number.");
+          }
+          // We must always come from a path like /.../categories/[categoryId]
+          if (isNaN(categoryId) || categoryId < 0) {
+            throw error(400, "categoryId must be passed in params.");
+          }
+          productDefinition = await productDefinitionApi.loadProductDefinition(productDefId);
+          if (aborted) return;
+          const prodDefVal = ProductDefinitionSchema.nullable().safeParse(productDefinition);
+          if (!prodDefVal.success) {
+            errors.productDefintion = zodToValidationErrorTree(prodDefVal.error);
+          }
+          offerings = await productDefinitionApi.loadOfferingsForProductDefinition(productDefId);
+          if (aborted) return;
+          const offeringsVal = safeParseFirstN(Wio_PDef_Cat_Supp_Nested_Schema, offerings, 3);
+          if (!offeringsVal.success) {
+            errors.offerings = zodToValidationErrorTree(offeringsVal.error);
+          }
+
+          log.debug(`Loaded productDefinition and offerings.`, { productDefinition, offerings });
         }
-        // We must always come from a path like /.../categories/[categoryId]
-        if (isNaN(categoryId) || categoryId < 0) {
-          throw error(400, "categoryId must be passed in params.");
-        }
-        productDefinition = await productDefinitionApi.loadProductDefinition(productDefId);
-        if (aborted) return;
-        const prodDefVal = ProductDefinitionSchema.nullable().safeParse(productDefinition);
-        if (!prodDefVal.success) {
-          errors.productDefintion = zodToValidationErrorTree(prodDefVal.error);
-        }
-        offerings = await productDefinitionApi.loadOfferingsForProductDefinition(productDefId);
-        if (aborted) return;
-        const offeringsVal = safeParseFirstN(Wio_PDef_Cat_Supp_Nested_Schema, offerings, 3);
-        if (!offeringsVal.success) {
-          errors.offerings = zodToValidationErrorTree(offeringsVal.error);
-        }
+
         forms = await formApi.loadForms();
         if (aborted) return;
         const formsVal = safeParseFirstN(FormSchema, forms, 3);
         if (!formsVal.success) {
           errors.forms = zodToValidationErrorTree(formsVal.error);
         }
-        materials = await materialApi.loadMaterials();
 
+        materials = await materialApi.loadMaterials();
         if (aborted) return;
         const materialsVal = safeParseFirstN(MaterialSchema, materials, 3);
         if (!materialsVal.success) {
           errors.materials = zodToValidationErrorTree(materialsVal.error);
         }
+        log.debug(`Loaded forms and materials.`, { forms, materials });
 
-        log.debug(`Promised resolved.`, { productDefinition, offerings, forms, materials });
-
-        if (aborted) return;
+        //
       } catch (rawError: any) {
         if (aborted) return;
         const status = rawError.status ?? 500;

@@ -2,7 +2,7 @@
 <script lang="ts">
 
   import "$lib/components/styles/list-page-layout.css";
-  import Combobox2 from "$lib/components/forms/Combobox2.svelte";
+    import ComboBox2 from "../forms/ComboBox2.svelte";
 
   // === TEST combo ===============================================================================
 
@@ -30,7 +30,7 @@
 <!----- TEMPLATE ----->
 
 <div class="list-page-content-wrapper">
-  <Combobox2
+  <ComboBox2
     items={users}
     bind:value={selectedUser}
     valueField="id"

@@ -1,25 +1,22 @@
 <!-- SupplierListPage.svelte -->
 <script lang="ts">
-  import SupplierGrid from "$lib/components/domain/suppliers/SupplierGrid.svelte";
-  import { supplierLoadingState, getSupplierApi } from "$lib/api/client/supplier";
-  import type { Wholesaler } from "$lib/domain/domainTypes";
   import { goto } from "$app/navigation";
+  import { getSupplierApi, supplierLoadingState } from "$lib/api/client/supplier";
+  import SupplierGrid from "$lib/components/domain/suppliers/SupplierGrid.svelte";
+  import type { Wholesaler } from "$lib/domain/domainTypes";
   import { log } from "$lib/utils/logger";
 
   import "$lib/components/styles/list-page-layout.css";
-
   // --- API & Strategy Imports ---
   // The ApiClient is the foundation for making SSR-safe fetch requests.
   import { ApiClient } from "$lib/api/client/ApiClient";
-
   // Types for the strategy pattern used by the generic DataGrid component.
-  import type { ID, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
-  import type { SortDescriptor } from "$lib/backendQueries/queryGrammar";
   import { page } from "$app/state";
+  import type { SortDescriptor } from "$lib/backendQueries/queryGrammar";
+  import type { DeleteStrategy, ID, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
 
-  import { stringsToNumbers } from "$lib/utils/typeConversions";
   import { cascadeDelete } from "$lib/api/client/cascadeDelete";
-  import Combobox2 from "$lib/components/forms/Combobox2.svelte";
+  import { stringsToNumbers } from "$lib/utils/typeConversions";
 
    // === PROPS ====================================================================================
 

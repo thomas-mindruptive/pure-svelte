@@ -21,6 +21,7 @@
   import type { ValidationErrorTree } from "$lib/components/validation/validation.types";
   import { zodToValidationErrorTree } from "$lib/domain/domainTypes.utils";
   import ComboBox from "$lib/components/forms/ComboBox.svelte";
+  import ComboBox2 from "$lib/components/forms/ComboBox2.svelte";
 
   // === PROPS ====================================================================================
 
@@ -158,68 +159,47 @@
 {/snippet}
 
 <!--
-  -- Render form combo using the reusable FormCombobox component
+  -- Render material combo using Combobox2 component
   -->
-{#snippet formCombo(fieldProps: FieldsProps<ProductDefinition>)}
+{#snippet materialCombo2(fieldProps: FieldsProps<ProductDefinition>)}
+  {@const { get, set, errors } = fieldProps}
+  {@const currentMaterialId = get(["material_id"])}
+  {@const selectedMaterial = materials.find((m) => m.material_id === currentMaterialId) ?? null}
 
-{/snippet}
-
-<!--
-  -- Render material combo. 
-  -->
-{#snippet materialCombo2({ getS, set, errors, markTouched }: FieldsProps<ProductDefinition>)}
-  <label for="offering">Material</label>
-  <select
-    id="material"
-    name="material_id"
-    value={getS("material_id") ?? ""}
-    class:invalid={errors.offering_id}
-    onchange={(e) => {
-      const material_id = parseInt((e.currentTarget as HTMLSelectElement).value);
-      set(["material_id"], material_id);
+  <ComboBox2
+    items={materials}
+    value={selectedMaterial}
+    labelField="name"
+    valueField="material_id"
+    placeholder="Search materials..."
+    label="Material"
+    onChange={(material) => {
+      set(["material_id"], material?.material_id ?? null);
+      log.debug("Material selected via Combobox2:", material?.name);
     }}
-    onblur={() => markTouched("material_id")}
-    required
-  >
-    <option value="">Select material...</option>
-    {#each materials as material (material.material_id)}
-      <option value={material.material_id}>
-        {material.name}
-      </option>
-    {/each}
-  </select>
+  />
+
   {#if errors.material_id}
     <div class="error-text">{errors.material_id[0]}</div>
   {/if}
 {/snippet}
 
 <!--
-  -- Render form combo. 
+  -- Render form combo using the reusable FormCombobox component
   -->
-{#snippet formCombo2({ getS, set, errors, markTouched }: FieldsProps<ProductDefinition>)}
-  <label for="offering">Form</label>
-  <select
-    id="form"
-    name="form_id"
-    value={getS("form_id") ?? ""}
-    class:invalid={errors.offering_id}
-    onchange={(e) => {
-      const form_id = parseInt((e.currentTarget as HTMLSelectElement).value);
-      set(["form_id"], form_id);
+{#snippet formCombo(fieldProps: FieldsProps<ProductDefinition>)}
+  <ComboBox
+    {fieldProps}
+    path={["form_id"]}
+    items={forms}
+    optionValue="form_id"
+    optionLabel="name"
+    label="Form"
+    placeholder="Select material..."
+    onChange={(value, form) => {
+      log.debug("Form selected:", form?.name);
     }}
-    onblur={() => markTouched("form_id")}
-    required
-  >
-    <option value="">Select form...</option>
-    {#each forms as form (form.form_id)}
-      <option value={form.form_id}>
-        {form.name}
-      </option>
-    {/each}
-  </select>
-  {#if errors.form_id}
-    <div class="error-text">{errors.form_id[0]}</div>
-  {/if}
+  />
 {/snippet}
 
 <!-- TEMPLATE ------------------------------------------------------------------------------------>
@@ -274,6 +254,10 @@
           <!--- MATERIAL ------------------------------------------------------------------------>
           <div class="form-group span-1">
             {@render materialCombo(fieldProps)}
+          </div>
+
+          <div class="form-group span-1">
+            {@render materialCombo2(fieldProps)}
           </div>
 
           <!--- FORM ---------------------------------------------------------------------------->

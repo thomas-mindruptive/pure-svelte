@@ -317,7 +317,7 @@
             <!--- Create mode and suppliers route => render "productdefs" combo --->
             {#if isCreateMode}
               {#if isSuppliersRoute}
-                <label for="offering-product">####Product *</label>
+                <label for="offering-product">Product *</label>
                 <select
                   id="offering-product"
                   name="product_def_id"

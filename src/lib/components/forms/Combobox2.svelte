@@ -18,6 +18,7 @@
 		valueField?: keyof T;
 		placeholder?: string;
 		label?: string;
+		onChange?: (value: T | null) => void;
 	};
 
 	let {
@@ -28,6 +29,7 @@
 		valueField,
 		placeholder = 'Search...',
 		label = 'Selection',
+		onChange,
 	}: ComboboxProps = $props();
 
 	let isOpen = $state(false);
@@ -68,6 +70,9 @@
 	function select(item: T) {
 		value = item;
 		isOpen = false;
+		if (onChange) {
+			onChange(item);
+		}
 	}
 
 	function open() {

@@ -150,35 +150,18 @@
     optionLabel="name"
     label="Material"
     placeholder="Select material..."
-    formatLabel={
-      /*
-       * NOTE: "formatLabel" only defined to show how it works 
-       * in case you need custom label for each combo entry.
-       * If not specified, "optionLabel" will be used
-       */ 
-      (m) => `${m.name}#`
-    }
-    required
     onChange={(value, material) => {
       log.debug("Material selected:", material?.name);
     }}
   />
+
 {/snippet}
 
 <!--
   -- Render form combo using the reusable FormCombobox component
   -->
 {#snippet formCombo(fieldProps: FieldsProps<ProductDefinition>)}
-  <ComboBox
-    {fieldProps}
-    path={["form_id"]}
-    items={forms}
-    optionValue="form_id"
-    optionLabel="name"
-    label="Form"
-    placeholder="Select form..."
-    required
-  />
+
 {/snippet}
 
 <!--

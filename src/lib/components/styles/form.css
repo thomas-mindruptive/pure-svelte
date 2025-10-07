@@ -49,6 +49,10 @@
   margin-bottom: 0.5rem;
 }
 
+/*
+ ***** FORM GROUP *********************************************************************************
+ */
+
 .form-group {
   display: flex;
   flex-direction: column;
@@ -68,6 +72,44 @@
   color: var(--color-heading, #0f172a);
   font-size: 0.875rem;
 }
+
+/*
+ ***** CONTROL GROUP FOR OTHER CONTROLS LIKE COMBOS ***********************************************
+ */
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.control-group label {
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+  color: var(--color-heading, #0f172a);
+  font-size: 0.875rem;
+}
+
+/* 
+ * Damit die Grid-Span-Klassen, die im Formular-Layout verwendet werden,
+ * auch für die control-group funktionieren, werden sie hier definiert.
+ * Dies ermöglicht es, die Breite der Komponente im Grid zu steuern.
+ */
+.control-group.span-1 {
+  grid-column: span 1;
+}
+.control-group.span-2 {
+  grid-column: span 2;
+}
+.control-group.span-4 {
+  grid-column: span 4;
+}
+.control-group.span-5 {
+  grid-column: span 5;
+}
+
+/*
+ ***** OTHER **************************************************************************************
+ */
 
 .char-count {
   font-size: 0.75rem;
@@ -145,7 +187,10 @@
   }
 
   .form-group.span-2,
-  .form-group.span-4 {
+  .form-group.span-4,
+  .control-group.span-2,
+  .control-group.span-4,
+  .control-group.span-5 {
     grid-column: span 1;
   }
 

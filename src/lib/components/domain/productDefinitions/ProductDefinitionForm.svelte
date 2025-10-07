@@ -256,7 +256,7 @@
             {@render materialCombo(fieldProps)}
           </div>
 
-          <div class="form-group span-1">
+          <div class="control-group span-1">
             {@render materialCombo2(fieldProps)}
           </div>
 

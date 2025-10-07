@@ -19,6 +19,9 @@
 		placeholder?: string;
 		label?: string;
 		onChange?: (value: T | null) => void;
+		filterFn?: (item: T, searchValue: string) => boolean;
+		minSearchLength?: number;
+		showDropdownButton?: boolean;
 	};
 
 	let {
@@ -30,11 +33,15 @@
 		placeholder = 'Search...',
 		label = 'Selection',
 		onChange,
+		filterFn,
+		minSearchLength = 2,
+		showDropdownButton = true,
 	}: ComboboxProps = $props();
 
 	let isOpen = $state(false);
 	let searchTerm = $state('');
 	let isPositionCalculated = $state(false);
+	let showAllMode = $state(false);
 
 	let containerEl: HTMLDivElement | null = $state(null);
 	let dropdownEl: HTMLUListElement | null = $state(null);
@@ -43,10 +50,21 @@
 	let filteredItems = $state<T[]>(items);
 
 	$effect(() => {
-		const localSearchTerm = searchTerm.toLowerCase();
-		if (!localSearchTerm) {
+		// EXTERNAL FILTER: Use provided filterFn, require minimum search length
+		if (filterFn) {
+			if (searchTerm.length < minSearchLength) {
+				filteredItems = [];
+			} else {
+				filteredItems = items.filter((item) => filterFn(item, searchTerm));
+			}
+			return;
+		}
+
+		// LOCAL FILTER: Show all items in dropdown mode or filter by search term
+		if (showAllMode || searchTerm === '') {
 			filteredItems = items;
 		} else {
+			const localSearchTerm = searchTerm.toLowerCase();
 			filteredItems = items.filter((item) =>
 				getItemLabel(item).toLowerCase().includes(localSearchTerm)
 			);
@@ -82,7 +100,17 @@
 
 	function close() {
 		searchTerm = getItemLabel(value);
+		showAllMode = false;
 		isOpen = false;
+	}
+
+	function toggleDropdown() {
+		// Only allow "show all" for local filtering (no external filterFn)
+		if (!filterFn) {
+			showAllMode = true;
+			searchTerm = '';
+			open();
+		}
 	}
 
 	function handleFocus(event: FocusEvent) {
@@ -123,44 +151,69 @@
 
 <div class="combobox-container" bind:this={containerEl}>
 	<label class="sr-only" for="combobox-input">{label}</label>
-	<input
-		type="text"
-		id="combobox-input"
-		class="combobox-input"
-		{placeholder}
-		bind:value={searchTerm}
-		onfocus={handleFocus}
-		oninput={open}
-		onkeydown={(e) => {
-			if (e.key === 'Escape') close();
-		}}
-		autocomplete="off"
-		role="combobox"
-		aria-expanded={isOpen}
-		aria-controls="combobox-list"
-	/>
+	<div class="combobox-input-wrapper">
+		<input
+			type="text"
+			id="combobox-input"
+			class="combobox-input"
+			class:combobox-input--no-button={!showDropdownButton}
+			{placeholder}
+			bind:value={searchTerm}
+			onfocus={handleFocus}
+			oninput={() => {
+				showAllMode = false;
+				open();
+			}}
+			onkeydown={(e) => {
+				if (e.key === 'Escape') close();
+			}}
+			autocomplete="off"
+			role="combobox"
+			aria-expanded={isOpen}
+			aria-controls="combobox-list"
+		/>
+		{#if showDropdownButton}
+			<button
+				type="button"
+				class="dropdown-toggle-button"
+				onclick={toggleDropdown}
+				aria-label="Toggle dropdown"
+				disabled={!!filterFn}
+			>
+				▼
+			</button>
+		{/if}
+	</div>
 
 	{#if isOpen}
-		<ul class="dropdown" bind:this={dropdownEl} id="combobox-list" role="listbox">
-			<!-- The type of `filteredItems` is now a clear `T[]`, which should resolve all LSP errors. -->
-			{#each filteredItems as item (getItemKey(item))}
-				<li role="presentation">
-					<button
-						type="button"
-						class="dropdown-item"
-						onclick={() => select(item)}
-						role="option"
-						aria-selected={item === value}
-					>
-						{getItemLabel(item)}
-					</button>
-				</li>
-			{:else}
-				<li class="no-results" role="option" aria-disabled="true" aria-selected="false">
-					No results found
-				</li>
-			{/each}
-		</ul>
+		{#if filterFn && searchTerm.length < minSearchLength}
+			<!-- Show hint for external filter when minimum length not reached -->
+			<div class="dropdown dropdown-hint">
+				Please enter at least {minSearchLength} character{minSearchLength !== 1 ? 's' : ''} to search
+			</div>
+		{:else}
+			<!-- Show filtered items -->
+			<ul class="dropdown" bind:this={dropdownEl} id="combobox-list" role="listbox">
+				<!-- The type of `filteredItems` is now a clear `T[]`, which should resolve all LSP errors. -->
+				{#each filteredItems as item (getItemKey(item))}
+					<li role="presentation">
+						<button
+							type="button"
+							class="dropdown-item"
+							onclick={() => select(item)}
+							role="option"
+							aria-selected={item === value}
+						>
+							{getItemLabel(item)}
+						</button>
+					</li>
+				{:else}
+					<li class="no-results" role="option" aria-disabled="true" aria-selected="false">
+						No results found
+					</li>
+				{/each}
+			</ul>
+		{/if}
 	{/if}
 </div>
 
@@ -180,18 +233,49 @@
 		clip: rect(0, 0, 0, 0);
 		border: 0;
 	}
-	.combobox-input {
+	.combobox-input-wrapper {
+		position: relative;
+		display: flex;
+		align-items: stretch;
 		width: 100%;
+	}
+	.combobox-input {
+		flex: 1;
 		padding: 8px 12px;
 		font-size: 16px;
 		border: 1px solid #ccc;
-		border-radius: 4px;
+		border-radius: 4px 0 0 4px;
 		box-sizing: border-box;
+	}
+	.combobox-input--no-button {
+		border-radius: 4px;
 	}
 	.combobox-input:focus {
 		outline: none;
 		border-color: #007bff;
 		box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+		z-index: 1;
+	}
+	.dropdown-toggle-button {
+		padding: 8px 12px;
+		font-size: 14px;
+		background: #f8f9fa;
+		border: 1px solid #ccc;
+		border-left: none;
+		border-radius: 0 4px 4px 0;
+		cursor: pointer;
+		transition: background-color 0.2s;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		min-width: 40px;
+	}
+	.dropdown-toggle-button:hover:not(:disabled) {
+		background: #e9ecef;
+	}
+	.dropdown-toggle-button:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
 	}
 	.dropdown {
 		position: absolute;
@@ -208,6 +292,15 @@
 		max-height: 200px;
 		overflow-y: auto;
 		z-index: 1000;
+	}
+	.dropdown-hint {
+		padding: 12px;
+		color: #6c757d;
+		font-size: 14px;
+		font-style: italic;
+		text-align: center;
+		list-style: none;
+		overflow-y: visible;
 	}
 	/* The svelte-ignore is placed correctly to suppress the static analysis warning. */
 	/* svelte-ignore css_unused_selector */

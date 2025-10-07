@@ -19,16 +19,17 @@
 
   import { stringsToNumbers } from "$lib/utils/typeConversions";
   import { cascadeDelete } from "$lib/api/client/cascadeDelete";
+  import Combobox2 from "$lib/components/forms/Combobox2.svelte";
 
-  // === PROPS ====================================================================================
+   // === PROPS ====================================================================================
 
   export interface SupplierListPageProps {
-     suppliers: Promise<Wholesaler[]>
+    suppliers: Promise<Wholesaler[]>;
   }
 
   // 1. The `data` prop receives the promise streamed from the non-blocking `load` function.
   //    It is NOT the resolved array of suppliers, but the promise that will resolve to it.
-  let { data }: { data:  SupplierListPageProps}  = $props();
+  let { data }: { data: SupplierListPageProps } = $props();
 
   // === STATE ====================================================================================
 

@@ -201,6 +201,20 @@ export const ordersHierarchyConfig: HierarchyTree = {
     }),
 };
 
+/**
+ * Navigation hierarchy for global Attributes master data.
+ */
+// prettier-ignore
+export const testHierarchyConfig: HierarchyTree = {
+  name: "test",
+  rootItem:
+    createHierarchyNode({
+      item: { key: "test", type: "list", href: "/test", label: "Test" },
+      children: [
+      ],
+    }),
+};
+
 // ================================================================================================
 // MAIN EXPORT FUNCTIONS
 // ================================================================================================
@@ -210,7 +224,7 @@ export const ordersHierarchyConfig: HierarchyTree = {
  * This is the main entry point for getting hierarchy definitions.
  */
 export function getAppHierarchies(): Hierarchy {
-  return [supplierHierarchyConfig, productCategoriesHierarchyConfig, attributesHierarchyConfig, ordersHierarchyConfig];
+  return [supplierHierarchyConfig, productCategoriesHierarchyConfig, attributesHierarchyConfig, ordersHierarchyConfig, testHierarchyConfig];
 }
 
 /**

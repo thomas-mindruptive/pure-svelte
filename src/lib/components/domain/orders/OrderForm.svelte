@@ -40,8 +40,6 @@
     onChanged?: ChangedCallback;
   };
 
-  const allProps: Props = $props();
-
   const {
     initial,
     wholeSalerOfOrder,
@@ -54,7 +52,7 @@
     onSubmitError,
     onCancelled,
     onChanged,
-  } = allProps;
+  } : Props = $props();
   // Silence tsc:
   isSuppliersRoute;
 
@@ -65,7 +63,7 @@
   // === INIT =====================================================================================
 
   $effect(() => {
-    log.debug(`Props: `, allProps);
+    log.debug(`Props: `, {initial, wholeSalerOfOrder, isCreateMode, availableWholesalers, isOrdersRoute, isSuppliersRoute});
     if (isCreateMode) {
       if (isSuppliersRoute) {
          if (!wholeSalerOfOrder) {

@@ -37,6 +37,7 @@
   import { stringsToNumbers } from "$lib/utils/typeConversions";
   import { buildChildUrl, buildSiblingUrl } from "$lib/utils/url";
   import { error } from "@sveltejs/kit";
+  import { getErrorMessage } from "$lib/api/client/common";
 
   // === PROPS ====================================================================================
 
@@ -47,9 +48,7 @@
     loadEventFetch: typeof fetch;
   };
 
-  //let { data }: { data: ProductDefinitionDetailPage_LoadDataAsync } = $props();
-  const allProps: ProductDefPageProps = $props();
-  const { productDefId, categoryId, isCreateMode, loadEventFetch } = allProps;
+  const { productDefId, categoryId, isCreateMode, loadEventFetch }: ProductDefPageProps = $props();
 
   // === STATE ====================================================================================
 
@@ -210,7 +209,7 @@
         // Redirect to the new edit page
         goto(buildSiblingUrl(page.url.pathname, newId), { invalidateAll: true });
       } else {
-        addNotification("Could not redirect to edit page, ID is missing.", "error");
+        addNotification("Could not redirect to edit page, ID is missing.", "error", 4000);
       }
     } else {
       // In edit mode, the FormShell has already updated the state.
@@ -221,7 +220,7 @@
 
   function handleFormSubmitError(event: { data: ProductDefinition; error: unknown }) {
     log.error("Form submit error in ProductDefinitionDetailPage", event.error);
-    addNotification(`Failed to save Product Definition.`, "error");
+    addNotification(`Failed to save Product Definition. ${getErrorMessage(event.error)}`, "error");
   }
 
   function handleFormCancelled() {

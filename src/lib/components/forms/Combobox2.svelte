@@ -150,7 +150,7 @@
 </script>
 
 <div class="combobox-container" bind:this={containerEl}>
-	<label class="sr-only" for="combobox-input">{label}</label>
+	<label for="combobox-input">{label}</label>
 	<div class="combobox-input-wrapper">
 		<input
 			type="text"
@@ -180,7 +180,7 @@
 				aria-label="Toggle dropdown"
 				disabled={!!filterFn}
 			>
-				▼
+				⌄
 			</button>
 		{/if}
 	</div>
@@ -220,8 +220,8 @@
 <style>
 	.combobox-container {
 		position: relative;
-		width: 300px;
-		font-family: system-ui, sans-serif;
+		width: 100%;
+		font-family: inherit;
 	}
 	.sr-only {
 		position: absolute;
@@ -236,46 +236,62 @@
 	.combobox-input-wrapper {
 		position: relative;
 		display: flex;
-		align-items: stretch;
+		align-items: flex-end;
 		width: 100%;
 	}
 	.combobox-input {
 		flex: 1;
-		padding: 8px 12px;
-		font-size: 16px;
-		border: 1px solid #ccc;
-		border-radius: 4px 0 0 4px;
+		/* Material Design: underline style */
+		border: none;
+		border-bottom: 1px solid var(--color-border, #cbd5e1);
+		border-radius: 0;
+		background-color: transparent;
+		padding: 0.6rem 2rem 0.6rem 0.2rem;
+		font-size: 0.875rem;
+		transition: border-bottom 0.2s ease-in-out;
+		font-family: inherit;
 		box-sizing: border-box;
 	}
 	.combobox-input--no-button {
-		border-radius: 4px;
+		padding-right: 0.2rem;
 	}
 	.combobox-input:focus {
 		outline: none;
-		border-color: #007bff;
-		box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+		border-bottom: 2px solid var(--color-primary, #4f46e5);
+		padding-bottom: calc(0.6rem - 1px);
 		z-index: 1;
 	}
+	.combobox-input::placeholder {
+		color: var(--color-muted, #64748b);
+	}
 	.dropdown-toggle-button {
-		padding: 8px 12px;
-		font-size: 14px;
-		background: #f8f9fa;
-		border: 1px solid #ccc;
-		border-left: none;
-		border-radius: 0 4px 4px 0;
+		/* Material Design: minimalistic button aligned with underline */
+		position: absolute;
+		right: 0;
+		bottom: 0;
+		padding: 0.6rem 0.5rem;
+		font-size: 0.875rem;
+		background: transparent;
+		border: none;
+		border-bottom: 1px solid var(--color-border, #cbd5e1);
 		cursor: pointer;
-		transition: background-color 0.2s;
+		transition: all 0.2s ease;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		min-width: 40px;
+		color: var(--color-muted, #64748b);
 	}
 	.dropdown-toggle-button:hover:not(:disabled) {
-		background: #e9ecef;
+		color: var(--color-primary, #4f46e5);
+		background: transparent;
 	}
 	.dropdown-toggle-button:disabled {
 		opacity: 0.5;
 		cursor: not-allowed;
+	}
+	.combobox-input:focus ~ .dropdown-toggle-button {
+		border-bottom: 2px solid var(--color-primary, #4f46e5);
+		padding-bottom: calc(0.6rem - 1px);
 	}
 	.dropdown {
 		position: absolute;
@@ -319,9 +335,11 @@
 		box-sizing: border-box;
 		display: block;
 		width: 100%;
-		padding: 8px 12px;
+		padding: 0.375rem 0.75rem;
 		text-align: left;
 		cursor: pointer;
+		font-size: 0.8rem;
+		line-height: 1.4;
 	}
 	.dropdown-item:hover,
 	.dropdown-item:focus {

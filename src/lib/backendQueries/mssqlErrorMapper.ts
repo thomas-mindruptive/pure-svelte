@@ -29,6 +29,7 @@
  * ```
  */
 
+import { coerceErrorMessage } from '$lib/utils/errorUtils';
 import { log } from '$lib/utils/logger';
 
 /**
@@ -49,6 +50,8 @@ export interface DbErrorMapper {
  * @see https://docs.microsoft.com/en-us/sql/relational-databases/errors-events/database-engine-events-and-errors
  */
 const MSSQL_ERROR_CODES = {
+  /** Unique index violation (composite or single column) */
+  UNIQUE_INDEX_VIOLATION: 2601,
   /** Unique constraint or primary key violation */
   UNIQUE_CONSTRAINT_VIOLATION: 2627,
   /** Primary key violation (same as unique constraint) */
@@ -130,7 +133,13 @@ export class MssqlErrorMapper implements DbErrorMapper {
    */
   private extractConstraintName(error: MssqlError): string {
     const message = error.message;
-    
+
+    // Pattern for unique index (error 2601): "with unique index 'UX_pdef_category_title'"
+    const indexMatch = message.match(/unique index '([^']+)'/i);
+    if (indexMatch) {
+      return this.humanizeConstraintName(indexMatch[1]);
+    }
+
     // Pattern for unique constraint: "Violation of UNIQUE KEY constraint 'UQ_wholesalers_name'"
     const uniqueMatch = message.match(/UNIQUE KEY constraint '([^']+)'/i);
     if (uniqueMatch) {
@@ -230,7 +239,7 @@ export class MssqlErrorMapper implements DbErrorMapper {
       
       return { 
         status: 500, 
-        message: 'Unknown database error occurred' 
+        message: `Unknown database error occurred. ${coerceErrorMessage(error)}`
       };
     }
 
@@ -245,12 +254,13 @@ export class MssqlErrorMapper implements DbErrorMapper {
 
     // Map MSSQL error codes to HTTP responses
     switch (error.number) {
+      case MSSQL_ERROR_CODES.UNIQUE_INDEX_VIOLATION:
       case MSSQL_ERROR_CODES.UNIQUE_CONSTRAINT_VIOLATION:
       case MSSQL_ERROR_CODES.PRIMARY_KEY_VIOLATION: {
         const constraintName = this.extractConstraintName(error);
         return {
           status: 409,
-          message: `This ${constraintName} already exists. Please use a different value.`
+          message: `This ${constraintName} already exists. Please use a different value.\n${error.message}`
         };
       }
 
@@ -329,7 +339,7 @@ export class MssqlErrorMapper implements DbErrorMapper {
         
         return {
           status: 500,
-          message: 'A database error occurred. Please try again or contact support.'
+          message: `A database error occurred. ${error.message}`
         };
       }
     }

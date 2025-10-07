@@ -171,7 +171,7 @@
     value={selectedMaterial}
     labelField="name"
     valueField="material_id"
-    placeholder="Search materials..."
+    placeholder="Search Forms..."
     label="Material"
     onChange={(material) => {
       set(["material_id"], material?.material_id ?? null);
@@ -181,6 +181,32 @@
 
   {#if errors.material_id}
     <div class="error-text">{errors.material_id[0]}</div>
+  {/if}
+{/snippet}
+
+<!--
+  -- Render material combo using Combobox2 component
+  -->
+{#snippet formCombo2(fieldProps: FieldsProps<ProductDefinition>)}
+  {@const { get, set, errors } = fieldProps}
+  {@const currentFormId = get(["form_id"])}
+  {@const selectedForm = forms.find((f) => f.form_id === currentFormId) ?? null}
+
+  <ComboBox2
+    items={forms}
+    value={selectedForm}
+    labelField="name"
+    valueField="form_id"
+    placeholder="Search materials..."
+    label="Form"
+    onChange={(form) => {
+      set(["form_id"], form?.form_id ?? null);
+      log.debug("Form selected via Combobox2:", form?.name);
+    }}
+  />
+
+  {#if errors.form_id}
+    <div class="error-text">{errors.form_id[0]}</div>
   {/if}
 {/snippet}
 
@@ -252,17 +278,21 @@
           </div>
 
           <!--- MATERIAL ------------------------------------------------------------------------>
-          <div class="form-group span-1">
+          <!-- <div class="form-group span-1">
             {@render materialCombo(fieldProps)}
-          </div>
+          </div> -->
 
           <div class="control-group span-1">
             {@render materialCombo2(fieldProps)}
           </div>
 
           <!--- FORM ---------------------------------------------------------------------------->
-          <div class="form-group span-1">
+          <!-- <div class="form-group span-1">
             {@render formCombo(fieldProps)}
+          </div> -->
+
+          <div class="control-group span-1">
+            {@render formCombo2(fieldProps)}
           </div>
         </div>
 

@@ -49,6 +49,11 @@
   margin-bottom: 0.5rem;
 }
 
+.form-row-grid:nth-of-type(n+1) {
+  margin-bottom: 2rem;
+
+}
+
 /*
  ***** FORM GROUP *********************************************************************************
  */

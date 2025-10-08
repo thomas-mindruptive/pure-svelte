@@ -5,7 +5,7 @@
 
   import FormShell from "$lib/components/forms/FormShell.svelte";
   import { log } from "$lib/utils/logger";
-  import { WholesalerSchema, type Wholesaler } from "$lib/domain/domainTypes";
+  import { WholesalerSchema, type Wholesaler, type WholesalerRelevance, type WholesalerPriceRange } from "$lib/domain/domainTypes";
   import "$lib/components/styles/form.css";
   import "$lib/components/styles/grid.css";
   import { ApiClient } from "$lib/api/client/ApiClient";
@@ -169,7 +169,6 @@
 
     {#snippet fields({ getS, set, errors, markTouched })}
       <div class="form-body">
-        
         <div class="form-row-grid">
           <!-- --------------------------------------------------------------------------------
             -- Name 
@@ -227,6 +226,7 @@
               <option value="">Select country…</option>
               <option value="AT">Austria</option>
               <option value="DE">Germany</option>
+              <option value="NL">Netherlands</option>
               <option value="CH">Switzerland</option>
               <option value="US">United States</option>
               <option value="CN">China</option>
@@ -254,6 +254,58 @@
             {/if}
           </div>
         </div>
+        <!-- --------------------------------------------------------------------------------
+            -- Relevance 
+            ---------------------------------------------------------------------------------- -->
+        <div class="form-row-grid">
+          <div class="form-group">
+            <label for="relevance">Relevance</label>
+            <select
+              id="relevance"
+              name="relevance"
+              value={getS("relevance") ?? ""}
+              class:invalid={errors.relevance}
+              onchange={(e) => set(["relevance"], (e.currentTarget as HTMLSelectElement).value as WholesalerRelevance)}
+              onblur={() => markTouched("relevance")}
+            >
+              <option value="">Select relevance...</option>
+              <option value="lowest">lowest</option>
+              <option value="low">low</option>
+              <option value="medium">medium</option>
+              <option value="high">high</option>
+              <option value="highest">highest States</option>
+            </select>
+            {#if errors.relevance}
+              <div class="error-text">{errors.relevance[0]}</div>
+            {/if}
+          </div>
+
+          <!-- --------------------------------------------------------------------------------
+            -- Price range 
+            ---------------------------------------------------------------------------------- -->
+          <div class="form-group">
+            <label for="pricerange">Price Range</label>
+            <select
+              id="pricerange"
+              name="price_range"
+              value={getS("price_range") ?? ""}
+              class:invalid={errors.price_range}
+              onchange={(e) => set(["price_range"], (e.currentTarget as HTMLSelectElement).value as WholesalerPriceRange)}
+              onblur={() => markTouched("price_range")}
+            >
+              <option value="">Select price range...</option>
+              <option value="very expensive">very expensive</option>
+              <option value="expensive">expensive</option>
+              <option value="medium">medium</option>
+              <option value="cheap">cheap</option>
+              <option value="very cheap">very cheap</option>
+            </select>
+            {#if errors.price_range}
+              <div class="error-text">{errors.price_range[0]}</div>
+            {/if}
+          </div>
+        </div>
+
         <div class="form-row-grid">
           <!-- --------------------------------------------------------------------------------
             -- Dropship 

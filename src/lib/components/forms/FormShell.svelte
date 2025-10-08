@@ -338,6 +338,7 @@
       }
     }
     const customErrors = customResult.errors || {};
+    log.detdebug(`Custom errors after await validate:`, customErrors);
 
     // --- Step 2: Inject custom errors into the DOM ---
     // This loop informs the browser's validation engine about our custom business rule violations.
@@ -359,25 +360,30 @@
     // --- Step 3: Check overall validity and synchronize Svelte state ---
     // The browser is now the single source of truth for the form's validity state.
     const isFormValid = formEl.checkValidity();
+    log.detdebug(`After formEl.checkValidity() isFormValid =  ${isFormValid}`);
 
     // Clear the Svelte error state before repopulating it.
     clearErrors();
 
     if (!isFormValid) {
+      log.detdebug(`Form is invalid => Reading DOM val messages`);
       // If the form is invalid, we read the validation messages from the DOM
       // and populate our reactive `formState.errors` object.
       // This is what makes the error summary block work.
       for (const element of allElements) {
         if (!element.validity.valid) {
           const fieldName = element.name || element.id;
+          log.detdebug(`Element ${fieldName} is invalid`);
           if (fieldName) {
             // `validationMessage` will be our custom message if we set one,
             // otherwise it will be the browser's default message (e.g., "Please fill out this field.").
             formState.errors[fieldName] = [element.validationMessage];
+          } else {
+            formState.errors["general_errors"] = [`No fieldname set for element`];
           }
         }
       }
-      log.warn(`Validation failed. Synchronized errors for UI:`, { entity, errors: formState.errors });
+      log.debug(`HTML/DOM: Form is invalid. All merged errors for UI:`, { entity, errors: {...formState.errors} });
     } else {
       log.detdebug(`Validation passed.`, { entity });
     }

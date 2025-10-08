@@ -41,7 +41,7 @@
 
   // === VALIDATE =================================================================================
 
-  let { errors } = $derived.by(() => {
+  let { errors: zodErrors } = $derived.by(() => {
     const result = ProductCategorySchema.nullable().safeParse(initialData);
     if (result.error) {
       log.error(`Validation of category to ProductCategorySchema failed.`, {error: result.error, initial: initialData});
@@ -117,12 +117,13 @@
   }
 </script>
 
-<ValidationWrapper {errors}>
+<ValidationWrapper errors={zodErrors}>
   <FormShell
     entity="Category"
     initial={initialData as CategoryFormData}
     validate={validateCategory}
     submitCbk={submitCategory}
+    autoValidate="change"
     {disabled}
     onSubmitted={handleSubmitted}
     onSubmitError={handleSubmitError}
@@ -153,7 +154,7 @@
           <div class="form-group span-2">
             <label for="cat-name">Category Name *</label>
             <input
-              id="cat-name"
+              id="name"
               type="text"
               value={getS("name") ?? ""}
               class:error={errors.name}
@@ -169,17 +170,17 @@
           <div class="form-group span-2">
             <label for="cat-description">Description *</label>
             <input
-              id="cat-description"
+              id="description"
               type="text"
               value={getS("description") ?? ""}
-              class:error={errors.name}
-              placeholder="Enter name"
+              class:error={errors.description}
+              placeholder="Enter description"
               oninput={(e) => set(["description"], (e.currentTarget as HTMLInputElement).value)}
               onblur={() => markTouched("description")}
               required
             />
-            {#if errors.name}
-              <div class="error-text">{errors.name[0]}</div>
+            {#if errors.description}
+              <div class="error-text">{errors.description[0]}</div>
             {/if}
           </div>
         </div>

@@ -228,7 +228,11 @@
               <option value="DE">Germany</option>
               <option value="NL">Netherlands</option>
               <option value="CH">Switzerland</option>
+              <option value="UK">United Kingdom</option>
+              <option value="CZ">Czech Rpublic</option>
+              <option value="SVK">Slowakia</option>
               <option value="US">United States</option>
+              <option value="BRA">Brasil</option>
               <option value="CN">China</option>
               <option value="JP">Japan</option>
             </select>
@@ -240,7 +244,7 @@
             -- Status 
             ---------------------------------------------------------------------------------- -->
           <div class="form-group span-2">
-            <label for="supplier-status">Status *</label>
+            <label for="supplier-status">Status</label>
             <textarea
               id="supplier-status"
               name="status"

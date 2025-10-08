@@ -194,6 +194,8 @@
   justify-content: flex-end;
   align-items: center;
   gap: 0.5rem;
+  height: 100%; /* Nimmt die volle Zellenhöhe ein */
+  min-height: fit-content; /* Verhindert Kollaps bei kleinen Inhalten */
 }
 
 /* Truncate helper for narrow columns */

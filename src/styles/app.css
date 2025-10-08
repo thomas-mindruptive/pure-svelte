@@ -41,6 +41,11 @@
   --color-error-boundary-border: #ef4444;
   --color-error-boundary-background: color-mix(in srgb, var(--color-error-boundary-border) 4%, white);
 
+  /* Colors for info boundaries */
+  --color-info-boundary: #a99602;
+  --color-info-boundary-border: #eacf01;
+  --color-info-boundary-background: color-mix(in srgb, var(--color-info-boundary-border) 3%, white);
+
   /* 
    * === Spacing ==================================================================================
    */
@@ -184,16 +189,15 @@ html[data-theme="dark"] {
  */
 
 .component-error-boundary {
-  margin: 1.5rem; 
+  margin: 1.5rem;
   margin-top: 0;
-  padding: 1.5rem; 
+  padding: 1.5rem;
 
   background-color: var(--color-error-boundary-background);
   color: var(--color-error-boundary);
 
-
-  border: 2px solid var(--color-error-boundary-border); 
-  border-radius: 8px; 
+  border: 2px solid var(--color-error-boundary-border);
+  border-radius: 8px;
 }
 
 /* Styling für die Überschrift innerhalb der Fehlerbox */
@@ -215,29 +219,32 @@ html[data-theme="dark"] {
 
 /* Styling für die technische Fehlermeldung (pre-Block) */
 .component-error-boundary pre {
-  background-color: #fee2e2; /* Etwas dunklerer Hintergrund zur Abhebung (wie Tailwind red-100) */
-  color: #7f1d1d; /* Sehr dunkles Rot für maximale Lesbarkeit (wie Tailwind red-900) */
+  background-color: #fee2e2;
+  color: #7f1d1d;
   padding: 0.75rem 1rem;
   border-radius: 6px;
 
-  /* Wichtige Eigenschaften für lange Fehlermeldungen */
-  white-space: pre-wrap; /* Zeilenumbruch, verhindert horizontales Scrollen */
-  word-break: break-all; /* Bricht auch sehr lange Wörter/Tokens um */
+  white-space: pre-wrap;
+  word-break: break-all;
 
-  font-size: 0.875rem; /* Etwas kleiner, um es als "Code" zu kennzeichnen */
+  font-size: 0.875rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
 .component-debug-boundary {
-  /* Box-Model: Sorgt für Abstand zum Rest der App */
-  margin: 1.5rem; /* Außenabstand, wie bei deinen anderen Sektionen */
-  padding: 1.5rem; /* Innenabstand für den Inhalt */
-
-  /* Farben: Klare Fehler-Semantik mit sanften Tönen */
+  margin: 1.5rem;
+  padding: 1.5rem;
   background-color: var(--color-background-info);
   color: var(--color-background-border);
+  border: 2px solid var(--color-background-border);
+  border-radius: 8px;
+}
 
-  /* Rahmen: Definiert die "Grenze" der Komponente klar */
-  border: 2px solid var(--color-background-border); /* Klares, aber nicht zu grelles Rot (wie Tailwind red-500) */
-  border-radius: 8px; /* Passt zu deinem bestehenden Design */
+.component-info-boundary {
+  margin: 1.5rem;
+  padding: 1.5rem;
+  background-color: var(--color-info-boundary-background);
+  color: var(--color-info-boundary);
+  border: 2px solid var(--color-info-boundary-border);
+  border-radius: 8px;
 }

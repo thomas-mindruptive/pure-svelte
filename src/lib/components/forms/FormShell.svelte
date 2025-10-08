@@ -633,7 +633,7 @@
   <!-- Error region -->
   {#if Object.keys(formState.errors).length > 0}
     <div
-      class="component-error-boundary"
+      class="component-info-boundary"
       aria-live="polite"
     >
       <!-- Compact summary of first messages per field -->

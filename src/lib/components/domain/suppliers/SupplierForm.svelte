@@ -273,7 +273,7 @@
               <option value="low">low</option>
               <option value="medium">medium</option>
               <option value="high">high</option>
-              <option value="highest">highest States</option>
+              <option value="highest">highest</option>
             </select>
             {#if errors.relevance}
               <div class="error-text">{errors.relevance[0]}</div>

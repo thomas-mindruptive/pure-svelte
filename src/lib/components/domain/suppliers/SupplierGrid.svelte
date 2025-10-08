@@ -21,7 +21,7 @@
   // === COLUMNS ==================================================================================
 
   const columns: ColumnDef<Wholesaler>[] = [
-    { key: "name", header: "Name", sortable: true },
+    { key: "name", header: "Name", sortable: true, width:"200px" },
     {
       key: "dropship",
       header: "Dropship",

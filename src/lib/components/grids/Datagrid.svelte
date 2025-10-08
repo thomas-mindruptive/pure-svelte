@@ -668,7 +668,7 @@
       <!-- COLGROUP: Define column widths once -->
       <colgroup>
         {#if selection !== "none"}
-          <col style="width: 2.5rem;" />
+          <col style="width: 3.5rem;" />
         {/if}
         {#each columns as col}
           <!-- NEU: Fallback auf minmax statt leer -->

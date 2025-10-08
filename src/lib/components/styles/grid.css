@@ -133,6 +133,7 @@
   border-bottom: 1px solid var(--pc-grid-border);
   vertical-align: middle;
   background: var(--pc-grid-bg);
+  overflow-x: auto;
 }
 
 /* Dense mode (apply on container: .pc-grid--dense) */
@@ -409,7 +410,6 @@
 }
 
 /* -------------------------- Compact Variants ------------------------------ */
-/* CORRECTED: Comfortable mode applies same padding to BOTH TH and TD */
 .pc-grid--comfortable .pc-grid__thead th,
 .pc-grid--comfortable .pc-grid__tbody td {
   padding: calc(var(--pc-grid-cell-py) + 2px) var(--pc-grid-cell-px);

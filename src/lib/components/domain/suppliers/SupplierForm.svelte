@@ -16,6 +16,7 @@
     CancelledCallback,
     ChangedCallback,
     ValidateResult,
+    Errors,
   } from "$lib/components/forms/forms.types";
   import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
   import { assertDefined } from "$lib/utils/assertions";
@@ -67,7 +68,7 @@
   // Diese Funktion bleibt für Geschäftslogik, die HTML nicht kann.
   function validateWholesaler(raw: Record<string, any>): ValidateResult<Wholesaler> {
     const data = raw as SupplierFormData;
-    const errors: ValidationErrors = {};
+    const errors: Errors<Wholesaler> = {};
 
     // Beispiel für eine Regel, die HTML nicht kann:
     if (data.name?.toLowerCase() === "test") {

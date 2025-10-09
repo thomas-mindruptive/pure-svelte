@@ -17,6 +17,7 @@
     CancelledCallback,
     ChangedCallback,
     ValidateResult,
+    Errors,
   } from "$lib/components/forms/forms.types";
   import { type OfferingDetail_LoadData, OfferingDetail_LoadDataSchema } from "$lib/components/domain/offerings/offeringDetail.types";
   import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
@@ -155,7 +156,7 @@
     log.debug(`Validating offering form data`, raw);
     assertDefined(raw, "validateOfferingForSubmit");
     const data = raw as Wio_PDef_Cat_Supp;
-    const errors: ValidationErrors = {};
+    const errors: Errors<Wio_PDef_Cat_Supp> = {};
 
     // Sample for a complex business rule involving multiple fields ---
     // Example: Prices in Japanese Yen (JPY) cannot have decimals.

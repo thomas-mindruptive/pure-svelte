@@ -17,6 +17,7 @@
     CancelledCallback,
     ChangedCallback,
     ValidateResult,
+    Errors,
   } from "$lib/components/forms/forms.types";
   import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
   import { assertDefined } from "$lib/utils/assertions";
@@ -70,7 +71,7 @@
 
   function validateAssignment(raw: Record<string, any>): ValidateResult<WholesalerCategory> {
     const data = raw as AssignmentFormData;
-    const errors: ValidationErrors = {};
+    const errors: Errors<WholesalerCategory> = {};
 
     // URL validation for link
     if (data.link && data.link.trim()) {

@@ -11,6 +11,7 @@
     CancelledCallback,
     ChangedCallback,
     ValidateResult,
+    Errors,
   } from "$lib/components/forms/forms.types";
   import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
   import { assertDefined } from "$lib/utils/assertions";
@@ -62,7 +63,7 @@
 
   function validateCategory(raw: Record<string, any>): ValidateResult<ProductCategory> {
     const data = raw as ProductCategory;
-    const errors: ValidationErrors = {};
+    const errors: Errors<ProductCategory> = {};
 
     // Beispiel für eine Regel, die HTML nicht kann:
     if (data.name?.toLowerCase() === "test") {

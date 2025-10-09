@@ -14,6 +14,7 @@
     CancelledCallback,
     ChangedCallback,
     ValidateResult,
+    Errors,
   } from "$lib/components/forms/forms.types";
   import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
   import { assertDefined } from "$lib/utils/assertions";
@@ -129,7 +130,7 @@
 
   function validateOrder(raw: Record<string, any>): ValidateResult<Order_Wholesaler> {
     const order = raw as Order_Wholesaler;
-    const errors: ValidationErrors = {};
+    const errors: Errors<Order_Wholesaler> = {};
 
     if (order.order_date) {
       const orderDate = new Date(order.order_date);

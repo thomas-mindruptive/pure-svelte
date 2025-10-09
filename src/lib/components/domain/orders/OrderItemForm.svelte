@@ -16,6 +16,7 @@
     CancelledCallback,
     ChangedCallback,
     ValidateResult,
+    Errors,
   } from "$lib/components/forms/forms.types";
   import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
   import { assertDefined } from "$lib/utils/assertions";
@@ -61,7 +62,7 @@
 
   function validateOrderItem(raw: Record<string, any>): ValidateResult<OrderItem> {
     const orderItem = raw as OrderItem;
-    const errors: ValidationErrors = {};
+    const errors: Errors<OrderItem> = {};
 
     if (!orderItem.offering_id) {
       errors.offering_id = ["Please select an offering"];

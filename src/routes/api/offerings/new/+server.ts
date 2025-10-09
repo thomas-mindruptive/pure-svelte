@@ -57,7 +57,7 @@ export const POST: RequestHandler = async ({ request }) => {
     }
 
     // 3. Use the sanitized data from the validator for the database operation.
-    const { wholesaler_id, category_id, product_def_id, size, dimensions, price, currency, comment } = validation.sanitized as Partial<
+    const { wholesaler_id, category_id, product_def_id, size, dimensions, weight_grams, price, currency, comment } = validation.sanitized as Partial<
       Omit<WholesalerItemOffering, "offering_id">
     >;
 
@@ -119,15 +119,16 @@ export const POST: RequestHandler = async ({ request }) => {
       .input("product_def_id", product_def_id)
       .input("size", size)
       .input("dimensions", dimensions)
+      .input("weight_grams", weight_grams)
       .input("price", price)
       .input("currency", currency)
       .input("comment", comment).query(`
                 INSERT INTO dbo.wholesaler_item_offerings (
-                    wholesaler_id, category_id, product_def_id, size, dimensions, price, currency, comment
+                    wholesaler_id, category_id, product_def_id, size, dimensions, weight_grams, price, currency, comment
                 ) 
                 OUTPUT INSERTED.* 
                 VALUES (
-                    @wholesaler_id, @category_id, @product_def_id, @size, @dimensions, @price, @currency, @comment
+                    @wholesaler_id, @category_id, @product_def_id, @size, @dimensions, @weight_grams, @price, @currency, @comment
                 )
             `);
 

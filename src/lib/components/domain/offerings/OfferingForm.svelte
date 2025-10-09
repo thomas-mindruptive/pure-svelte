@@ -26,7 +26,6 @@
 
   // ===== INTERNAL TYPES =====
 
-
   // ===== COMPONENT PROPS =====
 
   interface OfferingFormProps {
@@ -312,6 +311,7 @@
     {#snippet fields({ getS, set, markTouched, errors })}
       <div class="form-body">
         <div class="form-row-grid">
+          <!---->
           <!-- "product defs" combo -------------------------------------------------------------->
           <div class="form-group span-2">
             <!--- Create mode and suppliers route => render "productdefs" combo --->
@@ -389,9 +389,11 @@
               <p class="field-hint">The supplier cannot be changed for an existing offering.</p>
             {/if}
           </div>
+        </div>
 
+        <div class="form-row-grid">
           <!-- price ----------------------------------------------------------------------------->
-          <div class="form-group span-2">
+          <div class="form-group span-1">
             <label for="offering-price">Price*</label>
             <input
               id="offering-price"
@@ -408,7 +410,7 @@
           </div>
 
           <!-- curreny --------------------------------------------------------------------------->
-          <div class="form-group span-2">
+          <div class="form-group span-1">
             <label for="offering-currency">Currency</label>
             <input
               id="offering-currency"
@@ -429,7 +431,7 @@
           </div>
 
           <!-- size ------------------------------------------------------------------------------>
-          <div class="form-group span-2">
+          <div class="form-group span-1">
             <label for="offering-size">Size</label>
             <input
               id="offering-size"
@@ -443,7 +445,7 @@
           </div>
 
           <!-- dimensions ------------------------------------------------------------------------>
-          <div class="form-group span-2">
+          <div class="form-group span-1">
             <label for="offering-dimensions">Dimensions</label>
             <input
               id="offering-dimensions"
@@ -456,6 +458,22 @@
             />
           </div>
 
+          <!-- weight_grams ------------------------------------------------------------------------>
+          <div class="form-group span-1">
+            <label for="offering-dimensions">Weight</label>
+            <input
+              id="weight_grams"
+              name="weight_grams"
+              type="number"
+              placeholder="e.g., 250"
+              value={getS("weight_grams") ?? ""}
+              oninput={(e) => set(["weight_grams"], Number.parseInt((e.currentTarget as HTMLInputElement).value))}
+              onblur={() => markTouched("weight_grams")}
+            />
+          </div>
+        </div>
+
+        <div class="form-row-grid">
           <!-- comment --------------------------------------------------------------------------->
           <!-- NOTE: the closing "</textarea>" must follow "{getS("comment") ?? ""}" immediately-->
           <div class="form-group span-4">

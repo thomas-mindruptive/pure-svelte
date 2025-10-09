@@ -210,6 +210,7 @@ const Wio_BaseSchema = z
     size: z.string().max(50).nullable().optional(),
     dimensions: z.string().max(100).nullable().optional(),
     price: z.number().multipleOf(0.01).nullable().optional(), // precision [18,2]
+    weight_grams: z.number().int().positive().nullable().optional(),
     currency: z.string().length(3).nullable().optional(),
     comment: z.string().max(1000).nullable().optional(),
     created_at: z.string().optional(),

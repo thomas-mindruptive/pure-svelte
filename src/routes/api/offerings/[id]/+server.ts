@@ -143,7 +143,7 @@ export const PUT: RequestHandler = async ({ request }) => {
       return json(errRes, { status: 400 });
     }
 
-    const { wholesaler_id, category_id, product_def_id, size, dimensions, price, currency, comment } =
+    const { wholesaler_id, category_id, product_def_id, size, dimensions, weight_grams, price, currency, comment } =
       validation.sanitized as Partial<WholesalerItemOffering>;
 
     // Verify the offering exists and get current context
@@ -176,12 +176,13 @@ export const PUT: RequestHandler = async ({ request }) => {
       .input("product_def_id", product_def_id)
       .input("size", size)
       .input("dimensions", dimensions)
+      .input("weight_grams", weight_grams)
       .input("price", price)
       .input("currency", currency)
       .input("comment", comment).query(`
                 UPDATE dbo.wholesaler_item_offerings 
                 SET wholesaler_id=@wholesaler_id, category_id=@category_id, product_def_id=@product_def_id,
-                    size=@size, dimensions=@dimensions, price=@price, currency=@currency, comment=@comment
+                    size=@size, dimensions=@dimensions, weight_grams=@weight_grams, price=@price, currency=@currency, comment=@comment
                 OUTPUT INSERTED.* 
                 WHERE offering_id = @offering_id
             `);

@@ -12,11 +12,7 @@ import { log } from "$lib/utils/logger";
 import { buildQuery, executeQuery } from "$lib/backendQueries/queryBuilder";
 import { queryConfig } from "$lib/backendQueries/queryConfig";
 import { buildUnexpectedError } from "$lib/backendQueries/entityOperations";
-import {
-  WholesalerItemOfferingForCreateSchema,
-  type WholesalerItemOffering,
-  type Wio_PDef_Cat_Supp,
-} from "$lib/domain/domainTypes";
+import { WholesalerItemOfferingForCreateSchema, type WholesalerItemOffering, type Wio_PDef_Cat_Supp } from "$lib/domain/domainTypes";
 import { validateEntity } from "$lib/domain/domainTypes.utils";
 import type { ApiErrorResponse, ApiSuccessResponse } from "$lib/api/api.types";
 import { v4 as uuidv4 } from "uuid";
@@ -57,9 +53,8 @@ export const POST: RequestHandler = async ({ request }) => {
     }
 
     // 3. Use the sanitized data from the validator for the database operation.
-    const { wholesaler_id, category_id, product_def_id, size, dimensions, weight_grams, price, currency, comment } = validation.sanitized as Partial<
-      Omit<WholesalerItemOffering, "offering_id">
-    >;
+    const { wholesaler_id, category_id, product_def_id, title, size, dimensions, weight_grams, price, currency, comment } =
+      validation.sanitized as Partial<Omit<WholesalerItemOffering, "offering_id">>;
 
     // 4. Verify that supplier and category exist and are related
     const relationCheck = await transaction.request().input("wholesalerId", wholesaler_id).input("categoryId", category_id).query(`
@@ -117,6 +112,7 @@ export const POST: RequestHandler = async ({ request }) => {
       .input("wholesaler_id", wholesaler_id)
       .input("category_id", category_id)
       .input("product_def_id", product_def_id)
+      .input("title", title)
       .input("size", size)
       .input("dimensions", dimensions)
       .input("weight_grams", weight_grams)
@@ -124,11 +120,11 @@ export const POST: RequestHandler = async ({ request }) => {
       .input("currency", currency)
       .input("comment", comment).query(`
                 INSERT INTO dbo.wholesaler_item_offerings (
-                    wholesaler_id, category_id, product_def_id, size, dimensions, weight_grams, price, currency, comment
+                    wholesaler_id, category_id, product_def_id, title, size, dimensions, weight_grams, price, currency, comment
                 ) 
                 OUTPUT INSERTED.* 
                 VALUES (
-                    @wholesaler_id, @category_id, @product_def_id, @size, @dimensions, @weight_grams, @price, @currency, @comment
+                    @wholesaler_id, @category_id, @product_def_id, @title, @size, @dimensions, @weight_grams, @price, @currency, @comment
                 )
             `);
 

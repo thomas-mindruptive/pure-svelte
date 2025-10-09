@@ -207,6 +207,7 @@ const Wio_BaseSchema = z
     wholesaler_id: z.number().int().positive(),
     category_id: z.number().int().positive(),
     product_def_id: z.number().int().positive(),
+    title: z.string().max(255).nullable().optional(),
     size: z.string().max(50).nullable().optional(),
     dimensions: z.string().max(100).nullable().optional(),
     price: z.number().multipleOf(0.01).nullable().optional(), // precision [18,2]

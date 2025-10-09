@@ -38,14 +38,14 @@
       header: "URL",
       sortable: true,
       width: "4fr",
-      accessor: (link) => link.url,
+      accessor: (link) => link.url.substring(0, 50) + " ...",
     },
     {
       key: "notes",
       header: "Description",
       sortable: false,
       width: "3fr",
-      accessor: (link) => link.notes || "—",
+      //accessor: (link) => link.notes || "—",
     },
     {
       key: "created_at",

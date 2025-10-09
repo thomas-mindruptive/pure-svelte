@@ -485,9 +485,7 @@
               placeholder="Internal notes about this specific offering..."
               oninput={(e) => set(["comment"], (e.currentTarget as HTMLTextAreaElement).value)}
               onblur={() => markTouched("comment")}
-            >
-              {getS("comment") ?? ""}
-            </textarea>
+            >{getS("comment") ?? ""}</textarea>
           </div>
         </div>
       </div>

@@ -1,12 +1,5 @@
 <!-- src/lib/components/domain/offerings/OfferingGrid.svelte -->
 <script lang="ts">
-  // OfferingGrid.svelte (Svelte 5 + Runes) - REFACTORED
-  //
-  // PURPOSE:
-  // Thin wrapper around the reusable Datagrid component specifically for displaying
-  // WholesalerItemOffering_ProductDef_Category data. This component now directly accepts
-  // strategy objects, making it a pure presentation component consistent with other grids.
-
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
   import type { DeleteStrategy, RowActionStrategy, ColumnDefBase } from "$lib/components/grids/Datagrid.types";
   import type { WholesalerItemOffering_ProductDef_Category_Supplier_Nested, Wio_PDef_Cat_Supp_Nested_Schema } from "$lib/domain/domainTypes";
@@ -41,6 +34,12 @@
       accessor: (offering) => offering.product_def.title || "Unnamed Product",
     },
     {
+      key: "w.name",
+      header: "Supplier",
+      sortable: true,
+      width: "3fr",
+      accessor: (offering) => offering.wholesaler.name || "Unnamed Supplier",
+    },    {
       key: "price",
       header: "Price",
       sortable: true,
@@ -52,14 +51,15 @@
     },
     {
       key: "size",
-      header: "Size / Dimensions",
+      header: "Size/Dim/Weight",
       sortable: false,
       width: "2fr",
       accessor: (offering) => {
-        const size = offering.size || "";
-        const dimensions = offering.dimensions || "";
-        if (size && dimensions) return `${size} (${dimensions})`;
-        return size || dimensions || "—";
+        const size = offering.size || "NA";
+        const dimensions = offering.dimensions || "NA";
+        const weight = offering.weight_grams? offering.weight_grams.toString(): "NA"; 
+        const cellTitle = `${size} / ${dimensions} / ${weight}`; 
+        return cellTitle;
       },
     },
     {

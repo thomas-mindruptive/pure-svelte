@@ -23,6 +23,7 @@
   import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
   import { assertDefined } from "$lib/utils/assertions";
   import { getOfferingApi } from "$lib/api/client/offering";
+    import Field from "$lib/components/forms/Field.svelte";
 
   // ===== INTERNAL TYPES =====
 
@@ -308,7 +309,8 @@
     {/snippet}
 
     <!--- FIELDS --------------------------------------------------------------------------------->
-    {#snippet fields({ getS, set, markTouched, errors })}
+    {#snippet fields(fieldProps)}
+      {@const { getS, set, markTouched, errors } = fieldProps}
       <div class="form-body">
         <div class="form-row-grid">
           <!---->
@@ -429,6 +431,21 @@
               onblur={() => markTouched("currency")}
             />
           </div>
+          <!-- Test field component -->
+            <Field 
+              class="span-1"
+              label="Currency"
+              {fieldProps}
+              path={["currency"]}
+              id="offering-currency"
+              type="text"
+              placeholder="e.g., USD"
+              maxlength={3}
+              minlength={3}
+              pattern={"[A-Za-z]{3}"}
+              title="Enter a 3-letter currency code"
+              onInput={(value) => {log.detdebug(`offering-currency input`, value)}}
+            />
 
           <!-- size ------------------------------------------------------------------------------>
           <div class="form-group span-1">
@@ -485,7 +502,9 @@
               placeholder="Internal notes about this specific offering..."
               oninput={(e) => set(["comment"], (e.currentTarget as HTMLTextAreaElement).value)}
               onblur={() => markTouched("comment")}
-            >{getS("comment") ?? ""}</textarea>
+            >
+              {getS("comment") ?? ""}
+            </textarea>
           </div>
         </div>
       </div>

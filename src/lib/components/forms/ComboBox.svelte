@@ -70,9 +70,10 @@
   const { get, set, errors, markTouched } = fieldProps;
 
   // === DERIVED ==================================================================================
-  
-  const fieldName = String(path[0]);
-  const htmlId = id ?? fieldName;
+
+  // Join path segments with dots for error lookup (e.g., ["address", "city"] → "address.city")
+  const fieldName = path.join(".");
+  const htmlId = id ?? path.join("-");
   const currentValue = $derived(get(path) ?? "");
   const hasError = $derived(!!errors[fieldName]);
   const errorMessage = $derived(errors[fieldName]?.[0]);

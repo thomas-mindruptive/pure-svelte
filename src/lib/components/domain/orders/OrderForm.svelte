@@ -127,7 +127,7 @@
 
   // === BUSINESS FUNCTIONALITY ===================================================================
 
-  function validateOrder(raw: Record<string, any>): ValidateResult {
+  function validateOrder(raw: Record<string, any>): ValidateResult<Order_Wholesaler> {
     const order = raw as Order_Wholesaler;
     const errors: ValidationErrors = {};
 

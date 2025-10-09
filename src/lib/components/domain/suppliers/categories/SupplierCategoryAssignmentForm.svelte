@@ -68,7 +68,7 @@
 
   // === BUSINESS FUNCTIONALITY ===================================================================
 
-  function validateAssignment(raw: Record<string, any>): ValidateResult {
+  function validateAssignment(raw: Record<string, any>): ValidateResult<WholesalerCategory> {
     const data = raw as AssignmentFormData;
     const errors: ValidationErrors = {};
 

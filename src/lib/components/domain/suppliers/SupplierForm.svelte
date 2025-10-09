@@ -65,7 +65,7 @@
   // === BUSINESS FUNCTIONALITY ===================================================================
 
   // Diese Funktion bleibt für Geschäftslogik, die HTML nicht kann.
-  function validateWholesaler(raw: Record<string, any>): ValidateResult {
+  function validateWholesaler(raw: Record<string, any>): ValidateResult<Wholesaler> {
     const data = raw as SupplierFormData;
     const errors: ValidationErrors = {};
 

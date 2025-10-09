@@ -59,7 +59,7 @@
 
   // === BUSINESS FUNCTIONALITY ===================================================================
 
-  function validateOrderItem(raw: Record<string, any>): ValidateResult {
+  function validateOrderItem(raw: Record<string, any>): ValidateResult<OrderItem> {
     const orderItem = raw as OrderItem;
     const errors: ValidationErrors = {};
 

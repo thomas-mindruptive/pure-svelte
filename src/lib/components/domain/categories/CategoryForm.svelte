@@ -60,8 +60,8 @@
 
   // === BUSINESS FUNCTIONALITY ===================================================================
 
-  function validateCategory(raw: Record<string, any>): ValidateResult {
-    const data = raw as CategoryFormData;
+  function validateCategory(raw: Record<string, any>): ValidateResult<ProductCategory> {
+    const data = raw as ProductCategory;
     const errors: ValidationErrors = {};
 
     // Beispiel für eine Regel, die HTML nicht kann:

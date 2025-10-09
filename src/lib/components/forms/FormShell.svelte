@@ -58,7 +58,7 @@
     getS<K extends keyof FormData<T>>(key: K): FormData<T>[K] | undefined;
 
     // Form state
-    errors: Errors;
+    errors: Errors<T>;
     touched: Set<string>;
     markTouched: (path: string) => void;
     validate: (path?: string) => Promise<boolean>;
@@ -177,7 +177,7 @@
   const formState = $state({
     data: pureDataDeepClone(cleanInitial), // Current form data
     snapshot: pureDataDeepClone(cleanInitial), // Clean snapshot for dirty checking
-    errors: {} as Errors, // Field validation errors
+    errors: {} as Errors<T>, // Field validation errors
     touched: new Set<string>(), // Fields that have been interacted with
     submitting: false, // Form submission in progress
     validating: false, // Validation in progress
@@ -327,7 +327,7 @@
 
     // --- Step 1: Execute the parent's custom validation logic ---
     // This provides the business rule violations.
-    let customResult: ValidateResult = { valid: true, errors: {} };
+    let customResult: ValidateResult<T> = { valid: true, errors: {} };
     if (validate) {
       try {
         customResult = await validate(formState.data);
@@ -337,7 +337,7 @@
         return true;
       }
     }
-    const customErrors = customResult.errors || {};
+    const customErrors = customResult.errors || {} as Errors<T>;
     log.detdebug(`Custom errors after await validate:`, customErrors);
 
     // --- Step 2: Inject custom errors into the DOM ---
@@ -377,9 +377,9 @@
           if (fieldName) {
             // `validationMessage` will be our custom message if we set one,
             // otherwise it will be the browser's default message (e.g., "Please fill out this field.").
-            formState.errors[fieldName] = [element.validationMessage];
+            (formState.errors as any)[fieldName] = [element.validationMessage];
           } else {
-            formState.errors["general_errors"] = [`No fieldname set for element`];
+            (formState.errors as any)["general_errors"] = [`No fieldname set for element`];
           }
         }
       }
@@ -640,7 +640,7 @@
       {#each Object.entries(formState.errors) as [path, msgs]}
         <div>
           <strong>{path}</strong>
-          : {msgs[0]}
+          : {msgs? msgs[0] : `FormShell - Error region: No error messages for ${path} set! Should not happen.`}
         </div>
       {/each}
     </div>

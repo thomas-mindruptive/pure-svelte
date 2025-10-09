@@ -1,11 +1,11 @@
-export type Errors = Record<string, string[]>;
-export type ValidateResult = { valid: boolean; errors?: Errors };
+export type Errors<T> = Partial<Record<keyof T, string[]>>;
+export type ValidateResult<T> = { valid: boolean; errors?: Errors<T> };
 
 export type FormData<T> = T;
 
 export type ValidateCallback<T = any> = (
     data: T,
-) => ValidateResult | Promise<ValidateResult>;
+) => ValidateResult<T> | Promise<ValidateResult<T>>;
 
 export type SubmitCallback<T = any> = (data: T) => unknown | Promise<unknown>;
 export type CancelCallback<T = any> = (data: T) => void | Promise<void>;

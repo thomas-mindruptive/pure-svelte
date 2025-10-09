@@ -106,12 +106,17 @@
 
   // === BUSINESS LOGIC ===========================================================================
 
-  function validate(rawData: Record<string, any>): ValidateResult {
+  function validate(rawData: Record<string, any>): ValidateResult<ProductDefinition> {
+    //const prodDef = rawData as ProductDefinition;
+
     // For this entity, Zod's parsing is sufficient.
     // We can use a more specific schema if needed (e.g., for create vs. update)
     if (isCreateMode) {
       delete rawData.product_def_id;
     }
+
+    // TODO: All client form validates should validate against schema ("forCreateMode" and "forUpdateMode").
+
     const result = ProductDefinitionSchema.partial().safeParse(rawData);
     if (result.success) {
       return { valid: true };
@@ -262,9 +267,10 @@
           <!---->
           <!--- TITLE -------------------------------------------------------------------------->
           <div class="form-group span-2">
-            <label for="pd-title">Title *</label>
+            <label for="title">Title *</label>
             <input
-              id="pd-title"
+              id="title"
+              name="title"
               type="text"
               value={getS("title") ?? ""}
               class:error={errors.title}

@@ -151,8 +151,8 @@
    * @param data The current form data.
    * @returns A ValidateResult object containing any errors for custom rules.
    */
-  function validateOfferingForSubmit(raw: Record<string, any>): ValidateResult {
-    log.debug(`Validating offering form data`, raw)
+  function validateOfferingForSubmit(raw: Record<string, any>): ValidateResult<Wio_PDef_Cat_Supp> {
+    log.debug(`Validating offering form data`, raw);
     assertDefined(raw, "validateOfferingForSubmit");
     const data = raw as Wio_PDef_Cat_Supp;
     const errors: ValidationErrors = {};
@@ -309,7 +309,7 @@
     {/snippet}
 
     <!--- FIELDS --------------------------------------------------------------------------------->
-    {#snippet fields({ getS, set, markTouched })}
+    {#snippet fields({ getS, set, markTouched, errors })}
       <div class="form-body">
         <div class="form-row-grid">
           <!-- "product defs" combo -------------------------------------------------------------->
@@ -354,10 +354,11 @@
             <!--- Create mode and categories route => render "suppliers" combo --->
             {#if isCreateMode}
               {#if isCategoriesRoute}
-                <label for="offering-supplier">+++Supplier *</label>
+                <label for="offering-supplier">Supplier</label>
                 <select
                   id="offering-supplier"
                   name="wholesaler_id"
+                  class:error={errors.wholesaler_id}
                   required
                   value={getS("wholesaler_id")}
                   onchange={(e) => {
@@ -376,6 +377,9 @@
                     <option value={supplier.wholesaler_id}>{supplier.name}</option>
                   {/each}
                 </select>
+                {#if errors.wholesaler_id}
+                  <div class="error-text">{errors.wholesaler_id[0]}</div>
+                {/if}
               {/if}
             {:else}
               <!--- Not create mode => Render static text for supplier --->
@@ -463,7 +467,9 @@
               placeholder="Internal notes about this specific offering..."
               oninput={(e) => set(["comment"], (e.currentTarget as HTMLTextAreaElement).value)}
               onblur={() => markTouched("comment")}
-            >{getS("comment") ?? ""}</textarea>
+            >
+              {getS("comment") ?? ""}
+            </textarea>
           </div>
         </div>
       </div>

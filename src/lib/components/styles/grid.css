@@ -130,10 +130,24 @@
 
 .pc-grid__tbody td {
   padding: var(--pc-grid-cell-py) var(--pc-grid-cell-px);
-  border-bottom: 1px solid var(--pc-grid-border);
   vertical-align: middle;
   background: var(--pc-grid-bg);
   overflow-x: auto;
+}
+
+.pc-grid__tbody tr {
+  position: relative;
+  vertical-align: top;
+}
+
+.pc-grid__tbody tr::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background-color: var(--color-border, #202428);
 }
 
 /* Dense mode (apply on container: .pc-grid--dense) */

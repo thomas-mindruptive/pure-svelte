@@ -64,12 +64,12 @@ INCLUDE_PATTERNS: List[str] = [
     # "src/lib/backendQueries/**",
     # "src/lib/api/client/supplier.ts",
     # "src/lib/api/client/order.ts",
-    "src/lib/components/domain/categories/**",
-    "src/lib/components/test/**",
-    "src/lib/components/forms/**",
+    "src/lib/components/domain/suppliers/**",
+    # "src/lib/components/test/**",
+    "src/lib/components/grids/**",
     # "src/lib/components/styles/**",
-    "src/lib/utils/pathUtils.ts",
-    "src/lib/utils/pathUtils.types.ts",
+    # "src/lib/utils/pathUtils.ts",
+    # "src/lib/utils/pathUtils.types.ts",
     # "README*.*",
 ]
 

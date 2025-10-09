@@ -136,6 +136,117 @@ export const POST: RequestHandler = async ({ request }) => {
 };
 
 /**
+ * PUT /api/supplier-categories
+ * @description Updates an existing category assignment (comment, link).
+ */
+export const PUT: RequestHandler = async ({ request }) => {
+  log.infoHeader("PUT /api/supplier-categories");
+  const operationId = uuidv4();
+  log.info(`[${operationId}] PUT /supplier-categories: FN_START`);
+
+  try {
+    const body = (await request.json()) as AssignmentRequest<Wholesaler, ProductCategory, WholesalerCategory>;
+    const { parent1Id: supplierId, parent2Id: categoryId, data: wholesalerProductCategory } = body;
+    log.info(`[${operationId}] Parsed request body`, { supplierId, categoryId });
+
+    if (!supplierId || !categoryId) {
+      const errRes: ApiErrorResponse = {
+        success: false,
+        message: "supplierId (parent1Id) and categoryId (parent2Id) are required.",
+        status_code: 400,
+        error_code: "BAD_REQUEST",
+        meta: { timestamp: new Date().toISOString() },
+      };
+      log.warn(`[${operationId}] FN_FAILURE: Validation failed - missing IDs.`, { error: errRes });
+      return json(errRes, { status: 400 });
+    }
+
+    if (!wholesalerProductCategory) {
+      const errRes: ApiErrorResponse = {
+        success: false,
+        message: "Assignment data is required.",
+        status_code: 400,
+        error_code: "BAD_REQUEST",
+        meta: { timestamp: new Date().toISOString() },
+      };
+      log.warn(`[${operationId}] FN_FAILURE: Validation failed - missing assignment data.`, { error: errRes });
+      return json(errRes, { status: 400 });
+    }
+
+    const checkResult = await db.request().input("supplierId", supplierId).input("categoryId", categoryId).query(`
+                SELECT (SELECT name FROM dbo.wholesalers WHERE wholesaler_id = @supplierId) as supplier_name,
+                       (SELECT name FROM dbo.product_categories WHERE category_id = @categoryId) as category_name,
+                       (SELECT COUNT(*) FROM dbo.wholesaler_categories WHERE wholesaler_id = @supplierId AND category_id = @categoryId) as assignment_count;
+            `);
+    const { supplier_name, category_name, assignment_count } = checkResult.recordset[0];
+
+    if (!supplier_name) {
+      const errRes: ApiErrorResponse = {
+        success: false,
+        message: `Supplier with ID ${supplierId} not found.`,
+        status_code: 404,
+        error_code: "NOT_FOUND",
+        meta: { timestamp: new Date().toISOString() },
+      };
+      log.warn(`[${operationId}] FN_FAILURE: Supplier not found.`, { supplierId });
+      return json(errRes, { status: 404 });
+    }
+    if (!category_name) {
+      const errRes: ApiErrorResponse = {
+        success: false,
+        message: `Category with ID ${categoryId} not found.`,
+        status_code: 404,
+        error_code: "NOT_FOUND",
+        meta: { timestamp: new Date().toISOString() },
+      };
+      log.warn(`[${operationId}] FN_FAILURE: Category not found.`, { categoryId });
+      return json(errRes, { status: 404 });
+    }
+    if (assignment_count === 0) {
+      const errRes: ApiErrorResponse = {
+        success: false,
+        message: `Category "${category_name}" is not assigned to supplier "${supplier_name}".`,
+        status_code: 404,
+        error_code: "NOT_FOUND",
+        meta: { timestamp: new Date().toISOString() },
+      };
+      log.warn(`[${operationId}] FN_FAILURE: Assignment does not exist.`, { supplierId, categoryId });
+      return json(errRes, { status: 404 });
+    }
+
+    const result = await db
+      .request()
+      .input("supplierId", supplierId)
+      .input("categoryId", categoryId)
+      .input("comment", wholesalerProductCategory.comment || null)
+      .input("link", wholesalerProductCategory.link || null)
+      .query(
+        "UPDATE dbo.wholesaler_categories SET comment = @comment, link = @link OUTPUT INSERTED.* WHERE wholesaler_id = @supplierId AND category_id = @categoryId",
+      );
+
+    const response: AssignmentSuccessResponse<WholesalerCategory> = {
+      success: true,
+      message: `Category "${category_name}" assignment for supplier "${supplier_name}" updated.`,
+      data: {
+        assignment: result.recordset[0] as WholesalerCategory,
+        meta: {
+          assigned_at: wholesalerProductCategory.created_at || new Date().toISOString(),
+          parent_name: supplier_name,
+          child_name: category_name,
+        },
+      },
+      meta: { timestamp: new Date().toISOString() },
+    };
+    log.info(`[${operationId}] FN_SUCCESS: Assignment updated.`, { supplierId, categoryId });
+    return json(response, { status: 200 });
+  } catch (err: unknown) {
+    const { status, message } = mssqlErrorMapper.mapToHttpError(err);
+    log.error(`[${operationId}] FN_EXCEPTION: Unhandled error during update.`, { error: err });
+    throw error(status, message);
+  }
+};
+
+/**
  * DELETE /api/supplier-categories
  * @description Removes a category assignment.
  */

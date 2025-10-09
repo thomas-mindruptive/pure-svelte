@@ -387,6 +387,36 @@ export function getSupplierApi(client: ApiClient) {
     },
 
     /**
+     * Updates an existing category assignment for a supplier.
+     */
+    async updateSupplierCategoryAssignment(
+      supplierId: number,
+      categoryId: number,
+      updates: Partial<WholesalerCategory>,
+    ): Promise<WholesalerCategory> {
+      const operationId = `updateSupplierCategoryAssignment-${supplierId}-${categoryId}`;
+      supplierLoadingOperations.start(operationId);
+      try {
+        const requestBody: AssignmentRequest<Wholesaler, ProductCategory, Partial<WholesalerCategory>> = {
+          parent1Id: supplierId,
+          parent2Id: categoryId,
+          data: updates,
+        };
+        const response = await client.apiFetch<AssignmentSuccessData<WholesalerCategory>>(
+          "/api/supplier-categories",
+          { method: "PUT", body: createJsonBody(requestBody) },
+          { context: operationId },
+        );
+        return response.assignment;
+      } catch (err) {
+        log.error(`[${operationId}] Failed.`, { supplierId, categoryId, updates, error: getErrorMessage(err) });
+        throw err;
+      } finally {
+        supplierLoadingOperations.finish(operationId);
+      }
+    },
+
+    /**
      * Removes a category assignment from a supplier.
      */
     async removeCategoryFromSupplier(

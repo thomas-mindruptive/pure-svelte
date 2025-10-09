@@ -20,7 +20,6 @@
   import "$lib/components/styles/grid.css";
   import type { ValidationErrorTree } from "$lib/components/validation/validation.types";
   import { zodToValidationErrorTree } from "$lib/domain/domainTypes.utils";
-  import ComboBox from "$lib/components/forms/ComboBox.svelte";
   import ComboBox2 from "$lib/components/forms/ComboBox2.svelte";
 
   // === PROPS ====================================================================================
@@ -141,7 +140,7 @@
 <!--
   -- Render material combo using the reusable FormCombobox component
   -->
-<!-- prettier-ignore -->
+<!-- prettier-ignore 
 {#snippet materialCombo(fieldProps: FieldsProps<ProductDefinition>)}
   <ComboBox
     {fieldProps}
@@ -155,8 +154,8 @@
       log.debug("Material selected:", material?.name);
     }}
   />
-
 {/snippet}
+-->
 
 <!--
   -- Render material combo using Combobox2 component
@@ -213,6 +212,7 @@
 <!--
   -- Render form combo using the reusable FormCombobox component
   -->
+<!--  
 {#snippet formCombo(fieldProps: FieldsProps<ProductDefinition>)}
   <ComboBox
     {fieldProps}
@@ -227,6 +227,7 @@
     }}
   />
 {/snippet}
+  -->
 
 <!-- TEMPLATE ------------------------------------------------------------------------------------>
 

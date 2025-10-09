@@ -1,22 +1,21 @@
 <script lang="ts">
+  import { ApiClient } from "$lib/api/client/ApiClient";
+  import { getCategoryApi } from "$lib/api/client/category";
+  import type {
+      CancelledCallback,
+      ChangedCallback,
+      Errors,
+      SubmitErrorCallback,
+      SubmittedCallback,
+      ValidateResult,
+  } from "$lib/components/forms/forms.types";
   import FormShell from "$lib/components/forms/FormShell.svelte";
-  import { log } from "$lib/utils/logger";
-  import { ProductCategorySchema, type ProductCategory } from "$lib/domain/domainTypes";
   import "$lib/components/styles/form.css";
   import "$lib/components/styles/grid.css";
-  import { ApiClient } from "$lib/api/client/ApiClient";
-  import type {
-    SubmittedCallback,
-    SubmitErrorCallback,
-    CancelledCallback,
-    ChangedCallback,
-    ValidateResult,
-    Errors,
-  } from "$lib/components/forms/forms.types";
   import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
+  import { ProductCategorySchema, type ProductCategory } from "$lib/domain/domainTypes";
   import { assertDefined } from "$lib/utils/assertions";
-  import { getCategoryApi } from "$lib/api/client/category";
-    import type { ValidationErrors } from "$lib/components/validation/validation.types";
+  import { log } from "$lib/utils/logger";
 
 
   // === PROPS ====================================================================================

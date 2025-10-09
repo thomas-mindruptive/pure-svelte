@@ -3,25 +3,23 @@
    * SupplierForm Component (Svelte 5 + Runes)
    */
 
-  import FormShell from "$lib/components/forms/FormShell.svelte";
-  import { log } from "$lib/utils/logger";
-  import { WholesalerSchema, type Wholesaler, type WholesalerRelevance, type WholesalerPriceRange } from "$lib/domain/domainTypes";
-  import "$lib/components/styles/form.css";
-  import "$lib/components/styles/grid.css";
   import { ApiClient } from "$lib/api/client/ApiClient";
   import { getSupplierApi } from "$lib/api/client/supplier";
   import type {
-    SubmittedCallback,
-    SubmitErrorCallback,
-    CancelledCallback,
-    ChangedCallback,
-    ValidateResult,
-    Errors,
+      CancelledCallback,
+      ChangedCallback,
+      Errors,
+      SubmitErrorCallback,
+      SubmittedCallback,
+      ValidateResult,
   } from "$lib/components/forms/forms.types";
+  import FormShell from "$lib/components/forms/FormShell.svelte";
+  import "$lib/components/styles/form.css";
+  import "$lib/components/styles/grid.css";
   import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
+  import { WholesalerSchema, type Wholesaler, type WholesalerPriceRange, type WholesalerRelevance } from "$lib/domain/domainTypes";
   import { assertDefined } from "$lib/utils/assertions";
-
-  type ValidationErrors = Record<string, string[]>;
+  import { log } from "$lib/utils/logger";
 
   // === PROPS ====================================================================================
 

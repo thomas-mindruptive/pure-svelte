@@ -21,8 +21,8 @@
   } from "$lib/components/forms/forms.types";
   import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
   import { assertDefined } from "$lib/utils/assertions";
-  import type { ValidationErrors, ValidationErrorTree } from "$lib/components/validation/validation.types";
-    import { zodToValidationErrorTree } from "$lib/domain/domainTypes.utils";
+  import type { ValidationErrorTree } from "$lib/components/validation/validation.types";
+  import { zodToValidationErrorTree } from "$lib/domain/domainTypes.utils";
 
   // === PROPS ====================================================================================
 

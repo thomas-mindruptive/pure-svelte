@@ -22,8 +22,6 @@
   import { assertDefined } from "$lib/utils/assertions";
   import { getOrderItemApi } from "$lib/api/client/orderItem";
 
-  type ValidationErrors = Record<string, string[]>;
-
   // === PROPS ====================================================================================
 
   export type Props = {

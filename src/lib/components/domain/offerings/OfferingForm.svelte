@@ -26,7 +26,6 @@
 
   // ===== INTERNAL TYPES =====
 
-  type ValidationErrors = Record<string, string[]>;
 
   // ===== COMPONENT PROPS =====
 

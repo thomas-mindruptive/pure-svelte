@@ -20,9 +20,8 @@
   import { assertDefined } from "$lib/utils/assertions";
   import { getOrderApi } from "$lib/api/client/order";
   import { formatDateForInput, formatDateForApi } from "$lib/utils/formatUtils";
-    import type { ValidationErrors, ValidationErrorTree } from "$lib/components/validation/validation.types";
-    import { zodToValidationErrorTree } from "$lib/domain/domainTypes.utils";
-
+  import type { ValidationErrorTree } from "$lib/components/validation/validation.types";
+  import { zodToValidationErrorTree } from "$lib/domain/domainTypes.utils";
 
   // === PROPS ====================================================================================
 
@@ -53,7 +52,7 @@
     onSubmitError,
     onCancelled,
     onChanged,
-  } : Props = $props();
+  }: Props = $props();
   // Silence tsc:
   isSuppliersRoute;
 
@@ -64,14 +63,14 @@
   // === INIT =====================================================================================
 
   $effect(() => {
-    log.debug(`Props: `, {initial, wholeSalerOfOrder, isCreateMode, availableWholesalers, isOrdersRoute, isSuppliersRoute});
+    log.debug(`Props: `, { initial, wholeSalerOfOrder, isCreateMode, availableWholesalers, isOrdersRoute, isSuppliersRoute });
     if (isCreateMode) {
       if (isSuppliersRoute) {
-         if (!wholeSalerOfOrder) {
+        if (!wholeSalerOfOrder) {
           const msg = `if createMode and isSuppliersRoute => wholesaler must be set.`;
           log.error(msg);
-          errors.props = {wholeSalerOfOrder: [msg]}
-         }
+          errors.props = { wholeSalerOfOrder: [msg] };
+        }
       }
     }
 
@@ -111,18 +110,18 @@
   // === VALIDATE =================================================================================
 
   //let { schemaValidationErrors } = $derived.by(() => {
-    // const result = Order_Wholesaler_Schema.nullable().safeParse(initial);
-    // if (result.error) {
-    //   log.error(`Validation to OrderSchema failed.`, result.error);
-    // }
-    // if (result.error) {
-    //   errors.orderWholesaler = zodToValidationErrorTree(result.error);
-    // }
-    // return {
-    //   schemaValidationErrors: result.success  ? null : result.error.issues,
-    //   isValid: result.success,
-    // };
- // });
+  // const result = Order_Wholesaler_Schema.nullable().safeParse(initial);
+  // if (result.error) {
+  //   log.error(`Validation to OrderSchema failed.`, result.error);
+  // }
+  // if (result.error) {
+  //   errors.orderWholesaler = zodToValidationErrorTree(result.error);
+  // }
+  // return {
+  //   schemaValidationErrors: result.success  ? null : result.error.issues,
+  //   isValid: result.success,
+  // };
+  // });
 
   // === STATE ====================================================================================
 
@@ -190,7 +189,7 @@
   }
 </script>
 
-<ValidationWrapper errors={errors}>
+<ValidationWrapper {errors}>
   <FormShell
     entity="Order"
     initial={initialWithDefaults as Order_Wholesaler}

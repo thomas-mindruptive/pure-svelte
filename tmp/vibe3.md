@@ -125,7 +125,7 @@ Current assistants perform best when used for:
 *   exploration of new libraries, and
 *   development of small, pattern-consistent modules.
 
-They are unsuited for:
+However, their utility diminishes in more demanding scenarios. Without significant integration effort—such as implementing custom MCP servers and maintaining a comprehensive, up-to-date knowledge base—they are less suited for:
 
 *   mature codebases with specialized conventions,
 *   cross-component refactoring,
@@ -180,7 +180,7 @@ Future progress depends on **hybrid architectures** that combine *probabilistic 
 
 ---
 
-### Referenzen
+### References
 
 1.  Lewis, P., et al. (2020). "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks." *Advances in Neural Information Processing Systems 33*.
 2.  Microsoft. (n.d.). "Copilot: MCP Servers." *Visual Studio Code Docs*. Retrieved from https://code.visualstudio.com/docs/copilot/customization/mcp-servers

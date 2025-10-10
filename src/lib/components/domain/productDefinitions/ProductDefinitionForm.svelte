@@ -123,9 +123,9 @@
 
     // In case we need to add more business val errors, add them here:
     const errors: Errors<ProductDefinition> = {};
-    // errors.property = ["XYZ"]    
-    
-      if (result.success) {
+    // errors.property = ["XYZ"]
+
+    if (result.success) {
       return { valid: true, errors };
     }
     return { valid: false, errors: result.error.flatten().fieldErrors };
@@ -180,7 +180,7 @@
     placeholder="Search forms..."
     label="Form"
     onChange={(value, form) => {
-      log.debug("Form selected via Combobox2:", {value, form_name: form?.name});
+      log.debug("Form selected via Combobox2:", { value, form_name: form?.name });
     }}
   />
 {/snippet}
@@ -200,6 +200,7 @@
     {onChanged}
   >
     {#snippet header({ data, dirty })}
+      <!-- HEADER -------------------------------------------------------------------------------->
       <div class="form-header">
         <div>
           <h3>{data?.title || "New Product Definition"}</h3>
@@ -211,28 +212,43 @@
       </div>
     {/snippet}
 
+    <!-- FIELDS ---------------------------------------------------------------------------------->
     {#snippet fields(fieldProps)}
       <div class="form-body">
         <div class="form-row-grid">
+          <!---->
+          <!-- TITLE ----------------------------------------------------------------------------->
           <Field
             {fieldProps}
             path={["title"]}
             label="Title"
             placeholder="Enter a descriptive title"
             required
-            class="span-2"
+            class="span-1"
           />
 
+          <!-- MATERIAL -------------------------------------------------------------------------->
           <div class="control-group span-1">
             {@render materialCombo2(fieldProps)}
           </div>
 
+          <!-- FORM ------------------------------------------------------------------------------>
           <div class="control-group span-1">
             {@render formCombo2(fieldProps)}
           </div>
-        </div>
 
-        <div class="from-row-grid">
+          <Field
+            {fieldProps}
+            path={["for_liquids"]}
+            label="For Liquids"
+            type="checkbox"
+            class="span-1"
+          />
+        </div>
+        <!--END ROW -->
+
+        <!-- DESCRIPTION ------------------------------------------------------------------------->
+        <div class="form-row-grid">
           <Field
             {fieldProps}
             path={["description"]}
@@ -243,9 +259,11 @@
             class="span-5"
           />
         </div>
+        <!--END ROW -->
       </div>
     {/snippet}
 
+    <!-- ACTIONS --------------------------------------------------------------------------------->
     {#snippet actions({ submitAction, cancel, submitting, dirty })}
       <div class="form-actions">
         <button

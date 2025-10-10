@@ -287,20 +287,14 @@
           </div>
 
           <!-- --------------------------------------------------------------------------------
-            -- Dropship 
+            -- Dropship
             ---------------------------------------------------------------------------------- -->
-          <div class="form-group">
-            <label for="supplier-dropship">
-              <input
-                id="supplier-dropship"
-                name="dropship"
-                type="checkbox"
-                checked={!!getS("dropship")}
-                onchange={(e) => set(["dropship"], (e.currentTarget as HTMLInputElement).checked)}
-              />
-              Offers Dropshipping
-            </label>
-          </div>
+          <Field
+            {fieldProps}
+            path={["dropship"]}
+            label="Offers Dropshipping"
+            type="checkbox"
+          />
         </div>
 
         <div class="form-row-grid">

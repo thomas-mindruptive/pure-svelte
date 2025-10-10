@@ -8,7 +8,7 @@
 import { json, error, type RequestHandler } from "@sveltejs/kit";
 import { db } from "$lib/backendQueries/db";
 import { log } from "$lib/utils/logger";
-import { buildUnexpectedError, validateIdUrlParam } from "$lib/backendQueries/entityOperations";
+import { buildUnexpectedError, validateIdUrlParam, validateAndUpdateEntity } from "$lib/backendQueries/entityOperations";
 import {
   Wio_Schema,
   Wio_PDef_Cat_Supp_Schema,
@@ -103,112 +103,24 @@ export const GET: RequestHandler = async ({ params }) => {
 
 /**
  * PUT /api/offerings/[id]
- * @description Update offering.
+ * @description Dynamically updates an existing offering based on provided fields.
  */
-export const PUT: RequestHandler = async ({ request }) => {
+export const PUT: RequestHandler = async ({ params, request }) => {
   const operationId = uuidv4();
-  const info = `PUT /api/offerings/[id] - ${operationId}`;
+  const info = `PUT /api/offerings/${params.id} - ${operationId}`;
   log.infoHeader(info);
-  log.info(`[${operationId}] PUT /category-offerings: FN_START`);
+  log.info(`[${operationId}] PUT /offerings/${params.id}: FN_START`);
 
   try {
+    const { id: offering_id, errorResponse } = validateIdUrlParam(params.id);
+    if (errorResponse) {
+      return errorResponse;
+    }
+
     const requestData = await request.json();
     log.info(`[${operationId}] Parsed request body`, { fields: Object.keys(requestData) });
 
-    // Extract offering ID from the request data
-    const { offering_id } = requestData;
-    if (!offering_id) {
-      const errRes: ApiErrorResponse = {
-        success: false,
-        message: "offering_id is required for update operations.",
-        status_code: 400,
-        error_code: "BAD_REQUEST",
-        meta: { timestamp: new Date().toISOString() },
-      };
-      log.warn(`[${operationId}] FN_FAILURE: Missing offering_id.`);
-      return json(errRes, { status: 400 });
-    }
-
-    const validation = validateEntity(Wio_Schema, requestData);
-    if (!validation.isValid) {
-      const errRes: ApiErrorResponse = {
-        success: false,
-        message: "Validation failed.",
-        status_code: 400,
-        error_code: "VALIDATION_ERROR",
-        errors: validation.errors,
-        meta: { timestamp: new Date().toISOString() },
-      };
-      log.warn(`[${operationId}] FN_FAILURE: Validation failed.`, { errors: validation.errors });
-      return json(errRes, { status: 400 });
-    }
-
-    const { wholesaler_id, category_id, product_def_id, title, size, dimensions, weight_grams, price, currency, comment } =
-      validation.sanitized as Partial<WholesalerItemOffering>;
-
-    // Verify the offering exists and get current context
-    const existsCheck = await db.request().input("offeringId", offering_id).query(`
-                SELECT wio.offering_id, wio.wholesaler_id, wio.category_id,
-                       w.name as supplier_name, pc.name as category_name
-                FROM dbo.wholesaler_item_offerings wio
-                LEFT JOIN dbo.wholesalers w ON wio.wholesaler_id = w.wholesaler_id
-                LEFT JOIN dbo.product_categories pc ON wio.category_id = pc.category_id
-                WHERE wio.offering_id = @offeringId
-            `);
-
-    if (existsCheck.recordset.length === 0) {
-      const errRes: ApiErrorResponse = {
-        success: false,
-        message: `Offering with ID ${offering_id} not found.`,
-        status_code: 404,
-        error_code: "NOT_FOUND",
-        meta: { timestamp: new Date().toISOString() },
-      };
-      log.warn(`[${operationId}] FN_FAILURE: Offering not found for update.`, { offering_id });
-      return json(errRes, { status: 404 });
-    }
-
-    const result = await db
-      .request()
-      .input("offering_id", offering_id)
-      .input("wholesaler_id", wholesaler_id)
-      .input("category_id", category_id)
-      .input("product_def_id", product_def_id)
-      .input("title", title)
-      .input("size", size)
-      .input("dimensions", dimensions)
-      .input("weight_grams", weight_grams)
-      .input("price", price)
-      .input("currency", currency)
-      .input("comment", comment).query(`
-                UPDATE dbo.wholesaler_item_offerings 
-                SET wholesaler_id=@wholesaler_id, category_id=@category_id, product_def_id=@product_def_id, title=@title ,
-                    size=@size, dimensions=@dimensions, weight_grams=@weight_grams, price=@price, currency=@currency, comment=@comment
-                OUTPUT INSERTED.* 
-                WHERE offering_id = @offering_id
-            `);
-
-    if (result.recordset.length === 0) {
-      const errRes: ApiErrorResponse = {
-        success: false,
-        message: `Offering with ID ${offering_id} not found.`,
-        status_code: 404,
-        error_code: "NOT_FOUND",
-        meta: { timestamp: new Date().toISOString() },
-      };
-      log.warn(`[${operationId}] FN_FAILURE: Offering not found for update.`);
-      return json(errRes, { status: 404 });
-    }
-
-    const response: ApiSuccessResponse<{ offering: WholesalerItemOffering }> = {
-      success: true,
-      message: "Offering updated successfully.",
-      data: { offering: result.recordset[0] as WholesalerItemOffering },
-      meta: { timestamp: new Date().toISOString() },
-    };
-
-    log.info(`[${operationId}] FN_SUCCESS: Offering updated.`, { offering_id });
-    return json(response);
+    return validateAndUpdateEntity(Wio_Schema, offering_id, "offering_id", requestData, "offering");
   } catch (err: unknown) {
     return buildUnexpectedError(err, info);
   }

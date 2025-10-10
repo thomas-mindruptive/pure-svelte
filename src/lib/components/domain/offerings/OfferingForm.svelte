@@ -182,9 +182,6 @@
         errors.price = ["Price must be a valid, non-negative number."];
       }
     }
-    if (!data.currency || String(data.currency).trim().length !== 3) {
-      errors.currency = ["A 3-letter currency code (e.g., USD) is required."];
-    }
     return {
       valid: Object.keys(errors).length === 0,
       errors,
@@ -415,10 +412,10 @@
             type="text"
             placeholder="e.g., USD"
             maxlength={3}
-            minlength={3}
-            pattern="[A-Za-z]{3}"
+            pattern={"[A-Za-z]{3}"}
             title="Enter a 3-letter currency code"
             class="span-1"
+            required
           />
 
           <!-- size ------------------------------------------------------------------------------>

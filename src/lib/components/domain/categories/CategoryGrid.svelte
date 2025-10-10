@@ -18,9 +18,9 @@
   // === COLUMNS ====================================================================================
 
   const columns: ColumnDefDirect<ProductCategory>[] = [
-    { key: "name", header: "Name", sortable: true, width: "2fr" },
-    { key: "category_id", header: "id", sortable: true, width: "3fr" },
-    { key: "description", header: "description", sortable: true, width: "1fr" },
+    { key: "name", header: "Name", sortable: true, width: "250px" },
+    { key: "category_id", header: "id", sortable: true, width: "5rem" },
+    { key: "description", header: "description", sortable: true, width: "" },
   ];
 
   // Composite key for categories (wholesaler_id + category_id)

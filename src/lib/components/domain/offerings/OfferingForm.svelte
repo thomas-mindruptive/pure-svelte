@@ -310,6 +310,18 @@
       {@const { getS, set, markTouched, errors } = fieldProps}
       <div class="form-body">
         <div class="form-row-grid">
+                   
+          <!-- title ----------------------------------------------------------------------------->
+          <Field
+            {fieldProps}
+            path={["title"]}
+            label="Title"
+            type="text"
+            required
+            placeholder="Title"
+            class="span-1"
+          />
+
           <!---->
           <!-- "product defs" combo -------------------------------------------------------------->
           <div class="form-group span-2">

@@ -6,35 +6,34 @@
  * This module follows the Factory Pattern to ensure SSR safety.
  */
 
-import { log } from "$lib/utils/logger";
 import { ComparisonOperator, JoinType, LogicalOperator, type QueryPayload } from "$lib/backendQueries/queryGrammar";
 import type {
+  Attribute,
+  ProductDefinition,
   WholesalerItemOffering,
-  Wio_PDef_Cat_Supp,
   WholesalerOfferingAttribute,
   WholesalerOfferingAttribute_Attribute,
   WholesalerOfferingLink,
-  Attribute,
-  ProductDefinition,
-  Wio_PDef,
+  Wio_PDef_Cat_Supp
 } from "$lib/domain/domainTypes";
+import { log } from "$lib/utils/logger";
 
-import type { ApiClient } from "./ApiClient";
-import { createJsonBody, createJsonAndWrapInPayload, getErrorMessage } from "./common";
 import type {
+  AssignmentRequest,
+  AssignmentSuccessData,
+  AssignmentUpdateRequest,
+  CreateChildRequest,
   DeleteApiResponse,
+  DeleteRequest,
   PredefinedQueryRequest,
   QueryResponseData,
-  AssignmentSuccessData,
-  AssignmentRequest,
-  AssignmentUpdateRequest,
   RemoveAssignmentRequest,
-  CreateChildRequest,
-  DeleteRequest,
 } from "$lib/api/api.types";
-import { LoadingState } from "./loadingState";
 import { assertDefined } from "$lib/utils/assertions";
 import type { DeleteOfferingApiResponse } from "../app/appSpecificTypes";
+import type { ApiClient } from "./ApiClient";
+import { createJsonAndWrapInPayload, createJsonBody, getErrorMessage } from "./common";
+import { LoadingState } from "./loadingState";
 const offeringLoadingManager = new LoadingState();
 export const offeringLoadingState = offeringLoadingManager.isLoadingStore;
 
@@ -70,7 +69,7 @@ export function getOfferingApi(client: ApiClient) {
     /**
      * Creates a new offering.
      */
-    async createOffering(offeringData: Omit<WholesalerItemOffering, "offering_id">): Promise<Wio_PDef> {
+    async createOffering(offeringData: Omit<WholesalerItemOffering, "offering_id">): Promise<WholesalerItemOffering> {
       assertDefined(
         offeringData,
         "offeringData.supplierId and offeringData.categoryId must be defined",
@@ -81,7 +80,7 @@ export function getOfferingApi(client: ApiClient) {
       offeringLoadingManager.start(operationId);
       try {
         const body = createJsonBody(offeringData);
-        const responseData = await client.apiFetch<{ offering: Wio_PDef }>(
+        const responseData = await client.apiFetch<{ offering: WholesalerItemOffering }>(
           "/api/offerings/new",
           { method: "POST", body },
           { context: operationId },

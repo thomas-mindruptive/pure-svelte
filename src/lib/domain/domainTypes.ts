@@ -139,6 +139,8 @@ const ProductDefinitionSchemaBase = z
     description: z.string().max(1000).nullable().optional(),
     material_id: z.number().int().positive().nullable().optional(),
     form_id: z.number().int().positive().nullable().optional(),
+    // TODO: Replace with flexible "attributes", like "Offering". 
+    for_liquids: z.boolean().optional().nullable(),
     created_at: z.string().optional(),
   })
   .describe("ProductDefinitionSchema");

@@ -2,7 +2,10 @@
 <script lang="ts">
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
   import type { DeleteStrategy, RowActionStrategy, ColumnDefBase } from "$lib/components/grids/Datagrid.types";
-  import type { WholesalerItemOffering_ProductDef_Category_Supplier_Nested, Wio_PDef_Cat_Supp_Nested_Schema } from "$lib/domain/domainTypes";
+  import type {
+    WholesalerItemOffering_ProductDef_Category_Supplier_Nested,
+    Wio_PDef_Cat_Supp_Nested_Schema,
+  } from "$lib/domain/domainTypes";
 
   // === PROPS  ===================================================================================
 
@@ -11,7 +14,7 @@
     loading?: boolean;
     deleteStrategy: DeleteStrategy<WholesalerItemOffering_ProductDef_Category_Supplier_Nested>;
     rowActionStrategy?: RowActionStrategy<WholesalerItemOffering_ProductDef_Category_Supplier_Nested>;
-  }
+  };
 
   const {
     // Core data
@@ -21,29 +24,32 @@
     // Strategies (Dependency Injection pattern)
     deleteStrategy,
     rowActionStrategy,
-  }:OfferingGridProps = $props();
+  }: OfferingGridProps = $props();
 
   // === COLUMNS  =================================================================================
 
   const columns: ColumnDefBase<typeof Wio_PDef_Cat_Supp_Nested_Schema>[] = [
     {
+      key: "title",
+      header: "Title",
+      sortable: true
+    },
+    {
       key: "pd.title",
       header: "Product",
       sortable: true,
-      width: "3fr",
       accessor: (offering) => offering.product_def.title || "Unnamed Product",
     },
     {
       key: "w.name",
       header: "Supplier",
       sortable: true,
-      width: "3fr",
       accessor: (offering) => offering.wholesaler.name || "Unnamed Supplier",
-    },    {
+    },
+    {
       key: "price",
       header: "Price",
       sortable: true,
-      width: "1.5fr",
       accessor: (offering) => {
         if (offering.price == null) return "—";
         return `${offering.currency || "USD"} ${offering.price.toFixed(2)}`;
@@ -53,12 +59,11 @@
       key: "size",
       header: "Size/Dim/Weight",
       sortable: false,
-      width: "2fr",
       accessor: (offering) => {
         const size = offering.size || "NA";
         const dimensions = offering.dimensions || "NA";
-        const weight = offering.weight_grams? offering.weight_grams.toString(): "NA"; 
-        const cellTitle = `${size} / ${dimensions} / ${weight}`; 
+        const weight = offering.weight_grams ? offering.weight_grams.toString() : "NA";
+        const cellTitle = `${size} / ${dimensions} / ${weight}`;
         return cellTitle;
       },
     },
@@ -66,7 +71,6 @@
       key: "comment",
       header: "Notes",
       sortable: false,
-      width: "2fr",
       accessor: (offering) => offering.comment || "—",
     },
   ];

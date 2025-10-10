@@ -3,14 +3,15 @@
   lang="ts"
   generics="TEntity extends Record<string, any>, TPath extends NonEmptyPath<TEntity>"
 >
-  import type { FieldsProps } from "./FormShell.svelte";
+  import type { FieldsSnippetProps } from "./FormShell.svelte";
   import type { NonEmptyPath, PathValue } from "$lib/utils/pathUtils";
+    import type { FullAutoFill } from "svelte/elements";
 
   // === PROPS ====================================================================================
 
   interface FieldProps<TEntity, TPath extends NonEmptyPath<TEntity>> {
     // The field manipulation props from FormShell
-    fieldProps: FieldsProps<TEntity>;
+    fieldProps: FieldsSnippetProps<TEntity>;
 
     // The field path as readonly tuple, e.g., ["order_date"] or ["address", "city"]
     path: readonly [...TPath];
@@ -59,7 +60,7 @@
     disabled?: boolean;
 
     // Autocomplete attribute
-    autocomplete?: string;
+    autocomplete?: FullAutoFill | null | undefined;
 
     // Input mode (for mobile keyboards)
     inputmode?: "none" | "text" | "decimal" | "numeric" | "tel" | "search" | "email" | "url";

@@ -1,17 +1,14 @@
 <!-- Using Svelte 5 generics syntax -->
 <script
-  generics="T extends Record<string, any>, TLabelPath extends NonEmptyPath<T> = NonEmptyPath<T>, TValuePath extends NonEmptyPath<T> = NonEmptyPath<T>"
+  generics="T"
   lang="ts"
 >
-  import type { NonEmptyPath } from "$lib/utils/pathUtils";
-  import { get as getPath } from "$lib/utils/pathUtils";
-
   type ComboboxProps = {
     items: T[];
     value?: T | null;
     getLabel?: (item: T) => string;
-    labelPath?: readonly [...TLabelPath];
-    valuePath?: readonly [...TValuePath];
+    labelField?: keyof T;
+    valueField?: keyof T;
     placeholder?: string;
     label?: string;
     onChange?: (value: T | null) => void;
@@ -24,8 +21,8 @@
     items,
     value = $bindable(),
     getLabel,
-    labelPath,
-    valuePath,
+    labelField,
+    valueField,
     placeholder = "Search...",
     label = "Selection",
     onChange,
@@ -66,9 +63,8 @@
   });
 
   function getItemKey(item: T): string | T {
-    if (typeof item === "object" && item && valuePath) {
-      const value = getPath(item, valuePath);
-      return String(value);
+    if (typeof item === "object" && item && valueField) {
+      return item[valueField] as string;
     }
     return item;
   }
@@ -76,10 +72,7 @@
   function getItemLabel(item: T | null | undefined): string {
     if (item === null || item === undefined) return "";
     if (getLabel) return getLabel(item);
-    if (typeof item === "object" && labelPath) {
-      const value = getPath(item, labelPath);
-      return String(value ?? "");
-    }
+    if (typeof item === "object" && labelField) return String(item[labelField] ?? "");
     return String(item);
   }
 
@@ -104,7 +97,7 @@
 
   function toggleDropdown() {
     if (isOpen) {
-        close();
+		close();
     } else {
       // Only allow "show all" for local filtering (no external filterFn)
       if (!filterFn) {
@@ -238,15 +231,15 @@
     font-family: inherit;
   }
   /* .sr-only {
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        padding: 0;
-        margin: -1px;
-        overflow: hidden;
-        clip: rect(0, 0, 0, 0);
-        border: 0;
-    } */
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		border: 0;
+	} */
   .combobox-input-wrapper {
     position: relative;
     display: flex;
@@ -334,11 +327,11 @@
   }
 
   /* .dropdown.drop-up {
-        top: auto;
-        bottom: 100%;
-        margin-top: 0;
-        margin-bottom: 4px;
-    } */
+		top: auto;
+		bottom: 100%;
+		margin-top: 0;
+		margin-bottom: 4px;
+	} */
   .dropdown li {
     padding: 0;
     margin: 0;

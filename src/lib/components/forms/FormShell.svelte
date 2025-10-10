@@ -38,7 +38,7 @@
   /**
    * Props passed to the header snippet
    */
-  interface HeaderProps<T> {
+  interface HeaderSnippetProps<T> {
     data: FormData<T>;
     dirty: boolean;
   }
@@ -46,7 +46,7 @@
   /**
    * Props passed to the fields snippet - includes form data and manipulation methods
    */
-  export interface FieldsProps<T> {
+  export interface FieldsSnippetProps<T> {
     data: FormData<T>;
 
     // Path-based setters/getters for nested data
@@ -67,7 +67,7 @@
   /**
    * Props passed to the actions snippet - form controls and state
    */
-  interface ActionsProps {
+  interface ActionsSnippetProps {
     submitAction: () => Promise<void>;
     cancel: () => void;
     submitting: boolean;
@@ -100,9 +100,9 @@
     entity?: string;
 
     // UI Snippets
-    header?: Snippet<[HeaderProps<T>]>;
-    fields?: Snippet<[FieldsProps<T>]>;
-    actions?: Snippet<[ActionsProps]>;
+    header?: Snippet<[HeaderSnippetProps<T>]>;
+    fields?: Snippet<[FieldsSnippetProps<T>]>;
+    actions?: Snippet<[ActionsSnippetProps]>;
     footer?: Snippet<[FooterProps<T>]>;
 
     // Event callbacks
@@ -211,7 +211,7 @@
 
     // Notify parent of data change
     try {
-      console.log(`Before calling parent's onChanged, vaule:`, value);
+      console.log(`Before calling parent's onChanged, value:`, value);
       log.detdebug(`Before calling parent's onChanged, value:`, value);
       onChanged?.({
         data: pureDataDeepClone(formState.data),
@@ -501,7 +501,7 @@
    * Reactive props for header snippet - includes current data and dirty state
    */
   const headerProps = $derived.by(
-    (): HeaderProps<T> => ({
+    (): HeaderSnippetProps<T> => ({
       data: formState.data,
       dirty: isDirty(),
     }),
@@ -511,7 +511,7 @@
    * Reactive props for fields snippet - includes data manipulation methods
    */
   const fieldsProps = $derived.by(
-    (): FieldsProps<T> => ({
+    (): FieldsSnippetProps<T> => ({
       data: formState.data,
       set: set,
       get,
@@ -527,7 +527,7 @@
    * Reactive props for actions snippet - form controls and validation state
    */
   const actionsProps = $derived.by(
-    (): ActionsProps => ({
+    (): ActionsSnippetProps => ({
       submitAction: doSubmit,
       cancel: () => doCancel("button"),
       submitting: formState.submitting,

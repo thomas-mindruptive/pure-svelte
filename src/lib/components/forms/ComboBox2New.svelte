@@ -1,24 +1,17 @@
-<!-- Using Svelte 5 generics syntax -->
+<!-- File: src/lib/components/forms/ComboBox2.svelte -->
 <script
-  generics="T extends Record<string, any>, TLabelPath extends NonEmptyPath<T> = NonEmptyPath<T>, TValuePath extends NonEmptyPath<T> = NonEmptyPath<T>"
   lang="ts"
+  generics="T extends Record<string, any>, TLabelPath extends NonEmptyPath<T> = NonEmptyPath<T>, TValuePath extends NonEmptyPath<T> = NonEmptyPath<T>"
 >
   import type { NonEmptyPath } from "$lib/utils/pathUtils";
   import { get as getPath } from "$lib/utils/pathUtils";
+  import type { ComboboxProps } from "./ComboBox.types";
 
-  type ComboboxProps = {
-    items: T[];
-    value?: T | null;
-    getLabel?: (item: T) => string;
-    labelPath?: readonly [...TLabelPath];
-    valuePath?: readonly [...TValuePath];
-    placeholder?: string;
-    label?: string;
-    onChange?: (value: T | null) => void;
-    filterFn?: (item: T, searchValue: string) => boolean;
-    minSearchLength?: number;
-    showDropdownButton?: boolean;
-  };
+  // === PROPS ====================================================================================
+
+  // ./ComboBox.types.ts  
+
+  // === PROPS DESTRUCTURE ========================================================================
 
   let {
     items,
@@ -32,7 +25,9 @@
     filterFn,
     minSearchLength = 2,
     showDropdownButton = true,
-  }: ComboboxProps = $props();
+  }: ComboboxProps<T, TLabelPath, TValuePath> = $props();
+
+  // === STATE ====================================================================================
 
   let isOpen = $state(false);
   let searchTerm = $state("");
@@ -42,9 +37,12 @@
   let containerEl: HTMLDivElement | null = $state(null);
   let dropdownEl: HTMLUListElement | null = $state(null);
 
-  // Using $state and $effect instead of $derived for robustness against tooling errors.
+  // Using $state and $effect instead of $derived for robustness against tooling errors
   let filteredItems = $state<T[]>(items);
 
+  // === EFFECTS ==================================================================================
+
+  // Filter items based on search term or external filter
   $effect(() => {
     // EXTERNAL FILTER: Use provided filterFn, require minimum search length
     if (filterFn) {
@@ -65,6 +63,41 @@
     }
   });
 
+  // Close dropdown when clicking outside
+  $effect(() => {
+    if (isOpen) {
+      const handleClickOutside = (event: MouseEvent) => {
+        if (containerEl && !containerEl.contains(event.target as Node)) {
+          close();
+        }
+      };
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  });
+
+  // Position dropdown above or below based on available space
+  $effect(() => {
+    if (isOpen && containerEl && dropdownEl && !isPositionCalculated) {
+      const containerRect = containerEl.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - containerRect.bottom;
+      const dropdownHeight = dropdownEl.offsetHeight;
+      if (spaceBelow < dropdownHeight && containerRect.top > dropdownHeight) {
+        dropdownEl.classList.add("drop-up");
+      } else {
+        dropdownEl.classList.remove("drop-up");
+      }
+      isPositionCalculated = true;
+    }
+  });
+
+  // Sync search term with selected value
+  $effect(() => {
+    searchTerm = getItemLabel(value);
+  });
+
+  // === HELPERS ==================================================================================
+
   function getItemKey(item: T): string | T {
     if (typeof item === "object" && item && valuePath) {
       const value = getPath(item, valuePath);
@@ -82,6 +115,8 @@
     }
     return String(item);
   }
+
+  // === HANDLERS =================================================================================
 
   function select(item: T) {
     value = item;
@@ -104,7 +139,7 @@
 
   function toggleDropdown() {
     if (isOpen) {
-        close();
+      close();
     } else {
       // Only allow "show all" for local filtering (no external filterFn)
       if (!filterFn) {
@@ -119,37 +154,9 @@
     (event.currentTarget as HTMLInputElement).select();
     open();
   }
-
-  $effect(() => {
-    if (isOpen) {
-      const handleClickOutside = (event: MouseEvent) => {
-        if (containerEl && !containerEl.contains(event.target as Node)) {
-          close();
-        }
-      };
-      document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
-    }
-  });
-
-  $effect(() => {
-    if (isOpen && containerEl && dropdownEl && !isPositionCalculated) {
-      const containerRect = containerEl.getBoundingClientRect();
-      const spaceBelow = window.innerHeight - containerRect.bottom;
-      const dropdownHeight = dropdownEl.offsetHeight;
-      if (spaceBelow < dropdownHeight && containerRect.top > dropdownHeight) {
-        dropdownEl.classList.add("drop-up");
-      } else {
-        dropdownEl.classList.remove("drop-up");
-      }
-      isPositionCalculated = true;
-    }
-  });
-
-  $effect(() => {
-    searchTerm = getItemLabel(value);
-  });
 </script>
+
+<!-- TEMPLATE --------------------------------------------------------------------------------------->
 
 <div
   class="combobox-container"
@@ -237,16 +244,6 @@
     width: 100%;
     font-family: inherit;
   }
-  /* .sr-only {
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        padding: 0;
-        margin: -1px;
-        overflow: hidden;
-        clip: rect(0, 0, 0, 0);
-        border: 0;
-    } */
   .combobox-input-wrapper {
     position: relative;
     display: flex;
@@ -332,13 +329,6 @@
     list-style: none;
     overflow-y: visible;
   }
-
-  /* .dropdown.drop-up {
-        top: auto;
-        bottom: 100%;
-        margin-top: 0;
-        margin-bottom: 4px;
-    } */
   .dropdown li {
     padding: 0;
     margin: 0;

@@ -10,7 +10,7 @@
     SubmittedCallback,
     ValidateResult,
   } from "$lib/components/forms/forms.types";
-  import FormShell, { type FieldsProps } from "$lib/components/forms/FormShell.svelte";
+  import FormShell, { type FieldsSnippetProps } from "$lib/components/forms/FormShell.svelte";
   import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
   import { ProductDefinitionSchema, type Form, type Material, type ProductDefinition } from "$lib/domain/domainTypes";
   import { assertDefined } from "$lib/utils/assertions";
@@ -20,7 +20,8 @@
   import "$lib/components/styles/grid.css";
   import type { ValidationErrorTree } from "$lib/components/validation/validation.types";
   import { zodToValidationErrorTree } from "$lib/domain/domainTypes.utils";
-  import ComboBox2 from "$lib/components/forms/ComboBox2.svelte";
+  import ComboBox2New from "$lib/components/forms/ComboBox2New.svelte";
+  import FormComboBox2 from "$lib/components/forms/FormComboBox2.svelte";
 
   // === PROPS ====================================================================================
 
@@ -143,69 +144,37 @@
 <!-- SNIPPETS ------------------------------------------------------------------------------------>
 
 <!--
-  -- Render material combo using the reusable FormCombobox component
-  -->
-<!-- prettier-ignore 
-{#snippet materialCombo(fieldProps: FieldsProps<ProductDefinition>)}
-  <ComboBox
-    {fieldProps}
-    path={["material_id"]}
-    items={materials}
-    optionValue="material_id"
-    optionLabel="name"
-    label="Material"
-    placeholder="Select material..."
-    onChange={(value, material) => {
-      log.debug("Material selected:", material?.name);
-    }}
-  />
-{/snippet}
--->
-
-<!--
   -- Render material combo using Combobox2 component
   -->
-{#snippet materialCombo2(fieldProps: FieldsProps<ProductDefinition>)}
-  {@const { get, set, errors } = fieldProps}
-  {@const currentMaterialId = get(["material_id"])}
-  {@const selectedMaterial = materials.find((m) => m.material_id === currentMaterialId) ?? null}
-
-  <ComboBox2
+{#snippet materialCombo2(fieldProps: FieldsSnippetProps<ProductDefinition>)}
+  <FormComboBox2
+    {fieldProps}
     items={materials}
-    value={selectedMaterial}
-    labelField="name"
-    valueField="material_id"
+    path={["material_id"]}
+    labelPath={["name"]}
+    valuePath={["material_id"]}
     placeholder="Search Forms..."
     label="Material"
-    onChange={(material) => {
-      set(["material_id"], material?.material_id ?? null);
-      log.debug("Material selected via Combobox2:", material?.name);
+    onChange={(value, material) => {
+      log.debug("Material selected via Combobox2:", { value, material_name: material?.name });
     }}
   />
-
-  {#if errors.material_id}
-    <div class="error-text">{errors.material_id[0]}</div>
-  {/if}
 {/snippet}
 
 <!--
   -- Render material combo using Combobox2 component
   -->
-{#snippet formCombo2(fieldProps: FieldsProps<ProductDefinition>)}
-  {@const { get, set, errors } = fieldProps}
-  {@const currentFormId = get(["form_id"])}
-  {@const selectedForm = forms.find((f) => f.form_id === currentFormId) ?? null}
-
-  <ComboBox2
+{#snippet formCombo2(fieldProps: FieldsSnippetProps<ProductDefinition>)}
+  <FormComboBox2
+    {fieldProps}
     items={forms}
-    value={selectedForm}
-    labelField="name"
-    valueField="form_id"
+    path={["form_id"]}
+    labelPath={["name"]}
+    valuePath={["form_id"]}
     placeholder="Search materials..."
     label="Form"
-    onChange={(form) => {
-      set(["form_id"], form?.form_id ?? null);
-      log.debug("Form selected via Combobox2:", form?.name);
+    onChange={(value, form) => {
+      log.debug("Form selected via Combobox2:", {value, form_name: form?.name});
     }}
   />
 
@@ -213,26 +182,6 @@
     <div class="error-text">{errors.form_id[0]}</div>
   {/if}
 {/snippet}
-
-<!--
-  -- Render form combo using the reusable FormCombobox component
-  -->
-<!--  
-{#snippet formCombo(fieldProps: FieldsProps<ProductDefinition>)}
-  <ComboBox
-    {fieldProps}
-    path={["form_id"]}
-    items={forms}
-    optionValue="form_id"
-    optionLabel="name"
-    label="Form"
-    placeholder="Select material..."
-    onChange={(value, form) => {
-      log.debug("Form selected:", form?.name);
-    }}
-  />
-{/snippet}
-  -->
 
 <!-- TEMPLATE ------------------------------------------------------------------------------------>
 

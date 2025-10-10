@@ -33,7 +33,7 @@
   <ComboBox2
     items={users}
     bind:value={selectedUser}
-    valueField="id"
+    valuePath={["id"]}
     getLabel={(user) => `${user.firstName} ${user.lastName}`}
     placeholder="Benutzer suchen..."
     label="Benutzer auswählen"

@@ -3,14 +3,14 @@
   lang="ts"
   generics="TEntity extends Record<string, any>, TOption extends Record<string, any>, TPath extends NonEmptyPath<TEntity>"
 >
-  import type { FieldsProps } from "./FormShell.svelte";
+  import type { FieldsSnippetProps } from "./FormShell.svelte";
   import type { NonEmptyPath, PathValue } from "$lib/utils/pathUtils";
 
   // === PROPS ====================================================================================
   
   interface FormComboboxProps<TEntity, TOption, TPath extends NonEmptyPath<TEntity>> {
     // The field manipulation props from FormShell
-    fieldProps: FieldsProps<TEntity>;
+    fieldProps: FieldsSnippetProps<TEntity>;
     
     // The field path as readonly tuple, e.g., ["material_id"] or ["address", "city"]
     path: readonly [...TPath];

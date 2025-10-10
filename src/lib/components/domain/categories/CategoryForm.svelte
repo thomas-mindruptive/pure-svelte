@@ -10,6 +10,7 @@
       ValidateResult,
   } from "$lib/components/forms/forms.types";
   import FormShell from "$lib/components/forms/FormShell.svelte";
+  import Field from "$lib/components/forms/Field.svelte";
   import "$lib/components/styles/form.css";
   import "$lib/components/styles/grid.css";
   import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
@@ -148,41 +149,26 @@
       </div>
     {/snippet}
 
-    {#snippet fields({ getS, set, errors, markTouched })}
+    {#snippet fields(fieldProps)}
       <div class="form-body">
         <div class="form-row-grid">
-          <div class="form-group span-2">
-            <label for="cat-name">Category Name *</label>
-            <input
-              id="name"
-              type="text"
-              value={getS("name") ?? ""}
-              class:error={errors.name}
-              placeholder="Enter category name"
-              oninput={(e) => set(["name"], (e.currentTarget as HTMLInputElement).value)}
-              onblur={() => markTouched("name")}
-              required
-            />
-            {#if errors.name}
-              <div class="error-text">{errors.name[0]}</div>
-            {/if}
-          </div>
-          <div class="form-group span-2">
-            <label for="cat-description">Description *</label>
-            <input
-              id="description"
-              type="text"
-              value={getS("description") ?? ""}
-              class:error={errors.description}
-              placeholder="Enter description"
-              oninput={(e) => set(["description"], (e.currentTarget as HTMLInputElement).value)}
-              onblur={() => markTouched("description")}
-              required
-            />
-            {#if errors.description}
-              <div class="error-text">{errors.description[0]}</div>
-            {/if}
-          </div>
+          <Field
+            {fieldProps}
+            path={["name"]}
+            label="Category Name"
+            placeholder="Enter category name"
+            required
+            class="span-2"
+          />
+
+          <Field
+            {fieldProps}
+            path={["description"]}
+            label="Description"
+            placeholder="Enter description"
+            required
+            class="span-2"
+          />
         </div>
       </div>
     {/snippet}

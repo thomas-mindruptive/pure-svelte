@@ -1,5 +1,6 @@
 <script lang="ts">
   import FormShell from "$lib/components/forms/FormShell.svelte";
+  import Field from "$lib/components/forms/Field.svelte";
   import { log } from "$lib/utils/logger";
   import {
     OrderItemSchema,
@@ -157,7 +158,8 @@
       -- Fields
       ========================================================================================== -->
 
-    {#snippet fields({ getS, set, errors, markTouched })}
+    {#snippet fields(fieldProps)}
+      {@const { getS, set, errors, markTouched } = fieldProps}
       <div class="form-body">
 
         <!-- ================================================================================
@@ -277,25 +279,19 @@
 
         <div class="form-row-grid">
           <!-- Item Notes -->
-          <div class="form-group span-3">
-            <label for="item-notes">Item Notes</label>
-            <textarea
-              id="item-notes"
-              name="item_notes"
-              rows="3"
-              maxlength="500"
+          <div class="span-3">
+            <Field
+              {fieldProps}
+              path={["item_notes"]}
+              label="Item Notes"
+              type="textarea"
+              rows={3}
+              maxlength={500}
               placeholder="Additional notes for this item..."
-              value={getS("item_notes") ?? ""}
-              class:invalid={errors.item_notes}
-              oninput={(e) => set(["item_notes"], (e.currentTarget as HTMLTextAreaElement).value || null)}
-              onblur={() => markTouched("item_notes")}
-            ></textarea>
+            />
             <div class="char-count">
               {(getS("item_notes") ?? "").length} / 500
             </div>
-            {#if errors.item_notes}
-              <div class="error-text">{errors.item_notes[0]}</div>
-            {/if}
           </div>
         </div>
       </div>

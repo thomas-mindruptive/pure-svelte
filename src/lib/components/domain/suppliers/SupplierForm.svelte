@@ -6,14 +6,15 @@
   import { ApiClient } from "$lib/api/client/ApiClient";
   import { getSupplierApi } from "$lib/api/client/supplier";
   import type {
-      CancelledCallback,
-      ChangedCallback,
-      Errors,
-      SubmitErrorCallback,
-      SubmittedCallback,
-      ValidateResult,
+    CancelledCallback,
+    ChangedCallback,
+    Errors,
+    SubmitErrorCallback,
+    SubmittedCallback,
+    ValidateResult,
   } from "$lib/components/forms/forms.types";
   import FormShell from "$lib/components/forms/FormShell.svelte";
+  import Field from "$lib/components/forms/Field.svelte";
   import "$lib/components/styles/form.css";
   import "$lib/components/styles/grid.css";
   import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
@@ -166,48 +167,31 @@
       -- Fields 
       ========================================================================================== -->
 
-    {#snippet fields({ getS, set, errors, markTouched })}
+    {#snippet fields(fieldProps)}
+      {@const { getS, set, errors, markTouched } = fieldProps}
       <div class="form-body">
         <div class="form-row-grid">
           <!-- --------------------------------------------------------------------------------
-            -- Name 
+            -- Name
             ---------------------------------------------------------------------------------- -->
-          <div class="form-group span-1">
-            <label for="supplier-name">Supplier Name *</label>
-            <input
-              id="supplier-name"
-              name="name"
-              type="text"
-              value={getS("name") ?? ""}
-              class:invalid={errors.name}
-              placeholder="Enter supplier name"
-              oninput={(e) => set(["name"], (e.currentTarget as HTMLInputElement).value)}
-              onblur={() => markTouched("name")}
-              required
-            />
-            {#if errors.name}
-              <div class="error-text">{errors.name[0]}</div>
-            {/if}
-          </div>
+          <Field
+            {fieldProps}
+            path={["name"]}
+            label="Supplier Name"
+            placeholder="Enter supplier name"
+            required
+            class="span-1"
+          />
+
           <!-- --------------------------------------------------------------------------------
-            -- Region 
+            -- Region
             ---------------------------------------------------------------------------------- -->
-          <div class="form-group">
-            <label for="supplier-region">Region</label>
-            <input
-              id="supplier-region"
-              name="region"
-              type="text"
-              value={getS("region") ?? ""}
-              class:invalid={errors.region}
-              placeholder="e.g. Europe, Asia"
-              oninput={(e) => set(["region"], (e.currentTarget as HTMLInputElement).value)}
-              onblur={() => markTouched("region")}
-            />
-            {#if errors.region}
-              <div class="error-text">{errors.region[0]}</div>
-            {/if}
-          </div>
+          <Field
+            {fieldProps}
+            path={["region"]}
+            label="Region"
+            placeholder="e.g. Europe, Asia"
+          />
           <!-- --------------------------------------------------------------------------------
             -- Country 
             ---------------------------------------------------------------------------------- -->
@@ -240,22 +224,16 @@
             {/if}
           </div>
           <!-- --------------------------------------------------------------------------------
-            -- Status 
+            -- Status
             ---------------------------------------------------------------------------------- -->
-          <div class="form-group span-2">
-            <label for="supplier-status">Status</label>
-            <textarea
-              id="supplier-status"
-              name="status"
-              value={getS("status") ?? ""}
-              class:invalid={errors.status}
-              oninput={(e) => set(["status"], (e.currentTarget as HTMLTextAreaElement).value)}
-              onblur={() => markTouched("status")}
-            ></textarea>
-            {#if errors.status}
-              <div class="error-text">{errors.status[0]}</div>
-            {/if}
-          </div>
+          <Field
+            {fieldProps}
+            path={["status"]}
+            label="Status"
+            type="textarea"
+            rows={2}
+            class="span-2"
+          />
         </div>
         <!-- --------------------------------------------------------------------------------
             -- Relevance 
@@ -307,9 +285,7 @@
               <div class="error-text">{errors.price_range[0]}</div>
             {/if}
           </div>
-        </div>
 
-        <div class="form-row-grid">
           <!-- --------------------------------------------------------------------------------
             -- Dropship 
             ---------------------------------------------------------------------------------- -->
@@ -325,62 +301,47 @@
               Offers Dropshipping
             </label>
           </div>
+        </div>
+
+        <div class="form-row-grid">
           <!-- --------------------------------------------------------------------------------
-            -- email 
+            -- email
             ---------------------------------------------------------------------------------- -->
-          <div class="form-group span-1">
-            <label for="supplier-email">Email Address</label>
-            <input
-              id="supplier-email"
-              name="email"
-              type="email"
-              value={getS("email") ?? ""}
-              class:invalid={errors.email}
-              placeholder="contact@supplier.com"
-              oninput={(e) => set(["email"], (e.currentTarget as HTMLInputElement).value)}
-              onblur={() => markTouched("email")}
-            />
-            {#if errors.email}
-              <div class="error-text">{errors.email[0]}</div>
-            {/if}
-          </div>
-          <!-- --------------------------------------------------------------------------------
-            -- Website 
-            ---------------------------------------------------------------------------------- -->
-          <div class="form-group span-1">
-            <label for="supplier-website">Website</label>
-            <input
-              id="supplier-website"
-              name="website"
-              type="url"
-              value={getS("website") ?? ""}
-              class:invalid={errors.website}
-              placeholder="https://www.supplier.com"
-              oninput={(e) => set(["website"], (e.currentTarget as HTMLInputElement).value)}
-              onblur={() => markTouched("website")}
-            />
-            {#if errors.website}
-              <div class="error-text">{errors.website[0]}</div>
-            {/if}
-          </div>
+          <Field
+            {fieldProps}
+            path={["email"]}
+            label="Email Address"
+            type="email"
+            placeholder="contact@supplier.com"
+            class="span-1"
+          />
 
           <!-- --------------------------------------------------------------------------------
-            -- Notes 
+            -- Website
             ---------------------------------------------------------------------------------- -->
+          <Field
+            class="span-1"
+            {fieldProps}
+            path={["website"]}
+            label="Website"
+            type="url"
+            placeholder="https://www.supplier.com"
+          />
 
-          <div class="form-group span-2">
-            <label for="supplier-notes">Business Notes</label>
-            <textarea
-              id="supplier-notes"
-              name="b2b_notes"
-              rows="4"
-              placeholder="Additional notes..."
-              value={getS("b2b_notes") ?? ""}
-              oninput={(e) => set(["b2b_notes"], (e.currentTarget as HTMLTextAreaElement).value)}
-            ></textarea>
-            <div class="char-count">
-              {(getS("b2b_notes") ?? "").length}
-            </div>
+          <!-- --------------------------------------------------------------------------------
+            -- Notes
+            ---------------------------------------------------------------------------------- -->
+          <Field
+            class="span-3"
+            {fieldProps}
+            path={["b2b_notes"]}
+            label="Business Notes"
+            type="textarea"
+            rows={4}
+            placeholder="Additional notes..."
+          />
+          <div class="char-count">
+            {(getS("b2b_notes") ?? "").length}
           </div>
         </div>
       </div>

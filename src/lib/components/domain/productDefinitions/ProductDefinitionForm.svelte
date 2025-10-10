@@ -6,6 +6,7 @@
   import type {
     CancelledCallback,
     ChangedCallback,
+    Errors,
     SubmitErrorCallback,
     SubmittedCallback,
     ValidateResult,
@@ -20,8 +21,8 @@
   import "$lib/components/styles/grid.css";
   import type { ValidationErrorTree } from "$lib/components/validation/validation.types";
   import { zodToValidationErrorTree } from "$lib/domain/domainTypes.utils";
-  import ComboBox2New from "$lib/components/forms/ComboBox2New.svelte";
   import FormComboBox2 from "$lib/components/forms/FormComboBox2.svelte";
+  import Field from "$lib/components/forms/Field.svelte";
 
   // === PROPS ====================================================================================
 
@@ -119,8 +120,13 @@
     // TODO: All client form validates should validate against schema ("forCreateMode" and "forUpdateMode").
 
     const result = ProductDefinitionSchema.partial().safeParse(rawData);
-    if (result.success) {
-      return { valid: true };
+
+    // In case we need to add more business val errors, add them here:
+    const errors: Errors<ProductDefinition> = {};
+    // errors.property = ["XYZ"]    
+    
+      if (result.success) {
+      return { valid: true, errors };
     }
     return { valid: false, errors: result.error.flatten().fieldErrors };
   }
@@ -153,7 +159,7 @@
     path={["material_id"]}
     labelPath={["name"]}
     valuePath={["material_id"]}
-    placeholder="Search Forms..."
+    placeholder="Search materials..."
     label="Material"
     onChange={(value, material) => {
       log.debug("Material selected via Combobox2:", { value, material_name: material?.name });
@@ -162,7 +168,7 @@
 {/snippet}
 
 <!--
-  -- Render material combo using Combobox2 component
+  -- Render form combo using Combobox2 component
   -->
 {#snippet formCombo2(fieldProps: FieldsSnippetProps<ProductDefinition>)}
   <FormComboBox2
@@ -171,16 +177,12 @@
     path={["form_id"]}
     labelPath={["name"]}
     valuePath={["form_id"]}
-    placeholder="Search materials..."
+    placeholder="Search forms..."
     label="Form"
     onChange={(value, form) => {
       log.debug("Form selected via Combobox2:", {value, form_name: form?.name});
     }}
   />
-
-  {#if errors.form_id}
-    <div class="error-text">{errors.form_id[0]}</div>
-  {/if}
 {/snippet}
 
 <!-- TEMPLATE ------------------------------------------------------------------------------------>
@@ -210,42 +212,20 @@
     {/snippet}
 
     {#snippet fields(fieldProps)}
-      {@const { getS, set, errors, markTouched } = fieldProps}
       <div class="form-body">
         <div class="form-row-grid">
-          <!---->
-          <!--- TITLE -------------------------------------------------------------------------->
-          <div class="form-group span-2">
-            <label for="title">Title *</label>
-            <input
-              id="title"
-              name="title"
-              type="text"
-              value={getS("title") ?? ""}
-              class:error={errors.title}
-              placeholder="Enter a descriptive title"
-              oninput={(e) => set(["title"], (e.currentTarget as HTMLInputElement).value)}
-              onblur={() => markTouched("title")}
-              required
-            />
-            {#if errors.title}
-              <div class="error-text">{errors.title[0]}</div>
-            {/if}
-          </div>
-
-          <!--- MATERIAL ------------------------------------------------------------------------>
-          <!-- <div class="form-group span-1">
-            {@render materialCombo(fieldProps)}
-          </div> -->
+          <Field
+            {fieldProps}
+            path={["title"]}
+            label="Title"
+            placeholder="Enter a descriptive title"
+            required
+            class="span-2"
+          />
 
           <div class="control-group span-1">
             {@render materialCombo2(fieldProps)}
           </div>
-
-          <!--- FORM ---------------------------------------------------------------------------->
-          <!-- <div class="form-group span-1">
-            {@render formCombo(fieldProps)}
-          </div> -->
 
           <div class="control-group span-1">
             {@render formCombo2(fieldProps)}
@@ -253,17 +233,15 @@
         </div>
 
         <div class="from-row-grid">
-          <!--- DESCRIPTION ---------------------------------------------------------------------->
-          <div class="form-group span-5">
-            <label for="pd-description">Description</label>
-            <textarea
-              id="pd-description"
-              value={getS("description") ?? ""}
-              rows="4"
-              placeholder="Detailed description of the product..."
-              oninput={(e) => set(["description"], (e.currentTarget as HTMLTextAreaElement).value)}
-            ></textarea>
-          </div>
+          <Field
+            {fieldProps}
+            path={["description"]}
+            label="Description"
+            type="textarea"
+            rows={4}
+            placeholder="Detailed description of the product..."
+            class="span-5"
+          />
         </div>
       </div>
     {/snippet}

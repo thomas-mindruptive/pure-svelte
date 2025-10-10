@@ -3,6 +3,7 @@
   generics="T"
 >
   import FormShell from "$lib/components/forms/FormShell.svelte";
+  import Field from "$lib/components/forms/Field.svelte";
   import { log } from "$lib/utils/logger";
   import { Order_Wholesaler_Schema, type Order_Wholesaler, type Wholesaler } from "$lib/domain/domainTypes";
   import "$lib/components/styles/form.css";
@@ -229,7 +230,8 @@
       -- Fields 
       ========================================================================================== -->
 
-    {#snippet fields({ getS, get, set, errors, markTouched })}
+    {#snippet fields(fieldProps)}
+      {@const { getS, get, set, errors, markTouched } = fieldProps}
       <div class="form-body">
         <!-- ================================================================================
           == BASIC ORDER INFORMATION
@@ -288,23 +290,13 @@
           </div>
 
           <!-- Order Number -->
-          <div class="form-group">
-            <label for="order-number">Order Number</label>
-            <input
-              id="order-number"
-              name="order_number"
-              type="text"
-              maxlength="100"
-              value={getS("order_number") ?? ""}
-              class:invalid={errors.order_number}
-              placeholder="e.g. ORD-2024-001"
-              oninput={(e) => set(["order_number"], (e.currentTarget as HTMLInputElement).value)}
-              onblur={() => markTouched("order_number")}
-            />
-            {#if errors.order_number}
-              <div class="error-text">{errors.order_number[0]}</div>
-            {/if}
-          </div>
+          <Field
+            {fieldProps}
+            path={["order_number"]}
+            label="Order Number"
+            placeholder="e.g. ORD-2024-001"
+            maxlength={100}
+          />
 
           <!-- Status -->
           <div class="form-group">
@@ -331,24 +323,15 @@
           </div>
 
           <!-- Total Amount -->
-          <div class="form-group">
-            <label for="total-amount">Total Amount</label>
-            <input
-              id="total-amount"
-              name="total_amount"
-              type="number"
-              step="0.01"
-              min="0"
-              value={getS("total_amount") ?? ""}
-              class:invalid={errors.total_amount}
-              placeholder="0.00"
-              oninput={(e) => set(["total_amount"], parseFloat((e.currentTarget as HTMLInputElement).value) || null)}
-              onblur={() => markTouched("total_amount")}
-            />
-            {#if errors.total_amount}
-              <div class="error-text">{errors.total_amount[0]}</div>
-            {/if}
-          </div>
+          <Field
+            {fieldProps}
+            path={["total_amount"]}
+            label="Total Amount"
+            type="number"
+            step="0.01"
+            min="0"
+            placeholder="0.00"
+          />
 
           <!-- Currency -->
           <div class="form-group">
@@ -379,26 +362,20 @@
         <h4 class="form-section-title">Additional Information</h4>
 
         <div class="form-row-grid">
-          <!-- Notes (uses span-3 for wider textarea) -->
-          <div class="form-group span-4">
-            <label for="order-notes">Notes</label>
-            <textarea
-              id="order-notes"
-              name="notes"
-              rows="4"
-              maxlength="1000"
+          <!-- Notes (uses span-4 for wider textarea) -->
+          <div class="span-4">
+            <Field
+              {fieldProps}
+              path={["notes"]}
+              label="Notes"
+              type="textarea"
+              rows={4}
+              maxlength={1000}
               placeholder="Additional order notes..."
-              value={getS("notes") ?? ""}
-              class:invalid={errors.notes}
-              oninput={(e) => set(["notes"], (e.currentTarget as HTMLTextAreaElement).value || null)}
-              onblur={() => markTouched("notes")}
-            ></textarea>
+            />
             <div class="char-count">
               {(getS("notes") ?? "").length} / 1000
             </div>
-            {#if errors.notes}
-              <div class="error-text">{errors.notes[0]}</div>
-            {/if}
           </div>
         </div>
       </div>

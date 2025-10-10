@@ -49,9 +49,8 @@
   margin-bottom: 0.5rem;
 }
 
-.form-row-grid:nth-of-type(n+1) {
+.form-row-grid:nth-of-type(n + 1) {
   margin-bottom: 2rem;
-
 }
 
 /*
@@ -67,8 +66,16 @@
   grid-column: span 2;
 }
 
+.form-group.span-3 {
+  grid-column: span 3;
+}
+
 .form-group.span-4 {
   grid-column: span 4;
+}
+
+.form-group.span-5 {
+  grid-column: span 5;
 }
 
 .form-group label {
@@ -104,6 +111,9 @@
 }
 .control-group.span-2 {
   grid-column: span 2;
+}
+.control-group.span-3 {
+  grid-column: span 3;
 }
 .control-group.span-4 {
   grid-column: span 4;
@@ -192,8 +202,11 @@
   }
 
   .form-group.span-2,
+  .form-group.span-3,
   .form-group.span-4,
+  .form-group.span-5,
   .control-group.span-2,
+  .control-group.span-3,
   .control-group.span-4,
   .control-group.span-5 {
     grid-column: span 1;

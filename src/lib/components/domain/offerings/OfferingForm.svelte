@@ -395,117 +395,72 @@
 
         <div class="form-row-grid">
           <!-- price ----------------------------------------------------------------------------->
-          <div class="form-group span-1">
-            <label for="offering-price">Price*</label>
-            <input
-              id="offering-price"
-              name="price"
-              type="number"
-              step="0.01"
-              min="0"
-              required
-              placeholder="e.g., 199.99"
-              value={getS("price") ?? ""}
-              oninput={(e) => set(["price"], (e.currentTarget as HTMLInputElement).valueAsNumber)}
-              onblur={() => markTouched("price")}
-            />
-          </div>
+          <Field
+            {fieldProps}
+            path={["price"]}
+            label="Price"
+            type="number"
+            step="0.01"
+            min="0"
+            required
+            placeholder="e.g., 199.99"
+            class="span-1"
+          />
 
-          <!-- curreny --------------------------------------------------------------------------->
-          <div class="form-group span-1">
-            <label for="offering-currency">Currency</label>
-            <input
-              id="offering-currency"
-              name="currency"
-              type="text"
-              placeholder="e.g., USD"
-              maxlength="3"
-              minlength="3"
-              pattern={"[A-Za-z]{3}"}
-              title="Enter a 3-letter currency code"
-              value={getS("currency") ?? ""}
-              oninput={(e) => {
-                const value = e.currentTarget.value.toUpperCase();
-                set(["currency"], value);
-              }}
-              onblur={() => markTouched("currency")}
-            />
-          </div>
-          <!-- Test field component -->
-            <Field 
-              class="span-1"
-              label="Currency"
-              {fieldProps}
-              path={["currency"]}
-              id="offering-currency"
-              type="text"
-              placeholder="e.g., USD"
-              maxlength={3}
-              minlength={3}
-              pattern={"[A-Za-z]{3}"}
-              title="Enter a 3-letter currency code"
-              onInput={(value) => {log.detdebug(`offering-currency input`, value)}}
-            />
+          <!-- currency --------------------------------------------------------------------------->
+          <Field
+            {fieldProps}
+            path={["currency"]}
+            label="Currency"
+            type="text"
+            placeholder="e.g., USD"
+            maxlength={3}
+            minlength={3}
+            pattern="[A-Za-z]{3}"
+            title="Enter a 3-letter currency code"
+            class="span-1"
+          />
 
           <!-- size ------------------------------------------------------------------------------>
-          <div class="form-group span-1">
-            <label for="offering-size">Size</label>
-            <input
-              id="offering-size"
-              name="size"
-              type="text"
-              placeholder="e.g., 15 inch, Large"
-              value={getS("size") ?? ""}
-              oninput={(e) => set(["size"], (e.currentTarget as HTMLInputElement).value)}
-              onblur={() => markTouched("size")}
-            />
-          </div>
+          <Field
+            {fieldProps}
+            path={["size"]}
+            label="Size"
+            placeholder="e.g., 15 inch, Large"
+            class="span-1"
+          />
 
           <!-- dimensions ------------------------------------------------------------------------>
-          <div class="form-group span-1">
-            <label for="offering-dimensions">Dimensions</label>
-            <input
-              id="offering-dimensions"
-              name="dimensions"
-              type="text"
-              placeholder="e.g., 10x20x5 cm"
-              value={getS("dimensions") ?? ""}
-              oninput={(e) => set(["dimensions"], (e.currentTarget as HTMLInputElement).value)}
-              onblur={() => markTouched("dimensions")}
-            />
-          </div>
+          <Field
+            {fieldProps}
+            path={["dimensions"]}
+            label="Dimensions"
+            placeholder="e.g., 10x20x5 cm"
+            class="span-1"
+          />
 
           <!-- weight_grams ------------------------------------------------------------------------>
-          <div class="form-group span-1">
-            <label for="offering-dimensions">Weight</label>
-            <input
-              id="weight_grams"
-              name="weight_grams"
-              type="number"
-              placeholder="e.g., 250"
-              value={getS("weight_grams") ?? ""}
-              oninput={(e) => set(["weight_grams"], Number.parseInt((e.currentTarget as HTMLInputElement).value))}
-              onblur={() => markTouched("weight_grams")}
-            />
-          </div>
+          <Field
+            {fieldProps}
+            path={["weight_grams"]}
+            label="Weight"
+            type="number"
+            placeholder="e.g., 250"
+            class="span-1"
+          />
         </div>
 
         <div class="form-row-grid">
           <!-- comment --------------------------------------------------------------------------->
-          <!-- NOTE: the closing "</textarea>" must follow "{getS("comment") ?? ""}" immediately-->
-          <div class="form-group span-4">
-            <label for="offering-comment">Comment</label>
-            <textarea
-              id="offering-comment"
-              name="comment"
-              rows="3"
-              placeholder="Internal notes about this specific offering..."
-              oninput={(e) => set(["comment"], (e.currentTarget as HTMLTextAreaElement).value)}
-              onblur={() => markTouched("comment")}
-            >
-              {getS("comment") ?? ""}
-            </textarea>
-          </div>
+          <Field
+            {fieldProps}
+            path={["comment"]}
+            label="Comment"
+            type="textarea"
+            rows={3}
+            placeholder="Internal notes about this specific offering..."
+            class="span-4"
+          />
         </div>
       </div>
     {/snippet}

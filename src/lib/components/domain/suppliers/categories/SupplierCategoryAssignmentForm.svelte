@@ -5,6 +5,7 @@
    */
 
   import FormShell from "$lib/components/forms/FormShell.svelte";
+  import Field from "$lib/components/forms/Field.svelte";
   import { log } from "$lib/utils/logger";
   import { WholesalerCategorySchema, type WholesalerCategory } from "$lib/domain/domainTypes";
   import "$lib/components/styles/form.css";
@@ -165,48 +166,36 @@
       -- Fields
       ========================================================================================== -->
 
-    {#snippet fields({ getS, set, errors, markTouched })}
+    {#snippet fields(fieldProps)}
+      {@const { getS } = fieldProps}
       <div class="form-body">
         <div class="form-row-grid">
           <!-- --------------------------------------------------------------------------------
             -- Link
             ---------------------------------------------------------------------------------- -->
-          <div class="form-group span-2">
-            <label for="assignment-link">Supplier Category Link</label>
-            <input
-              id="assignment-link"
-              name="link"
+          <div class="span-2">
+            <Field
+              {fieldProps}
+              path={["link"]}
+              label="Supplier Category Link"
               type="url"
-              value={getS("link") ?? ""}
-              class:invalid={errors.link}
               placeholder="https://supplier.com/category-page"
-              oninput={(e) => set(["link"], (e.currentTarget as HTMLInputElement).value)}
-              onblur={() => markTouched("link")}
             />
-            {#if errors.link}
-              <div class="error-text">{errors.link[0]}</div>
-            {/if}
             <span class="field-hint">Link to the supplier's category page (if available)</span>
           </div>
 
           <!-- --------------------------------------------------------------------------------
             -- Comment
             ---------------------------------------------------------------------------------- -->
-          <div class="form-group span-2">
-            <label for="assignment-comment">Notes</label>
-            <textarea
-              id="assignment-comment"
-              name="comment"
-              rows="4"
+          <div class="span-2">
+            <Field
+              {fieldProps}
+              path={["comment"]}
+              label="Notes"
+              type="textarea"
+              rows={4}
               placeholder="Add notes about this supplier's offerings in this category..."
-              value={getS("comment") ?? ""}
-              class:invalid={errors.comment}
-              oninput={(e) => set(["comment"], (e.currentTarget as HTMLTextAreaElement).value)}
-              onblur={() => markTouched("comment")}
-            ></textarea>
-            {#if errors.comment}
-              <div class="error-text">{errors.comment[0]}</div>
-            {/if}
+            />
             <div class="char-count">
               {(getS("comment") ?? "").length} / 1000
             </div>

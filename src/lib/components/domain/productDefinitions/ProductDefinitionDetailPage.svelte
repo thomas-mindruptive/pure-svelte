@@ -197,6 +197,7 @@
 
   const rowActionStrategy: RowActionStrategy<Wio_PDef_Cat_Supp> = {
     click: handleOfferingSelect,
+    doubleClick: handleOfferingSelect
   };
 
   // === FORM EVENT HANDLERS =======================================================================

@@ -745,6 +745,8 @@
         {:else}
           {#each rows as row, i (keyForRow(row, i))}
             <tr
+              onclick={() => handleRowClick(row)}
+              ondblclick={() => handleRowDoubleClick(row)}
               data-deleting={rowIsDeleting(row) ? "true" : undefined}
               aria-selected={rowIsSelected(row) ? "true" : undefined}
               class={rowClass(row)}
@@ -791,7 +793,11 @@
                       {safeAccessor(row, col)}
                     </button>
                   {:else}
-                    {safeAccessor(row, col)}
+                    <button
+                      class="pc-grid__link-btn"
+                    >
+                      {safeAccessor(row, col)}
+                    </button>
                   {/if}
                 </td>
               {/each}

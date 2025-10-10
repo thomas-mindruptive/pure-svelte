@@ -275,7 +275,7 @@
 >
   <FormShell
     bind:this={formShell}
-    autoValidate="blur"
+    autoValidate="change"
     entity="Offering"
     initial={initialValidatedOfferingData as Wio_PDef_Cat_Supp}
     validate={validateOfferingForSubmit}

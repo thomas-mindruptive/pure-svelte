@@ -138,7 +138,6 @@
   .confirm-button {
     background-color: #dc3545; /* Rot für eine destruktive Aktion */
     color: white;
-    user-select: none;
   }
   .confirm-button:hover {
     background-color: #c82333;

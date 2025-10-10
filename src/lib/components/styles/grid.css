@@ -181,7 +181,6 @@
   transition: var(--button-transition);
   font-size: var(--button-font-size);
   text-align: var(--button-text-align);
-  user-select: none;
 }
 
 .pc-grid__createbtn:hover:not(:disabled) {
@@ -224,7 +223,6 @@
 /* Sortable headers */
 .pc-grid__th--sortable {
   cursor: pointer;
-  user-select: none;
 }
 
 .pc-grid__th--sortable:focus-visible {

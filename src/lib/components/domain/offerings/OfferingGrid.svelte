@@ -30,15 +30,15 @@
 
   const columns: ColumnDefBase<typeof Wio_PDef_Cat_Supp_Nested_Schema>[] = [
     {
-      key: "title",
-      header: "Title",
-      sortable: true
-    },
-    {
       key: "pd.title",
       header: "Product",
       sortable: true,
       accessor: (offering) => offering.product_def.title || "Unnamed Product",
+    },
+    {
+      key: "title",
+      header: "Title",
+      sortable: true,
     },
     {
       key: "w.name",

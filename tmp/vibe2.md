@@ -1,0 +1,179 @@
+# Systemic Limits of AI Code Assistants in Complex Projects
+
+## 1 Large Language Models and the Nature of Probabilistic Generation
+
+Modern AI coding assistants are built on *large language models (LLMs)* — systems trained to predict the next token in a sequence based on statistical likelihood.
+Rather than computing explicit logical proofs, they perform **probabilistic continuation**: each generated token is selected according to conditional probability distributions learned from training data.
+
+This mechanism enables remarkable fluency in both natural language and source code, but it also imposes structural limits. The model’s reasoning is **local**, governed by token proximity and statistical association rather than by deterministic logic, type systems, or formal proofs.
+
+In software engineering, this means that correctness, consistency, and architectural compliance cannot be proven within the model’s internal process. LLMs reproduce syntax and stylistic patterns but lack the capacity to verify that generated code will compile, execute, or integrate coherently into a larger system.
+These probabilistic foundations define the systemic constraints examined throughout this paper.
+
+---
+
+## 2 Operational Model of AI Coding Assistants
+
+An assistant operates within a bounded conversational **session**, exchanging messages and code fragments with the user. Each system maintains a **context window** — a token-based memory limit defining how much information can be processed simultaneously. When new material exceeds that limit, earlier content is either removed or summarized, reducing effective memory.
+
+Two operational modes can be distinguished. In a **complete-bundle** configuration, the entire project is provided upfront, enabling a consistent internal model while it fits within the context limit. In contrast, **incremental or “vibe-coding”** workflows build awareness gradually as the developer exposes parts of the codebase. The assistant never holds the entire system simultaneously, forming a partial and evolving representation. **Retrieval** mechanisms complement this process by reloading relevant material on demand through semantic or symbolic search.
+
+The following section details how such sessions manage and reconstruct context across multiple files.
+
+---
+
+## 3 Context, Retrieval, and Embeddings
+
+### 3.1 Multilayered Context in IDE-Integrated Assistants
+
+In practical implementations, IDE-integrated assistants assemble several layers of context for each generation step:
+
+1. **Local editing state:** the currently edited file, including the code immediately surrounding the insertion point and the most recent developer changes.
+2. **Indexed project context:** information derived from the IDE’s internal code index — such as symbol definitions, imports, and type relations — from other files within the same project.
+3. **Embedding-based retrieval:** semantically related fragments from the broader codebase, dynamically fetched when relevant.
+
+These layers are merged through a **prompt-composition process**, in which the integration heuristically determines which excerpts — function signatures, class definitions, or short code blocks — fit into the available context window for the next model call.
+
+### 3.2 Function of Embeddings
+
+*Embeddings* are vector representations of text or code that capture semantic proximity. They enable **similarity-based retrieval**: given an embedding of the current query or prompt, the system identifies nearby vectors in a pre-computed index of the project and retrieves the corresponding fragments. This process — known as **retrieval-augmented generation (RAG)** — extends the assistant’s effective reach beyond its immediate conversational memory.
+
+However, embeddings represent **approximate meaning**, not precise structure. They do not preserve control flow, dependency hierarchies, or type safety. The retrieved fragments are therefore thematically relevant but not guaranteed to be logically consistent with the overall system.
+
+### 3.3 Observable Runtime Behavior
+
+Empirical traces show a recurring **read–search–edit** cycle. The assistant inspects selected files, generates modifications, searches for related elements, loads additional fragments, and repeats the process.
+A representative sequence of operations may look as follows:
+
+> read(file A) → read(file B) → search("symbol") → update(changes) → read(file C) → update …
+
+This pattern indicates that only the **local editing state** persists continuously, while **indexed context** and **retrieval layers** are reconstructed for each iteration. The resulting **context turnover** means that relevant portions of the project are repeatedly re-extracted and re-inserted into the limited context window, replacing previous details.
+
+### 3.4 Systemic Outcome
+
+Even with multiple layers, assistants remain confined by the finite context window. **Prompt composition** relies on heuristic selection, *embeddings* provide approximate rather than exact information, and no complete project state is retained persistently. As a result:
+
+* **Partial knowledge:** cross-file relationships and global invariants rarely coexist in memory.
+* **Repeated re-loading:** relevant code must be fetched anew for each operation.
+* **Incomplete architectural model:** similarity search cannot reconstruct full structural dependencies.
+* **Probabilistic reasoning:** generation remains statistical, allowing plausible but incorrect code to appear.
+
+This layered design increases reach and responsiveness but does not remove the underlying constraints of bounded memory and probabilistic reasoning.
+
+---
+
+## 4 Practical Risks and Workflow Impact
+
+The combination of probabilistic inference and restricted context produces tangible inefficiencies and risks in daily development.
+
+### 4.1 Probabilistic Generation and Its Consequences
+
+The probabilistic mechanism described in Section 1 becomes most visible when assistants operate on partial project data.
+Each completion or suggestion is a **continuation of observed tokens**, guided by statistical similarity rather than structural verification.
+Even when a model reproduces naming conventions and syntax accurately, correctness depends on relationships that may lie outside the visible window.
+
+Typical manifestations include:
+
+* code that appears coherent but does not compile;
+* references to undefined variables, parameters, or functions;
+* cross-layer violations, such as backend logic generated inside UI components.
+
+These outcomes reflect not software bugs but the inherent behavior of probabilistic generation itself.
+The system produces *plausible text* without a mechanism to test its validity against the actual program.
+This gap between **probabilistic fluency** and **deterministic correctness** defines the operational risk underlying all subsequent workflow patterns.
+
+### 4.2 Capacity and Planning Uncertainty
+
+Most assistants do not expose remaining **context capacity**, leaving developers unaware of how close a session is to its memory ceiling. Extended multi-file edits can fail abruptly when this limit is reached. The absence of transparency introduces a subtle form of dependency, as workflow continuity becomes constrained by parameters outside user control.
+
+This dependency is reinforced by **usage-based pricing**. Unlike traditional *IDE* licensing, AI assistants meter interaction volume via token consumption. Hitting a **subscription limit** may disable essential features, making team productivity subject to vendor-defined thresholds rather than technical competence.
+
+### 4.3 Efficiency and Memory Overhead
+
+Instead of eliminating routine work, many assistants introduce coordination costs. Developers must repeatedly reload files that have fallen out of scope, restate local rules, and verify code that looks correct but fails in testing. The human effectively acts as the assistant’s **external memory controller**.
+The cumulative time spent clarifying and correcting can offset the nominal efficiency gain from automation.
+
+### 4.4 Integration Limitations
+
+Software development is inherently **iterative** and **stateful**, involving continuous builds, testing, and deployments. AI assistants, however, operate on static **context snapshots** with limited persistence, minimal awareness of **file-system changes**, and weak coupling to **build or test pipelines**.
+This disconnect makes sustained refactoring and architectural evolution fragile and error-prone.
+
+### 4.5 Security Considerations
+
+Probabilistic generation can introduce subtle security flaws. Typical examples include unparameterized database queries, missing validation, or incomplete authentication flows.
+Because the generated text is presented with steady confidence, such issues can escape notice.
+AI-produced code should therefore be treated as untrusted input and subjected to deterministic static-analysis tools such as *CodeQL*, *SonarQube*, or *Veracode* before integration.
+
+---
+
+## 5 Strategic Use and Safe Boundaries
+
+Effective deployment of AI assistants requires clearly defined operational limits.
+Reliable work on complex systems would demand **persistent memory across sessions**, **retrieval mechanisms** that preserve structural relations, visible indicators of context usage, and tighter integration with compilation and testing workflows.
+
+Current assistants perform best when used for:
+
+* scaffolding or boilerplate generation,
+* explanation and translation of unfamiliar code,
+* exploration of new libraries, and
+* development of small, pattern-consistent modules.
+
+They are unsuited for:
+
+* mature codebases with specialized conventions,
+* cross-component refactoring,
+* architecture-level or performance-critical tasks, and
+* security-sensitive domains.
+
+Recognizing when to disengage is essential: repeated undefined references, non-compiling output, or escalating correction cycles signal diminishing returns.
+
+---
+
+## 6 Toward Deterministic and Hybrid Systems
+
+The main limitation of current assistants lies in their **probabilistic foundation**.
+Achieving reliability requires combining generative flexibility with deterministic validation.
+
+### 6.1 Structural and Logical Validation
+
+A more dependable architecture can build on two deterministic layers:
+
+1. **Structural validation:** provided by the *language-server* architecture of modern *IDEs*, which maintains an **abstract syntax tree (AST)** encoding functions, variables, and type relations.
+   An assistant referencing this model cannot hallucinate non-existent entities, ensuring syntactic integrity.
+2. **Logical validation:** achieved through **automated reasoning (AR)** applied to the *AST*. Structural facts act as **axioms** (e.g., “`UserService` resides in the Service layer”), while architectural rules define admissible dependencies (e.g., “Service must not invoke Database directly”).
+   The AR engine can then verify whether proposed changes comply with these constraints.
+
+Together, these layers transform generation from statistical prediction into rule-constrained synthesis.
+
+### 6.2 Hybrid Generation–Validation Loop
+
+A **hybrid system** integrates probabilistic generation with deterministic validation through a **generate–validate** cycle:
+
+1. The *LLM* produces a candidate modification in response to the user request.
+2. The **structural validator** checks syntactic consistency against the *AST*.
+3. The **logical validator** tests compliance with architectural rules.
+4. Only code passing both checks is presented to the developer.
+
+### 6.3 Barriers to Adoption
+
+Three challenges currently impede this approach:
+
+* **Latency:** deterministic validation increases computational cost, conflicting with expectations of instant response.
+* **Incomplete states:** work-in-progress code is often syntactically invalid, complicating continuous validation.
+* **Formalization effort:** few projects maintain machine-readable specifications of architectural rules required for automated reasoning.
+
+Consequently, most current assistants prioritize responsiveness over verifiable correctness.
+
+---
+
+## 7 Conclusion
+
+AI coding assistants — whether operating on a **complete bundle** or through **incremental workflows** — remain limited by **bounded context** and **probabilistic generation**.
+These properties restrict their accuracy, scalability, and predictability.
+Even with embedding-based retrieval, assistants reconstruct project knowledge piecemeal and lack a persistent architectural model.
+
+When used deliberately — for exploration, explanation, and routine generation — such assistants provide tangible utility.
+For sustained, multi-component, or safety-critical development, however, their probabilistic nature introduces irreducible uncertainty.
+
+Future progress depends on **hybrid architectures** that combine *probabilistic synthesis* with **deterministic validation**.
+Until such systems mature, disciplined review and formal analysis remain the foundation of dependable software engineering.

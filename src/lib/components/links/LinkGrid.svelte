@@ -35,22 +35,21 @@
     {
       key: "url",
       header: "URL",
+      width:"350px",
       sortable: true,
-      width: "4fr",
-      accessor: (link) => link.url.substring(0, 50) + " ...",
+      accessor: (link) => link.url.substring(0, 40) + " ...",
     },
     {
       key: "notes",
       header: "Description",
       sortable: false,
-      width: "3fr",
       //accessor: (link) => link.notes || "—",
     },
     {
       key: "created_at",
       header: "Added",
+      width:"100px",
       sortable: true,
-      width: "2fr",
       accessor: (link) => {
         if (!link.created_at) return "—";
         try {

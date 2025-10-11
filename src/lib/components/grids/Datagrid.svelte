@@ -793,11 +793,9 @@
                       {safeAccessor(row, col)}
                     </button>
                   {:else}
-                    <button
-                      class="pc-grid__link-btn"
-                    >
+                    <div>
                       {safeAccessor(row, col)}
-                    </button>
+                    </div>
                   {/if}
                 </td>
               {/each}

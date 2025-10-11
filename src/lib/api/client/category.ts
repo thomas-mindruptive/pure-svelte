@@ -13,7 +13,7 @@ import {
   type ProductCategory,
   type ProductDefinition,
   type Wholesaler,
-  type WholesalerItemOffering_ProductDef_Category_Supplier_Nested,
+  type Wio_PDef_Cat_Supp_Nested,
 } from "$lib/domain/domainTypes";
 import type { ApiClient } from "./ApiClient";
 import { createJsonBody, createJsonAndWrapInPayload, getErrorMessage } from "./common";
@@ -25,7 +25,7 @@ import { transformToNestedObjects } from "$lib/backendQueries/recordsetTransform
 const categoryLoadingManager = new LoadingState();
 export const categoryLoadingState = categoryLoadingManager.isLoadingStore;
 
-export type OfferingWithDetails = WholesalerItemOffering_ProductDef_Category_Supplier_Nested;
+export type OfferingWithDetails = Wio_PDef_Cat_Supp_Nested;
 
 /**
  * Factory function to create a category-specific API client.
@@ -254,7 +254,7 @@ export function getCategoryApi(client: ApiClient) {
       categoryLoadingManager.start(operationId);
       try {
         const cols = genTypedQualifiedColumns(Wio_PDef_Cat_Supp_Nested_Schema, true)
-        const request: PredefinedQueryRequest<WholesalerItemOffering_ProductDef_Category_Supplier_Nested> = {
+        const request: PredefinedQueryRequest<Wio_PDef_Cat_Supp_Nested> = {
           namedQuery: "offering->product_def->category->wholesaler",
           payload: {
             select: cols,
@@ -268,7 +268,7 @@ export function getCategoryApi(client: ApiClient) {
             orderBy: [{ key: "wio.created_at", direction: "desc" }],
           },
         };
-        const responseData = await client.apiFetch<QueryResponseData<WholesalerItemOffering_ProductDef_Category_Supplier_Nested>>(
+        const responseData = await client.apiFetch<QueryResponseData<Wio_PDef_Cat_Supp_Nested>>(
           "/api/query",
           { method: "POST", body: createJsonBody(request) },
           { context: operationId },

@@ -98,6 +98,52 @@ function validateSelectColumns(selectColumns: string[], hasJoins: boolean): void
 // --- HELPER FUNCTIONS ---
 
 /**
+ * Validates ORDER BY keys against schema definitions.
+ * Permissive validation: allows sorting by any column in the schema, not just SELECT columns.
+ * @param orderBy - Array of sort descriptors to validate
+ * @param hasJoins - Whether the query contains JOINs
+ */
+function validateOrderByKeys<T>(orderBy: SortDescriptor<T>[] | undefined, hasJoins: boolean): void {
+  if (!orderBy || orderBy.length === 0) return;
+
+  for (const sort of orderBy) {
+    const key = String(sort.key);
+
+    // Handle qualified keys (e.g., "wio.sub_seller")
+    if (key.includes(".")) {
+      const [alias, columnName] = key.split(".");
+
+      // Validate against branded schema
+      const schema = schemaByAlias.get(alias);
+      if (schema) {
+        const allowedColumns = schema.keyof().options;
+        if (!allowedColumns.includes(columnName)) {
+          throw new Error(
+            `ORDER BY column '${columnName}' not found in schema for alias '${alias}'. ` +
+              `Available columns: ${allowedColumns.join(", ")}`,
+          );
+        }
+      } else {
+        throw new Error(
+          `ORDER BY alias '${alias}' is not defined in any branded schema. ` +
+            `Available aliases: ${Array.from(metaByAlias.keys()).join(", ")}`,
+        );
+      }
+    } else {
+      // Unqualified ORDER BY key
+      if (hasJoins) {
+        throw new Error(
+          `Unqualified ORDER BY key '${key}' found in JOIN query. ` +
+            `All ORDER BY keys in JOIN queries must be qualified (e.g., 'wio.sub_seller', 'w.name').`,
+        );
+      }
+      // In single-table queries, unqualified keys are acceptable
+      // Let SQL Server handle validation at runtime
+    }
+  }
+}
+
+/**
  * Recursively builds the WHERE clause string with proper parameterization.
  * @param where The condition or group of conditions to process.
  * @param ctx The build context for tracking parameters.
@@ -279,6 +325,9 @@ export function buildQuery<T>(payload: Partial<QueryPayload<T>> | undefined, con
   if (select && Array.isArray(select)) {
     validateSelectColumns(select as string[], hasJoins);
   }
+
+  // --- 2b. Validate ORDER BY keys against Schema definitions ---
+  validateOrderByKeys(orderBy, hasJoins);
 
   // --- 3. Build JOIN Clauses ---
   const joinClause = realJoins

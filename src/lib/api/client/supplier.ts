@@ -25,7 +25,7 @@ import {
   type WholesalerCategory,
   type WholesalerCategory_Category,
   type WholesalerCategoryWithCount,
-  type WholesalerItemOffering_ProductDef_Category_Supplier_Nested,
+  type Wio_PDef_Cat_Supp_Nested,
 } from "$lib/domain/domainTypes";
 import { log } from "$lib/utils/logger";
 
@@ -451,12 +451,12 @@ export function getSupplierApi(client: ApiClient) {
      * Uses nested schema with transformToNestedObjects for proper data structure.
      * Returns offerings with nested product_def, category, and wholesaler objects.
      */
-    async loadOfferingsForSupplier(supplierId: number): Promise<WholesalerItemOffering_ProductDef_Category_Supplier_Nested[]> {
+    async loadOfferingsForSupplier(supplierId: number): Promise<Wio_PDef_Cat_Supp_Nested[]> {
       const operationId = `loadOfferingsForSupplier-${supplierId}`;
       supplierLoadingOperations.start(operationId);
       try {
         const cols = genTypedQualifiedColumns(Wio_PDef_Cat_Supp_Nested_Schema, true);
-        const request: PredefinedQueryRequest<WholesalerItemOffering_ProductDef_Category_Supplier_Nested> = {
+        const request: PredefinedQueryRequest<Wio_PDef_Cat_Supp_Nested> = {
           namedQuery: "offering->product_def->category->wholesaler",
           payload: {
             select: cols,
@@ -468,7 +468,7 @@ export function getSupplierApi(client: ApiClient) {
             orderBy: [{ key: "wio.created_at", direction: "desc" }],
           },
         };
-        const responseData = await client.apiFetch<QueryResponseData<WholesalerItemOffering_ProductDef_Category_Supplier_Nested>>(
+        const responseData = await client.apiFetch<QueryResponseData<Wio_PDef_Cat_Supp_Nested>>(
           "/api/query",
           { method: "POST", body: createJsonBody(request) },
           { context: operationId },

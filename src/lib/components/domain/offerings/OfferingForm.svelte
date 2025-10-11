@@ -397,7 +397,9 @@
               <p class="field-hint">The product cannot be changed for an existing offering.</p>
             {/if}
           </div>
+        </div>
 
+        <div class="form-row-grid">
           <!-- "suppliers" combo ----------------------------------------------------------------->
           <div class="form-group span-2">
             <!--- Create mode and categories route => render "suppliers" combo --->
@@ -438,6 +440,16 @@
               <p class="field-hint">The supplier cannot be changed for an existing offering.</p>
             {/if}
           </div>
+
+          <!-- title ----------------------------------------------------------------------------->
+          <Field
+            {fieldProps}
+            path={["sub_seller"]}
+            label="Subseller"
+            type="text"
+            placeholder="Subseller"
+            class="span-2"
+          />
         </div>
 
         <div class="form-row-grid">

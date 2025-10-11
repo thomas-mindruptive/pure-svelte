@@ -13,7 +13,7 @@
     type Form,
     type Material,
     type ProductDefinition,
-    type WholesalerItemOffering_ProductDef_Category_Supplier_Nested,
+    type Wio_PDef_Cat_Supp_Nested,
     type Wio_PDef_Cat_Supp,
   } from "$lib/domain/domainTypes";
   import { addNotification } from "$lib/stores/notifications";
@@ -38,6 +38,8 @@
   import { buildChildUrl, buildSiblingUrl } from "$lib/utils/url";
   import { error } from "@sveltejs/kit";
   import { getErrorMessage } from "$lib/api/client/common";
+  import type { SortDescriptor } from "$lib/backendQueries/queryGrammar";
+    import { coerceErrorMessage } from "$lib/utils/errorUtils";
 
   // === PROPS ====================================================================================
 
@@ -56,7 +58,7 @@
   const errors = $state<Record<string, ValidationErrorTree>>({});
   const allowForceCascadingDelte = $state(true);
   let productDefinition: ProductDefinition | null = $state(null);
-  let offerings: WholesalerItemOffering_ProductDef_Category_Supplier_Nested[] = $state([]);
+  let offerings: Wio_PDef_Cat_Supp_Nested[] = $state([]);
   let materials: Material[] = $state([]);
   let forms: Form[] = $state([]);
 
@@ -151,7 +153,7 @@
     log.info("Local state for offerings updated.");
   }
 
-  // === BUSINESS LOGIC ===========================================================================
+  // === GRID/BUSINESS LOGIC ======================================================================
 
   function handleOfferingCreate(): void {
     log.info(`Navigating to create new offering.`);
@@ -191,13 +193,21 @@
     }
   }
 
+  async function handleOfferingsSort(sortState: SortDescriptor<Wio_PDef_Cat_Supp_Nested>[] | null) {
+    try {
+      offerings = await productDefinitionApi.loadOfferingsForProductDefinition(productDefId, null, sortState);
+    } catch (e: unknown) {
+      addNotification(`Error during sorting API: ${JSON.stringify(e, null, 4)}`);
+    }
+  }
+
   const deleteStrategy: DeleteStrategy<Wio_PDef_Cat_Supp> = {
     execute: handleOfferingDelete,
   };
 
   const rowActionStrategy: RowActionStrategy<Wio_PDef_Cat_Supp> = {
     click: handleOfferingSelect,
-    doubleClick: handleOfferingSelect
+    doubleClick: handleOfferingSelect,
   };
 
   // === FORM EVENT HANDLERS =======================================================================
@@ -268,6 +278,7 @@
             loading={$offeringLoadingState}
             {deleteStrategy}
             {rowActionStrategy}
+            onSort={handleOfferingsSort}
           />
         {:else}
           <p>Offerings will be displayed here after the product definition has been saved.</p>

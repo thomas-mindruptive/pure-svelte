@@ -6,7 +6,7 @@
     OrderItemSchema,
     type Order,
     type OrderItem,
-    type WholesalerItemOffering_ProductDef_Category_Supplier_Nested,
+    type Wio_PDef_Cat_Supp_Nested,
   } from "$lib/domain/domainTypes";
   import "$lib/components/styles/form.css";
   import "$lib/components/styles/grid.css";
@@ -29,7 +29,7 @@
     initial?: OrderItem | undefined | null;
     isCreateMode: boolean;
     order: Order;
-    availableOfferings: WholesalerItemOffering_ProductDef_Category_Supplier_Nested[];
+    availableOfferings: Wio_PDef_Cat_Supp_Nested[];
     disabled?: boolean;
     onSubmitted?: SubmittedCallback;
     onSubmitError?: SubmitErrorCallback;

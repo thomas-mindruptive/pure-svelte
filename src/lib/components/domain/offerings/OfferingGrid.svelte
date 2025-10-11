@@ -1,19 +1,21 @@
 <!-- src/lib/components/domain/offerings/OfferingGrid.svelte -->
 <script lang="ts">
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
-  import type { DeleteStrategy, RowActionStrategy, ColumnDefBase } from "$lib/components/grids/Datagrid.types";
+  import type { DeleteStrategy, RowActionStrategy, ColumnDefBase, SortFunc } from "$lib/components/grids/Datagrid.types";
   import type {
-    WholesalerItemOffering_ProductDef_Category_Supplier_Nested,
+    Wio_PDef_Cat_Supp_Nested,
     Wio_PDef_Cat_Supp_Nested_Schema,
   } from "$lib/domain/domainTypes";
 
   // === PROPS  ===================================================================================
 
   export type OfferingGridProps = {
-    rows: WholesalerItemOffering_ProductDef_Category_Supplier_Nested[];
+    rows: Wio_PDef_Cat_Supp_Nested[];
     loading?: boolean;
-    deleteStrategy: DeleteStrategy<WholesalerItemOffering_ProductDef_Category_Supplier_Nested>;
-    rowActionStrategy?: RowActionStrategy<WholesalerItemOffering_ProductDef_Category_Supplier_Nested>;
+    deleteStrategy: DeleteStrategy<Wio_PDef_Cat_Supp_Nested>;
+    rowActionStrategy?: RowActionStrategy<Wio_PDef_Cat_Supp_Nested>;
+    // Callback when sort state changes - parent loads data
+    onSort?: SortFunc<Wio_PDef_Cat_Supp_Nested> | undefined;
   };
 
   const {
@@ -24,6 +26,7 @@
     // Strategies (Dependency Injection pattern)
     deleteStrategy,
     rowActionStrategy,
+    onSort
   }: OfferingGridProps = $props();
 
   // === COLUMNS  =================================================================================
@@ -37,7 +40,7 @@
     },
     {
       key: "title",
-      header: "Title",
+      header: "Offering",
       sortable: true,
     },
     {
@@ -68,6 +71,12 @@
       },
     },
     {
+      key: "sub_seller",
+      header: "Subseller",
+      sortable: true,
+      //accessor: (offering) => offering.comment?.substring(0, 20) || "—",
+    },
+    {
       key: "comment",
       header: "Notes",
       sortable: false,
@@ -75,7 +84,7 @@
     },
   ];
 
-  const getId = (offering: WholesalerItemOffering_ProductDef_Category_Supplier_Nested) => offering.offering_id;
+  const getId = (offering: Wio_PDef_Cat_Supp_Nested) => offering.offering_id;
 </script>
 
 <Datagrid
@@ -87,4 +96,5 @@
   entity="offering"
   {deleteStrategy}
   {rowActionStrategy}
+  {onSort}
 />

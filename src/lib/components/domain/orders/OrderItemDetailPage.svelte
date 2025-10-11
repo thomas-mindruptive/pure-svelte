@@ -13,7 +13,7 @@
     type Order,
     type OrderItem,
     type OrderItem_ProdDef_Category,
-    type WholesalerItemOffering_ProductDef_Category_Supplier_Nested,
+    type Wio_PDef_Cat_Supp_Nested,
   } from "$lib/domain/domainTypes";
 
   import { page } from "$app/state";
@@ -47,7 +47,7 @@
 
   let order = $state<Order | null>(null);
   let orderItem = $state<OrderItem_ProdDef_Category | null>(null);
-  let availableOfferings = $state<WholesalerItemOffering_ProductDef_Category_Supplier_Nested[]>([]);
+  let availableOfferings = $state<Wio_PDef_Cat_Supp_Nested[]>([]);
   let isLoading = $state(true);
   const errors = $state<Record<string, ValidationErrorTree>>({});
 

@@ -261,12 +261,12 @@ export function buildUnexpectedError(err: unknown, info?: string) {
     // Generischer unerwarteter Fehler (JSON parse error, network, etc.)
     const errorMsg = coerceErrorMessage(err);
     const additionalInfo = info ? ` - ${info}` : "";
-    const msg = `An unexpected error occurred ${additionalInfo}`;
+    const msg = `An unexpected error occurred ${additionalInfo} - ${errorMsg}`;
     log.error(msg, { errorMsg });
 
     const errorResponse: ApiErrorResponse = {
       success: false,
-      message: "An unexpected internal server error occurred.",
+      message: msg,
       status_code: 500,
       error_code: "INTERNAL_SERVER_ERROR",
       meta: { timestamp: new Date().toISOString() },

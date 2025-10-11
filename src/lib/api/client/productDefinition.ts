@@ -7,15 +7,18 @@
  */
 
 import { log } from "$lib/utils/logger";
-import { type QueryPayload } from "$lib/backendQueries/queryGrammar";
-import { Wio_PDef_Cat_Supp_Nested_Schema, type ProductDefinition, type WholesalerItemOffering_ProductDef_Category_Supplier_Nested } from "$lib/domain/domainTypes";
+import { type QueryPayload, type SortDescriptor, type WhereCondition, type WhereConditionGroup } from "$lib/backendQueries/queryGrammar";
+import {
+  Wio_PDef_Cat_Supp_Nested_Schema,
+  type ProductDefinition,
+  type Wio_PDef_Cat_Supp_Nested,
+} from "$lib/domain/domainTypes";
 import type { ApiClient } from "./ApiClient";
 import { createJsonBody, createJsonAndWrapInPayload, getErrorMessage } from "./common";
 import type { DeleteApiResponse, DeleteRequest, PredefinedQueryRequest, QueryResponseData } from "$lib/api/api.types";
 import { LoadingState } from "./loadingState";
 import { genTypedQualifiedColumns } from "$lib/domain/domainTypes.utils";
 import { transformToNestedObjects } from "$lib/backendQueries/recordsetTransformer";
-
 
 // Create a dedicated loading state manager for this entity.
 const productDefinitionLoadingManager = new LoadingState();
@@ -132,7 +135,7 @@ export function getProductDefinitionApi(client: ApiClient) {
     async deleteProductDefinition(
       productDefId: number,
       cascade = false,
-      forceCascade = false
+      forceCascade = false,
     ): Promise<DeleteApiResponse<Pick<ProductDefinition, "product_def_id" | "title">, string[]>> {
       const operationId = `deleteProductDefinition-${productDefId}`;
       productDefinitionLoadingManager.start(operationId);
@@ -141,7 +144,7 @@ export function getProductDefinitionApi(client: ApiClient) {
         const removeRequest: DeleteRequest<ProductDefinition> = {
           id: productDefId,
           cascade,
-          forceCascade
+          forceCascade,
         };
         const body = createJsonBody(removeRequest);
 
@@ -167,34 +170,45 @@ export function getProductDefinitionApi(client: ApiClient) {
      * @param productDefId The ID of the product definition.
      * @returns A promise that resolves to an array of offerings with details.
      */
-    async loadOfferingsForProductDefinition(productDefId: number): Promise<WholesalerItemOffering_ProductDef_Category_Supplier_Nested[]> {
+    async loadOfferingsForProductDefinition(
+      productDefId: number,
+      aWhere?: WhereConditionGroup<Wio_PDef_Cat_Supp_Nested> | null,
+      aOrderBy?: SortDescriptor<Wio_PDef_Cat_Supp_Nested>[] | null,
+    ): Promise<Wio_PDef_Cat_Supp_Nested[]> {
       const operationId = `loadOfferingsForProductDefinition-${productDefId}`;
       productDefinitionLoadingManager.start(operationId);
       try {
         const cols = genTypedQualifiedColumns(Wio_PDef_Cat_Supp_Nested_Schema, true);
-        const payload: QueryPayload<WholesalerItemOffering_ProductDef_Category_Supplier_Nested> = {
+        let finalWhere: WhereConditionGroup<Wio_PDef_Cat_Supp_Nested> | WhereCondition<Wio_PDef_Cat_Supp_Nested> = {
+          whereCondOp: "AND",
+          conditions: [{ key: "wio.product_def_id", whereCondOp: "=", val: productDefId }],
+        };
+        if (aWhere) {
+          finalWhere = {whereCondOp: "AND", conditions:[aWhere, finalWhere]} 
+        }
+
+        let finalOrderBy: SortDescriptor<Wio_PDef_Cat_Supp_Nested>[] = [{ key: "w.name", direction: "asc" }];
+        if (aOrderBy) {
+          finalOrderBy = [...finalOrderBy, ...aOrderBy];
+        }
+
+        const payload: QueryPayload<Wio_PDef_Cat_Supp_Nested> = {
           select: cols,
-          where: {
-            whereCondOp: "AND",
-            conditions: [{ key: "wio.product_def_id", whereCondOp: "=", val: productDefId }],
-          },
-          orderBy: [{ key: "w.name", direction: "asc" }],
+          where: finalWhere,
+          orderBy: finalOrderBy,
         };
 
-        const request: PredefinedQueryRequest<WholesalerItemOffering_ProductDef_Category_Supplier_Nested> = {
+        const request: PredefinedQueryRequest<Wio_PDef_Cat_Supp_Nested> = {
           namedQuery: "product_definition_offerings",
           payload: payload,
         };
 
-        const responseData = await client.apiFetch<QueryResponseData<WholesalerItemOffering_ProductDef_Category_Supplier_Nested>>(
+        const responseData = await client.apiFetch<QueryResponseData<Wio_PDef_Cat_Supp_Nested>>(
           "/api/query",
           { method: "POST", body: createJsonBody(request) },
           { context: operationId },
         );
-        const transformed = transformToNestedObjects(
-          responseData.results as Record<string, unknown>[],
-          Wio_PDef_Cat_Supp_Nested_Schema,
-        );
+        const transformed = transformToNestedObjects(responseData.results as Record<string, unknown>[], Wio_PDef_Cat_Supp_Nested_Schema);
         return transformed;
       } catch (err) {
         log.error(`[${operationId}] Failed.`, { productDefId, error: getErrorMessage(err) });

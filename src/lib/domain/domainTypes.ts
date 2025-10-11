@@ -209,6 +209,8 @@ const Wio_BaseSchema = z
     wholesaler_id: z.number().int().positive(),
     category_id: z.number().int().positive(),
     product_def_id: z.number().int().positive(),
+    // TODO: In the future this schould be a hierarchy, also in data model.
+    sub_seller: z.string().max(255).nullable().optional(),
     // Offerings can optionally have material and form, too.
     material_id: z.number().int().positive().nullable().optional(),
     form_id: z.number().int().positive().nullable().optional(),
@@ -478,7 +480,7 @@ export type WholesalerCategoryWithCount = z.infer<typeof WholesalerCategoryWithC
 export type WholesalerItemOffering = z.infer<typeof Wio_Schema>;
 export type Wio_PDef = z.infer<typeof Wio_PDef_Schema>;
 export type Wio_PDef_Cat_Supp = z.infer<typeof Wio_PDef_Cat_Supp_Schema>;
-export type WholesalerItemOffering_ProductDef_Category_Supplier_Nested = z.infer<typeof Wio_PDef_Cat_Supp_Nested_Schema>;
+export type Wio_PDef_Cat_Supp_Nested = z.infer<typeof Wio_PDef_Cat_Supp_Nested_Schema>;
 export type WholesalerOfferingLink = z.infer<typeof WholesalerOfferingLinkSchema>;
 export type WholesalerOfferingAttribute = z.infer<typeof WholesalerOfferingAttributeSchema>;
 export type WholesalerOfferingAttribute_Attribute = z.infer<typeof WholesalerOfferingAttribute_AttributeSchema>;

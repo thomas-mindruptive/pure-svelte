@@ -74,7 +74,7 @@
       key: "sub_seller",
       header: "Subseller",
       sortable: true,
-      //accessor: (offering) => offering.comment?.substring(0, 20) || "—",
+      accessor: (offering) => offering.sub_seller || "—",
     },
     {
       key: "comment",

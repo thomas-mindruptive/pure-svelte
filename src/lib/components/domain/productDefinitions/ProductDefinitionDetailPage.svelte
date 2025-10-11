@@ -197,7 +197,7 @@
     try {
       offerings = await productDefinitionApi.loadOfferingsForProductDefinition(productDefId, null, sortState);
     } catch (e: unknown) {
-      addNotification(`Error during sorting API: ${JSON.stringify(e, null, 4)}`);
+      addNotification(`Error during sorting API: ${coerceErrorMessage(e)}`);
     }
   }
 

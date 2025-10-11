@@ -5,7 +5,9 @@ import { z } from "zod";
 
 // ===== SCHEMA META HELPER =====
 
-type WithMeta<T, M> = T & { readonly _meta: M };
+type WithMeta<T, M> = T & { readonly __brandMeta: M };
+export type ExtractSchemaMeta<T> = T extends { readonly __brandMeta: infer M } ? M : never;
+export type GetSchemaAlias<T> = ExtractSchemaMeta<T> extends { alias: infer A } ? A : never;
 
 /**
  * Add metadata to the schema itself (not a copy!) and return the schema.
@@ -17,19 +19,30 @@ function createSchemaWithMeta<T extends z.ZodObject<any>, M extends { alias: str
   schema: T,
   meta: M,
 ): WithMeta<T, M> {
-  (schema as any).__brandMeta = meta; // Einfach als normale Property
+  (schema as any).__brandMeta = meta;
   log.debug(`Added metadata to ${schema.description} - ${JSON.stringify(meta)}`);
   return schema as WithMeta<T, M>;
 }
 
 /**
- * Copy metadata. Creates a copy of the metadata, not a reference.
- * @param from
- * @param to
+ * Copies metadata from a source schema to a target schema.
+ * CRUCIAL: It returns a new type that TypeScript understands,
+ * combining the target schema's structure with the source schema's metadata type.
+ * @param from The source schema with metadata.
+ * @param to The target schema that will receive the metadata.
+ * @returns The target schema, now correctly typed with the added metadata.
  */
-export function copyMetaFrom(from: z.ZodObject<any>, to: z.ZodObject<any>) {
-  (to as any).__brandMeta = { ...(to as any).__brandMeta, ...(from as any).__brandMeta };
+export function copyMetaFrom<F extends z.ZodObject<any>, T extends z.ZodObject<any>>(
+  from: F,
+  to: T,
+): WithMeta<T, ExtractSchemaMeta<F>> {
+  const fromMeta = (from as any).__brandMeta;
+  if (fromMeta) {
+    (to as any).__brandMeta = { ...(to as any).__brandMeta, ...fromMeta };
+  }
+  return to as WithMeta<T, ExtractSchemaMeta<F>>;
 }
+
 
 // ===== GENERAL =====
 
@@ -73,11 +86,12 @@ export const WholesalerSchema = createSchemaWithMeta(WholesalerSchemaBase, {
  * Schema for creating a new Wholesaler.
  * Omits server-generated fields like the primary key and timestamps.
  */
-export const WholesalerForCreateSchema = WholesalerSchema.omit({
+const tempWholesalerForCreate = WholesalerSchema.omit({
   wholesaler_id: true,
   created_at: true,
 }).describe("WholesalerForCreateSchema");
-copyMetaFrom(WholesalerSchema, WholesalerForCreateSchema);
+export const WholesalerForCreateSchema = copyMetaFrom(WholesalerSchema, tempWholesalerForCreate);
+
 
 // ===== PRODUCT CATEGORY (dbo.product_categories) =====
 
@@ -99,10 +113,10 @@ export const ProductCategorySchema = createSchemaWithMeta(ProductCategorySchemaB
  * Schema for creating a new ProductCategory.
  * Omits the server-generated primary key.
  */
-export const ProductCategoryForCreateSchema = ProductCategorySchema.omit({
+const tempProductCategoryForCreate = ProductCategorySchema.omit({
   category_id: true,
 }).describe("ProductCategoryForCreateSchema");
-copyMetaFrom(ProductCategorySchema, ProductCategoryForCreateSchema);
+export const ProductCategoryForCreateSchema = copyMetaFrom(ProductCategorySchema, tempProductCategoryForCreate);
 
 // ===== ATTRIBUTE (dbo.attributes) =====
 
@@ -124,10 +138,10 @@ export const AttributeSchema = createSchemaWithMeta(AttributeSchemaBase, {
  * Schema for creating a new Attribute.
  * Omits the server-generated primary key.
  */
-export const AttributeForCreateSchema = AttributeSchema.omit({
+const tempAttributeForCreate = AttributeSchema.omit({
   attribute_id: true,
 }).describe("AttributeForCreateSchema");
-copyMetaFrom(AttributeSchema, AttributeForCreateSchema);
+export const AttributeForCreateSchema = copyMetaFrom(AttributeSchema, tempAttributeForCreate);
 
 // ===== PRODUCT DEFINITION (dbo.product_definitions) =====
 
@@ -139,7 +153,6 @@ const ProductDefinitionSchemaBase = z
     description: z.string().max(1000).nullable().optional(),
     material_id: z.number().int().positive().nullable().optional(),
     form_id: z.number().int().positive().nullable().optional(),
-    // TODO: Replace with flexible "attributes", like "Offering".
     for_liquids: z.boolean().optional().nullable(),
     created_at: z.string().optional(),
   })
@@ -155,11 +168,12 @@ export const ProductDefinitionSchema = createSchemaWithMeta(ProductDefinitionSch
  * Schema for creating a new ProductDefinition.
  * Omits server-generated fields.
  */
-export const ProductDefinitionForCreateSchema = ProductDefinitionSchema.omit({
+const tempProductDefinitionForCreate = ProductDefinitionSchema.omit({
   product_def_id: true,
   created_at: true,
 }).describe("ProductDefinitionForCreateSchema");
-copyMetaFrom(ProductDefinitionSchema, ProductDefinitionForCreateSchema);
+export const ProductDefinitionForCreateSchema = copyMetaFrom(ProductDefinitionSchema, tempProductDefinitionForCreate);
+
 
 // ===== WHOLESALER CATEGORY (dbo.wholesaler_categories) =====
 
@@ -183,10 +197,10 @@ export const WholesalerCategorySchema = createSchemaWithMeta(WholesalerCategoryS
  * Schema for creating a new WholesalerCategory assignment.
  * Client provides foreign keys and data, but not the timestamp.
  */
-export const WholesalerCategoryForCreateSchema = WholesalerCategorySchema.omit({
+const tempWholesalerCategoryForCreate = WholesalerCategorySchema.omit({
   created_at: true,
 }).describe("WholesalerCategoryForCreateSchema");
-copyMetaFrom(WholesalerCategorySchema, WholesalerCategoryForCreateSchema);
+export const WholesalerCategoryForCreateSchema = copyMetaFrom(WholesalerCategorySchema, tempWholesalerCategoryForCreate);
 
 // ===== WHOLESALER CATEGORY including joins (dbo.wholesaler_categories) =====
 
@@ -209,9 +223,7 @@ const Wio_BaseSchema = z
     wholesaler_id: z.number().int().positive(),
     category_id: z.number().int().positive(),
     product_def_id: z.number().int().positive(),
-    // TODO: In the future this schould be a hierarchy, also in data model.
     sub_seller: z.string().max(255).nullable().optional(),
-    // Offerings can optionally have material and form, too.
     material_id: z.number().int().positive().nullable().optional(),
     form_id: z.number().int().positive().nullable().optional(),
     title: z.string().max(255).nullable().optional(),
@@ -235,11 +247,12 @@ export const Wio_Schema = createSchemaWithMeta(Wio_BaseSchema, {
  * Schema for creating a new WholesalerItemOffering.
  * Omits server-generated fields.
  */
-export const WholesalerItemOfferingForCreateSchema = Wio_Schema.omit({
+const tempWholesalerItemOfferingForCreate = Wio_Schema.omit({
   offering_id: true,
   created_at: true,
 }).describe("WholesalerItemOfferingForCreateSchema");
-copyMetaFrom(Wio_Schema, WholesalerItemOfferingForCreateSchema);
+export const WholesalerItemOfferingForCreateSchema = copyMetaFrom(Wio_Schema, tempWholesalerItemOfferingForCreate);
+
 
 // ===== WHOLESALER ITEM OFFERING including join to product_def  =====
 
@@ -252,8 +265,6 @@ export const Wio_PDef_Schema = Wio_Schema.extend({
 
 /**
  * FLAT SCHEMA (LEGACY): Direct properties for joined data.
- * Use WholesalerItemOffering_ProductDef_Category_Supplier_NestedSchema instead for new code.
- * This schema will be deprecated once all usages are migrated to nested schema.
  */
 export const Wio_PDef_Cat_Supp_Schema = Wio_Schema.extend({
   product_def_title: z.string().optional(),
@@ -265,23 +276,14 @@ export const Wio_PDef_Cat_Supp_Schema = Wio_Schema.extend({
 
 /**
  * NESTED SCHEMA (RECOMMENDED): Uses nested branded schemas for joined data.
- * This schema works with genTypedQualifiedColumns() and transformToNestedObjects().
- * Follows the same pattern as OrderItem_ProdDef_Category_Schema.
- *
- * Example usage:
- * ```typescript
- * const cols = genTypedQualifiedColumns(WholesalerItemOffering_ProductDef_Category_Supplier_NestedSchema);
- * const results = await fetchData(cols);
- * const nested = transformToNestedObjects(results, WholesalerItemOffering_ProductDef_Category_Supplier_NestedSchema);
- * // Access: nested[0].product_def.title, nested[0].category.name, nested[0].wholesaler.name
- * ```
  */
-export const Wio_PDef_Cat_Supp_Nested_Schema = Wio_Schema.extend({
+const tempWioNestedSchema = Wio_Schema.extend({
   product_def: ProductDefinitionSchema,
   category: ProductCategorySchema,
   wholesaler: WholesalerSchema,
 }).describe("WholesalerItemOffering_ProductDef_Category_Supplier_NestedSchema");
-copyMetaFrom(Wio_Schema, Wio_PDef_Cat_Supp_Nested_Schema);
+export const Wio_PDef_Cat_Supp_Nested_Schema = copyMetaFrom(Wio_Schema, tempWioNestedSchema);
+
 
 // ===== WHOLESALER OFFERING LINK (dbo.wholesaler_offering_links) =====
 
@@ -305,11 +307,12 @@ export const WholesalerOfferingLinkSchema = createSchemaWithMeta(WholesalerOffer
  * Schema for creating a new WholesalerOfferingLink.
  * Omits server-generated fields.
  */
-export const WholesalerOfferingLinkForCreateSchema = WholesalerOfferingLinkSchema.omit({
+const tempWholesalerOfferingLinkForCreate = WholesalerOfferingLinkSchema.omit({
   link_id: true,
   created_at: true,
 }).describe("WholesalerOfferingLinkForCreateSchema");
-copyMetaFrom(WholesalerOfferingLinkSchema, WholesalerOfferingLinkForCreateSchema);
+export const WholesalerOfferingLinkForCreateSchema = copyMetaFrom(WholesalerOfferingLinkSchema, tempWholesalerOfferingLinkForCreate);
+
 
 // ===== WHOLESALER OFFERING ATTRIBUTE (dbo.wholesaler_offering_attributes) =====
 
@@ -329,7 +332,6 @@ export const WholesalerOfferingAttributeSchema = createSchemaWithMeta(Wholesaler
 
 /**
  * Schema for creating a new WholesalerOfferingAttribute assignment.
- * The client provides all fields for this relationship.
  */
 export const WholesalerOfferingAttributeForCreateSchema = WholesalerOfferingAttributeSchema.describe(
   "WholesalerOfferingAttributeForCreateSchema",
@@ -359,12 +361,12 @@ export const MaterialSchema = createSchemaWithMeta(MaterialSchemaBase, {
 
 /**
  * Schema for creating a new Material.
- * Omits the server-generated primary key.
  */
-export const MaterialForCreateSchema = MaterialSchema.omit({
+const tempMaterialForCreate = MaterialSchema.omit({
   material_id: true,
 }).describe("MaterialForCreateSchema");
-copyMetaFrom(MaterialSchema, MaterialForCreateSchema);
+export const MaterialForCreateSchema = copyMetaFrom(MaterialSchema, tempMaterialForCreate);
+
 
 // ===== FORM (dbo.forms) =====
 
@@ -383,19 +385,18 @@ export const FormSchema = createSchemaWithMeta(FormSchemaBase, {
 
 /**
  * Schema for creating a new Form.
- * Omits the server-generated primary key.
  */
-export const FormForCreateSchema = FormSchema.omit({
+const tempFormForCreate = FormSchema.omit({
   form_id: true,
 }).describe("FormForCreateSchema");
-copyMetaFrom(FormSchema, FormForCreateSchema);
+export const FormForCreateSchema = copyMetaFrom(FormSchema, tempFormForCreate);
+
 
 // ===== ORDER (dbo.orders) =====
 
 export const OrderStatusSchema = z
   .enum(["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"])
   .describe("OrderStatusSchema");
-
 export type OrderStatus = z.infer<typeof OrderStatusSchema>;
 
 const OrderSchemaBase = z
@@ -418,18 +419,19 @@ export const OrderSchema = createSchemaWithMeta(OrderSchemaBase, {
   dbSchema: "dbo",
 } as const);
 
-export const OrderForCreateSchema = OrderSchema.omit({
+const tempOrderForCreate = OrderSchema.omit({
   order_id: true,
   created_at: true,
 }).describe("OrderForCreateSchema");
-copyMetaFrom(OrderSchema, OrderForCreateSchema);
+export const OrderForCreateSchema = copyMetaFrom(OrderSchema, tempOrderForCreate);
+
 
 // ===== ORDER with joins =====
 
-export const Order_Wholesaler_Schema = OrderSchema.extend({
+const tempOrderWholesaler = OrderSchema.extend({
   wholesaler: WholesalerSchema,
 });
-copyMetaFrom(OrderSchema, Order_Wholesaler_Schema);
+export const Order_Wholesaler_Schema = copyMetaFrom(OrderSchema, tempOrderWholesaler);
 
 // ===== ORDER ITEM (dbo.order_items) =====
 
@@ -452,21 +454,22 @@ export const OrderItemSchema = createSchemaWithMeta(OrderItemSchemaBase, {
   dbSchema: "dbo",
 } as const);
 
-export const OrderItemForCreateSchema = OrderItemSchema.omit({
+const tempOrderItemForCreate = OrderItemSchema.omit({
   order_item_id: true,
   created_at: true,
 }).describe("OrderItemForCreateSchema");
-copyMetaFrom(OrderItemSchema, OrderItemForCreateSchema);
+export const OrderItemForCreateSchema = copyMetaFrom(OrderItemSchema, tempOrderItemForCreate);
 
 // ===== ORDER ITEM with JOINS =====
 
-export const OrderItem_ProdDef_Category_Schema = OrderItemSchema.extend({
+const tempOrderItemNested = OrderItemSchema.extend({
   order: OrderSchema,
   offering: Wio_Schema,
   product_def: ProductDefinitionSchema,
   category: ProductCategorySchema,
 });
-copyMetaFrom(OrderItemSchema, OrderItem_ProdDef_Category_Schema);
+export const OrderItem_ProdDef_Category_Schema = copyMetaFrom(OrderItemSchema, tempOrderItemNested);
+
 
 // ===== SCHEMAS => TYPES  =====
 
@@ -510,5 +513,3 @@ export const AllBrandedSchemas = {
 
 // ===== HELPER EXPORT =====
 export { createSchemaWithMeta, type WithMeta };
-
-// DEBUG: log.debug(`+++++ domainTypes.ts, Order_Wholesaler_Schema: ${JSON.stringify(Order_Wholesaler_Schema, null, 4)}`)

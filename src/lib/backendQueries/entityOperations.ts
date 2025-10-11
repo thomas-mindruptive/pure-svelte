@@ -260,8 +260,8 @@ export function buildUnexpectedError(err: unknown, info?: string) {
   } else {
     // Generischer unerwarteter Fehler (JSON parse error, network, etc.)
     const errorMsg = coerceErrorMessage(err);
-    const additionalInfo = info ? ` - ${info}` : "";
-    const msg = `An unexpected error occurred ${additionalInfo} - ${errorMsg}`;
+    //const additionalInfo = info ? ` - ${info}` : "";
+    const msg = `An unexpected error occurred:\n${info}\n${errorMsg}`;
     log.error(msg, { errorMsg });
 
     const errorResponse: ApiErrorResponse = {

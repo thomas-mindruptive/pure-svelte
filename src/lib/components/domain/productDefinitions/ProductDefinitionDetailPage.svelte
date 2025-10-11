@@ -161,7 +161,7 @@
   function handleOfferingSelect(offering: Wio_PDef_Cat_Supp) {
     log.info(`Selected offering: `, offering);
     const { wholesaler_id, category_id, offering_id, product_def_id } = offering;
-    if (wholesaler_id && category_id && offering_id & product_def_id) {
+    if (wholesaler_id && category_id && offering_id && product_def_id) {
       const targetUrl = buildChildUrl(page.url.pathname, "offerings", offering_id);
       log.debug(`Going to: ${targetUrl}`);
       goto(targetUrl);

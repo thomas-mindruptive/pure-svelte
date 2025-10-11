@@ -327,7 +327,7 @@
       <div class="form-header">
         <div>
           {#if data.offering_id}
-            <h3>{data.product_def_title || "Unnamed Product"}</h3>
+            <h3>{data.product_def_title || "Unnamed Product"} ➜ {data.title || "Unnamed Product"}</h3>
           {:else}
             <h3>New Product Offering</h3>
           {/if}
@@ -354,7 +354,7 @@
             type="text"
             required
             placeholder="Title"
-            class="span-1"
+            class="span-2"
           />
 
           <!-- "product defs" combo -------------------------------------------------------------->
@@ -420,7 +420,7 @@
                     value=""
                     disabled
                   >
-                    Select a product...
+                    Select a supplier...
                   </option>
                   {#each availableSuppliers ?? [] as supplier (supplier.wholesaler_id)}
                     <option value={supplier.wholesaler_id}>{supplier.name}</option>

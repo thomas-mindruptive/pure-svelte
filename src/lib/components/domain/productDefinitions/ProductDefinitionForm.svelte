@@ -224,7 +224,7 @@
             label="Title"
             placeholder="Enter a descriptive title"
             required
-            class="span-1"
+            class="span-2"
           />
 
           <!-- MATERIAL -------------------------------------------------------------------------->

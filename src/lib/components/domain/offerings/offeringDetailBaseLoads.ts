@@ -9,9 +9,11 @@ import { getOfferingApi } from "$lib/api/client/offering";
 import { log } from "$lib/utils/logger";
 import { error, type LoadEvent } from "@sveltejs/kit";
 import type { OfferingDetail_LoadDataAsync } from "./offeringDetail.types";
-import { type ProductDefinition, type Wholesaler } from "$lib/domain/domainTypes";
+import { type Form, type Material, type ProductDefinition, type Wholesaler } from "$lib/domain/domainTypes";
 import { getCategoryApi } from "$lib/api/client/category";
 import { parseUrlSegments } from "$lib/utils/url";
+import { getMaterialApi } from "$lib/api/client/material";
+import { getFormApi } from "$lib/api/client/form";
 
 /**
  * Load the basis data for offering detail pages.
@@ -35,6 +37,8 @@ export function loadOfferingDetailBasisData({
   const client = new ApiClient(fetchLoad);
   const offeringApi = getOfferingApi(client);
   const categoryApi = getCategoryApi(client);
+  const materialApi = getMaterialApi(client);
+  const formApi = getFormApi(client);
 
   // --- MODE and ROUTE CONTEXT and VALIDATION ----------------------------------------------------
 
@@ -85,6 +89,8 @@ export function loadOfferingDetailBasisData({
 
   let availableProducts = (async () => [] as ProductDefinition[])();
   let availableSuppliers = (async () => [] as Wholesaler[])();
+  let materials = (async () => [] as Material[])();
+  let forms = (async () => [] as Form[])()
 
   if (isSuppliersRoute) {
     //  Load all product defs for category because multiple offerings for same product def may exist, e.g. with different sizes.
@@ -94,6 +100,9 @@ export function loadOfferingDetailBasisData({
     // Note: Multiple offerings for the same supplier may exist, e.g. with different size.
     availableSuppliers = categoryApi.loadSuppliersForCategory(categoryId);
   }
+
+  materials = materialApi.loadMaterials();
+  forms = formApi.loadForms();
 
   // --- RETURN LOADDATA --------------------------------------------------------------------------
 
@@ -111,6 +120,8 @@ export function loadOfferingDetailBasisData({
       isCategoriesRoute,
       availableProducts,
       availableSuppliers,
+      materials,
+      forms
     };
     return asyncLoadData;
   } else {
@@ -148,6 +159,8 @@ export function loadOfferingDetailBasisData({
       isCategoriesRoute,
       availableProducts,
       availableSuppliers,
+      materials,
+      forms
     };
     log.info(`(OfferDetailLinksPage) Kicked off loading promises offeringId: ${offeringId}`);
     return asyncLoadData;

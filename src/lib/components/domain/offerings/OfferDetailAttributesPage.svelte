@@ -49,12 +49,14 @@
       resolvedData = null;
 
       try {
-        const [offering, assignedAttributes, availableAttributes, availableProducts, availableSuppliers] = await Promise.all([
+        const [offering, assignedAttributes, availableAttributes, availableProducts, availableSuppliers, materials, forms] = await Promise.all([
           data.offering,
           data.assignedAttributes,
           data.availableAttributes,
           data.availableProducts,
           data.availableSuppliers,
+          data.materials,
+          data.forms
         ]);
 
         if (aborted) return;
@@ -66,6 +68,8 @@
           availableAttributes,
           availableProducts,
           availableSuppliers,
+          materials,
+          forms
         };
 
         const validationResult = OfferingDetailAttributes_LoadDataSchema.safeParse(dataToValidate);
@@ -159,29 +163,6 @@
     }
   }
 
-  // async function handleAttributeDelete_old(ids: ID[]): Promise<void> {
-  //   assertDefined(ids, "OfferingDetailAttributesPage.handleAttributeDelete");
-  //   log.info(`Deleting attribute assignments`, {
-  //     ids,
-  //   });
-  //   let dataChanged = false;
-  //   for (const id of ids) {
-  //     const parsed = offeringApi.parseAttributeCompositeId(String(id));
-  //     if (!parsed) continue;
-  //     const { offeringId, attributeId } = parsed;
-  //     const result = await offeringApi.deleteOfferingAttribute(offeringId, attributeId);
-  //     if (result.success) {
-  //       addNotification(`Attribute assignment deleted.`, "success");
-  //       dataChanged = true;
-  //     } else {
-  //       addNotification(`Could not delete attribute assignment.`, "error");
-  //     }
-  //   }
-  //   if (dataChanged) {
-  //     reloadAttributes();
-  //   }
-  // }
-
   function handleAttributeSelect(attribute: WholesalerOfferingAttribute_Attribute) {
     assertDefined(attribute, "OfferingDetailAttributesPage.handleAttributeSelect");
     addNotification(`Editing for "${attribute.attribute_name}" not yet implemented.`, "info");
@@ -243,8 +224,8 @@
 {:else}
   <OfferingDetailWrapper initialLoadedData={resolvedData}>
     <div class="grid-section">
+      <!---->
       <!----- ASSGIN ATTRIBUTE ----->
-
       <div class="assignment-section">
         <h3>Assign New Attribute</h3>
         {#if !resolvedData.offering}

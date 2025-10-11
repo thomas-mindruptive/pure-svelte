@@ -10,7 +10,6 @@
   import type { WholesalerOfferingLink } from "$lib/domain/domainTypes";
   import type {
     DeleteStrategy,
-    RowActionStrategy,
     ColumnDef,
   } from "../grids/Datagrid.types";
 
@@ -20,14 +19,14 @@
     rows: WholesalerOfferingLink[];
     loading?: boolean;
     deleteStrategy: DeleteStrategy<WholesalerOfferingLink>;
-    rowActionStrategy?: RowActionStrategy<WholesalerOfferingLink>;
+    // We navigate to the link externally!
+      //rowActionStrategy?: RowActionStrategy<WholesalerOfferingLink>;
   }
 
   const {
     rows = [] as WholesalerOfferingLink[],
     loading = false,
     deleteStrategy,
-    rowActionStrategy,
   }:LinkGridProps = $props();
 
   // ===== COLUMN DEFINITIONS (Unchanged) =====
@@ -76,5 +75,7 @@
   gridId="links"
   entity="link"
   {deleteStrategy}
-  {rowActionStrategy}
+  rowActionStrategy={{
+      click: (link) => window.open(link.url, '_blank')
+    }}
 />

@@ -5,7 +5,7 @@
    */
 
   // ===== IMPORTS =====
-  import FormShell from "$lib/components/forms/FormShell.svelte";
+  import FormShell, { type FieldsSnippetProps } from "$lib/components/forms/FormShell.svelte";
   import { log } from "$lib/utils/logger";
   import type { WholesalerItemOffering, Wio_PDef_Cat_Supp } from "$lib/domain/domainTypes";
   import { ApiClient } from "$lib/api/client/ApiClient";
@@ -23,7 +23,8 @@
   import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
   import { assertDefined } from "$lib/utils/assertions";
   import { getOfferingApi } from "$lib/api/client/offering";
-    import Field from "$lib/components/forms/Field.svelte";
+  import Field from "$lib/components/forms/Field.svelte";
+  import FormComboBox2 from "$lib/components/forms/FormComboBox2.svelte";
 
   // ===== INTERNAL TYPES =====
 
@@ -48,19 +49,14 @@
 
   // ===== LOAD DATA ASYNC =====
 
-  let { initialValidatedOfferingData, errors, validatedData, availableProducts, availableSuppliers } = $derived.by(() => {
+  let { initialValidatedOfferingData, errors, validatedData, availableProducts, availableSuppliers, materials, forms } = $derived.by(() => {
     const result = OfferingDetail_LoadDataSchema.safeParse(initialLoadedData);
     if (!result.success) {
       return {
-        //validatedData: null,
         errors: result.error.issues,
         isValid: false,
-        // initialValidatedOfferingData: null,
-        // supplierId: null,
-        // categoryId: null,
-        // productDefId: null,
-        // availableProducts: null,
-        // availableSuppliers: null,
+        materials: [],
+        forms: [],
       };
     }
 
@@ -95,6 +91,8 @@
       productDefId: data.productDefId ?? null,
       availableProducts: data.availableProducts ?? null,
       availableSuppliers: data.availableSuppliers ?? null,
+      materials: data.materials ?? [],
+      forms: data.forms ?? [],
     };
   });
 
@@ -269,6 +267,44 @@
   }
 </script>
 
+<!-- SNIPPETS ------------------------------------------------------------------------------------>
+
+<!--
+  -- Render material combo using Combobox2 component
+  -->
+{#snippet materialCombo2(fieldProps: FieldsSnippetProps<WholesalerItemOffering>)}
+  <FormComboBox2
+    {fieldProps}
+    items={materials}
+    path={["material_id"]}
+    labelPath={["name"]}
+    valuePath={["material_id"]}
+    placeholder="Search materials..."
+    label="Material"
+    onChange={(value, material) => {
+      log.debug("Material selected via Combobox2:", { value, material_name: material?.name });
+    }}
+  />
+{/snippet}
+
+<!--
+  -- Render form combo using Combobox2 component
+  -->
+{#snippet formCombo2(fieldProps: FieldsSnippetProps<WholesalerItemOffering>)}
+  <FormComboBox2
+    {fieldProps}
+    items={forms}
+    path={["form_id"]}
+    labelPath={["name"]}
+    valuePath={["form_id"]}
+    placeholder="Search forms..."
+    label="Form"
+    onChange={(value, form) => {
+      log.debug("Form selected via Combobox2:", { value, form_name: form?.name });
+    }}
+  />
+{/snippet}
+
 <ValidationWrapper
   {errors}
   renderChildrenInCaseOfErrors={true}
@@ -310,7 +346,6 @@
       {@const { getS, set, markTouched, errors } = fieldProps}
       <div class="form-body">
         <div class="form-row-grid">
-                   
           <!-- title ----------------------------------------------------------------------------->
           <Field
             {fieldProps}
@@ -322,7 +357,6 @@
             class="span-1"
           />
 
-          <!---->
           <!-- "product defs" combo -------------------------------------------------------------->
           <div class="form-group span-2">
             <!--- Create mode and suppliers route => render "productdefs" combo --->
@@ -350,6 +384,10 @@
                     <option value={product.product_def_id}>{product.title}</option>
                   {/each}
                 </select>
+              {:else}
+                <p>
+                  {getS("product_def_title") ?? "product_def_title missing"}
+                </p>
               {/if}
             {:else}
               <!--- Not create mode => Render static text for prodcuct def --->
@@ -399,6 +437,18 @@
               </p>
               <p class="field-hint">The supplier cannot be changed for an existing offering.</p>
             {/if}
+          </div>
+        </div>
+
+        <div class="form-row-grid">
+          <!-- material -------------------------------------------------------------------------->
+          <div class="control-group span-1">
+            {@render materialCombo2(fieldProps)}
+          </div>
+
+          <!-- form ------------------------------------------------------------------------------>
+          <div class="control-group span-1">
+            {@render formCombo2(fieldProps)}
           </div>
         </div>
 
@@ -454,6 +504,7 @@
             path={["weight_grams"]}
             label="Weight"
             type="number"
+            step="0.01"
             placeholder="e.g., 250"
             class="span-1"
           />

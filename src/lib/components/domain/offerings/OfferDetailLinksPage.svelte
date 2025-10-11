@@ -10,7 +10,7 @@
   import "$lib/components/styles/detail-page-layout.css";
   import "$lib/components/styles/form-elements.css";
   import OfferingDetailWrapper from "$lib/components/domain/offerings/OfferingDetailWrapper.svelte";
-  import type { ID, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
+  import type { ID, DeleteStrategy } from "$lib/components/grids/Datagrid.types";
   import {
     OfferingDetailLinks_LoadDataSchema,
     type OfferingDetailLinks_LoadData,
@@ -39,13 +39,15 @@
       resolvedData = null;
 
       try {
-        const [offering, links, availableProducts, availableSuppliers] = await Promise.all([
+        const [offering, links, availableProducts, availableSuppliers, materials, forms] = await Promise.all([
           data.offering,
           data.links,
           data.availableProducts,
           data.availableSuppliers,
+          data.materials,
+          data.forms
         ]);
-        log.debug(`All promises resolved: `, {offering, links, availableProducts, availableSuppliers})
+        log.debug(`All promises resolved: `, { offering, links, availableProducts, availableSuppliers });
 
         if (aborted) return;
 
@@ -55,6 +57,8 @@
           links,
           availableProducts,
           availableSuppliers,
+          materials,
+          forms
         };
 
         const validationResult = OfferingDetailLinks_LoadDataSchema.safeParse(dataToValidate);
@@ -148,10 +152,11 @@
     }
   }
 
-  function handleLinkSelect(link: WholesalerOfferingLink) {
-    assertDefined(link, "OfferDetailLinksPage.handleLinkSelect");
-    addNotification(`Editing for link "${link.url}" not yet implemented.`, "info");
-  }
+  // NOT needed. Link grid navigates to EXTERNAL link.
+  // function handleLinkSelect(link: WholesalerOfferingLink) {
+  //   assertDefined(link, "OfferDetailLinksPage.handleLinkSelect");
+  //   addNotification(`Editing for link "${link.url}" not yet implemented.`, "info");
+  // }
 
   async function handleAssignLink(event: SubmitEvent) {
     assertDefined(event, "OfferDetailLinksPage.handleAssignLink");
@@ -185,9 +190,10 @@
   const deleteStrategy: DeleteStrategy<WholesalerOfferingLink> = {
     execute: handleLinkDelete,
   };
-  const rowActionStrategy: RowActionStrategy<WholesalerOfferingLink> = {
-    click: handleLinkSelect,
-  };
+  // NOTE: Link grid navigates to external link => No strategy.
+  // const rowActionStrategy: RowActionStrategy<WholesalerOfferingLink> = {
+  //   click: handleLinkSelect,
+  // };
 </script>
 
 <!-- TEMPLATE mit bedingtem Rendering -->
@@ -237,11 +243,11 @@
       {#if !resolvedData.offering}
         <p class="field-hint">You must save the new offering first before you can add/see links.</p>
       {:else}
+        <!-- We do NOT pass rowStrategy because the link grid navigates to EXTERNAL link. -->
         <LinkGrid
           rows={resolvedData.links}
           loading={$offeringLoadingState}
           {deleteStrategy}
-          {rowActionStrategy}
         />
       {/if}
     </div>

@@ -5,6 +5,8 @@ import {
   ProductDefinitionSchema,
   WholesalerOfferingLinkSchema,
   WholesalerSchema,
+  MaterialSchema,
+  FormSchema,
 } from "$lib/domain/domainTypes";
 import type { PromisifyComplex } from "$lib/utils/typeUtils";
 import z from "zod";
@@ -20,6 +22,8 @@ export const OfferingDetail_LoadDataSchema = z.object({
     offering: z.nullable(Wio_PDef_Cat_Supp_Schema).optional(),   // CREATE-mode: can be null
     availableProducts: z.array(ProductDefinitionSchema).nullable().optional(),               // This is only needed for the "create" mode: We need the available products for the combobox.
     availableSuppliers: z.array(WholesalerSchema).nullable().optional(),                     // This is only needed for the "create" mode: We need the available suppliers for the combobox.
+    materials: z.array(MaterialSchema).nullable().optional(),
+    forms: z.array(FormSchema).nullable().optional(),
     isCreateMode: z.boolean(),                                                               // Derived. true if we are on "new" route
     isSuppliersRoute: z.boolean(),                                                           // Derived. true if in route context "/suppliers"  
     isCategoriesRoute: z.boolean()                                                           // Derived. true if in route context "/categories"

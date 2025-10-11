@@ -139,7 +139,7 @@ const ProductDefinitionSchemaBase = z
     description: z.string().max(1000).nullable().optional(),
     material_id: z.number().int().positive().nullable().optional(),
     form_id: z.number().int().positive().nullable().optional(),
-    // TODO: Replace with flexible "attributes", like "Offering". 
+    // TODO: Replace with flexible "attributes", like "Offering".
     for_liquids: z.boolean().optional().nullable(),
     created_at: z.string().optional(),
   })
@@ -209,11 +209,14 @@ const Wio_BaseSchema = z
     wholesaler_id: z.number().int().positive(),
     category_id: z.number().int().positive(),
     product_def_id: z.number().int().positive(),
+    // Offerings can optionally have material and form, too.
+    material_id: z.number().int().positive().nullable().optional(),
+    form_id: z.number().int().positive().nullable().optional(),
     title: z.string().max(255).nullable().optional(),
     size: z.string().max(50).nullable().optional(),
     dimensions: z.string().max(100).nullable().optional(),
     price: z.number().multipleOf(0.01).nullable().optional(), // precision [18,2]
-    weight_grams: z.number().int().positive().nullable().optional(),
+    weight_grams: z.number().positive().nullable().optional(),
     currency: z.string().length(3).nullable().optional(),
     comment: z.string().max(1000).nullable().optional(),
     created_at: z.string().optional(),
@@ -421,9 +424,9 @@ copyMetaFrom(OrderSchema, OrderForCreateSchema);
 
 // ===== ORDER with joins =====
 
-export const Order_Wholesaler_Schema = OrderSchema.extend ({
-  wholesaler: WholesalerSchema
-})
+export const Order_Wholesaler_Schema = OrderSchema.extend({
+  wholesaler: WholesalerSchema,
+});
 copyMetaFrom(OrderSchema, Order_Wholesaler_Schema);
 
 // ===== ORDER ITEM (dbo.order_items) =====

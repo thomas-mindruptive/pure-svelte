@@ -71,7 +71,7 @@
       key: "comment",
       header: "Notes",
       sortable: false,
-      accessor: (offering) => offering.comment || "—",
+      accessor: (offering) => offering.comment?.substring(0, 20) || "—",
     },
   ];
 

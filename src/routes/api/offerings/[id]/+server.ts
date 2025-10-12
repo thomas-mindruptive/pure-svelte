@@ -7,7 +7,7 @@
 
 import type { ApiErrorResponse, ApiSuccessResponse, DeleteConflictResponse, DeleteRequest } from "$lib/api/api.types";
 import { db } from "$lib/backendQueries/db";
-import { buildUnexpectedError, validateAndUpdateEntity, validateIdUrlParam } from "$lib/backendQueries/entityOperations";
+import { buildUnexpectedError, validateAndUpdateEntity, validateIdUrlParam } from "$lib/backendQueries/genericEntityOperations";
 import {
   Wio_PDef_Cat_Supp_WithLinks_Schema,
   Wio_Schema,

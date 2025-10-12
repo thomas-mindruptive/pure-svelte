@@ -11,7 +11,7 @@ import { json, type RequestHandler } from "@sveltejs/kit";
 import { log } from "$lib/utils/logger";
 import { buildQuery, executeQuery } from "$lib/backendQueries/queryBuilder";
 import { queryConfig } from "$lib/backendQueries/queryConfig";
-import { buildUnexpectedError } from "$lib/backendQueries/entityOperations";
+import { buildUnexpectedError } from "$lib/backendQueries/genericEntityOperations";
 import type { WholesalerItemOffering } from "$lib/domain/domainTypes";
 import type {
   QueryRequest,

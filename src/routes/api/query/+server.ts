@@ -10,7 +10,7 @@ import { json, type RequestHandler } from "@sveltejs/kit";
 import { log } from "$lib/utils/logger";
 import { buildQuery, executeQuery } from "$lib/backendQueries/queryBuilder";
 import { queryConfig } from "$lib/backendQueries/queryConfig";
-import { buildUnexpectedError } from "$lib/backendQueries/entityOperations";
+import { buildUnexpectedError } from "$lib/backendQueries/genericEntityOperations";
 import type { ApiErrorResponse, QueryRequest, PredefinedQueryRequest, QuerySuccessResponse } from "$lib/api/api.types";
 import { v4 as uuidv4 } from "uuid";
 import { isTableInBrandedSchemas } from "$lib/domain/domainTypes.utils";

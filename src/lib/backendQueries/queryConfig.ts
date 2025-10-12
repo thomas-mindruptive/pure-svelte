@@ -7,7 +7,7 @@
  */
 
 import { ComparisonOperator, JoinType, LogicalOperator, type QueryPayload } from "$lib/backendQueries/queryGrammar";
-import { Order_Wholesaler_Schema, OrderItem_ProdDef_Category_Schema } from "$lib/domain/domainTypes";
+import { Order_Wholesaler_Schema, OrderItem_ProdDef_Category_Schema, Wio_PDef_Cat_Supp_Nested_Schema } from "$lib/domain/domainTypes";
 import { genTypedQualifiedColumns } from "$lib/domain/domainTypes.utils";
 
 type Optional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
@@ -180,6 +180,7 @@ export const queryConfig: QueryConfig = {
       ],
     },
     product_definition_offerings: {
+      select: genTypedQualifiedColumns(Wio_PDef_Cat_Supp_Nested_Schema, true),
       from: { table: "dbo.wholesaler_item_offerings", alias: "wio" },
       joins: [
         {

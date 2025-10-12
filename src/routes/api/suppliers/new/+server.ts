@@ -10,7 +10,7 @@ import { type RequestHandler } from "@sveltejs/kit";
 import { log } from "$lib/utils/logger";
 import { WholesalerForCreateSchema, type Wholesaler } from "$lib/domain/domainTypes";
 import { v4 as uuidv4 } from "uuid";
-import { buildUnexpectedError, validateAndInsertEntity } from "$lib/backendQueries/entityOperations";
+import { buildUnexpectedError, validateAndInsertEntity } from "$lib/backendQueries/genericEntityOperations";
 
 /**
  * POST /api/suppliers/new

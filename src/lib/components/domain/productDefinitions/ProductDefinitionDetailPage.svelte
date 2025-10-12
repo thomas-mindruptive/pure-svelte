@@ -10,10 +10,12 @@
     MaterialSchema,
     ProductDefinitionSchema,
     Wio_PDef_Cat_Supp_Nested_Schema,
+    Wio_PDef_Cat_Supp_Nested_WithLinks_Schema,
     type Form,
     type Material,
     type ProductDefinition,
     type Wio_PDef_Cat_Supp_Nested,
+    type Wio_PDef_Cat_Supp_Nested_WithLinks,
     type Wio_PDef_Cat_Supp,
   } from "$lib/domain/domainTypes";
   import { addNotification } from "$lib/stores/notifications";
@@ -58,7 +60,7 @@
   const errors = $state<Record<string, ValidationErrorTree>>({});
   const allowForceCascadingDelte = $state(true);
   let productDefinition: ProductDefinition | null = $state(null);
-  let offerings: Wio_PDef_Cat_Supp_Nested[] = $state([]);
+  let offerings: Wio_PDef_Cat_Supp_Nested_WithLinks[] = $state([]);
   let materials: Material[] = $state([]);
   let forms: Form[] = $state([]);
 
@@ -96,9 +98,10 @@
           if (!prodDefVal.success) {
             errors.productDefintion = zodToValidationErrorTree(prodDefVal.error);
           }
-          offerings = await productDefinitionApi.loadOfferingsForProductDefinition(productDefId);
+          // offerings = await productDefinitionApi.loadOfferingsForProductDefinition(productDefId);
+          offerings = await productDefinitionApi.loadNestedOfferingsWithLinksForProductDefinition(productDefId);
           if (aborted) return;
-          const offeringsVal = safeParseFirstN(Wio_PDef_Cat_Supp_Nested_Schema, offerings, 3);
+          const offeringsVal = safeParseFirstN(Wio_PDef_Cat_Supp_Nested_WithLinks_Schema, offerings, 3);
           if (!offeringsVal.success) {
             errors.offerings = zodToValidationErrorTree(offeringsVal.error);
           }
@@ -126,8 +129,15 @@
         if (aborted) return;
         const status = rawError.status ?? 500;
         const message = rawError.message || "Failed to load product definition details.";
-        errors.unexpectedError = { message, status };
-        log.error("Promise processing failed in ProductDefinitionDetailPage", { rawError });
+
+        // If the API returned validation errors, include them
+        if (rawError.errors) {
+          errors.unexpectedError = { message, status, validationErrors: rawError.errors };
+          log.error("Promise processing failed with validation errors", { rawError, validationErrors: rawError.errors });
+        } else {
+          errors.unexpectedError = { message, status };
+          log.error("Promise processing failed in ProductDefinitionDetailPage", { rawError });
+        }
       } finally {
         if (!aborted) {
           isLoading = false;

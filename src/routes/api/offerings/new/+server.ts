@@ -9,7 +9,7 @@
 
 import { type RequestHandler } from "@sveltejs/kit";
 import { log } from "$lib/utils/logger";
-import { buildUnexpectedError, validateAndInsertEntity } from "$lib/backendQueries/entityOperations";
+import { buildUnexpectedError, validateAndInsertEntity } from "$lib/backendQueries/genericEntityOperations";
 import { WholesalerItemOfferingForCreateSchema } from "$lib/domain/domainTypes";
 import { v4 as uuidv4 } from "uuid";
 

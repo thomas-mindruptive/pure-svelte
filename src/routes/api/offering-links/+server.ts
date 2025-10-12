@@ -11,7 +11,7 @@
 import { json, error, type RequestHandler } from '@sveltejs/kit';
 import { db } from '$lib/backendQueries/db';
 import { log } from '$lib/utils/logger';
-import { buildUnexpectedError } from '$lib/backendQueries/entityOperations';
+import { buildUnexpectedError } from '$lib/backendQueries/genericEntityOperations';
 import { WholesalerOfferingLinkForCreateSchema, type WholesalerItemOffering, type WholesalerOfferingLink } from '$lib/domain/domainTypes';
 import { validateEntity } from "$lib/domain/domainTypes.utils";
 import { v4 as uuidv4 } from 'uuid';

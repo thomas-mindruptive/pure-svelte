@@ -6,19 +6,20 @@
  * This module follows the Factory Pattern to ensure SSR safety.
  */
 
-import { log } from "$lib/utils/logger";
+import type { DeleteApiResponse, DeleteRequest, PredefinedQueryRequest, QueryResponseData } from "$lib/api/api.types";
 import { type QueryPayload, type SortDescriptor, type WhereCondition, type WhereConditionGroup } from "$lib/backendQueries/queryGrammar";
+import { transformToNestedObjects } from "$lib/backendQueries/recordsetTransformer";
 import {
   Wio_PDef_Cat_Supp_Nested_Schema,
   type ProductDefinition,
+  type WholesalerItemOffering,
   type Wio_PDef_Cat_Supp_Nested,
+  type Wio_PDef_Cat_Supp_Nested_WithLinks,
 } from "$lib/domain/domainTypes";
+import { log } from "$lib/utils/logger";
 import type { ApiClient } from "./ApiClient";
-import { createJsonBody, createJsonAndWrapInPayload, getErrorMessage } from "./common";
-import type { DeleteApiResponse, DeleteRequest, PredefinedQueryRequest, QueryResponseData } from "$lib/api/api.types";
+import { createJsonAndWrapInPayload, createJsonBody, getErrorMessage } from "./common";
 import { LoadingState } from "./loadingState";
-import { genTypedQualifiedColumns } from "$lib/domain/domainTypes.utils";
-import { transformToNestedObjects } from "$lib/backendQueries/recordsetTransformer";
 
 // Create a dedicated loading state manager for this entity.
 const productDefinitionLoadingManager = new LoadingState();
@@ -178,13 +179,14 @@ export function getProductDefinitionApi(client: ApiClient) {
       const operationId = `loadOfferingsForProductDefinition-${productDefId}`;
       productDefinitionLoadingManager.start(operationId);
       try {
-        const cols = genTypedQualifiedColumns(Wio_PDef_Cat_Supp_Nested_Schema, true);
+        // The COLUMNS are already defined in queryConfig.ts!
+        // => not needed: const cols = genTypedQualifiedColumns(Wio_PDef_Cat_Supp_Nested_Schema, true);
         let finalWhere: WhereConditionGroup<Wio_PDef_Cat_Supp_Nested> | WhereCondition<Wio_PDef_Cat_Supp_Nested> = {
           whereCondOp: "AND",
           conditions: [{ key: "wio.product_def_id", whereCondOp: "=", val: productDefId }],
         };
         if (aWhere) {
-          finalWhere = {whereCondOp: "AND", conditions:[aWhere, finalWhere]} 
+          finalWhere = {whereCondOp: "AND", conditions:[aWhere, finalWhere]}
         }
 
         let finalOrderBy: SortDescriptor<Wio_PDef_Cat_Supp_Nested>[] = [{ key: "w.name", direction: "asc" }];
@@ -192,8 +194,8 @@ export function getProductDefinitionApi(client: ApiClient) {
           finalOrderBy = [...finalOrderBy, ...aOrderBy];
         }
 
-        const payload: QueryPayload<Wio_PDef_Cat_Supp_Nested> = {
-          select: cols,
+        const payload = {
+          //select: cols, => DONE IN queryConfig.ts!
           where: finalWhere,
           orderBy: finalOrderBy,
         };
@@ -210,6 +212,57 @@ export function getProductDefinitionApi(client: ApiClient) {
         );
         const transformed = transformToNestedObjects(responseData.results as Record<string, unknown>[], Wio_PDef_Cat_Supp_Nested_Schema);
         return transformed;
+      } catch (err) {
+        log.error(`[${operationId}] Failed.`, { productDefId, error: getErrorMessage(err) });
+        throw err;
+      } finally {
+        productDefinitionLoadingManager.finish(operationId);
+      }
+    },
+
+    /**
+     * Loads all offerings with links for a specific product definition across all suppliers.
+     * Uses the nested offerings endpoint with full JSON structure including links.
+     * @param productDefId The ID of the product definition.
+     * @param aWhere Optional additional WHERE conditions.
+     * @param aOrderBy Optional sort descriptors.
+     * @param aLimit Optional limit for pagination.
+     * @param aOffset Optional offset for pagination.
+     * @returns A promise that resolves to an array of nested offerings with links.
+     */
+    async loadNestedOfferingsWithLinksForProductDefinition(
+      productDefId: number,
+      aWhere?: WhereConditionGroup<WholesalerItemOffering> | WhereCondition<WholesalerItemOffering> | null,
+      aOrderBy?: SortDescriptor<WholesalerItemOffering>[] | null,
+      aLimit?: number | null,
+      aOffset?: number | null,
+    ): Promise<Wio_PDef_Cat_Supp_Nested_WithLinks[]> {
+      const operationId = `loadNestedOfferingsWithLinksForProductDefinition-${productDefId}`;
+      productDefinitionLoadingManager.start(operationId);
+      try {
+        let finalWhere: WhereConditionGroup<WholesalerItemOffering> | WhereCondition<WholesalerItemOffering> = {
+          whereCondOp: "AND",
+          conditions: [{ key: "product_def_id", whereCondOp: "=", val: productDefId }],
+        };
+        if (aWhere) {
+          finalWhere = { whereCondOp: "AND", conditions: [aWhere, finalWhere] };
+        }
+
+        const payload: QueryPayload<WholesalerItemOffering> = {
+          // ⚠️ "select" not used by nested endpoint - uses wio.* in SQL
+          select: [], 
+          where: finalWhere,
+          ...(aOrderBy && { orderBy: aOrderBy }),
+          ...(aLimit && { limit: aLimit }),
+          ...(aOffset && { offset: aOffset }),
+        };
+
+        const responseData = await client.apiFetch<QueryResponseData<Wio_PDef_Cat_Supp_Nested_WithLinks>>(
+          "/api/offerings/nested",
+          { method: "POST", body: createJsonBody(payload) },
+          { context: operationId },
+        );
+        return responseData.results as Wio_PDef_Cat_Supp_Nested_WithLinks[];
       } catch (err) {
         log.error(`[${operationId}] Failed.`, { productDefId, error: getErrorMessage(err) });
         throw err;

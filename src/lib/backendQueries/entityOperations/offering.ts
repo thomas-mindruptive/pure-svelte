@@ -1,13 +1,16 @@
 import type { WholesalerItemOffering } from "$lib/domain/domainTypes";
 import type { Transaction } from "mssql";
 import { buildWhereClause, type BuildContext } from "../queryBuilder";
-import type { WhereCondition, WhereConditionGroup } from "../queryGrammar";
+import type { WhereCondition, WhereConditionGroup, SortDescriptor } from "../queryGrammar";
 import { error } from "@sveltejs/kit";
 import { assertDefined } from "$lib/utils/assertions";
 
 export async function loadNestedOfferingsWithJoinsAndLinks(
   transaction: Transaction,
   aWhere?: WhereConditionGroup<WholesalerItemOffering> | WhereCondition<WholesalerItemOffering>,
+  aOrderBy?: SortDescriptor<WholesalerItemOffering>[],
+  aLimit?: number,
+  aOffset?: number,
 ): Promise<string> {
   assertDefined(transaction, "transaction");
 
@@ -21,6 +24,24 @@ export async function loadNestedOfferingsWithJoinsAndLinks(
     whereClause = `WHERE ${buildWhereClause(aWhere, ctx)}`;
   }
 
+  // Build ORDER BY clause
+  let orderByClause = "";
+  if (aOrderBy && aOrderBy.length > 0) {
+    orderByClause = `ORDER BY ${aOrderBy.map((s) => `${String(s.key)} ${s.direction}`).join(", ")}`;
+  } else if (aLimit || aOffset) {
+    // SQL Server requires ORDER BY for OFFSET/FETCH
+    orderByClause = "ORDER BY wio.offering_id ASC";
+  }
+
+  // Build LIMIT/OFFSET clause (SQL Server syntax)
+  let limitClause = "";
+  if (aLimit && aLimit > 0) {
+    limitClause = `OFFSET ${aOffset || 0} ROWS FETCH NEXT ${aLimit} ROWS ONLY`;
+  } else if (aOffset && aOffset > 0) {
+    // Only OFFSET without LIMIT - fetch all remaining rows
+    limitClause = `OFFSET ${aOffset} ROWS`;
+  }
+
   const request = transaction.request();
 
   // Dynamische Parameter binden
@@ -32,50 +53,38 @@ export async function loadNestedOfferingsWithJoinsAndLinks(
   const result = await request.query(`
     SELECT (
         SELECT
-            wio.offering_id,
-            wio.wholesaler_id,
-            wio.category_id,
-            wio.product_def_id,
-            wio.sub_seller,
-            wio.material_id,
-            wio.form_id,
-            wio.title,
-            wio.size,
-            wio.dimensions,
-            wio.weight_grams,
-            wio.price,
-            wio.currency,
-            wio.comment,
-            wio.created_at,
-            (
+            wio.*,
+            JSON_QUERY((
                 SELECT pd.product_def_id, pd.category_id, pd.title, pd.description,
                        pd.material_id, pd.form_id, pd.for_liquids, pd.created_at
                 FROM dbo.product_definitions AS pd
                 WHERE pd.product_def_id = wio.product_def_id
                 FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
-            ) AS product_def,
-            (
+            )) AS product_def,
+            JSON_QUERY((
                 SELECT pc.category_id, pc.name, pc.description
                 FROM dbo.product_categories AS pc
                 WHERE pc.category_id = wio.category_id
                 FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
-            ) AS category,
-            (
+            )) AS category,
+            JSON_QUERY((
                 SELECT w.wholesaler_id, w.name, w.country, w.region,
                        w.b2b_notes, w.status, w.dropship, w.website,
                        w.email, w.price_range, w.relevance, w.created_at
                 FROM dbo.wholesalers AS w
                 WHERE w.wholesaler_id = wio.wholesaler_id
                 FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
-            ) AS wholesaler,
-            (
-                SELECT l.link_id, l.url, l.notes, l.created_at
+            )) AS wholesaler,
+            JSON_QUERY((
+                SELECT l.link_id, l.offering_id, l.url, l.notes, l.created_at
                 FROM dbo.wholesaler_offering_links AS l
                 WHERE l.offering_id = wio.offering_id
                 FOR JSON PATH
-            ) AS links
+            )) AS links
         FROM dbo.wholesaler_item_offerings AS wio
         ${whereClause}
+        ${orderByClause}
+        ${limitClause}
         FOR JSON PATH, INCLUDE_NULL_VALUES
     ) AS json_result;
   `);
@@ -99,6 +108,9 @@ export async function loadNestedOfferingWithJoinsAndLinksForId(transaction: Tran
 export async function loadFlatOfferingsWithJoinsAndLinks(
   transaction: Transaction,
   aWhere?: WhereConditionGroup<WholesalerItemOffering> | WhereCondition<WholesalerItemOffering>,
+  aOrderBy?: SortDescriptor<WholesalerItemOffering>[],
+  aLimit?: number,
+  aOffset?: number,
 ): Promise<any[]> {
   assertDefined(transaction, "transaction");
 
@@ -110,6 +122,24 @@ export async function loadFlatOfferingsWithJoinsAndLinks(
   let whereClause = "";
   if (aWhere) {
     whereClause = `WHERE ${buildWhereClause(aWhere, ctx)}`;
+  }
+
+  // Build ORDER BY clause
+  let orderByClause = "";
+  if (aOrderBy && aOrderBy.length > 0) {
+    orderByClause = `ORDER BY ${aOrderBy.map((s) => `${String(s.key)} ${s.direction}`).join(", ")}`;
+  } else if (aLimit || aOffset) {
+    // SQL Server requires ORDER BY for OFFSET/FETCH
+    orderByClause = "ORDER BY wio.offering_id ASC";
+  }
+
+  // Build LIMIT/OFFSET clause (SQL Server syntax)
+  let limitClause = "";
+  if (aLimit && aLimit > 0) {
+    limitClause = `OFFSET ${aOffset || 0} ROWS FETCH NEXT ${aLimit} ROWS ONLY`;
+  } else if (aOffset && aOffset > 0) {
+    // Only OFFSET without LIMIT - fetch all remaining rows
+    limitClause = `OFFSET ${aOffset} ROWS`;
   }
 
   const request = transaction.request();
@@ -153,6 +183,8 @@ export async function loadFlatOfferingsWithJoinsAndLinks(
     LEFT JOIN dbo.product_categories pc ON wio.category_id = pc.category_id
     LEFT JOIN dbo.wholesalers w ON wio.wholesaler_id = w.wholesaler_id
     ${whereClause}
+    ${orderByClause}
+    ${limitClause}
   `);
 
   if (!result.recordset?.length) {
@@ -171,6 +203,7 @@ export async function loadFlatOfferingWithJoinsAndLinksForId(transaction: Transa
   assertDefined(id, "id");
 
   const whereCondition: WhereCondition<WholesalerItemOffering> = { key: "offering_id", whereCondOp: "=", val: id };
+  // No need for orderBy/limit/offset when fetching single record by ID
   const results = await loadFlatOfferingsWithJoinsAndLinks(transaction, whereCondition);
 
   if (!results || results.length === 0) {

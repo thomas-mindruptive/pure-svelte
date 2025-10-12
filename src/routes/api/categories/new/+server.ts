@@ -10,7 +10,7 @@
 import { type RequestHandler } from '@sveltejs/kit';
 import { log } from '$lib/utils/logger';
 import { ProductCategoryForCreateSchema, type ProductCategory } from '$lib/domain/domainTypes';
-import { buildUnexpectedError, validateAndInsertEntity } from '$lib/backendQueries/entityOperations';
+import { buildUnexpectedError, validateAndInsertEntity } from '$lib/backendQueries/genericEntityOperations';
 import { v4 as uuidv4 } from 'uuid';
 
 

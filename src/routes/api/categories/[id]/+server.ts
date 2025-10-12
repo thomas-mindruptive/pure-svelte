@@ -10,7 +10,7 @@
 import { json, error, type RequestHandler } from "@sveltejs/kit";
 import { db } from "$lib/backendQueries/db";
 import { log } from "$lib/utils/logger";
-import { buildUnexpectedError, validateIdUrlParam, validateAndUpdateEntity } from "$lib/backendQueries/entityOperations";
+import { buildUnexpectedError, validateIdUrlParam, validateAndUpdateEntity } from "$lib/backendQueries/genericEntityOperations";
 import { checkProductCategoryMasterDependencies } from "$lib/backendQueries/dependencyChecks";
 import { ProductCategorySchema, type ProductCategory } from "$lib/domain/domainTypes";
 import { v4 as uuidv4 } from "uuid";

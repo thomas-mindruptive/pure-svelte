@@ -19,7 +19,7 @@ import { v4 as uuidv4 } from "uuid";
 import type { ApiSuccessResponse, DeleteConflictResponse, DeleteRequest, QueryRequest, QuerySuccessResponse } from "$lib/api/api.types";
 import { deleteSupplier } from "$lib/backendQueries/cascadingDeleteOperations";
 import type { DeleteSupplierSuccessResponse } from "$lib/api/app/appSpecificTypes";
-import { buildUnexpectedError, validateAndUpdateEntity, validateIdUrlParam } from "$lib/backendQueries/entityOperations";
+import { buildUnexpectedError, validateAndUpdateEntity, validateIdUrlParam } from "$lib/backendQueries/genericEntityOperations";
 import { rollbackTransaction } from "$lib/backendQueries/transactionWrapper";
 
 /**

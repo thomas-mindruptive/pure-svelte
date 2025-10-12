@@ -24,7 +24,7 @@ import type {
   QuerySuccessResponse,
 } from "$lib/api/api.types";
 import { deleteOrder } from "$lib/backendQueries/cascadingDeleteOperations";
-import { buildUnexpectedError, validateAndUpdateEntity, validateIdUrlParam } from "$lib/backendQueries/entityOperations";
+import { buildUnexpectedError, validateAndUpdateEntity, validateIdUrlParam } from "$lib/backendQueries/genericEntityOperations";
 import { rollbackTransaction } from "$lib/backendQueries/transactionWrapper";
 
 /**

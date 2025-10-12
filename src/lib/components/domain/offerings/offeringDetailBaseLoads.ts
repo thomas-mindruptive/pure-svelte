@@ -5,15 +5,15 @@
  */
 
 import { ApiClient } from "$lib/api/client/ApiClient";
+import { getCategoryApi } from "$lib/api/client/category";
+import { getFormApi } from "$lib/api/client/form";
+import { getMaterialApi } from "$lib/api/client/material";
 import { getOfferingApi } from "$lib/api/client/offering";
+import { type Form, type Material, type ProductDefinition, type Wholesaler } from "$lib/domain/domainTypes";
 import { log } from "$lib/utils/logger";
+import { parseUrlSegments } from "$lib/utils/url";
 import { error, type LoadEvent } from "@sveltejs/kit";
 import type { OfferingDetail_LoadDataAsync } from "./offeringDetail.types";
-import { type Form, type Material, type ProductDefinition, type Wholesaler } from "$lib/domain/domainTypes";
-import { getCategoryApi } from "$lib/api/client/category";
-import { parseUrlSegments } from "$lib/utils/url";
-import { getMaterialApi } from "$lib/api/client/material";
-import { getFormApi } from "$lib/api/client/form";
 
 /**
  * Load the basis data for offering detail pages.
@@ -142,7 +142,7 @@ export function loadOfferingDetailBasisData({
       // Wenn der ApiClient einen SvelteKit-`error` wirft, ist `err` eine `Response`-Instanz.
       // Wir loggen es und werfen es erneut, damit SvelteKit seine Fehlerseite anzeigen kann.
       log.error(`SSR Load failed, re-throwing SvelteKit error for page display.`, err);
-      return null;
+      return { offering: null, error: err };
       // DO NOT: throw err; 
     });
     // ⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️

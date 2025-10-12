@@ -1,7 +1,5 @@
 // src/lib/pages/offerings/offerDetailLinksPage.ts
 
-import { ApiClient } from "$lib/api/client/ApiClient";
-import { getOfferingApi } from "$lib/api/client/offering";
 import { log } from "$lib/utils/logger";
 import { type LoadEvent } from "@sveltejs/kit";
 import type { OfferingDetail_LoadDataAsync, OfferingDetailLinks_LoadDataAsync } from "./offeringDetail.types";
@@ -16,26 +14,28 @@ export function load({ url, params, fetch: fetchLoad }: LoadEvent): OfferingDeta
 
   // --- PARAMS and basis data for all offering detail pages --------------------------------------
 
-  const offeringId = Number(params.offeringId);
+  //⚠️NOTE: We load the links directly with the offering! => not needed: const offeringId = Number(params.offeringId);
   const offeringDetailBasisData: OfferingDetail_LoadDataAsync = loadOfferingDetailBasisData({ url, params, fetch: fetchLoad });
 
   // --- LOAD SPECIFIC DATA -----------------------------------------------------------------------
 
-  const client = new ApiClient(fetchLoad);
-  const offeringApi = getOfferingApi(client);
-
+  //⚠️NOTE: We load the links directly with the offering! => not needed:
+  // const client = new ApiClient(fetchLoad);
+  // const offeringApi = getOfferingApi(client);
+  // END NOT NEEDED 
+  
   if (offeringDetailBasisData.isCreateMode) {
     // --- CREATE MODE
     const asyncLoadData: OfferingDetailLinks_LoadDataAsync = {
       ...offeringDetailBasisData,
-      links: Promise.resolve([]),
+      //⚠️NOTE: We load the links directly with the offering! => not needed: links: Promise.resolve([]),
     };
     return asyncLoadData;
   } else {
     // --- EDIT MODE
     const asyncLoadData: OfferingDetailLinks_LoadDataAsync = {
       ...offeringDetailBasisData,
-      links: offeringApi.loadOfferingLinks(offeringId),
+      //⚠️NOTE: We load the links directly with the offering! => not needed: links: offeringApi.loadOfferingLinks(offeringId),
     };
     return asyncLoadData;
   }

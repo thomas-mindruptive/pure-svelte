@@ -14,7 +14,7 @@ import type {
   WholesalerOfferingAttribute,
   WholesalerOfferingAttribute_Attribute,
   WholesalerOfferingLink,
-  Wio_PDef_Cat_Supp
+  Wio_PDef_Cat_Supp_WithLinks
 } from "$lib/domain/domainTypes";
 import { log } from "$lib/utils/logger";
 
@@ -49,13 +49,13 @@ export function getOfferingApi(client: ApiClient) {
     /**
      * Loads a single offering with all its details by ID.
      */
-    async loadOffering(offeringId: number): Promise<Wio_PDef_Cat_Supp> {
+    async loadOffering(offeringId: number): Promise<Wio_PDef_Cat_Supp_WithLinks> {
       log.info(`API, Loading offering: ${offeringId}`);
       const operationId = `loadOffering-${offeringId}`;
       offeringLoadingManager.start(operationId);
       try {
         const responseData = await client.apiFetch<{
-          offering: Wio_PDef_Cat_Supp;
+          offering: Wio_PDef_Cat_Supp_WithLinks;
         }>(`/api/offerings/${offeringId}`, { method: "GET" }, { context: operationId });
         return responseData.offering;
       } catch (err) {

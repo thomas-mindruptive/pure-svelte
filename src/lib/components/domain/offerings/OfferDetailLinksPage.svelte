@@ -18,6 +18,7 @@
   } from "./offeringDetail.types";
   import { log } from "$lib/utils/logger";
   import { assertDefined } from "$lib/utils/assertions";
+    import { coerceErrorMessage } from "$lib/utils/errorUtils";
 
   // === PROPS ====================================================================================
 
@@ -39,27 +40,32 @@
       resolvedData = null;
 
       try {
-        const [offering, links, availableProducts, availableSuppliers, materials, forms] = await Promise.all([
+        const [offering, availableProducts, availableSuppliers, materials, forms] = await Promise.all([
           data.offering,
-          data.links,
+          //⚠️NOTE: We load the links directly with the offering! => not needed: data.links,
           data.availableProducts,
           data.availableSuppliers,
           data.materials,
-          data.forms
+          data.forms,
         ]);
-        log.debug(`All promises resolved: `, { offering, links, availableProducts, availableSuppliers });
+        log.debug(`All promises resolved: `, { offering, availableProducts, availableSuppliers });
 
         if (aborted) return;
 
         const dataToValidate: OfferingDetailLinks_LoadData = {
           ...data,
           offering,
-          links,
+          //⚠️NOTE: We load the links directly with the offering! => not needed:links,
           availableProducts,
           availableSuppliers,
           materials,
-          forms
+          forms,
         };
+
+        if ((offering as any).error) {
+          addNotification(`Cannot load offering: ${coerceErrorMessage((offering as any).error)}`);
+          throw (offering as any).error;
+        }
 
         const validationResult = OfferingDetailLinks_LoadDataSchema.safeParse(dataToValidate);
 
@@ -125,7 +131,7 @@
 
     log.info("(OfferDetailLinksPage) Re-fetching links...");
     const updatedLinks = await offeringApi.loadOfferingLinks(resolvedData.offering.offering_id);
-    resolvedData.links = updatedLinks;
+    resolvedData.offering.links = updatedLinks;
     log.info("(OfferDetailLinksPage) Local state updated with new links.");
   }
 
@@ -196,7 +202,6 @@
   // };
 </script>
 
-<!-- TEMPLATE mit bedingtem Rendering -->
 {#if loadingError}
   <div class="component-error-boundary">
     <h3>Error Loading Data (Status: {loadingError.status})</h3>
@@ -245,7 +250,7 @@
       {:else}
         <!-- We do NOT pass rowStrategy because the link grid navigates to EXTERNAL link. -->
         <LinkGrid
-          rows={resolvedData.links}
+          rows={resolvedData.offering.links || []}
           loading={$offeringLoadingState}
           {deleteStrategy}
         />

@@ -9,21 +9,21 @@ import type { ApiErrorResponse, ApiSuccessResponse, DeleteConflictResponse, Dele
 import { db } from "$lib/backendQueries/db";
 import { buildUnexpectedError, validateAndUpdateEntity, validateIdUrlParam } from "$lib/backendQueries/entityOperations";
 import {
-  Wio_PDef_Cat_Supp_Nested_WithLinks_Schema,
+  Wio_PDef_Cat_Supp_WithLinks_Schema,
   Wio_Schema,
   type WholesalerItemOffering,
-  type Wio_PDef_Cat_Supp_Nested_WithLinks,
+  type Wio_PDef_Cat_Supp_WithLinks
 } from "$lib/domain/domainTypes";
 import { validateEntity } from "$lib/domain/domainTypes.utils";
 import { log } from "$lib/utils/logger";
-import { error, json, type RequestHandler } from "@sveltejs/kit";
+import { json, type RequestHandler } from "@sveltejs/kit";
 import { v4 as uuidv4 } from "uuid";
 
 // Type alias for offering with links
 import type { DeleteOfferingSuccessResponse } from "$lib/api/app/appSpecificTypes";
 import { deleteOffering } from "$lib/backendQueries/cascadingDeleteOperations";
 import { checkOfferingDependencies } from "$lib/backendQueries/dependencyChecks";
-import { loadOfferingsWithJoinsAndLinksForId } from "$lib/backendQueries/entityOperations/offering";
+import { loadFlatOfferingWithJoinsAndLinksForId } from "$lib/backendQueries/entityOperations/offering";
 import { rollbackTransaction } from "$lib/backendQueries/transactionWrapper";
 
 /**
@@ -49,18 +49,20 @@ export const GET: RequestHandler = async ({ params }) => {
     log.info(`[${operationId}] Transaction started for offering retrieval.`);
 
     try {
-      const jsonString = await loadOfferingsWithJoinsAndLinksForId(transaction, id);
-      const offeringsArray = JSON.parse(jsonString);
+      const flatOfferingWithLinks = await loadFlatOfferingWithJoinsAndLinksForId(transaction, id);
+      // Convert to json and back to ensure that validation works 100% same as on client.
+      const parsedOffering = JSON.parse(JSON.stringify(flatOfferingWithLinks));
 
-      if (!offeringsArray || offeringsArray.length === 0) {
-        await rollbackTransaction(transaction);
-        throw error(404, `Offering with ID ${id} not found.`);
-      }
+      // const offeringsArray = JSON.parse(jsonString);
+      // if (!offeringsArray || offeringsArray.length === 0) {
+      //   await rollbackTransaction(transaction);
+      //   throw error(404, `Offering with ID ${id} not found.`);
+      // }
 
-      const offeringWithJoinsAndLinks = offeringsArray[0];
+      //const offeringWithJoinsAndLinks = offeringsArray[0];
 
       // TODO: all GET <path>/id endpoints should validate retrieved record.
-      const validation = validateEntity(Wio_PDef_Cat_Supp_Nested_WithLinks_Schema, offeringWithJoinsAndLinks);
+      const validation = validateEntity(Wio_PDef_Cat_Supp_WithLinks_Schema, parsedOffering);
       const debugError = false; // ONLY FOR DEBUG!
       if (!validation.isValid || debugError) {
         await rollbackTransaction(transaction);
@@ -76,14 +78,14 @@ export const GET: RequestHandler = async ({ params }) => {
         return json(errRes, { status: 500 });
       }
 
-      const offering = validation.sanitized as Wio_PDef_Cat_Supp_Nested_WithLinks;
+      const offering = validation.sanitized as Wio_PDef_Cat_Supp_WithLinks;
 
       // Commit transaction
       await transaction.commit();
       log.info(`[${operationId}] Transaction committed successfully.`);
 
       // The response now correctly wraps the data in an 'offering' property.
-      const response: ApiSuccessResponse<{ offering: Wio_PDef_Cat_Supp_Nested_WithLinks }> = {
+      const response: ApiSuccessResponse<{ offering: Wio_PDef_Cat_Supp_WithLinks }> = {
         success: true,
         message: "Offering retrieved successfully.",
         data: { offering },

@@ -22,6 +22,7 @@
   import { assertDefined } from "$lib/utils/assertions";
   import { stringsToNumbers } from "$lib/utils/typeConversions";
   import { cascadeDeleteAssignments, type CompositeID } from "$lib/api/client/cascadeDelete";
+    import { coerceErrorMessage } from "$lib/utils/errorUtils";
 
   // === PROPS ==================================================================================
 
@@ -71,6 +72,11 @@
           materials,
           forms
         };
+
+        if ((offering as any).error) {
+          addNotification(`Cannot load offering: ${coerceErrorMessage((offering as any).error)}`);
+          throw ((offering as any).error);
+        }
 
         const validationResult = OfferingDetailAttributes_LoadDataSchema.safeParse(dataToValidate);
 

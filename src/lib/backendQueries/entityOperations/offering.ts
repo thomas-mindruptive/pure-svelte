@@ -3,11 +3,14 @@ import type { Transaction } from "mssql";
 import { buildWhereClause, type BuildContext } from "../queryBuilder";
 import type { WhereCondition, WhereConditionGroup } from "../queryGrammar";
 import { error } from "@sveltejs/kit";
+import { assertDefined } from "$lib/utils/assertions";
 
-export async function loadOfferingsWithJoinsAndLinks(
+export async function loadNestedOfferingsWithJoinsAndLinks(
   transaction: Transaction,
   aWhere?: WhereConditionGroup<WholesalerItemOffering> | WhereCondition<WholesalerItemOffering>,
 ): Promise<string> {
+  assertDefined(transaction, "transaction");
+
   const ctx: BuildContext = {
     parameters: {},
     paramIndex: 0,
@@ -85,8 +88,94 @@ export async function loadOfferingsWithJoinsAndLinks(
   return jsonString;
 }
 
-export async function loadOfferingsWithJoinsAndLinksForId(transaction: Transaction, id: number) {
+export async function loadNestedOfferingWithJoinsAndLinksForId(transaction: Transaction, id: number) {
+  assertDefined(transaction, "transaction");
+  assertDefined(id, "id");
   const whereCondition: WhereCondition<WholesalerItemOffering> = { key: "offering_id", whereCondOp: "=", val: id };
-  const jsonString = await loadOfferingsWithJoinsAndLinks(transaction, whereCondition);
+  const jsonString = await loadNestedOfferingsWithJoinsAndLinks(transaction, whereCondition);
   return jsonString;
+}
+
+export async function loadFlatOfferingsWithJoinsAndLinks(
+  transaction: Transaction,
+  aWhere?: WhereConditionGroup<WholesalerItemOffering> | WhereCondition<WholesalerItemOffering>,
+): Promise<any[]> {
+  assertDefined(transaction, "transaction");
+
+  const ctx: BuildContext = {
+    parameters: {},
+    paramIndex: 0,
+  };
+
+  let whereClause = "";
+  if (aWhere) {
+    whereClause = `WHERE ${buildWhereClause(aWhere, ctx)}`;
+  }
+
+  const request = transaction.request();
+
+  // Dynamische Parameter binden
+  for (const [key, value] of Object.entries(ctx.parameters)) {
+    request.input(key, value);
+  }
+
+  // Query ausführen - FLAT structure mit LEFT JOINs
+  const result = await request.query(`
+    SELECT
+        wio.offering_id,
+        wio.wholesaler_id,
+        wio.category_id,
+        wio.product_def_id,
+        wio.sub_seller,
+        wio.material_id,
+        wio.form_id,
+        wio.title,
+        wio.size,
+        wio.dimensions,
+        wio.weight_grams,
+        wio.price,
+        wio.currency,
+        wio.comment,
+        wio.created_at,
+        pd.title AS product_def_title,
+        pd.description AS product_def_description,
+        pc.name AS category_name,
+        pc.description AS category_description,
+        w.name AS wholesaler_name,
+        (
+            SELECT l.link_id, l.offering_id, l.url, l.notes, l.created_at
+            FROM dbo.wholesaler_offering_links AS l
+            WHERE l.offering_id = wio.offering_id
+            FOR JSON PATH
+        ) AS links
+    FROM dbo.wholesaler_item_offerings AS wio
+    LEFT JOIN dbo.product_definitions pd ON wio.product_def_id = pd.product_def_id
+    LEFT JOIN dbo.product_categories pc ON wio.category_id = pc.category_id
+    LEFT JOIN dbo.wholesalers w ON wio.wholesaler_id = w.wholesaler_id
+    ${whereClause}
+  `);
+
+  if (!result.recordset?.length) {
+    throw error(404, "No offerings found for the given criteria.");
+  }
+
+  // Parse links JSON für jede Row
+  return result.recordset.map((row: any) => ({
+    ...row,
+    links: row.links ? JSON.parse(row.links) : null,
+  }));
+}
+
+export async function loadFlatOfferingWithJoinsAndLinksForId(transaction: Transaction, id: number): Promise<any> {
+  assertDefined(transaction, "transaction");
+  assertDefined(id, "id");
+
+  const whereCondition: WhereCondition<WholesalerItemOffering> = { key: "offering_id", whereCondOp: "=", val: id };
+  const results = await loadFlatOfferingsWithJoinsAndLinks(transaction, whereCondition);
+
+  if (!results || results.length === 0) {
+    throw error(404, `Offering with ID ${id} not found.`);
+  }
+
+  return results[0];
 }

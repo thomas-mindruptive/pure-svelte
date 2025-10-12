@@ -23,8 +23,8 @@ import { v4 as uuidv4 } from "uuid";
 import type { DeleteOfferingSuccessResponse } from "$lib/api/app/appSpecificTypes";
 import { deleteOffering } from "$lib/backendQueries/cascadingDeleteOperations";
 import { checkOfferingDependencies } from "$lib/backendQueries/dependencyChecks";
-import { rollbackTransaction } from "$lib/backendQueries/transactionWrapper";
 import { loadOfferingsWithJoinsAndLinksForId } from "$lib/backendQueries/entityOperations/offering";
+import { rollbackTransaction } from "$lib/backendQueries/transactionWrapper";
 
 /**
  * GET /api/offerings/[id]
@@ -50,45 +50,14 @@ export const GET: RequestHandler = async ({ params }) => {
 
     try {
       const jsonString = await loadOfferingsWithJoinsAndLinksForId(transaction, id);
-      const offeringWithJoinsAndLinks = JSON.parse(jsonString);
+      const offeringsArray = JSON.parse(jsonString);
 
-      // // This query joins all necessary tables to build the
-      // // WholesalerItemOffering_ProductDef_Category type.
-      // const result = await transaction.request().input("id", id).query(`
-      //             SELECT
-      //                 wio.*,
-      //                 pd.title AS product_def_title,
-      //                 pd.description AS product_def_description,
-      //                 pc.name AS category_name,
-      //                 w.name AS wholesaler_name
-      //             FROM dbo.wholesaler_item_offerings wio
-      //             LEFT JOIN dbo.product_definitions pd ON wio.product_def_id = pd.product_def_id
-      //             LEFT JOIN dbo.product_categories pc ON wio.category_id = pc.category_id
-      //             LEFT JOIN dbo.wholesalers w ON wio.wholesaler_id = w.wholesaler_id
-      //             WHERE wio.offering_id = @id
-      //         `);
+      if (!offeringsArray || offeringsArray.length === 0) {
+        await rollbackTransaction(transaction);
+        throw error(404, `Offering with ID ${id} not found.`);
+      }
 
-      // if (result.recordset.length === 0) {
-      //   await rollbackTransaction(transaction);
-      //   throw error(404, `Offering with ID ${id} not found.`);
-      // }
-
-      // // Query links for this offering
-      // const linksResult = await transaction.request().input("offering_id", id).query(`
-      //             SELECT * FROM dbo.wholesaler_offering_links
-      //             WHERE offering_id = @offering_id
-      //             ORDER BY created_at DESC
-      //         `);
-
-      // const serialized = JSON.parse(JSON.stringify(result.recordset[0]));
-
-      // // Add links to the offering data
-      // serialized.links = linksResult.recordset.length > 0 ? JSON.parse(JSON.stringify(linksResult.recordset)) : null;
-
-      // // Serialize and deserialize object to ensure validation is the same as on client.
-      // // If not: validation fails, because record contains "date" object whereas schema "string".
-      // // Changing schema to date does not help, because JSON serialization converts it to string anyway
-      // // => Client always receives iso-string.
+      const offeringWithJoinsAndLinks = offeringsArray[0];
 
       // TODO: all GET <path>/id endpoints should validate retrieved record.
       const validation = validateEntity(Wio_PDef_Cat_Supp_Nested_WithLinks_Schema, offeringWithJoinsAndLinks);

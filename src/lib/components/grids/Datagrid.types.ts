@@ -4,45 +4,27 @@ import type z from "zod";
 
 // ===== COLUMNS ==================================================================================
 
-// If an accessor is present: key can be anything (as accessor handles the logic)
-export type ColumnDefWithAccessor<T> = {
-  key: keyof T;
-  header: string;
-  accessor: ((row: T) => unknown) | null;
-  sortable?: boolean;
-  width?: string;
-  class?: string;
-};
-
-// If no accessor: key must be a valid property name
-export type ColumnDefDirect<T> = {
-  key: keyof T; // ONLY valid property names
-  header: string;
-  accessor?: never; // no accessor allowed
-  sortable?: boolean;
-  width?: string;
-  class?: string;
-};
-
-export type ColumnDefBase<S extends z.ZodObject<any>> = {
-  key: QualifiedColumnsFromBrandedSchemaWithJoins<S>;
-  header: string;
-  accessor?: ((row: z.infer<S>) => unknown) | null;
-  sortable?: boolean;
-  width?: string;
-  class?: string;
-};
-
-export type ColumnDefDirect_<S extends z.ZodObject<any>> = ColumnDefBase<S> & {
-  accessor?: never; // no accessor allowed
-}
-
-export type ColumnDefWithAccessor_<S extends z.ZodObject<any>> = ColumnDefBase<S> & {
-  accessor?: ((row: z.infer<S>) => unknown) | null;
-}
-
-// Union: either direct access OR accessor
-export type ColumnDef<T> = ColumnDefWithAccessor<T> | ColumnDefDirect<T>;
+export type ColumnDef<S extends z.ZodObject<any>> =
+  // Case 1: A standard, sortable column with a key from the schema.
+  | {
+      key: QualifiedColumnsFromBrandedSchemaWithJoins<S>;
+      header: string;
+      accessor?: ((row: z.infer<S>) => unknown) | null; // Accessor is optional
+      sortable?: boolean; // Sortable is optional
+      width?: string;
+      class?: string;
+      isExternalLink?: boolean;
+    }
+  // Case 2: A special, non-sortable column for computed values.
+  | {
+      key: "<computed>"; // The key is one of the allowed literals
+      header: string;
+      accessor: (row: z.infer<S>) => unknown; // Accessor is REQUIRED
+      sortable: false; // Sortable MUST be false
+      width?: string;
+      class?: string;
+      isExternalLink?: boolean;
+    };
 
 // ===== DELETE ===================================================================================
 
@@ -101,5 +83,3 @@ export type ApiLoadFuncWithId<T> = (id: number, where: WhereConditionGroup<T> | 
  * Sort callback for the DataGrid.
  */
 export type SortFunc<T> = (sortState: SortDescriptor<T>[] | null) => void | Promise<void>;
-
-

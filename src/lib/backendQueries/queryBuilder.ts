@@ -28,7 +28,7 @@ import { metaByAlias, schemaByAlias } from "$lib/domain/domainTypes.utils";
 type Parameters = Record<string, unknown>;
 
 /** A context object passed through the builder functions to track parameters. */
-type BuildContext = {
+export type BuildContext = {
   parameters: Parameters;
   paramIndex: number;
 };
@@ -149,7 +149,7 @@ function validateOrderByKeys<T>(orderBy: SortDescriptor<T>[] | undefined, hasJoi
  * @param ctx The build context for tracking parameters.
  * @returns The generated SQL string for the WHERE clause segment.
  */
-function buildWhereClause<T>(where: WhereCondition<T> | WhereConditionGroup<T>, ctx: BuildContext): string {
+export function buildWhereClause<T>(where: WhereCondition<T> | WhereConditionGroup<T>, ctx: BuildContext): string {
   if (isWhereConditionGroup(where)) {
     // It's a group (e.g., with AND/OR), so we recurse through its nested conditions.
     const conditions = where.conditions.map((c) => buildWhereClause(c, ctx)).join(` ${where.whereCondOp} `);

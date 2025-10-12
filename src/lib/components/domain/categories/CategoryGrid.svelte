@@ -1,7 +1,7 @@
 <script lang="ts">
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
-  import type { DeleteStrategy, RowActionStrategy, ColumnDefDirect, SortFunc } from "$lib/components/grids/Datagrid.types";
-  import type { ProductCategory } from "$lib/domain/domainTypes";
+  import type { ColumnDef, DeleteStrategy, RowActionStrategy, SortFunc } from "$lib/components/grids/Datagrid.types";
+  import type { ProductCategory, ProductCategorySchema } from "$lib/domain/domainTypes";
 
   // === PROPS ====================================================================================
 
@@ -17,7 +17,7 @@
 
   // === COLUMNS ====================================================================================
 
-  const columns: ColumnDefDirect<ProductCategory>[] = [
+  const columns: ColumnDef<typeof ProductCategorySchema>[] = [
     { key: "name", header: "Name", sortable: true, width: "250px" },
     { key: "category_id", header: "id", sortable: true, width: "5rem" },
     { key: "description", header: "description", sortable: true, width: "" },

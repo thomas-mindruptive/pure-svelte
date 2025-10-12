@@ -7,8 +7,8 @@
   // WholesalerOfferingAttribute data. Now accepts strategy props for consistency.
 
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
-  import type { DeleteStrategy, RowActionStrategy, ColumnDef } from "$lib/components/grids/Datagrid.types";
-  import type { WholesalerOfferingAttribute_Attribute } from "$lib/domain/domainTypes";
+  import type { ColumnDef, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
+  import type { WholesalerOfferingAttribute_Attribute, WholesalerOfferingAttribute_AttributeSchema } from "$lib/domain/domainTypes";
 
   // ===== COMPONENT PROPS =====
 
@@ -28,7 +28,7 @@
 
   // ===== COLUMN DEFINITIONS (Unchanged) =====
 
-  const columns: ColumnDef<WholesalerOfferingAttribute_Attribute>[] = [
+  const columns: ColumnDef<typeof WholesalerOfferingAttribute_AttributeSchema>[] = [
     {
       key: "attribute_name",
       header: "Attribute",

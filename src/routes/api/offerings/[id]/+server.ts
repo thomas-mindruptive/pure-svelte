@@ -5,23 +5,26 @@
  * @description Provides GET operation for a single, detailed offering record.
  */
 
-import { json, error, type RequestHandler } from "@sveltejs/kit";
+import type { ApiErrorResponse, ApiSuccessResponse, DeleteConflictResponse, DeleteRequest } from "$lib/api/api.types";
 import { db } from "$lib/backendQueries/db";
-import { log } from "$lib/utils/logger";
-import { buildUnexpectedError, validateIdUrlParam, validateAndUpdateEntity } from "$lib/backendQueries/entityOperations";
+import { buildUnexpectedError, validateAndUpdateEntity, validateIdUrlParam } from "$lib/backendQueries/entityOperations";
 import {
+  Wio_PDef_Cat_Supp_Nested_WithLinks_Schema,
   Wio_Schema,
-  Wio_PDef_Cat_Supp_Schema,
   type WholesalerItemOffering,
-  type Wio_PDef_Cat_Supp,
+  type Wio_PDef_Cat_Supp_Nested_WithLinks,
 } from "$lib/domain/domainTypes";
 import { validateEntity } from "$lib/domain/domainTypes.utils";
+import { log } from "$lib/utils/logger";
+import { error, json, type RequestHandler } from "@sveltejs/kit";
 import { v4 as uuidv4 } from "uuid";
-import type { ApiErrorResponse, ApiSuccessResponse, DeleteConflictResponse, DeleteRequest } from "$lib/api/api.types";
-import { checkOfferingDependencies } from "$lib/backendQueries/dependencyChecks";
+
+// Type alias for offering with links
 import type { DeleteOfferingSuccessResponse } from "$lib/api/app/appSpecificTypes";
 import { deleteOffering } from "$lib/backendQueries/cascadingDeleteOperations";
+import { checkOfferingDependencies } from "$lib/backendQueries/dependencyChecks";
 import { rollbackTransaction } from "$lib/backendQueries/transactionWrapper";
+import { loadOfferingsWithJoinsAndLinksForId } from "$lib/backendQueries/entityOperations/offering";
 
 /**
  * GET /api/offerings/[id]
@@ -33,66 +36,98 @@ export const GET: RequestHandler = async ({ params }) => {
   log.infoHeader(info);
   log.info(`[${operationId}] GET /offerings/${params.id}: FN_START`);
 
+  const transaction = db.transaction();
+
   try {
     const { id, errorResponse } = validateIdUrlParam(params.id);
     if (errorResponse) {
       return errorResponse;
     }
-    // This query joins all necessary tables to build the
-    // WholesalerItemOffering_ProductDef_Category type.
-    const result = await db.request().input("id", id).query(`
-                SELECT 
-                    wio.*,
-                    pd.title AS product_def_title,
-                    pd.description AS product_def_description,
-                    pc.name AS category_name,
-                    w.name AS wholesaler_name
-                FROM dbo.wholesaler_item_offerings wio
-                LEFT JOIN dbo.product_definitions pd ON wio.product_def_id = pd.product_def_id
-                LEFT JOIN dbo.product_categories pc ON wio.category_id = pc.category_id
-                LEFT JOIN dbo.wholesalers w ON wio.wholesaler_id = w.wholesaler_id
-                WHERE wio.offering_id = @id
-            `);
 
-    if (result.recordset.length === 0) {
-      throw error(404, `Offering with ID ${id} not found.`);
-    }
+    // Start transaction
+    await transaction.begin();
+    log.info(`[${operationId}] Transaction started for offering retrieval.`);
 
-    const serialized = JSON.parse(JSON.stringify(result.recordset[0]));
+    try {
+      const jsonString = await loadOfferingsWithJoinsAndLinksForId(transaction, id);
+      const offeringWithJoinsAndLinks = JSON.parse(jsonString);
 
-    // Serialize and deserialize object to ensure validation is the same as on client.
-    // If not: validation fails, because record contains "date" object whereas schema "string".
-    // Changing schema to date does not help, because JSON serialization converts it to string anyway
-    // => Client always receives iso-string.
+      // // This query joins all necessary tables to build the
+      // // WholesalerItemOffering_ProductDef_Category type.
+      // const result = await transaction.request().input("id", id).query(`
+      //             SELECT
+      //                 wio.*,
+      //                 pd.title AS product_def_title,
+      //                 pd.description AS product_def_description,
+      //                 pc.name AS category_name,
+      //                 w.name AS wholesaler_name
+      //             FROM dbo.wholesaler_item_offerings wio
+      //             LEFT JOIN dbo.product_definitions pd ON wio.product_def_id = pd.product_def_id
+      //             LEFT JOIN dbo.product_categories pc ON wio.category_id = pc.category_id
+      //             LEFT JOIN dbo.wholesalers w ON wio.wholesaler_id = w.wholesaler_id
+      //             WHERE wio.offering_id = @id
+      //         `);
 
-    // TODO: all GET <path>/id endpoints should validate retrieved record.
-    const validation = validateEntity(Wio_PDef_Cat_Supp_Schema, serialized);
-    const debugError = false; // ONLY FOR DEBUG!
-    if (!validation.isValid || debugError) {
-      const errRes: ApiErrorResponse = {
-        success: false,
-        message: "Data validation failed for retrieved offering record.",
-        status_code: 500,
-        error_code: "INTERNAL_SERVER_ERROR",
-        errors: validation.errors,
+      // if (result.recordset.length === 0) {
+      //   await rollbackTransaction(transaction);
+      //   throw error(404, `Offering with ID ${id} not found.`);
+      // }
+
+      // // Query links for this offering
+      // const linksResult = await transaction.request().input("offering_id", id).query(`
+      //             SELECT * FROM dbo.wholesaler_offering_links
+      //             WHERE offering_id = @offering_id
+      //             ORDER BY created_at DESC
+      //         `);
+
+      // const serialized = JSON.parse(JSON.stringify(result.recordset[0]));
+
+      // // Add links to the offering data
+      // serialized.links = linksResult.recordset.length > 0 ? JSON.parse(JSON.stringify(linksResult.recordset)) : null;
+
+      // // Serialize and deserialize object to ensure validation is the same as on client.
+      // // If not: validation fails, because record contains "date" object whereas schema "string".
+      // // Changing schema to date does not help, because JSON serialization converts it to string anyway
+      // // => Client always receives iso-string.
+
+      // TODO: all GET <path>/id endpoints should validate retrieved record.
+      const validation = validateEntity(Wio_PDef_Cat_Supp_Nested_WithLinks_Schema, offeringWithJoinsAndLinks);
+      const debugError = false; // ONLY FOR DEBUG!
+      if (!validation.isValid || debugError) {
+        await rollbackTransaction(transaction);
+        const errRes: ApiErrorResponse = {
+          success: false,
+          message: "Data validation failed for retrieved offering record.",
+          status_code: 500,
+          error_code: "INTERNAL_SERVER_ERROR",
+          errors: validation.errors,
+          meta: { timestamp: new Date().toISOString() },
+        };
+        log.error(`[${operationId}] FN_FAILURE: Database record validation failed.`, { errors: validation.errors });
+        return json(errRes, { status: 500 });
+      }
+
+      const offering = validation.sanitized as Wio_PDef_Cat_Supp_Nested_WithLinks;
+
+      // Commit transaction
+      await transaction.commit();
+      log.info(`[${operationId}] Transaction committed successfully.`);
+
+      // The response now correctly wraps the data in an 'offering' property.
+      const response: ApiSuccessResponse<{ offering: Wio_PDef_Cat_Supp_Nested_WithLinks }> = {
+        success: true,
+        message: "Offering retrieved successfully.",
+        data: { offering },
         meta: { timestamp: new Date().toISOString() },
       };
-      log.error(`[${operationId}] FN_FAILURE: Database record validation failed.`, { errors: validation.errors });
-      return json(errRes, { status: 500 });
+
+      log.info(`[${operationId}] FN_SUCCESS: Returning detailed offering data with links.`);
+      return json(response);
+    } catch (err) {
+      await rollbackTransaction(transaction);
+      log.error(`[${operationId}] Transaction failed, rolling back.`, { error: err });
+      throw err;
     }
-
-    const offering = validation.sanitized as Wio_PDef_Cat_Supp;
-
-    // The response now correctly wraps the data in an 'offering' property.
-    const response: ApiSuccessResponse<{ offering: Wio_PDef_Cat_Supp }> = {
-      success: true,
-      message: "Offering retrieved successfully.",
-      data: { offering },
-      meta: { timestamp: new Date().toISOString() },
-    };
-
-    log.info(`[${operationId}] FN_SUCCESS: Returning detailed offering data.`);
-    return json(response);
   } catch (err: unknown) {
     if ((err as { status?: number })?.status === 404) {
       throw err; // Re-throw SvelteKit's 404 error

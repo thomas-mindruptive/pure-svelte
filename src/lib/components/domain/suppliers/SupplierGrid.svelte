@@ -3,8 +3,8 @@
 <script lang="ts">
   // Thin wrapper around Datagrid for wholesalers
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
-  import type { DeleteStrategy, RowActionStrategy, ColumnDef, SortFunc } from "$lib/components/grids/Datagrid.types";
-  import type { Wholesaler } from "$lib/domain/domainTypes";
+  import type { DeleteStrategy, RowActionStrategy, SortFunc, ColumnDef } from "$lib/components/grids/Datagrid.types";
+  import type { Wholesaler, WholesalerSchema } from "$lib/domain/domainTypes";
 
   // === PROPS ====================================================================================
 
@@ -20,7 +20,7 @@
 
   // === COLUMNS ==================================================================================
 
-  const columns: ColumnDef<Wholesaler>[] = [
+  const columns: ColumnDef<typeof WholesalerSchema>[] = [
     { key: "name", header: "Name", sortable: true, width:"200px" },
     {
       key: "dropship",

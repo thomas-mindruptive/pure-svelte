@@ -14,7 +14,7 @@
   import { ApiClient } from "$lib/api/client/ApiClient";
   import { categoryLoadingState } from "$lib/api/client/category";
   import { getSupplierApi, supplierLoadingState } from "$lib/api/client/supplier";
-  import type { ColumnDefBase, DeleteStrategy, ID, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
+  import type { ColumnDef, DeleteStrategy, ID, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
   import type { SortDescriptor } from "$lib/backendQueries/queryGrammar";
   import {
     type Order,
@@ -317,7 +317,7 @@
 
   // === ORDERS GRID FUNCTIONS ====================================================================
 
-  const ordersColumns: ColumnDefBase<typeof Order_Wholesaler_Schema>[] = [
+  const ordersColumns: ColumnDef<typeof Order_Wholesaler_Schema>[] = [
     { key: "order_id", header: "ID", accessor: null, sortable: true },
     { key: "w.name", header: "Wholesaler", accessor: (order) => order.wholesaler.name, sortable: true },
   ];

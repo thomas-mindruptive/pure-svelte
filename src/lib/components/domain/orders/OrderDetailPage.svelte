@@ -10,7 +10,7 @@
 // API & Type Imports
   import { ApiClient } from "$lib/api/client/ApiClient";
   import type { SortDescriptor } from "$lib/backendQueries/queryGrammar";
-  import type { ColumnDefBase, DeleteStrategy, ID, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
+  import type { ColumnDef, DeleteStrategy, ID, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
   import {
       OrderItem_ProdDef_Category_Schema,
       OrderSchema,
@@ -263,7 +263,7 @@
 
   // === DATAGRID DATA =====
 
-  const columns: ColumnDefBase<typeof OrderItem_ProdDef_Category_Schema>[] = [
+  const columns: ColumnDef<typeof OrderItem_ProdDef_Category_Schema>[] = [
     { key: "pc.name", header: "Product Category", accessor: (orderItem) => orderItem.category.name, sortable: true },
     { key: "wio.price", header: "Price", accessor: (orderItem) => orderItem.offering.price, sortable: true },
     { key: "wio.comment", header: "Comment", accessor: (orderItem) => orderItem.offering.comment, sortable: true },

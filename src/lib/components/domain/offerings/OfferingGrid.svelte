@@ -1,10 +1,11 @@
 <!-- src/lib/components/domain/offerings/OfferingGrid.svelte -->
 <script lang="ts">
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
-  import type { DeleteStrategy, RowActionStrategy, ColumnDefBase, SortFunc } from "$lib/components/grids/Datagrid.types";
+  import type { ColumnDef, DeleteStrategy, RowActionStrategy, SortFunc } from "$lib/components/grids/Datagrid.types";
   import type {
-    Wio_PDef_Cat_Supp_Nested,
-    Wio_PDef_Cat_Supp_Nested_Schema,
+      Wio_PDef_Cat_Supp_Nested,
+      Wio_PDef_Cat_Supp_Nested_WithLinks,
+      Wio_PDef_Cat_Supp_Nested_WithLinks_Schema
   } from "$lib/domain/domainTypes";
 
   // === PROPS  ===================================================================================
@@ -31,7 +32,7 @@
 
   // === COLUMNS  =================================================================================
 
-  const columns: ColumnDefBase<typeof Wio_PDef_Cat_Supp_Nested_Schema>[] = [
+  const columns: ColumnDef<typeof Wio_PDef_Cat_Supp_Nested_WithLinks_Schema>[] = [
     {
       key: "pd.title",
       header: "Product",
@@ -71,7 +72,7 @@
       },
     },
     {
-      key: "sub_seller",
+      key: "wio.sub_seller",
       header: "Subseller",
       sortable: true,
       accessor: (offering) => offering.sub_seller || "—",
@@ -81,10 +82,10 @@
       header: "Notes",
       sortable: false,
       accessor: (offering) => offering.comment?.substring(0, 20) || "—",
-    },
+    }
   ];
 
-  const getId = (offering: Wio_PDef_Cat_Supp_Nested) => offering.offering_id;
+  const getId = (offering: Wio_PDef_Cat_Supp_Nested_WithLinks) => offering.offering_id;
 </script>
 
 <Datagrid

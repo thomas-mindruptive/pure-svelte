@@ -9,7 +9,7 @@
 
   // --- API & Strategy Imports ---
   import { ApiClient } from "$lib/api/client/ApiClient";
-  import type { ID, DeleteStrategy, RowActionStrategy, ColumnDefBase } from "$lib/components/grids/Datagrid.types";
+  import type { ID, DeleteStrategy, RowActionStrategy, ColumnDef } from "$lib/components/grids/Datagrid.types";
   import type { SortDescriptor } from "$lib/backendQueries/queryGrammar";
 
   import { stringsToNumbers } from "$lib/utils/typeConversions";
@@ -140,7 +140,7 @@
 
   // === DATAGRID DATA ============================================================================
 
-  const columns: ColumnDefBase<typeof Order_Wholesaler_Schema>[] = [
+  const columns: ColumnDef<typeof Order_Wholesaler_Schema>[] = [
     { key: "w.name", header: "Wholesaler", accessor: (order) => order.wholesaler.name, sortable: true },
     { key: "order_id", header: "ID", accessor: null, sortable: true },
     { key: "order_date", header: "Date", accessor: (order) => isoDateStringToLocale(order.order_date), sortable: true },

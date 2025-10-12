@@ -7,7 +7,7 @@
   // WholesalerOfferingLink data. Now accepts strategy props for consistency.
 
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
-  import type { WholesalerOfferingLink } from "$lib/domain/domainTypes";
+  import { type WholesalerOfferingLink, WholesalerOfferingLinkSchema } from "$lib/domain/domainTypes";
   import type {
     DeleteStrategy,
     ColumnDef,
@@ -31,7 +31,7 @@
 
   // ===== COLUMN DEFINITIONS (Unchanged) =====
 
-  const columns: ColumnDef<WholesalerOfferingLink>[] = [
+  const columns: ColumnDef<typeof WholesalerOfferingLinkSchema>[] = [
     {
       key: "url",
       header: "URL",

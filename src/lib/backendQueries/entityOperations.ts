@@ -247,7 +247,7 @@ export function buildUnexpectedError(err: unknown, info?: string) {
 
     const errorResponse: ApiErrorResponse = {
       success: false,
-      message: message, // User-friendly DB message
+      message: `${message}\n${errorMsg}`, // User-friendly DB message
       status_code: status as HttpStatusCode,
       error_code: status === 400 ? "BAD_REQUEST" :
                  status === 404 ? "NOT_FOUND" :

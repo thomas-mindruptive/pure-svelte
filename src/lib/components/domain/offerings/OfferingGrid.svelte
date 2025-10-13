@@ -3,12 +3,11 @@
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
   import type { ColumnDef, DeleteStrategy, RowActionStrategy, SortFunc } from "$lib/components/grids/Datagrid.types";
   import type {
-    WholesalerOfferingLink,
-    Wio_PDef_Cat_Supp_Nested,
-    Wio_PDef_Cat_Supp_Nested_WithLinks,
-    Wio_PDef_Cat_Supp_Nested_WithLinks_Schema,
+      WholesalerOfferingLink,
+      Wio_PDef_Cat_Supp_Nested,
+      Wio_PDef_Cat_Supp_Nested_WithLinks,
+      Wio_PDef_Cat_Supp_Nested_WithLinks_Schema,
   } from "$lib/domain/domainTypes";
-    import { parseUrlPathSegments } from "$lib/utils/url";
 
   // === PROPS  ===================================================================================
 

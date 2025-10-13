@@ -56,8 +56,8 @@ export const POST: RequestHandler = async ({ request }) => {
         payload.offset,
       );
 
-      // Parse JSON string to array
-      const offeringsArray = JSON.parse(jsonString);
+      // Parse JSON string to array (SQL Server returns null for empty results)
+      const offeringsArray = jsonString ? JSON.parse(jsonString) : [];
       log.debug(`[${operationId}] Parsed ${offeringsArray.length} offerings from JSON.`);
 
       // Log first offering for debugging

@@ -9,7 +9,6 @@
     FormSchema,
     MaterialSchema,
     ProductDefinitionSchema,
-    Wio_PDef_Cat_Supp_Nested_Schema,
     Wio_PDef_Cat_Supp_Nested_WithLinks_Schema,
     type Form,
     type Material,

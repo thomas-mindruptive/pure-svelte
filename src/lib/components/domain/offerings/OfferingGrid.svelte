@@ -3,9 +3,10 @@
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
   import type { ColumnDef, DeleteStrategy, RowActionStrategy, SortFunc } from "$lib/components/grids/Datagrid.types";
   import type {
-      Wio_PDef_Cat_Supp_Nested,
-      Wio_PDef_Cat_Supp_Nested_WithLinks,
-      Wio_PDef_Cat_Supp_Nested_WithLinks_Schema
+    WholesalerOfferingLink,
+    Wio_PDef_Cat_Supp_Nested,
+    Wio_PDef_Cat_Supp_Nested_WithLinks,
+    Wio_PDef_Cat_Supp_Nested_WithLinks_Schema,
   } from "$lib/domain/domainTypes";
 
   // === PROPS  ===================================================================================
@@ -27,7 +28,7 @@
     // Strategies (Dependency Injection pattern)
     deleteStrategy,
     rowActionStrategy,
-    onSort
+    onSort,
   }: OfferingGridProps = $props();
 
   // === COLUMNS  =================================================================================
@@ -82,7 +83,19 @@
       header: "Notes",
       sortable: false,
       accessor: (offering) => offering.comment?.substring(0, 20) || "—",
-    }
+    },
+    {
+      key: "links",
+      header: "Links",
+      sortable: false,
+      accessor: (offering) => offering.links?.[0]?.url.substring(0, 50) || "—",
+      isLink: true,
+      onClick(row, col) {
+        const linkArray = row[col.key as keyof typeof row] as WholesalerOfferingLink[];
+        const url = linkArray[0].url; 
+        if (url) window.open(url, "_blank");
+      },
+    },
   ];
 
   const getId = (offering: Wio_PDef_Cat_Supp_Nested_WithLinks) => offering.offering_id;

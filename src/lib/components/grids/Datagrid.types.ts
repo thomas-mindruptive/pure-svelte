@@ -13,7 +13,8 @@ export type ColumnDef<S extends z.ZodObject<any>> =
       sortable?: boolean; // Sortable is optional
       width?: string;
       class?: string;
-      isExternalLink?: boolean;
+      isLink?: boolean;
+      onClick?: ((row: z.infer<S>, col: ColumnDef<any>) => unknown) | null | undefined;
     }
   // Case 2: A special, non-sortable column for computed values.
   | {
@@ -23,7 +24,8 @@ export type ColumnDef<S extends z.ZodObject<any>> =
       sortable: false; // Sortable MUST be false
       width?: string;
       class?: string;
-      isExternalLink?: boolean;
+      isLink?: boolean;
+     onClick?: ((row: z.infer<S>, col: ColumnDef<any>) => unknown) | null | undefined;
     };
 
 // ===== DELETE ===================================================================================

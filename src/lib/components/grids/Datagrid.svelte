@@ -604,7 +604,7 @@
   class="pc-grid pc-grid--comfortable pc-grid--scroll-body"
   style={maxBodyHeight ? `--pc-grid-body-max-height:${maxBodyHeight};` : ""}
 >
-  <!-- TOOLBAR -->
+  <!-- TOOLBAR ----------------------------------------------------------------------------------->
   <div class="pc-grid__toolbar">
     {#if toolbar}
       {@render toolbar({ selectedIds, deletingObjectIds, deleteSelected })}
@@ -620,6 +620,7 @@
         </label>
       {/if}
 
+      <!-- DELETE SELECTED ----------------------------------------------------------------------->
       <button
         class="pc-grid__btn"
         disabled={selectedIds.size === 0 || loading || isSorting || !deleteStrategy || typeof deleteStrategy.execute !== "function"}
@@ -632,6 +633,7 @@
         Delete selected ({selectedIds.size})
       </button>
 
+      <!-- CLEAR SORTING ------------------------------------------------------------------------->
       <button
         class="pc-grid__btn"
         disabled={sortState.length === 0 || loading || isSorting}
@@ -644,6 +646,7 @@
         Clear all sortings ({sortState.length})
       </button>
 
+      <!-- DELETE SPINNER ------------------------------------------------------------------------>
       {#if Array.from(selectedIds).some((id: ID) => isDeleting(id))}
         <span
           class="pc-grid__spinner"
@@ -651,6 +654,7 @@
         ></span>
       {/if}
 
+      <!-- LOADING SPINNER ----------------------------------------------------------------------->
       {#if loading || isSorting}
         <div
           class="loader-wrapper"
@@ -662,10 +666,11 @@
     {/if}
   </div>
 
-  <!-- TABLE CONTAINER -->
+  <!-- TABLE CONTAINER --------------------------------------------------------------------------->
   <div class="pc-grid__scroller">
     <table class="pc-grid__table">
-      <!-- COLGROUP: Define column widths once -->
+      <!---->
+      <!-- COLGROUP: Define column widths once --------------------------------------------------->
       <colgroup>
         {#if selection !== "none"}
           <col style="width: 3.5rem;" />
@@ -678,7 +683,7 @@
         <!-- Actions: Feste Breite statt auto -->
       </colgroup>
 
-      <!-- THEAD -->
+      <!-- HEAD ---------------------------------------------------------------------------------->
       <thead class="pc-grid__thead">
         <tr>
           {#if selection !== "none"}
@@ -727,7 +732,7 @@
         </tr>
       </thead>
 
-      <!-- TBODY -->
+      <!-- BODY ---------------------------------------------------------------------------------->
       <tbody class="pc-grid__tbody">
         {#if rows.length === 0}
           <tr>
@@ -752,6 +757,7 @@
               class={rowClass(row)}
               aria-rowindex={i + 2}
             >
+              <!-- SELECTION BOX ----------------------------------------------------------------->
               {#if selection !== "none"}
                 <td class="pc-grid__td--center">
                   {#if safeGetId(row) != null}
@@ -776,6 +782,7 @@
                 </td>
               {/if}
 
+              <!-- COLUMN ------------------------------------------------------------------------>
               {#each columns as col, colIndex}
                 <td class={col.class}>
                   {#if cell}
@@ -784,26 +791,34 @@
                     <button
                       class="pc-grid__link-btn"
                       type="button"
-                      onclick={() => handleRowClick(row)}
-                      ondblclick={() => handleRowDoubleClick(row)}
                       disabled={rowIsDeleting(row)}
                       title={`Open ${entity} details`}
                       aria-label={`View details for ${safeAccessor(row, col)}`}
                     >
                       {safeAccessor(row, col)}
                     </button>
-                  {:else}
-                    <div>
+                  {:else if col.isLink}
+                    <button
+                      class="pc-grid__link-btn"
+                      onclick={(e) => {
+                        e.stopPropagation();
+                        col.onClick?.(row, col);
+                      }}
+                    >
                       {safeAccessor(row, col)}
-                    </div>
+                    </button>
+                  {:else}
+                    {safeAccessor(row, col)}
                   {/if}
                 </td>
               {/each}
 
+              <!-- ROW ACTIONS ------------------------------------------------------------------->
               <td class="pc-grid__actions">
                 {#if rowActions}
                   {@render rowActions({ row, id: safeGetId(row), isDeleting })}
                 {:else}
+                  <!-- DELETE -------------------------------------------------------------------->
                   <button
                     class="pc-grid__btn pc-grid__btn--danger"
                     disabled={!(safeGetId(row) != null && isRowDeletable(row)) ||

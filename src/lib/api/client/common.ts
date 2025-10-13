@@ -68,7 +68,13 @@ export function createJsonAndWrapInPayload<T>(payload: QueryPayload<T>): string 
  * @returns A user-friendly string.
  */
 export function getErrorMessage(error: unknown): string {
-	if (error instanceof ApiError) return error.message;
+	if (error instanceof ApiError) {
+		let message = error.message;
+		if (error.errors) {
+			message += " - " + JSON.stringify(error.errors, null, 4);
+		}
+		return message;
+	}
 	if (error instanceof Error) return error.message;
 	const msg = coerceErrorMessage(error);
 	return msg;

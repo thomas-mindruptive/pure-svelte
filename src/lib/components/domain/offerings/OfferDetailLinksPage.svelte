@@ -62,7 +62,7 @@
           forms,
         };
 
-        if ((offering as any).error) {
+        if (offering && (offering as any).error) {
           addNotification(`Cannot load offering: ${coerceErrorMessage((offering as any).error)}`);
           throw (offering as any).error;
         }

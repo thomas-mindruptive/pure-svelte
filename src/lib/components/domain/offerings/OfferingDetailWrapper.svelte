@@ -17,6 +17,7 @@
   import { log } from "$lib/utils/logger";
   import { buildSiblingUrl } from "$lib/utils/url";
   import OfferingForm from "./OfferingForm.svelte";
+    import { getErrorMessage } from "$lib/api/client/common";
 
   // ===== PROPS =====
 
@@ -67,7 +68,7 @@
   async function handleSubmitError(info: { data: Wio_PDef_Cat_Supp; error: unknown }): Promise<void> {
     assertDefined(info, "OfferingFormDetailWrapper.handleSubmitError");
     log.info(`Form submission error`, info);
-    addNotification(`Form submission error. ${coerceErrorMessage(info.error)}`, "error");
+    addNotification(`Form submission error. ${getErrorMessage(info.error)}`, "error");
   }
 
   async function handleCancelled(p: { data: Wio_PDef_Cat_Supp; reason?: string }): Promise<void> {

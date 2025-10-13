@@ -11,7 +11,7 @@ import { getMaterialApi } from "$lib/api/client/material";
 import { getOfferingApi } from "$lib/api/client/offering";
 import { type Form, type Material, type ProductDefinition, type Wholesaler } from "$lib/domain/domainTypes";
 import { log } from "$lib/utils/logger";
-import { parseUrlSegments } from "$lib/utils/url";
+import { parseUrlPathSegments } from "$lib/utils/url";
 import { error, type LoadEvent } from "@sveltejs/kit";
 import type { OfferingDetail_LoadDataAsync } from "./offeringDetail.types";
 
@@ -46,7 +46,7 @@ export function loadOfferingDetailBasisData({
   let isSuppliersRoute = false;
   let isCategoriesRoute = false;
 
-  const urlSegments = parseUrlSegments(url);
+  const urlSegments = parseUrlPathSegments(url);
 
   if (isNaN(offeringId)) {
     isCreateMode = true;

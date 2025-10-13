@@ -1,5 +1,5 @@
 import { log } from "$lib/utils/logger";
-import { parseUrlSegments } from "$lib/utils/url";
+import { parseUrlPathSegments } from "$lib/utils/url";
 import { error, type LoadEvent } from "@sveltejs/kit";
 
 /**
@@ -24,7 +24,7 @@ export function load({ url, params, fetch: loadEventFetch }: LoadEvent) {
   }
 
   // --- ROUTE CONTEXT DETECTION ---
-  const urlSegments = parseUrlSegments(url);
+  const urlSegments = parseUrlPathSegments(url);
 
   if (urlSegments[0].toLowerCase() === "orders") {
     isOrdersRoute = true;

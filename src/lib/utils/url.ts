@@ -5,7 +5,7 @@
  * Supports both full URLs and pathname.
  * @param url - Full URL (https://...) or pathname (/path/to/resource)
  */
-export function parseUrlSegments(url: URL | string): string[] {
+export function parseUrlPathSegments(url: URL | string): string[] {
   try {
     let pathname: string;
     

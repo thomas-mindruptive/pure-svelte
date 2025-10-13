@@ -2,7 +2,7 @@
 
 import { supplierHierarchyConfig } from "$lib/routes/navHierarchyConfig";
 import { log } from "$lib/utils/logger";
-import { parseUrlSegments } from "$lib/utils/url";
+import { parseUrlPathSegments } from "$lib/utils/url";
 import { error, type LoadEvent } from "@sveltejs/kit";
 import type { ChildRelationships, SupplierDetailPageProps } from "./SupplierDetailPage.svelte";
 
@@ -36,7 +36,7 @@ export function load(loadEvent: LoadEvent): SupplierDetailPageProps {
   // ===== EXTRACT CHILD PATH  ====================================================================
 
   // Extract child path from URL
-  const urlSegments = parseUrlSegments(url);
+  const urlSegments = parseUrlPathSegments(url);
   // ['suppliers', '1', 'orders'] → take index 2
   const supplierNode = supplierHierarchyConfig.rootItem.children?.[0];
   const defaultChild = supplierNode?.defaultChild;

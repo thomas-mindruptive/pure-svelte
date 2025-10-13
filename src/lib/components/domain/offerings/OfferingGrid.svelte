@@ -8,6 +8,7 @@
     Wio_PDef_Cat_Supp_Nested_WithLinks,
     Wio_PDef_Cat_Supp_Nested_WithLinks_Schema,
   } from "$lib/domain/domainTypes";
+    import { parseUrlPathSegments } from "$lib/utils/url";
 
   // === PROPS  ===================================================================================
 
@@ -51,6 +52,12 @@
       sortable: true,
       accessor: (offering) => offering.wholesaler.name || "Unnamed Supplier",
     },
+        {
+      key: "wio.sub_seller",
+      header: "Subseller",
+      sortable: true,
+      accessor: (offering) => offering.sub_seller || "—",
+    },
     {
       key: "price",
       header: "Price",
@@ -73,12 +80,6 @@
       },
     },
     {
-      key: "wio.sub_seller",
-      header: "Subseller",
-      sortable: true,
-      accessor: (offering) => offering.sub_seller || "—",
-    },
-    {
       key: "comment",
       header: "Notes",
       sortable: false,
@@ -88,7 +89,16 @@
       key: "links",
       header: "Links",
       sortable: false,
-      accessor: (offering) => offering.links?.[0]?.url.substring(0, 50) || "—",
+      accessor: (offering) => {
+        let displayUrl = "";
+        if (offering.links?.[0]) {
+          //const segs = parseUrlPathSegments(offering.links?.[0].url);
+          displayUrl = new URL(offering.links?.[0].url).hostname; //segs.join("/");
+        } else {
+          displayUrl = "-";
+        }
+        return displayUrl; 
+      },
       isLink: true,
       onClick(row, col) {
         const linkArray = row[col.key as keyof typeof row] as WholesalerOfferingLink[];

@@ -6,30 +6,30 @@
   // IMPORTS
   // ========================================================================
 
-  import { onMount } from "svelte";
-  import type { Snippet } from "svelte";
   import { cloneDeep } from "lodash-es";
-
-  // Utils
-  import { log } from "$lib/utils/logger";
-  import * as pathUtils from "$lib/utils/pathUtils";
-  import type { NonEmptyPath, PathValue } from "$lib/utils/pathUtils";
+  import type { Snippet } from "svelte";
+  import { onMount } from "svelte";
+// Utils
   import { assertDefined } from "$lib/utils/assertions";
-
-  // Types
-  import type {
-    Errors,
-    ValidateCallback,
-    SubmitCallback,
-    CancelCallback,
-    SubmittedCallback,
-    SubmitErrorCallback,
-    CancelledCallback,
-    ChangedCallback,
-    FormData,
-    ValidateResult,
-  } from "./forms.types";
+  import { log } from "$lib/utils/logger";
+  import type { NonEmptyPath, PathValue } from "$lib/utils/pathUtils";
+  import * as pathUtils from "$lib/utils/pathUtils";
+// Types
+  import { getErrorMessage } from "$lib/api/client/common";
   import { coerceErrorMessage } from "$lib/utils/errorUtils";
+  import { convertToHtml } from "$lib/utils/formatUtils";
+  import type {
+      CancelCallback,
+      CancelledCallback,
+      ChangedCallback,
+      Errors,
+      FormData,
+      SubmitCallback,
+      SubmitErrorCallback,
+      SubmittedCallback,
+      ValidateCallback,
+      ValidateResult,
+  } from "./forms.types";
 
   // ========================================================================
   // TYPE DEFINITIONS
@@ -175,12 +175,13 @@
    * All form data, validation, and UI state in one reactive container
    */
   const formState = $state({
-    data: pureDataDeepClone(cleanInitial), // Current form data
-    snapshot: pureDataDeepClone(cleanInitial), // Clean snapshot for dirty checking
-    errors: {} as Errors<T>, // Field validation errors
-    touched: new Set<string>(), // Fields that have been interacted with
-    submitting: false, // Form submission in progress
-    validating: false, // Validation in progress
+    data: pureDataDeepClone(cleanInitial),      // Current form data
+    snapshot: pureDataDeepClone(cleanInitial),  // Clean snapshot for dirty checking
+    validationErrors: {} as Errors<T>,           // Field validation errors
+    errors: {} as Record<string, string[]>,      // Other errors
+    touched: new Set<string>(),                 // Fields that have been interacted with
+    submitting: false,                           // Form submission in progress
+    validating: false,                          // Validation in progress
   });
 
   // Form DOM element reference for keyboard event handling
@@ -218,6 +219,7 @@
         dirty: isDirty(),
       });
     } catch (e) {
+      formState.errors.set = ["onChanged threw error"];
       log.error("onChanged threw error", {
         component: "FormShell",
         entity,
@@ -239,6 +241,7 @@
     try {
       pathUtils.set<FormData<T>, P>(formState.data, path, value);
     } catch (e) {
+      formState.errors.internalSet = ["internalSet failed"]
       log.error({ component: "FormShell", entity, path, error: coerceMessage(e) }, "set failed");
     }
   }
@@ -250,6 +253,7 @@
     try {
       return pathUtils.get(formState.data, path);
     } catch (e) {
+      formState.errors.get = ["get failed"];
       log.error("get failed", {
         component: "FormShell",
         entity,
@@ -267,6 +271,7 @@
     try {
       return pathUtils.get(formState.data, key);
     } catch (e) {
+      formState.errors.getS = ["getS failed"];
       log.error("get failed", {
         component: "FormShell",
         entity,
@@ -285,6 +290,7 @@
       const currentSnapshot = pureDataDeepClone(formState.data);
       return JSON.stringify(currentSnapshot) !== JSON.stringify(formState.snapshot);
     } catch {
+      formState.errors.isDirty = ["isDirty comparison failed, assuming dirty"]
       log.warn({ component: "FormShell", entity }, "isDirty comparison failed, assuming dirty");
       return true; // Fail-safe: assume dirty if comparison fails
     }
@@ -299,10 +305,10 @@
    */
   function clearErrors(paths?: string[]) {
     if (!paths || paths.length === 0) {
-      for (const k in formState.errors) delete formState.errors[k];
+      for (const k in formState.validationErrors) delete formState.validationErrors[k];
       return;
     }
-    for (const p of paths) delete formState.errors[p];
+    for (const p of paths) delete formState.validationErrors[p];
   }
 
   // /**
@@ -332,12 +338,13 @@
       try {
         customResult = await validate(formState.data);
       } catch (e) {
-        log.error({ component: "FormShell", entity, error: coerceMessage(e) }, "The 'validate' prop threw an unhandled error.");
+        formState.errors.runValidate = ["'validate' threw an unhandled error."];
+        log.error({ component: "FormShell", entity, error: coerceMessage(e) }, "'validate' threw an unhandled error.");
         // In case of a crash in the validation function, we assume it's valid to not block the UI.
         return true;
       }
     }
-    const customErrors = customResult.errors || {} as Errors<T>;
+    const customErrors = customResult.errors || ({} as Errors<T>);
     log.detdebug(`Custom errors after await validate:`, customErrors);
 
     // --- Step 2: Inject custom errors into the DOM ---
@@ -377,13 +384,13 @@
           if (fieldName) {
             // `validationMessage` will be our custom message if we set one,
             // otherwise it will be the browser's default message (e.g., "Please fill out this field.").
-            (formState.errors as any)[fieldName] = [element.validationMessage];
+            (formState.validationErrors as any)[fieldName] = [element.validationMessage];
           } else {
-            (formState.errors as any)["general_errors"] = [`No fieldname set for element`];
+            (formState.validationErrors as any)["general_errors"] = [`No fieldname set for element`];
           }
         }
       }
-      log.debug(`HTML/DOM: Form is invalid. All merged errors for UI:`, { entity, errors: {...formState.errors} });
+      log.debug(`HTML/DOM: Form is invalid. All merged errors for UI:`, { entity, errors: { ...formState.validationErrors } });
     } else {
       log.detdebug(`Validation passed.`, { entity });
     }
@@ -428,6 +435,7 @@
             error: new Error("Validation failed before submission."),
           });
         } catch (e) {
+          formState.errors.doSubmit_onSubmitError = ["onSubmitError threw"]
           log.error({ component: "FormShell", entity, error: coerceMessage(e) }, "onSubmitError threw");
         }
         return;
@@ -458,10 +466,12 @@
         // Do not call onsubmitted because we are in an invalid state.
       }
     } catch (e) {
-      log.error({ component: "FormShell", entity, error: coerceMessage(e) }, "FORM_SUBMIT_FAILED");
+      formState.errors.doSubmit_submitCbk = ["submitCbk error: " + getErrorMessage(e)]
+      log.error({ component: "FormShell", entity, error: getErrorMessage(e) }, "FORM_SUBMIT_FAILED");
       try {
         onSubmitError?.({ data: pureDataDeepClone(formState.data), error: e });
       } catch (e) {
+        formState.errors.doSubmit_onSubmitError = ["onSubmitError threw"];
         log.error({ component: "FormShell", entity, error: coerceMessage(e) }, "onSubmitError threw");
       }
     } finally {
@@ -478,6 +488,7 @@
     try {
       onCancel?.(pureDataDeepClone(formState.data));
     } catch (e) {
+      formState.errors.doCancel_onCancel = ["onCancel threw"]
       log.warn({ component: "FormShell", entity, error: coerceMessage(e) }, "onCancel threw");
     } finally {
       const detail: { data: FormData<T>; reason?: string } = {
@@ -488,6 +499,7 @@
       try {
         onCancelled?.(detail);
       } catch (e) {
+        formState.errors.doCancel_onCancelled = ["onCancelled threw"]
         log.error({ component: "FormShell", entity, error: coerceMessage(e) }, "onCancelled threw");
       }
     }
@@ -516,7 +528,7 @@
       set: set,
       get,
       getS,
-      validationErrors: formState.errors,
+      validationErrors: formState.validationErrors,
       touched: formState.touched,
       markTouched,
       validate: runValidate,
@@ -531,7 +543,7 @@
       submitAction: doSubmit,
       cancel: () => doCancel("button"),
       submitting: formState.submitting,
-      valid: Object.keys(formState.errors).length === 0,
+      valid: Object.keys(formState.validationErrors).length === 0,
       dirty: isDirty(),
       disabled,
     }),
@@ -630,17 +642,33 @@
     {/if}
   </div>
 
-  <!-- Error region -->
-  {#if Object.keys(formState.errors).length > 0}
+  <!-- Validation errors region -->
+  {#if Object.keys(formState.validationErrors).length > 0}
     <div
       class="component-info-boundary"
+      aria-live="polite"
+    >
+      <!-- Compact summary of first messages per field -->
+      {#each Object.entries(formState.validationErrors) as [path, msgs]}
+        <div>
+          <strong>{path}</strong>
+          : {msgs ? msgs[0] : `FormShell - Validation error region: No error messages for ${path} set! Should not happen.`}
+        </div>
+      {/each}
+    </div>
+  {/if}
+
+  <!-- Other errors region -->
+  {#if Object.keys(formState.errors).length > 0}
+    <div
+      class="component-error-boundary"
       aria-live="polite"
     >
       <!-- Compact summary of first messages per field -->
       {#each Object.entries(formState.errors) as [path, msgs]}
         <div>
           <strong>{path}</strong>
-          : {msgs? msgs[0] : `FormShell - Error region: No error messages for ${path} set! Should not happen.`}
+          {@html `: ${msgs ? convertToHtml(msgs[0]) : "FormShell - Error region: No error messages for " + path + " set! Should not happen."}` }
         </div>
       {/each}
     </div>

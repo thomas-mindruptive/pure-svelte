@@ -343,7 +343,7 @@
 
     <!--- FIELDS --------------------------------------------------------------------------------->
     {#snippet fields(fieldProps)}
-      {@const { getS, set, markTouched, errors } = fieldProps}
+      {@const { getS, set, markTouched, validationErrors: errors } = fieldProps}
       <div class="form-body">
         <div class="form-row-grid">
           <!-- title ----------------------------------------------------------------------------->

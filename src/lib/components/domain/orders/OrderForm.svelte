@@ -231,7 +231,7 @@
       ========================================================================================== -->
 
     {#snippet fields(fieldProps)}
-      {@const { getS, get, set, errors, markTouched } = fieldProps}
+      {@const { getS, get, set, validationErrors: errors, markTouched } = fieldProps}
       <div class="form-body">
         <!-- ================================================================================
           == BASIC ORDER INFORMATION

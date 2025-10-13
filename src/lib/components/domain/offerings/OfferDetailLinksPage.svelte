@@ -18,7 +18,7 @@
   } from "./offeringDetail.types";
   import { log } from "$lib/utils/logger";
   import { assertDefined } from "$lib/utils/assertions";
-    import { coerceErrorMessage } from "$lib/utils/errorUtils";
+  import { getErrorMessage } from "$lib/api/client/common";
 
   // === PROPS ====================================================================================
 
@@ -63,7 +63,7 @@
         };
 
         if (offering && (offering as any).error) {
-          addNotification(`Cannot load offering: ${coerceErrorMessage((offering as any).error)}`);
+          addNotification(`Cannot load offering: ${getErrorMessage((offering as any).error)}`);
           throw (offering as any).error;
         }
 

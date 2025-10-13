@@ -13,11 +13,10 @@
   import "$lib/components/styles/grid-section.css";
   import { addNotification } from "$lib/stores/notifications";
   import { assertDefined } from "$lib/utils/assertions";
-  import { coerceErrorMessage } from "$lib/utils/errorUtils";
   import { log } from "$lib/utils/logger";
   import { buildSiblingUrl } from "$lib/utils/url";
   import OfferingForm from "./OfferingForm.svelte";
-    import { getErrorMessage } from "$lib/api/client/common";
+  import { getErrorMessage } from "$lib/api/client/common";
 
   // ===== PROPS =====
 

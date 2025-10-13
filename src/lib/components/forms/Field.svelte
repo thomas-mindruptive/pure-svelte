@@ -102,7 +102,7 @@
 
   // === DESTRUCTURE FIELD PROPS ==================================================================
 
-  const { get, set, errors, markTouched } = fieldProps;
+  const { get, set, validationErrors: errors, markTouched } = fieldProps;
 
   // === DERIVED ==================================================================================
 

@@ -159,7 +159,7 @@
       ========================================================================================== -->
 
     {#snippet fields(fieldProps)}
-      {@const { getS, set, errors, markTouched } = fieldProps}
+      {@const { getS, set, validationErrors: errors, markTouched } = fieldProps}
       <div class="form-body">
 
         <!-- ================================================================================

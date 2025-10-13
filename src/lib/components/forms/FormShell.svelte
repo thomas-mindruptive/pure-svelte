@@ -58,7 +58,7 @@
     getS<K extends keyof FormData<T>>(key: K): FormData<T>[K] | undefined;
 
     // Form state
-    errors: Errors<T>;
+    validationErrors: Errors<T>;
     touched: Set<string>;
     markTouched: (path: string) => void;
     validate: (path?: string) => Promise<boolean>;
@@ -516,7 +516,7 @@
       set: set,
       get,
       getS,
-      errors: formState.errors,
+      validationErrors: formState.errors,
       touched: formState.touched,
       markTouched,
       validate: runValidate,

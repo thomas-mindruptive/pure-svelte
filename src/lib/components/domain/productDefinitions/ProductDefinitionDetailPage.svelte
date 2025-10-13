@@ -40,7 +40,6 @@
   import { error } from "@sveltejs/kit";
   import { getErrorMessage } from "$lib/api/client/common";
   import type { SortDescriptor } from "$lib/backendQueries/queryGrammar";
-    import { coerceErrorMessage } from "$lib/utils/errorUtils";
 
   // === PROPS ====================================================================================
 
@@ -206,7 +205,7 @@
     try {
       offerings = await productDefinitionApi.loadOfferingsForProductDefinition(productDefId, null, sortState);
     } catch (e: unknown) {
-      addNotification(`Error during sorting API: ${coerceErrorMessage(e)}`);
+      addNotification(`Error during sorting API: ${getErrorMessage(e)}`);
     }
   }
 

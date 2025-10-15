@@ -18,7 +18,7 @@
   // === COLUMNS ====================================================================================
 
   const columns: ColumnDef<typeof ProductDefinitionSchema>[] = [
-    { key: "title", header: "Title", sortable: true },
+    { key: "title", header: "Title", sortable: true, width: "25rem" },
     { key: "product_def_id", header: "id", sortable: true },
     { key: "material_id", header: "Material", sortable: true },
     { key: "form_id", header: "Form", sortable: true },
@@ -26,7 +26,7 @@
       key: "description",
       header: "Description",
       sortable: true,
-      accessor: (pd: ProductDefinition) => pd.description?.substring(0, 30),
+      accessor: (pd: ProductDefinition) => pd.description?.substring(0, 20),
     },
   ];
 

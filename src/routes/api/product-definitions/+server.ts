@@ -6,92 +6,79 @@
  * Follows the "Secure Entity Endpoint" pattern by enforcing the table name on the server.
  */
 
-import type { QueryRequest, QuerySuccessResponse } from '$lib/api/api.types';
-import { mssqlErrorMapper } from '$lib/backendQueries/mssqlErrorMapper';
-import { buildQuery, executeQuery } from '$lib/backendQueries/queryBuilder';
-import { queryConfig } from '$lib/backendQueries/queryConfig';
-import type { QueryPayload } from '$lib/backendQueries/queryGrammar';
-import { ProductDefinitionSchema, type ProductDefinition } from '$lib/domain/domainTypes';
-import { genTypedQualifiedColumns } from '$lib/domain/domainTypes.utils';
-import { log } from '$lib/utils/logger';
-import { error, json, type RequestHandler } from '@sveltejs/kit';
-import { v4 as uuidv4 } from 'uuid';
+import type { QueryRequest, QuerySuccessResponse } from "$lib/api/api.types";
+import { mssqlErrorMapper } from "$lib/backendQueries/mssqlErrorMapper";
+import { buildQuery, executeQuery } from "$lib/backendQueries/queryBuilder";
+import { queryConfig } from "$lib/backendQueries/queryConfig";
+import type { QueryPayload } from "$lib/backendQueries/queryGrammar";
+import { ProductDefinitionSchema, type ProductDefinition } from "$lib/domain/domainTypes";
+import { genTypedQualifiedColumns } from "$lib/domain/domainTypes.utils";
+import { log } from "$lib/utils/logger";
+import { error, json, type RequestHandler } from "@sveltejs/kit";
+import { v4 as uuidv4 } from "uuid";
 
 /**
  * POST /api/product-definitions
  * @description Fetches a list of product definitions based on a client-provided query payload.
  */
 export const POST: RequestHandler = async (event) => {
-	log.infoHeader('POST /api/product-definitions');
-	const operationId = uuidv4();
-	log.info(`[${operationId}] POST /product-definitions: FN_START`);
+  log.infoHeader("POST /api/product-definitions");
+  const operationId = uuidv4();
+  log.info(`[${operationId}] POST /product-definitions: FN_START`);
 
-	const DEFAULT_PRODUCT_DEFINITION_QUERY: QueryPayload<ProductDefinition> = {
-	  from: { table: "dbo.product_definitions", alias: "pd" },	
-	  select: genTypedQualifiedColumns(ProductDefinitionSchema), //["product_def_id", "title", "description", "category_id"],
-	  orderBy: [{ key: "title", direction: "asc" }]
-	};
+  const DEFAULT_PRODUCT_DEFINITION_QUERY: QueryPayload<ProductDefinition> = {
+    from: { table: "dbo.product_definitions", alias: "pd" },
+    select: genTypedQualifiedColumns(ProductDefinitionSchema), //["product_def_id", "title", "description", "category_id"],
+    orderBy: [{ key: "title", direction: "asc" }],
+  };
 
-	try {
-		// 1. Expect the standard QueryRequest envelope and extract the payload.
-		const requestBody = (await event.request.json()) as QueryRequest<ProductDefinition>;
-		let payload = requestBody.payload;
+  try {
+    // 1. Expect the standard QueryRequest envelope and extract the payload.
+    const requestBody = (await event.request.json()) as QueryRequest<ProductDefinition>;
+    let payload = requestBody.payload;
 
-		if (payload && Object.keys(payload).length === 0) {
-						payload = {...DEFAULT_PRODUCT_DEFINITION_QUERY, ...payload}
+    if (payload && Object.keys(payload).length > 0) {
+      log.info(`[${operationId}] Client payload available`, {
+        select: payload.select,
+        where: payload.where,
+        limit: payload.limit,
+      });
+      payload = { ...DEFAULT_PRODUCT_DEFINITION_QUERY, ...payload };
+    } else {
+      log.info(`No client payload received => Using DEFAULT_PRODUCT_DEFINITION_QUERY`, DEFAULT_PRODUCT_DEFINITION_QUERY);
+      payload = DEFAULT_PRODUCT_DEFINITION_QUERY;
+    }
 
-		} else {
-			log.info(`No client payload received => Using DEFAULT_PRODUCT_DEFINITION_QUERY`, DEFAULT_PRODUCT_DEFINITION_QUERY);
-			payload = DEFAULT_PRODUCT_DEFINITION_QUERY;
-			// const errRes: ApiErrorResponse = {
-			// 	success: false,
-			// 	message: 'Request body must be a valid QueryRequest object containing a `payload`.',
-			// 	status_code: 400,
-			// 	error_code: 'BAD_REQUEST',
-			// 	meta: { timestamp: new Date().toISOString() }
-			// };
-			// log.warn(`[${operationId}] FN_FAILURE: Malformed request body.`, { body: requestBody });
-			// return json(errRes, { status: 400 });
-		}
+    // 3. Build and execute the query using the secure, generic query builder.
+    const { sql, parameters, metadata } = buildQuery(payload, queryConfig, undefined, { table: "dbo.product_definitions", alias: "pd" });
+    const results = await executeQuery(sql, parameters);
 
-		log.info(`[${operationId}] Parsed request payload`, {
-			select: payload.select,
-			where: payload.where,
-			limit: payload.limit
-		});
-
-
-
-		// 3. Build and execute the query using the secure, generic query builder.
-		const { sql, parameters, metadata } = buildQuery(payload, queryConfig, undefined, { table: 'dbo.product_definitions', alias: 'pd' });
-		const results = await executeQuery(sql, parameters);
-
-		// 4. Format the response using the standard `QuerySuccessResponse` type.
-		const response: QuerySuccessResponse<ProductDefinition> = {
-			success: true,
-			message: 'Product definitions retrieved successfully.',
-			data: {
-				results: results as Partial<ProductDefinition>[],
-				meta: {
-					retrieved_at: new Date().toISOString(),
-					result_count: results.length,
-					columns_selected: metadata.selectColumns,
-					has_joins: metadata.hasJoins,
-					has_where: metadata.hasWhere,
-					parameter_count: metadata.parameterCount,
-					table_fixed: 'dbo.product_definitions',
-					sql_generated: sql.replace(/\s+/g, ' ').trim()
-				}
-			},
-			meta: {
-				timestamp: new Date().toISOString()
-			}
-		};
-		log.info(`[${operationId}] FN_SUCCESS: Returning ${results.length} product definitions.`);
-		return json(response);
-	} catch (err: unknown) {
-		const { status, message } = mssqlErrorMapper.mapToHttpError(err);
-		log.error(`[${operationId}] FN_EXCEPTION: Unhandled error during product definition query.`, { error: err });
-		throw error(status, message);
-	}
+    // 4. Format the response using the standard `QuerySuccessResponse` type.
+    const response: QuerySuccessResponse<ProductDefinition> = {
+      success: true,
+      message: "Product definitions retrieved successfully.",
+      data: {
+        results: results as Partial<ProductDefinition>[],
+        meta: {
+          retrieved_at: new Date().toISOString(),
+          result_count: results.length,
+          columns_selected: metadata.selectColumns,
+          has_joins: metadata.hasJoins,
+          has_where: metadata.hasWhere,
+          parameter_count: metadata.parameterCount,
+          table_fixed: "dbo.product_definitions",
+          sql_generated: sql.replace(/\s+/g, " ").trim(),
+        },
+      },
+      meta: {
+        timestamp: new Date().toISOString(),
+      },
+    };
+    log.info(`[${operationId}] FN_SUCCESS: Returning ${results.length} product definitions.`);
+    return json(response);
+  } catch (err: unknown) {
+    const { status, message } = mssqlErrorMapper.mapToHttpError(err);
+    log.error(`[${operationId}] FN_EXCEPTION: Unhandled error during product definition query.`, { error: err });
+    throw error(status, message);
+  }
 };

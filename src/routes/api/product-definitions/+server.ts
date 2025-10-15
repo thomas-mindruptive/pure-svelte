@@ -33,7 +33,6 @@ export const POST: RequestHandler = async (event) => {
   };
 
   try {
-    // 1. Expect the standard QueryRequest envelope and extract the payload.
     const requestBody = (await event.request.json()) as QueryRequest<ProductDefinition>;
     let payload = requestBody.payload;
 
@@ -49,11 +48,11 @@ export const POST: RequestHandler = async (event) => {
       payload = DEFAULT_PRODUCT_DEFINITION_QUERY;
     }
 
-    // 3. Build and execute the query using the secure, generic query builder.
+    // Build and execute the query using the secure, generic query builder.
     const { sql, parameters, metadata } = buildQuery(payload, queryConfig, undefined, { table: "dbo.product_definitions", alias: "pd" });
     const results = await executeQuery(sql, parameters);
 
-    // 4. Format the response using the standard `QuerySuccessResponse` type.
+    // Format the response using the standard `QuerySuccessResponse` type.
     const response: QuerySuccessResponse<ProductDefinition> = {
       success: true,
       message: "Product definitions retrieved successfully.",

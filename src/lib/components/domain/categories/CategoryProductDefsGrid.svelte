@@ -18,9 +18,11 @@
   // === COLUMNS ====================================================================================
 
   const columns: ColumnDef<typeof ProductDefinitionSchema>[] = [
-    { key: "title", header: "Tile", sortable: true, width: "2fr" },
-    { key: "product_def_id", header: "id", sortable: true, width: "3fr" },
-    { key: "description", header: "description", sortable: true, width: "1fr" },
+    { key: "title", header: "Title", sortable: true },
+    { key: "product_def_id", header: "id", sortable: true },
+    { key: "material_id", header: "Material", sortable: true },
+    { key: "form_id", header: "Form", sortable: true },    
+    { key: "description", header: "Description", sortable: true},
   ];
 
   const getId = (r: ProductDefinition) => r.product_def_id;

@@ -18,7 +18,7 @@
   // === COLUMNS ====================================================================================
 
   const columns: ColumnDef<typeof ProductCategorySchema>[] = [
-    { key: "name", header: "Name", sortable: true, width: "250px" },
+    { key: "name", header: "Name", sortable: true, width: "25rem" },
     { key: "category_id", header: "id", sortable: true, width: "5rem" },
     { key: "description", header: "description", sortable: true, width: "" },
   ];

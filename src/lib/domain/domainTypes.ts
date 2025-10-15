@@ -145,7 +145,7 @@ const ProductDefinitionSchemaBase = z
     product_def_id: z.number().int().positive(),
     category_id: z.number().int().positive(),
     title: z.string().max(200),
-    description: z.string().max(1000).nullable().optional(),
+    description: z.string().max(4000).nullable().optional(),
     material_id: z.number().int().positive().nullable().optional(),
     form_id: z.number().int().positive().nullable().optional(),
     for_liquids: z.boolean().optional().nullable(),
@@ -175,7 +175,7 @@ const WholesalerCategorySchemaBase = z
   .object({
     wholesaler_id: z.number().int().positive(),
     category_id: z.number().int().positive(),
-    comment: z.string().max(1000).nullable().optional(),
+    comment: z.string().max(4000).nullable().optional(),
     link: z.string().url().max(2048).nullable().optional(),
     created_at: z.string().optional(),
   })

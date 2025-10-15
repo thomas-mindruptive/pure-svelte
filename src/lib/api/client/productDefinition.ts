@@ -18,21 +18,12 @@ import {
 } from "$lib/domain/domainTypes";
 import { log } from "$lib/utils/logger";
 import type { ApiClient } from "./ApiClient";
-import { createJsonAndWrapInPayload, createJsonBody, getErrorMessage } from "./common";
+import { createJsonBody, getErrorMessage } from "./common";
 import { LoadingState } from "./loadingState";
 
 // Create a dedicated loading state manager for this entity.
 const productDefinitionLoadingManager = new LoadingState();
 export const productDefinitionLoadingState = productDefinitionLoadingManager.isLoadingStore;
-
-/**
- * The default query payload used when fetching product definitions.
- */
-export const DEFAULT_PRODUCT_DEFINITION_QUERY: QueryPayload<ProductDefinition> = {
-  select: ["product_def_id", "title", "description", "category_id"],
-  orderBy: [{ key: "title", direction: "asc" }],
-  limit: 200,
-};
 
 /**
  * Factory function to create a product-definition-specific API client.
@@ -48,13 +39,12 @@ export function getProductDefinitionApi(client: ApiClient) {
       const operationId = "loadProductDefinitions";
       productDefinitionLoadingManager.start(operationId);
       try {
-        const fullQuery: QueryPayload<ProductDefinition> = {
-          ...DEFAULT_PRODUCT_DEFINITION_QUERY,
-          ...query,
-        };
+        // TODO: All endpoints should check null or empty payload. Either use default or return ApiErrorResponse.
+        // /api/product-definitions handles it corretly already.
+        const body = query? createJsonBody({payload: query}) : null;
         const responseData = await client.apiFetch<QueryResponseData<ProductDefinition>>(
           "/api/product-definitions",
-          { method: "POST", body: createJsonAndWrapInPayload(fullQuery) },
+          { method: "POST", body },
           { context: operationId },
         );
         return responseData.results as ProductDefinition[];

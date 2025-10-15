@@ -7,7 +7,7 @@
  */
 
 import { log } from "$lib/utils/logger";
-import { ComparisonOperator, type QueryPayload, type SortDescriptor, type WhereConditionGroup } from "$lib/backendQueries/queryGrammar";
+import { ComparisonOperator, type QueryPayload, type QueryPayloadPartial, type SortDescriptor, type WhereConditionGroup } from "$lib/backendQueries/queryGrammar";
 import {
   Wio_PDef_Cat_Supp_Nested_Schema,
   type ProductCategory,
@@ -16,7 +16,7 @@ import {
   type Wio_PDef_Cat_Supp_Nested,
 } from "$lib/domain/domainTypes";
 import type { ApiClient } from "./ApiClient";
-import { createJsonBody, createJsonAndWrapInPayload, getErrorMessage } from "./common";
+import { createJsonBody, createJsonAndWrapInPayload, getErrorMessage, createJsonAndWrapInPayloadPartial } from "./common";
 import type { PredefinedQueryRequest, QueryResponseData } from "$lib/api/api.types";
 import type { DeleteCategoryApiResponse } from "$lib/api/app/appSpecificTypes"; // CORRECTED IMPORT PATH
 import { LoadingState } from "./loadingState";
@@ -33,7 +33,7 @@ export type OfferingWithDetails = Wio_PDef_Cat_Supp_Nested;
  * @returns An object with all category and category-composition API methods.
  */
 export function getCategoryApi(client: ApiClient) {
-  const api =  {
+  const api = {
     // ===== CATEGORY MASTER-DATA CRUD =====
 
     /**
@@ -168,9 +168,9 @@ export function getCategoryApi(client: ApiClient) {
       const operationId = `loadProductDefsForCategory-${categoryId}`;
       categoryLoadingManager.start(operationId);
       try {
-        const query: QueryPayload<ProductDefinition> = {
-          from: { table: "dbo.product_definitions", alias: "pd" },
-          select: ["pd.product_def_id", "pd.title", "pd.category_id"],
+        // TODO: All endpoints should check null or empty payload. Either use default or return ApiErrorResponse.
+        // /api/product-definitions handles it corretly already.
+        const query: QueryPayloadPartial<ProductDefinition> = {
           where: {
             key: "pd.category_id",
             whereCondOp: ComparisonOperator.EQUALS,
@@ -179,9 +179,10 @@ export function getCategoryApi(client: ApiClient) {
           orderBy: [{ key: "pd.title", direction: "asc" }],
         };
 
+      
         const responseData = await client.apiFetch<QueryResponseData<ProductDefinition>>(
-          "/api/product-definitions", // Nutzt den Standard-Endpunkt
-          { method: "POST", body: createJsonAndWrapInPayload(query) },
+          "/api/product-definitions",
+          { method: "POST", body: createJsonAndWrapInPayloadPartial(query) },
           { context: operationId },
         );
         return responseData.results as ProductDefinition[];
@@ -253,7 +254,7 @@ export function getCategoryApi(client: ApiClient) {
       const operationId = `loadOfferingsForSupplierCategory-${supplierId}-${categoryId}`;
       categoryLoadingManager.start(operationId);
       try {
-        const cols = genTypedQualifiedColumns(Wio_PDef_Cat_Supp_Nested_Schema, true)
+        const cols = genTypedQualifiedColumns(Wio_PDef_Cat_Supp_Nested_Schema, true);
         const request: PredefinedQueryRequest<Wio_PDef_Cat_Supp_Nested> = {
           namedQuery: "offering->product_def->category->wholesaler",
           payload: {
@@ -273,10 +274,7 @@ export function getCategoryApi(client: ApiClient) {
           { method: "POST", body: createJsonBody(request) },
           { context: operationId },
         );
-        const transformed = transformToNestedObjects(
-          responseData.results as Record<string, unknown>[],
-          Wio_PDef_Cat_Supp_Nested_Schema,
-        );
+        const transformed = transformToNestedObjects(responseData.results as Record<string, unknown>[], Wio_PDef_Cat_Supp_Nested_Schema);
         return transformed;
       } catch (err) {
         log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });

@@ -1,6 +1,6 @@
 // src/lib/api/api.types.ts
 
-import type { QueryPayload } from "$lib/backendQueries/queryGrammar";
+import type { QueryPayload, QueryPayloadPartial } from "$lib/backendQueries/queryGrammar";
 import type { ValidationErrors, ValidationErrorTree } from "$lib/components/validation/validation.types";
 
 /**
@@ -120,6 +120,10 @@ export interface QueryRequest<T> {
 
 export interface QueryRequestWithOptionalPayload<T> {
   payload?: QueryPayload<T>;
+}
+
+export interface QueryRequestWithPartialPayload<T> {
+  payload?: QueryPayloadPartial<T>;
 }
 
 /**

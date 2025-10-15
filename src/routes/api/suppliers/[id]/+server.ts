@@ -83,6 +83,8 @@ export const POST: RequestHandler = async ({ params, request }) => {
 
     const requestBody = (await request.json()) as QueryRequest<Wholesaler>;
     const clientPayload = requestBody.payload;
+    
+    // TODO: Add defensive check to endpoints: If requestBody.payload is null, either use default or return ApiErrorResponse.
     log.info(`[${operationId}] Parsed request body`, { clientPayload });
 
     const supplierIdCondition: WhereCondition<Wholesaler> = { key: "wholesaler_id", whereCondOp: ComparisonOperator.EQUALS, val: id };

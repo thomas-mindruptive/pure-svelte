@@ -7,10 +7,10 @@
  * of the client-side data fetching strategy.
  */
 
-import { type QueryRequest } from '../api.types';
-import type { QueryPayload } from '$lib/backendQueries/queryGrammar';
+import type { QueryPayload, QueryPayloadPartial } from '$lib/backendQueries/queryGrammar';
 import type { ValidationErrors } from '$lib/components/validation/validation.types';
 import { coerceErrorMessage } from '$lib/utils/errorUtils';
+import { type QueryRequest, type QueryRequestWithPartialPayload } from '../api.types';
 
 /**
  * A custom client-side error class that extends the native Error.
@@ -58,6 +58,11 @@ export function createJsonBody(data: unknown): string {
  */
 export function createJsonAndWrapInPayload<T>(payload: QueryPayload<T>): string {
 	const request: QueryRequest<T> = { payload };
+	return JSON.stringify(request);
+}
+
+export function createJsonAndWrapInPayloadPartial<T>(payload: QueryPayloadPartial<T>): string {
+	const request: QueryRequestWithPartialPayload<T> = { payload };
 	return JSON.stringify(request);
 }
 

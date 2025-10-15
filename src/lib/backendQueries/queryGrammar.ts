@@ -143,3 +143,5 @@ export interface QueryPayload<T> {
   limit?: number;
   offset?: number;
 }
+
+export type QueryPayloadPartial<T> = Partial<QueryPayload<T>>;

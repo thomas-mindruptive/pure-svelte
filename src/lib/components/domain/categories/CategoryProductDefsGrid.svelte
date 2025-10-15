@@ -22,7 +22,7 @@
     { key: "product_def_id", header: "id", sortable: true },
     { key: "material_id", header: "Material", sortable: true },
     { key: "form_id", header: "Form", sortable: true },    
-    { key: "description", header: "Description", sortable: true},
+    { key: "description", header: "Description", sortable: true, accessor: (pd: ProductDefinition) => pd.description?.substring(0,30)},
   ];
 
   const getId = (r: ProductDefinition) => r.product_def_id;

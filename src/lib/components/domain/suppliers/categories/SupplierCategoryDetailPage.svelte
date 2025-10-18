@@ -183,7 +183,7 @@
   <div class="detail-page-layout">
     <div class="detail-header-section">
       <h1>Offerings in "{resolvedData.assignmentDetails.category_name}"</h1>
-      <p>{resolvedData.assignmentDetails.category_description || "No description available for this category."}</p>
+      <p>{resolvedData.assignmentDetails.category_name || "No name available for this category."}</p>
 
       {#if resolvedData.assignmentDetails.comment}
         <p class="comment">

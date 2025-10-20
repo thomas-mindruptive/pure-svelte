@@ -175,7 +175,7 @@ The **limited context window** is a major driver of the challenges described ear
 
 Significantly expanding the context window would substantially mitigate the memory-related constraints of AI agents, though it would not resolve the underlying issue of **probabilistic generation**. The fundamental problem is that the computational cost of large language models increases approximately **quadratically** with the size of the context window. As the window grows, both memory consumption and inference time rise sharply, creating practical limits on scalability.
 
-Emerging architectures such as **xLSTM** (developed by Prof. Sepp Hochreiter and colleagues) and other **long-context recurrent models** offer promising alternatives. These models aim to maintain or even improve performance while reducing the resource requirements associated with long-range dependencies. By enabling efficient handling of extended sequences, such architectures could significantly alleviate current context constraints — and thereby reduce the need for complex retrieval or embedding-based workarounds.
+Emerging architectures such as **xLSTM** (developed by Prof. Sepp Hochreiter and colleagues, **Ref. 10**) and other **long-context recurrent models** **(Refs 12 and 13)** offer promising alternatives. These models aim to maintain or even improve performance while reducing the resource requirements associated with long-range dependencies. By enabling efficient handling of extended sequences, such architectures could significantly alleviate current context constraints — and thereby reduce the need for complex retrieval or embedding-based workarounds.
  
 
 ### 6.2 Structural and Logical Validation

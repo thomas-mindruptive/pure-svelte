@@ -155,7 +155,7 @@
     {fieldProps}
     items={productTypes}
     path={["product_type_id"]}
-    labelath={["name"]}
+    labelPath={["name"]}
     valuePath={["product_type_id"]}
     placeholder="Search product types..."
     label="Product type"

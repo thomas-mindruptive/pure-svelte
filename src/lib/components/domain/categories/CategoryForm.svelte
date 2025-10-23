@@ -1,6 +1,8 @@
 <script lang="ts">
   import { ApiClient } from "$lib/api/client/ApiClient";
   import { getCategoryApi } from "$lib/api/client/category";
+  import Field from "$lib/components/forms/Field.svelte";
+  import FormComboBox2 from "$lib/components/forms/FormComboBox2.svelte";
   import type {
       CancelledCallback,
       ChangedCallback,
@@ -9,20 +11,30 @@
       SubmittedCallback,
       ValidateResult,
   } from "$lib/components/forms/forms.types";
-  import FormShell from "$lib/components/forms/FormShell.svelte";
-  import Field from "$lib/components/forms/Field.svelte";
+  import FormShell, { type FieldsSnippetProps } from "$lib/components/forms/FormShell.svelte";
   import "$lib/components/styles/form.css";
   import "$lib/components/styles/grid.css";
+  import type { ValidationErrorTree } from "$lib/components/validation/validation.types";
   import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
-  import { ProductCategorySchema, type ProductCategory } from "$lib/domain/domainTypes";
+  import {
+      ProductCategorySchema,
+      ProductTypeSchema,
+      type ProductCategory,
+      type ProductType
+  } from "$lib/domain/domainTypes";
+  import { safeParseFirstN, zodToValidationErrorTree } from "$lib/domain/domainTypes.utils";
   import { assertDefined } from "$lib/utils/assertions";
   import { log } from "$lib/utils/logger";
 
+  // === TYPES ====================================================================================
+
+  type CategoryFormData = ProductCategory & { productTypes: ProductType[] };
 
   // === PROPS ====================================================================================
 
   export type Props = {
     initial?: ProductCategory | undefined | null;
+    productTypes: ProductType[];
     disabled?: boolean;
     isCreateMode: boolean;
     onSubmitted?: SubmittedCallback;
@@ -31,9 +43,16 @@
     onChanged?: ChangedCallback;
   };
 
-  const { initial: initialData, disabled = false, onSubmitted, isCreateMode, onSubmitError, onCancelled, onChanged }: Props = $props();
-
-  type CategoryFormData = ProductCategory;
+  const {
+    initial: initialData,
+    disabled = false,
+    onSubmitted,
+    isCreateMode,
+    onSubmitError,
+    onCancelled,
+    onChanged,
+    productTypes,
+  }: Props = $props();
 
   // === API ======================================================================================
 
@@ -42,14 +61,22 @@
 
   // === VALIDATE =================================================================================
 
-  let { errors: zodErrors } = $derived.by(() => {
+  const { zodErrors, formData } = $derived.by(() => {
+    let err: ValidationErrorTree = {};
     const result = ProductCategorySchema.nullable().safeParse(initialData);
     if (result.error) {
-      log.error(`Validation of category to ProductCategorySchema failed.`, {error: result.error, initial: initialData});
+      err.productCategory = zodToValidationErrorTree(result.error);
+      log.error(`Validation of category to ProductCategorySchema failed.`, { error: result.error, initial: initialData });
     }
+    const productTypesVal = safeParseFirstN(ProductTypeSchema, productTypes, 3);
+    if (productTypesVal.error) {
+      err.productTypes = zodToValidationErrorTree(productTypesVal.error);
+    }
+
     return {
       validatedData: result.success ? result.data : null,
-      errors: result.success ? null : result.error.issues,
+      formData: { ...initialData, productTypes },
+      zodErrors: err,
       isValid: result.success,
       initialValidatedData: result.success ? (result.data ?? null) : null,
     };
@@ -85,7 +112,7 @@
 
   async function submitCategory(raw: Record<string, any>) {
     log.debug(`Submitting wholesaler`, raw);
-    const data = raw as CategoryFormData;
+    const data = raw as ProductCategory;
     const isUpdate = !isCreateMode;
     try {
       if (isUpdate) {
@@ -118,10 +145,32 @@
   }
 </script>
 
+<!-- SNIPPETS ------------------------------------------------------------------------------------>
+
+<!--
+  -- Render material combo using Combobox2 component
+  -->
+{#snippet productTypesCombo(fieldProps: FieldsSnippetProps<ProductType>)}
+  <FormComboBox2
+    {fieldProps}
+    items={productTypes}
+    path={["product_type_id"]}
+    labelath={["name"]}
+    valuePath={["product_type_id"]}
+    placeholder="Search product types..."
+    label="Product type"
+    onChange={(value, product_type) => {
+      log.debug("Material selected via Combobox2:", { value, material_name: product_type?.name });
+    }}
+  />
+{/snippet}
+
+<!-- TEMPLATE ------------------------------------------------------------------------------------>
+
 <ValidationWrapper errors={zodErrors}>
   <FormShell
     entity="Category"
-    initial={initialData as CategoryFormData}
+    initial={formData as CategoryFormData}
     validate={validateCategory}
     submitCbk={submitCategory}
     autoValidate="change"
@@ -131,12 +180,16 @@
     onCancelled={handleCancelled}
     onChanged={handleChanged}
   >
+    <!-- Header ---------------------------------------------------------------------------------->
     {#snippet header({ data, dirty })}
       {@const category = data as CategoryFormData}
       <div class="form-header">
         <div>
           {#if category?.category_id}
-            <h3>{category.name || "Unnamed Category"} <span class="field-hint">ID: {category.category_id}</span></h3> 
+            <h3>
+              {category.name || "Unnamed Category"}
+              <span class="field-hint">ID: {category.category_id}</span>
+            </h3>
           {:else}
             <h3>{category.name || "New Category"}</h3>
           {/if}
@@ -149,9 +202,11 @@
       </div>
     {/snippet}
 
+    <!-- Fields ---------------------------------------------------------------------------------->
     {#snippet fields(fieldProps)}
       <div class="form-body">
         <div class="form-row-grid">
+          <!-- Name ------------------------------------------------------------------------------>
           <Field
             {fieldProps}
             path={["name"]}
@@ -161,6 +216,7 @@
             class="span-2"
           />
 
+          <!-- Description ----------------------------------------------------------------------->
           <Field
             {fieldProps}
             path={["description"]}
@@ -169,10 +225,13 @@
             required
             class="span-2"
           />
+
+          {@render productTypesCombo(fieldProps)}
         </div>
       </div>
     {/snippet}
 
+    <!-- Actions --------------------------------------------------------------------------------->
     {#snippet actions({ submitAction, cancel, submitting, dirty })}
       <div class="form-actions">
         <button
@@ -183,7 +242,7 @@
         >
           Cancel
         </button>
-       
+
         <button
           class="primary-button"
           type="submit"

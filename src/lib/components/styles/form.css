@@ -3,7 +3,17 @@
  * It imports the basic element styles and adds LAYOUT styles on top.
  */
 
-@import "./form-elements.css"; /* 
+@import "./form-elements.css"; /*
+
+/* --- FORM OVERRIDE --- */
+/* Override grid overflow for forms to allow dropdowns */
+.pc-form.pc-grid {
+  overflow: visible !important;
+}
+
+.pc-form .pc-grid__scroller {
+  overflow: visible !important;
+} 
 
 /* --- LAYOUT STYLES --- */
 .form-header {

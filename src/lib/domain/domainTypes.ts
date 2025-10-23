@@ -93,6 +93,7 @@ export const WholesalerForCreateSchema = copyMetaFrom(WholesalerSchema, tempWhol
 const ProductCategorySchemaBase = z
   .object({
     category_id: z.number().int().positive(),
+    product_type_id: z.number().int().positive(),
     name: NameOrTitle,
     description: z.string().max(500).nullable().optional(),
   })
@@ -353,6 +354,21 @@ export const WholesalerOfferingAttribute_AttributeSchema = WholesalerOfferingAtt
   attribute_description: z.string().nullable().optional(),
 }).describe("WholesalerOfferingAttribute_AttributeSchema");
 
+// ===== ProductType (dbo.productType) =====
+
+const ProductTypeSchemaBase = z
+  .object({
+    product_type_id: z.number().int().positive(),
+    name: NameOrTitle,
+  })
+  .describe("ProductTypeSchema");
+
+export const ProductTypeSchema = createSchemaWithMeta(ProductTypeSchemaBase, {
+  alias: "pt",
+  tableName: "product_types",
+  dbSchema: "dbo",
+} as const);
+
 // ===== MATERIAL (dbo.materials) =====
 
 const MaterialSchemaBase = z
@@ -494,6 +510,7 @@ export type Wio_PDef_Cat_Supp_Nested_WithLinks = z.infer<typeof Wio_PDef_Cat_Sup
 export type WholesalerOfferingLink = z.infer<typeof WholesalerOfferingLinkSchema>;
 export type WholesalerOfferingAttribute = z.infer<typeof WholesalerOfferingAttributeSchema>;
 export type WholesalerOfferingAttribute_Attribute = z.infer<typeof WholesalerOfferingAttribute_AttributeSchema>;
+export type ProductType = z.infer<typeof ProductTypeSchema>;
 export type Material = z.infer<typeof MaterialSchema>;
 export type Form = z.infer<typeof FormSchema>;
 export type Order = z.infer<typeof OrderSchema>;
@@ -516,6 +533,7 @@ export const AllBrandedSchemas = {
   OrderItemSchema,
   MaterialSchema,
   FormSchema,
+  ProductTypeSchema,
 } as const;
 
 // ===== HELPER EXPORT =====

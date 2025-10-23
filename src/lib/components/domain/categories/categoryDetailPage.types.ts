@@ -8,30 +8,32 @@
  */
 
 import { z } from "zod";
-import { ProductCategorySchema, ProductDefinitionSchema } from "$lib/domain/domainTypes";
+import { ProductCategorySchema, ProductDefinitionSchema, ProductTypeSchema } from "$lib/domain/domainTypes";
 import type { PromisifyComplex } from "$lib/utils/typeUtils";
 
 // --- Zod Schema ---
 
-/**
- * Supplier detail, e.g. for SullierForm
- */
-export const CategoryDetail_LoadDataSchema = z.object({
-  // The core supplier entity being displayed.
-  // Optional for CREATE mode!
-  category: z.optional(ProductCategorySchema).nullable(),
-});
+// /**
+//  * Supplier detail, e.g. for SullierForm
+//  */
+// export const CategoryDetail_LoadDataSchema = z.object({
+//   // The core supplier entity being displayed.
+//   // Optional for CREATE mode!
+//   category: z.optional(ProductCategorySchema).nullable(),
+// });
 
-export type CategoryDetail_LoadData = z.infer<typeof CategoryDetail_LoadDataSchema>;
-export type CategoryDetail_LoadDataAsync = PromisifyComplex<CategoryDetail_LoadData>;
+// export type CategoryDetail_LoadData = z.infer<typeof CategoryDetail_LoadDataSchema>;
+// export type CategoryDetail_LoadDataAsync = PromisifyComplex<CategoryDetail_LoadData>;
 
 /**
- * Defines the schema for the fully resolved data required by the Supplier Detail Page.
+ * Defines the schema for the fully resolved data required by the Category Detail Page.
  * This is used to validate the data shape after all promises from the `load` function have been resolved.
  */
-export const CategoryDetailPage_LoadDataSchema = CategoryDetail_LoadDataSchema.extend({
+export const CategoryDetailPage_LoadDataSchema = z.object({
+  category: z.optional(ProductCategorySchema).nullable(),
   productDefinitions: z.array(ProductDefinitionSchema),
-  isCreateMode: z.boolean()
+  productTypes: z.array(ProductTypeSchema),
+  isCreateMode: z.boolean(),
 });
 
 // --- TypeScript Type Exports ---

@@ -3,6 +3,7 @@ import { error, type LoadEvent } from "@sveltejs/kit";
 import { ApiClient } from "$lib/api/client/ApiClient";
 import type { CategoryDetailPage_LoadDataAsync } from "./categoryDetailPage.types";
 import { getCategoryApi } from "$lib/api/client/category";
+import { getProductTypeApi } from "$lib/api/client/productTypes";
 
 /**
  * Loads all data for the Category Detail Page using the non-blocking "app shell" pattern.
@@ -29,11 +30,10 @@ export function load({ params, fetch: loadEventFetch }: LoadEvent): CategoryDeta
 
   log.info(`Kicking off non-blocking load for categoryId: ${categoryId}`);
 
-  // Create an ApiClient instance with the context-aware `fetch`.
+  // API
   const client = new ApiClient(loadEventFetch);
-
-  // Get the specific API methods from the factory.
   const categoryApi = getCategoryApi(client);
+  const productTypeApi = getProductTypeApi(client);
 
   // ⚠️ Return the object of promises directly without `await`.
   //    The page component will handle resolving and error states.
@@ -43,7 +43,8 @@ export function load({ params, fetch: loadEventFetch }: LoadEvent): CategoryDeta
     const loadDataAsync: CategoryDetailPage_LoadDataAsync = {
       category: categoryApi.loadCategory(categoryId),
       productDefinitions: categoryApi.loadProductDefsForCategory(categoryId),
-	  isCreateMode
+      productTypes: productTypeApi.loadProductTypes(),
+      isCreateMode,
     };
     return loadDataAsync;
   }
@@ -52,7 +53,8 @@ export function load({ params, fetch: loadEventFetch }: LoadEvent): CategoryDeta
     const loadDataAsync: CategoryDetailPage_LoadDataAsync = {
       category: Promise.resolve(null),
       productDefinitions: Promise.resolve([]),
-	  isCreateMode
+      productTypes: productTypeApi.loadProductTypes(),
+      isCreateMode,
     };
     return loadDataAsync;
   }

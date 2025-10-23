@@ -28,7 +28,7 @@
   import CategoryForm from "./CategoryForm.svelte";
   import { cascadeDelete } from "$lib/api/client/cascadeDelete";
   import { stringsToNumbers } from "$lib/utils/typeConversions";
-    import { error } from "@sveltejs/kit";
+  import { error } from "@sveltejs/kit";
   import { buildChildUrl, buildSiblingUrl } from "$lib/utils/url";
 
   // === PROPS ====================================================================================
@@ -57,7 +57,7 @@
 
       try {
         // 2. Resolve all promises in parallel.
-        const [category, productDefinitions] = await Promise.all([data.category, data.productDefinitions]);
+        const [category, productDefinitions, productTypes] = await Promise.all([data.category, data.productDefinitions, data.productTypes]);
 
         if (aborted) return;
 
@@ -66,6 +66,7 @@
           ...data,
           category,
           productDefinitions,
+          productTypes,
         };
 
         // 4. Validate the resolved data against the Zod schema.
@@ -74,7 +75,8 @@
         if (!validationResult.success) {
           log.error("Zod validation failed", validationResult.error.issues);
           // Treat a validation failure as a loading error.
-          throw error(500,
+          throw error(
+            500,
             `CategoryDetailPage: Received invalid data structure from the API: ${JSON.stringify(validationResult.error.issues)}`,
           );
         }
@@ -241,8 +243,9 @@
     <!-- Section 1: Details form -->
     <div class="form-section">
       <CategoryForm
-        isCreateMode={isCreateMode}
+        {isCreateMode}
         initial={resolvedData.category}
+        productTypes = {resolvedData.productTypes}
         disabled={$categoryLoadingState}
         onSubmitted={handleFormSubmitted}
         onCancelled={handleFormCancelled}

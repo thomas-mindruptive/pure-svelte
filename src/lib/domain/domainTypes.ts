@@ -43,6 +43,10 @@ export function copyMetaFrom<F extends z.ZodObject<any>, T extends z.ZodObject<a
 // ===== GENERAL =====
 
 export const NameOrTitle = z.string().max(200);
+export const LongDescription = z.string().max(4000);
+export const ShortDescription = z.string().max(500);
+export const OptionalLongDescription = LongDescription.nullable().optional();
+export const OptionalShortDescription = ShortDescription.nullable().optional();
 
 // ===== WHOLESALER (dbo.wholesalers) =====
 
@@ -354,7 +358,40 @@ export const WholesalerOfferingAttribute_AttributeSchema = WholesalerOfferingAtt
   attribute_description: z.string().nullable().optional(),
 }).describe("WholesalerOfferingAttribute_AttributeSchema");
 
-// ===== ProductType (dbo.productType) =====
+// ===== ConstructionType (dbo.construction_types) =====
+
+const ConstructionTypeSchemaBase = z
+  .object({
+    construction_type_id: z.number().int().positive(),
+    name: NameOrTitle,
+    description: OptionalShortDescription
+  })
+  .describe("ConstructionTypeSchema");
+
+export const ConstructionTypeSchema = createSchemaWithMeta(ConstructionTypeSchemaBase, {
+  alias: "ct",
+  tableName: "construction_types",
+  dbSchema: "dbo",
+} as const);
+
+
+// ===== SurfaceFinish (dbo.surface_finishes) =====
+
+const SurfaceFinishSchemaBase = z
+  .object({
+    surface_finish_id: z.number().int().positive(),
+    name: NameOrTitle,
+    description: OptionalShortDescription
+  })
+  .describe("SurfaceFinishSchema");
+
+export const SurfaceFinishSchema = createSchemaWithMeta(SurfaceFinishSchemaBase, {
+  alias: "sf",
+  tableName: "surface_finishes",
+  dbSchema: "dbo",
+} as const);
+
+// ===== ProductType (dbo.product_types) =====
 
 const ProductTypeSchemaBase = z
   .object({
@@ -534,6 +571,8 @@ export const AllBrandedSchemas = {
   MaterialSchema,
   FormSchema,
   ProductTypeSchema,
+  SurfaceFinishSchema,
+  ConstructionTypeSchema
 } as const;
 
 // ===== HELPER EXPORT =====

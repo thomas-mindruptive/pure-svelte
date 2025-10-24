@@ -3,7 +3,7 @@ import { error, type LoadEvent } from "@sveltejs/kit";
 import { ApiClient } from "$lib/api/client/ApiClient";
 import type { CategoryDetailPage_LoadDataAsync } from "./categoryDetailPage.types";
 import { getCategoryApi } from "$lib/api/client/category";
-import { getProductTypeApi } from "$lib/api/client/productTypes";
+import { getProductTypeApi } from "$lib/api/client/productType";
 
 /**
  * Loads all data for the Category Detail Page using the non-blocking "app shell" pattern.

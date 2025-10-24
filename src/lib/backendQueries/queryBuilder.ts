@@ -147,17 +147,26 @@ function validateOrderByKeys<T>(orderBy: SortDescriptor<T>[] | undefined, hasJoi
  * Recursively builds the WHERE clause string with proper parameterization.
  * @param where The condition or group of conditions to process.
  * @param ctx The build context for tracking parameters.
+ * @param hasJoins Whether the query contains JOINs (requires qualified column names).
  * @returns The generated SQL string for the WHERE clause segment.
  */
-export function buildWhereClause<T>(where: WhereCondition<T> | WhereConditionGroup<T>, ctx: BuildContext): string {
+export function buildWhereClause<T>(where: WhereCondition<T> | WhereConditionGroup<T>, ctx: BuildContext, hasJoins: boolean = false): string {
   if (isWhereConditionGroup(where)) {
     // It's a group (e.g., with AND/OR), so we recurse through its nested conditions.
-    const conditions = where.conditions.map((c) => buildWhereClause(c, ctx)).join(` ${where.whereCondOp} `);
+    const conditions = where.conditions.map((c) => buildWhereClause(c, ctx, hasJoins)).join(` ${where.whereCondOp} `);
     return `(${conditions})`;
   }
 
   // It's a single WhereCondition (e.g., { key: 'w.status', op: '=', val: 'active' }).
   const { key, whereCondOp, val } = where;
+
+  // Validate that column names are qualified in JOIN queries
+  if (hasJoins && !String(key).includes('.')) {
+    throw new Error(
+      `Unqualified WHERE key '${String(key)}' found in JOIN query. ` +
+      `All WHERE keys in JOIN queries must be qualified (e.g., 'wio.product_def_id', 'w.status').`
+    );
+  }
 
   // Handle operators that don't require a value.
   if (whereCondOp === "IS NULL" || whereCondOp === "IS NOT NULL") {
@@ -197,7 +206,7 @@ function buildOnClause(on: JoinConditionGroup, ctx: BuildContext): string {
       if (isWhereCondition(cond) || isWhereConditionGroup(cond)) {
         // This handles dynamic parameters within the ON clause (for the anti-join pattern).
         // e.g., 'AND wio.wholesaler_id = @p1'
-        return buildWhereClause(cond, ctx);
+        return buildWhereClause(cond, ctx, true); // hasJoins = true (we're in a JOIN ON clause)
       }
       throw new Error("Unsupported condition type encountered in JOIN ON clause.");
     })
@@ -359,8 +368,9 @@ export function buildQuery<T>(payload: Partial<QueryPayload<T>> | undefined, con
   if (!select || !Array.isArray(select) || select.length === 0) {
     throw new Error("Query must have a 'select' clause with at least one column.");
   }
+
   const selectClause = select.join(", ");
-  const whereClause = where ? `WHERE ${buildWhereClause(where, ctx)}` : "";
+  const whereClause = where ? `WHERE ${buildWhereClause(where, ctx, hasJoins)}` : "";
   const orderByClause = orderBy && orderBy.length > 0 ? `ORDER BY ${orderBy.map((s: SortDescriptor<T>) => `${String(s.key)} ${s.direction}`).join(", ")}` : "";
   const limitClause = limit && limit > 0 ? `OFFSET ${offset || 0} ROWS FETCH NEXT ${limit} ROWS ONLY` : "";
 
@@ -372,7 +382,7 @@ export function buildQuery<T>(payload: Partial<QueryPayload<T>> | undefined, con
     parameters: ctx.parameters,
     metadata: {
       selectColumns: select as string[],
-      hasJoins: !!realJoins?.length,
+      hasJoins: hasJoins,
       hasWhere: !!where,
       parameterCount: ctx.paramIndex,
       tableFixed: fromTableForMetadata,

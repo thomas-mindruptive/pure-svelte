@@ -232,7 +232,7 @@ export function getProductDefinitionApi(client: ApiClient) {
       try {
         let finalWhere: WhereConditionGroup<WholesalerItemOffering> | WhereCondition<WholesalerItemOffering> = {
           whereCondOp: "AND",
-          conditions: [{ key: "product_def_id", whereCondOp: "=", val: productDefId }],
+          conditions: [{ key: "wio.product_def_id", whereCondOp: "=", val: productDefId }], // Qualified for JOIN query
         };
         if (aWhere) {
           finalWhere = { whereCondOp: "AND", conditions: [aWhere, finalWhere] };

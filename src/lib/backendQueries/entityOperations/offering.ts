@@ -21,7 +21,7 @@ export async function loadNestedOfferingsWithJoinsAndLinks(
 
   let whereClause = "";
   if (aWhere) {
-    whereClause = `WHERE ${buildWhereClause(aWhere, ctx)}`;
+    whereClause = `WHERE ${buildWhereClause(aWhere, ctx, true)}`; // hasJoins = true (we use JOINs)
   }
 
   // Build ORDER BY clause
@@ -49,51 +49,79 @@ export async function loadNestedOfferingsWithJoinsAndLinks(
     request.input(key, value);
   }
 
-  // Query ausführen
+  // Using JOINs instead of subqueries for better performance.
+  // JSON PATH automatically nests based on dotted aliases (e.g. 'product_def.title').
   const result = await request.query(`
-    SELECT (
-        SELECT
-            wio.*,
-            JSON_QUERY((
-                SELECT pd.product_def_id, pd.category_id, pd.title, pd.description,
-                       pd.material_id, pd.form_id, pd.for_liquids, pd.created_at
-                FROM dbo.product_definitions AS pd
-                WHERE pd.product_def_id = wio.product_def_id
-                FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
-            )) AS product_def,
-            JSON_QUERY((
-                SELECT pc.category_id, pc.product_type_id, pc.name, pc.description
-                FROM dbo.product_categories AS pc
-                WHERE pc.category_id = wio.category_id
-                FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
-            )) AS category,
-            JSON_QUERY((
-                SELECT w.wholesaler_id, w.name, w.country, w.region,
-                       w.b2b_notes, w.status, w.dropship, w.website,
-                       w.email, w.price_range, w.relevance, w.created_at
-                FROM dbo.wholesalers AS w
-                WHERE w.wholesaler_id = wio.wholesaler_id
-                FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
-            )) AS wholesaler,
-            JSON_QUERY((
-                SELECT l.link_id, l.offering_id, l.url, l.notes, l.created_at
-                FROM dbo.wholesaler_offering_links AS l
-                WHERE l.offering_id = wio.offering_id
-                FOR JSON PATH
-            )) AS links
-        FROM dbo.wholesaler_item_offerings AS wio
-        ${whereClause}
-        ${orderByClause}
-        ${limitClause}
-        FOR JSON PATH, INCLUDE_NULL_VALUES
-    ) AS json_result;
+    SELECT
+        -- Main offering columns
+        wio.offering_id,
+        wio.wholesaler_id,
+        wio.category_id,
+        wio.product_def_id,
+        wio.sub_seller,
+        wio.material_id,
+        wio.form_id,
+        wio.title,
+        wio.size,
+        wio.dimensions,
+        wio.price,
+        wio.weight_grams,
+        wio.currency,
+        wio.comment,
+        wio.created_at,
+        -- Product definition (nested via dotted alias)
+        pd.product_def_id AS 'product_def.product_def_id',
+        pd.category_id AS 'product_def.category_id',
+        pd.title AS 'product_def.title',
+        pd.description AS 'product_def.description',
+        pd.material_id AS 'product_def.material_id',
+        pd.form_id AS 'product_def.form_id',
+        pd.construction_type_id AS 'product_def.construction_type_id',
+        pd.surface_finish_id AS 'product_def.surface_finish_id',
+        pd.for_liquids AS 'product_def.for_liquids',
+        pd.created_at AS 'product_def.created_at',
+        -- Category (nested via dotted alias)
+        pc.category_id AS 'category.category_id',
+        pc.product_type_id AS 'category.product_type_id',
+        pc.name AS 'category.name',
+        pc.description AS 'category.description',
+        -- Wholesaler (nested via dotted alias)
+        w.wholesaler_id AS 'wholesaler.wholesaler_id',
+        w.name AS 'wholesaler.name',
+        w.country AS 'wholesaler.country',
+        w.region AS 'wholesaler.region',
+        w.b2b_notes AS 'wholesaler.b2b_notes',
+        w.status AS 'wholesaler.status',
+        w.dropship AS 'wholesaler.dropship',
+        w.website AS 'wholesaler.website',
+        w.email AS 'wholesaler.email',
+        w.price_range AS 'wholesaler.price_range',
+        w.relevance AS 'wholesaler.relevance',
+        w.created_at AS 'wholesaler.created_at',
+        -- Links (still subquery due to 1:N relationship)
+        (
+            SELECT l.link_id, l.offering_id, l.url, l.notes, l.created_at
+            FROM dbo.wholesaler_offering_links AS l
+            WHERE l.offering_id = wio.offering_id
+            FOR JSON PATH
+        ) AS links
+    FROM dbo.wholesaler_item_offerings AS wio
+    LEFT JOIN dbo.product_definitions pd ON wio.product_def_id = pd.product_def_id
+    LEFT JOIN dbo.product_categories pc ON wio.category_id = pc.category_id
+    LEFT JOIN dbo.wholesalers w ON wio.wholesaler_id = w.wholesaler_id
+    ${whereClause}
+    ${orderByClause}
+    ${limitClause}
+    FOR JSON PATH, INCLUDE_NULL_VALUES
   `);
 
   if (!result.recordset?.length) {
     throw error(404, "No offerings found for the given criteria.");
   }
 
-  const jsonString = result.recordset[0].json_result;
+  // FOR JSON PATH returns JSON in the first column of the first row
+  const firstRow = result.recordset[0];
+  const jsonString = firstRow[Object.keys(firstRow)[0]];
   return jsonString;
 }
 
@@ -121,7 +149,7 @@ export async function loadFlatOfferingsWithJoinsAndLinks(
 
   let whereClause = "";
   if (aWhere) {
-    whereClause = `WHERE ${buildWhereClause(aWhere, ctx)}`;
+    whereClause = `WHERE ${buildWhereClause(aWhere, ctx, true)}`; // hasJoins = true (we use JOINs)
   }
 
   // Build ORDER BY clause

@@ -16,6 +16,14 @@
     type Wio_PDef_Cat_Supp_Nested,
     type Wio_PDef_Cat_Supp_Nested_WithLinks,
     type Wio_PDef_Cat_Supp,
+    type ConstructionType,
+    type SurfaceFinish,
+
+    ConstructionTypeSchema,
+
+    SurfaceFinishSchema
+
+
   } from "$lib/domain/domainTypes";
   import { addNotification } from "$lib/stores/notifications";
   import { log } from "$lib/utils/logger";
@@ -40,6 +48,8 @@
   import { error } from "@sveltejs/kit";
   import { getErrorMessage } from "$lib/api/client/common";
   import type { SortDescriptor } from "$lib/backendQueries/queryGrammar";
+    import { getSurfaceFinishApi } from "$lib/api/client/surfaceFinish";
+    import { getConstructionTypeApi } from "$lib/api/client/constructionType";
 
   // === PROPS ====================================================================================
 
@@ -59,6 +69,8 @@
   const allowForceCascadingDelte = $state(true);
   let productDefinition: ProductDefinition | null = $state(null);
   let offerings: Wio_PDef_Cat_Supp_Nested_WithLinks[] = $state([]);
+  let constructionTypes: ConstructionType[] = $state([]);
+  let surfaceFinishes: SurfaceFinish[] = $state([]);
   let materials: Material[] = $state([]);
   let forms: Form[] = $state([]);
 
@@ -66,6 +78,8 @@
 
   const client = new ApiClient(loadEventFetch);
   const productDefinitionApi = getProductDefinitionApi(client);
+  const surfaceFinishApi = getSurfaceFinishApi(client);
+  const constructionTypeApi = getConstructionTypeApi(client);
   const offeringApi = getOfferingApi(client);
   const materialApi = getMaterialApi(client);
   const formApi = getFormApi(client);
@@ -90,18 +104,33 @@
           if (isNaN(categoryId) || categoryId < 0) {
             throw error(400, "categoryId must be passed in params.");
           }
+
           productDefinition = await productDefinitionApi.loadProductDefinition(productDefId);
           if (aborted) return;
           const prodDefVal = ProductDefinitionSchema.nullable().safeParse(productDefinition);
           if (!prodDefVal.success) {
             errors.productDefintion = zodToValidationErrorTree(prodDefVal.error);
           }
-          // offerings = await productDefinitionApi.loadOfferingsForProductDefinition(productDefId);
+
           offerings = await productDefinitionApi.loadNestedOfferingsWithLinksForProductDefinition(productDefId);
           if (aborted) return;
           const offeringsVal = safeParseFirstN(Wio_PDef_Cat_Supp_Nested_WithLinks_Schema, offerings, 3);
           if (!offeringsVal.success) {
             errors.offerings = zodToValidationErrorTree(offeringsVal.error);
+          }
+
+          constructionTypes = await constructionTypeApi.loadConstructionTypes();
+          if (aborted) return;
+          const constructionTypesVal = safeParseFirstN(ConstructionTypeSchema, constructionTypes, 3);
+          if (!constructionTypesVal.success) {
+            errors.constructionTypes = zodToValidationErrorTree(constructionTypesVal.error);
+          }
+
+          surfaceFinishes = await surfaceFinishApi.loadSurfaceFinishes();
+          const surfaceFinishesVal = safeParseFirstN(SurfaceFinishSchema, surfaceFinishes, 3);
+          if (aborted) return;
+          if (!surfaceFinishesVal.success) {
+            errors.surfaceFinishes = zodToValidationErrorTree(surfaceFinishesVal.error);
           }
 
           log.debug(`Loaded productDefinition and offerings.`, { productDefinition, offerings });
@@ -264,6 +293,8 @@
           initial={productDefinition}
           {forms}
           {materials}
+          {constructionTypes}
+          {surfaceFinishes}
           onSubmitted={handleFormSubmitted}
           onSubmitError={handleFormSubmitError}
           onCancelled={handleFormCancelled}

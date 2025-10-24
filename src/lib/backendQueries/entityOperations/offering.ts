@@ -62,7 +62,7 @@ export async function loadNestedOfferingsWithJoinsAndLinks(
                 FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
             )) AS product_def,
             JSON_QUERY((
-                SELECT pc.category_id, pc.name, pc.description
+                SELECT pc.category_id, pc.product_type_id, pc.name, pc.description
                 FROM dbo.product_categories AS pc
                 WHERE pc.category_id = wio.category_id
                 FOR JSON PATH, WITHOUT_ARRAY_WRAPPER

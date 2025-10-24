@@ -13,7 +13,7 @@
   } from "$lib/components/forms/forms.types";
   import FormShell, { type FieldsSnippetProps } from "$lib/components/forms/FormShell.svelte";
   import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
-  import { ProductDefinitionSchema, type Form, type Material, type ProductDefinition } from "$lib/domain/domainTypes";
+  import { ProductDefinitionSchema, type ConstructionType, type Form, type Material, type ProductDefinition, type SurfaceFinish } from "$lib/domain/domainTypes";
   import { assertDefined } from "$lib/utils/assertions";
   import { log } from "$lib/utils/logger";
 
@@ -30,6 +30,8 @@
     initial: ProductDefinition | null;
     materials: Material[];
     forms: Form[];
+    constructionTypes: ConstructionType[];
+    surfaceFinishes: SurfaceFinish[];
     disabled?: boolean;
     isCreateMode: boolean;
     categoryId: number | null; // Needed for create-mode.
@@ -43,6 +45,8 @@
     initial,
     materials,
     forms,
+    constructionTypes,
+    surfaceFinishes,
     disabled = false,
     isCreateMode,
     categoryId,
@@ -150,7 +154,7 @@
 <!-- SNIPPETS ------------------------------------------------------------------------------------>
 
 <!--
-  -- Render material combo using Combobox2 component
+  -- Render material combo 
   -->
 {#snippet materialCombo2(fieldProps: FieldsSnippetProps<ProductDefinition>)}
   <FormComboBox2
@@ -168,7 +172,7 @@
 {/snippet}
 
 <!--
-  -- Render form combo using Combobox2 component
+  -- Render form combo 
   -->
 {#snippet formCombo2(fieldProps: FieldsSnippetProps<ProductDefinition>)}
   <FormComboBox2
@@ -181,6 +185,42 @@
     label="Form"
     onChange={(value, form) => {
       log.debug("Form selected via Combobox2:", { value, form_name: form?.name });
+    }}
+  />
+{/snippet}
+
+<!--
+  -- Render constructionType combo 
+  -->
+{#snippet constructionTypeCombo(fieldProps: FieldsSnippetProps<ProductDefinition>)}
+  <FormComboBox2
+    {fieldProps}
+    items={constructionTypes}
+    path={["construction_type_id"]}
+    labelPath={["name"]}
+    valuePath={["construction_type_id"]}
+    placeholder="Search construction types ..."
+    label="Form"
+    onChange={(value, constructionType) => {
+      log.debug("Construction type selected via Combobox:", { value, construction_type_name: constructionType?.name });
+    }}
+  />
+{/snippet}
+
+<!--
+  -- Render surfaceFinish combo 
+  -->
+{#snippet surfaceFinishCombo(fieldProps: FieldsSnippetProps<ProductDefinition>)}
+  <FormComboBox2
+    {fieldProps}
+    items={surfaceFinishes}
+    path={["surface_finish_id"]}
+    labelPath={["name"]}
+    valuePath={["surface_finish_id"]}
+    placeholder="Search construction types ..."
+    label="Form"
+    onChange={(value, constructionType) => {
+      log.debug("Construction type selected via Combobox:", { value, construction_type_name: constructionType?.name });
     }}
   />
 {/snippet}

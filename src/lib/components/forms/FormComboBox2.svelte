@@ -1,7 +1,11 @@
 <!-- File: src/lib/components/forms/FormComboBox2.svelte -->
 <script
   lang="ts"
-  generics="TEntity extends Record<string, any>, TOption extends Record<string, any>, TPath extends NonEmptyPath<TEntity>, TLabelPath extends NonEmptyPath<TOption> = NonEmptyPath<TOption>, TValuePath extends NonEmptyPath<TOption> = NonEmptyPath<TOption>"
+  generics="TEntity extends Record<string, any>, 
+    TOption extends Record<string, any>, 
+    TPath extends NonEmptyPath<TEntity>, 
+    TLabelPath extends NonEmptyPath<TOption> = NonEmptyPath<TOption>, 
+    TValuePath extends NonEmptyPath<TOption> = NonEmptyPath<TOption>"
 >
   import type { FieldsSnippetProps } from "./FormShell.svelte";
   import type { NonEmptyPath, PathValue } from "$lib/utils/pathUtils";
@@ -11,7 +15,7 @@
 
   // === PROPS ====================================================================================
 
-  type FormComboBox2Props = Omit<ComboboxProps<TOption, TLabelPath, TValuePath>, 'value' | 'onChange'> & {
+  type FormComboBox2Props = Omit<ComboboxProps<TOption, TLabelPath, TValuePath>, "value" | "onChange"> & {
     // The field manipulation props from FormShell
     fieldProps: FieldsSnippetProps<TEntity>;
 
@@ -25,13 +29,7 @@
     onChange?: (value: PathValue<TEntity, TPath>, item: TOption | null) => void;
   };
 
-  const {
-    fieldProps,
-    path,
-    class: className = "",
-    onChange,
-    ...comboBoxProps
-  }: FormComboBox2Props = $props();
+  const { fieldProps, path, class: className = "", onChange, ...comboBoxProps }: FormComboBox2Props = $props();
 
   // === DESTRUCTURE FIELD PROPS ==================================================================
 

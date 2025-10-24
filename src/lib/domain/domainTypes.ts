@@ -153,6 +153,8 @@ const ProductDefinitionSchemaBase = z
     description: z.string().max(4000).nullable().optional(),
     material_id: z.number().int().positive().nullable().optional(),
     form_id: z.number().int().positive().nullable().optional(),
+    construction_type_id: z.number().int().positive().nullable().optional(),
+    surface_finish_id: z.number().int().positive().nullable().optional(),
     for_liquids: z.boolean().optional().nullable(),
     created_at: z.string().optional(),
   })

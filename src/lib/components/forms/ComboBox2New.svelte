@@ -98,7 +98,8 @@
 
   // === HELPERS ==================================================================================
 
-  function getItemKey(item: T): string | T {
+  function getItemKey(item: T | null | undefined): string | T | null {
+    if (item === null || item === undefined) return null;
     if (typeof item === "object" && item && valuePath) {
       const value = getPath(item, valuePath);
       return String(value);

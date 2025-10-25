@@ -264,6 +264,7 @@ const Wio_BaseSchema = z
     weight_grams: z.number().positive().nullable().optional(),
     currency: z.string().length(3).nullable().optional(),
     comment: z.string().max(4000).nullable().optional(),
+    is_assortment: z.boolean().nullable().optional(),
     created_at: z.string().optional(),
   })
   .describe("WholesalerItemOfferingSchema");

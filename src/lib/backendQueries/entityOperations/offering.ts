@@ -230,7 +230,7 @@ export async function loadFlatOfferingWithJoinsAndLinksForId(transaction: Transa
   assertDefined(transaction, "transaction");
   assertDefined(id, "id");
 
-  const whereCondition: WhereCondition<WholesalerItemOffering> = { key: "offering_id", whereCondOp: "=", val: id };
+  const whereCondition: WhereCondition<WholesalerItemOffering> = { key: "wio.offering_id", whereCondOp: "=", val: id };
   // No need for orderBy/limit/offset when fetching single record by ID
   const results = await loadFlatOfferingsWithJoinsAndLinks(transaction, whereCondition);
 

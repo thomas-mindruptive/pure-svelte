@@ -13,7 +13,14 @@
   } from "$lib/components/forms/forms.types";
   import FormShell, { type FieldsSnippetProps } from "$lib/components/forms/FormShell.svelte";
   import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
-  import { ProductDefinitionSchema, type ConstructionType, type Form, type Material, type ProductDefinition, type SurfaceFinish } from "$lib/domain/domainTypes";
+  import {
+    ProductDefinitionSchema,
+    type ConstructionType,
+    type Form,
+    type Material,
+    type ProductDefinition,
+    type SurfaceFinish,
+  } from "$lib/domain/domainTypes";
   import { assertDefined } from "$lib/utils/assertions";
   import { log } from "$lib/utils/logger";
 
@@ -200,7 +207,7 @@
     labelPath={["name"]}
     valuePath={["construction_type_id"]}
     placeholder="Search construction types ..."
-    label="Form"
+    label="Construction Type"
     onChange={(value, constructionType) => {
       log.debug("Construction type selected via Combobox:", { value, construction_type_name: constructionType?.name });
     }}
@@ -218,7 +225,7 @@
     labelPath={["name"]}
     valuePath={["surface_finish_id"]}
     placeholder="Search construction types ..."
-    label="Form"
+    label="Surface Type"
     onChange={(value, constructionType) => {
       log.debug("Construction type selected via Combobox:", { value, construction_type_name: constructionType?.name });
     }}
@@ -267,6 +274,17 @@
             class="span-2"
           />
 
+          <Field
+            {fieldProps}
+            path={["for_liquids"]}
+            label="For Liquids"
+            type="checkbox"
+            class="span-1"
+          />
+        </div>
+        <!--END ROW -->
+
+        <div class="form-row-grid">
           <!-- MATERIAL -------------------------------------------------------------------------->
           <div class="control-group span-1">
             {@render materialCombo2(fieldProps)}
@@ -277,13 +295,15 @@
             {@render formCombo2(fieldProps)}
           </div>
 
-          <Field
-            {fieldProps}
-            path={["for_liquids"]}
-            label="For Liquids"
-            type="checkbox"
-            class="span-1"
-          />
+          <!-- CONSTRUCTION TYPE ----------------------------------------------------------------->
+          <div class="control-group span-1">
+            {@render constructionTypeCombo(fieldProps)}
+          </div>
+
+          <!-- SURFACE FINISH -------------------------------------------------------------------->
+          <div class="control-group span-1">
+            {@render surfaceFinishCombo(fieldProps)}
+          </div>
         </div>
         <!--END ROW -->
 

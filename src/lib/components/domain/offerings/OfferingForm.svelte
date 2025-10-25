@@ -49,7 +49,17 @@
 
   // ===== LOAD DATA ASYNC =====
 
-  let { initialValidatedOfferingData, errors, validatedData, availableProducts, availableSuppliers, materials, forms } = $derived.by(() => {
+  let {
+    initialValidatedOfferingData,
+    errors,
+    validatedData,
+    availableProducts,
+    availableSuppliers,
+    materials,
+    forms,
+    constructionTypes,
+    surfaceFinishes,
+  } = $derived.by(() => {
     const result = OfferingDetail_LoadDataSchema.safeParse(initialLoadedData);
     if (!result.success) {
       return {
@@ -57,6 +67,8 @@
         isValid: false,
         materials: [],
         forms: [],
+        constructionTypes: [],
+        surfaceFinishes: [],
       };
     }
 
@@ -93,6 +105,8 @@
       availableSuppliers: data.availableSuppliers ?? null,
       materials: data.materials ?? [],
       forms: data.forms ?? [],
+      constructionTypes: data.constructionTypes ?? [],
+      surfaceFinishes: data.surfaceFinishes ?? [],
     };
   });
 
@@ -243,6 +257,7 @@
     log.info({ component: "OfferingForm", event: "submitted" }, "FORM_EVENT");
     onSubmitted?.(p);
   }
+
   function handleSubmitError(p: { data: Record<string, any>; error: unknown }) {
     assertDefined(p, "handleSubmitError");
     log.warn(`Submit error: ${String(p.error)}`, {
@@ -251,11 +266,13 @@
     });
     onSubmitError?.(p);
   }
+
   function handleCancelled(p: { data: Record<string, any>; reason?: string }) {
     assertDefined(p, "handleCancelled");
     log.debug({ component: "OfferingForm", event: "cancelled" }, "FORM_EVENT");
     onCancelled?.(p);
   }
+
   function handleChanged(p: { data: Record<string, any>; dirty: boolean }) {
     //assertDefined(p, "handleChanged");
     log.info("handleChanged", {
@@ -304,6 +321,44 @@
     }}
   />
 {/snippet}
+
+<!--
+  -- Render constructionType combo 
+  -->
+{#snippet constructionTypeCombo(fieldProps: FieldsSnippetProps<WholesalerItemOffering>)}
+  <FormComboBox2
+    {fieldProps}
+    items={constructionTypes}
+    path={["construction_type_id"]}
+    labelPath={["name"]}
+    valuePath={["construction_type_id"]}
+    placeholder="Search construction types ..."
+    label="Construction Type"
+    onChange={(value, constructionType) => {
+      log.debug("Construction type selected via Combobox:", { value, construction_type_name: constructionType?.name });
+    }}
+  />
+{/snippet}
+
+<!--
+  -- Render surfaceFinish combo 
+  -->
+{#snippet surfaceFinishCombo(fieldProps: FieldsSnippetProps<WholesalerItemOffering>)}
+  <FormComboBox2
+    {fieldProps}
+    items={surfaceFinishes}
+    path={["surface_finish_id"]}
+    labelPath={["name"]}
+    valuePath={["surface_finish_id"]}
+    placeholder="Search construction types ..."
+    label="Surface Type"
+    onChange={(value, constructionType) => {
+      log.debug("Construction type selected via Combobox:", { value, construction_type_name: constructionType?.name });
+    }}
+  />
+{/snippet}
+
+<!-- TEMPLATE ------------------------------------------------------------------------------------>
 
 <ValidationWrapper
   {errors}
@@ -461,6 +516,16 @@
           <!-- form ------------------------------------------------------------------------------>
           <div class="control-group span-1">
             {@render formCombo2(fieldProps)}
+          </div>
+
+          <!-- construction type ----------------------------------------------------------------->
+          <div class="control-group span-1">
+            {@render constructionTypeCombo(fieldProps)}
+          </div>
+
+          <!-- surface finish -------------------------------------------------------------------->
+          <div class="control-group span-1">
+            {@render surfaceFinishCombo(fieldProps)}
           </div>
         </div>
 

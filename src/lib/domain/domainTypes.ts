@@ -255,6 +255,8 @@ const Wio_BaseSchema = z
     sub_seller: z.string().max(255).nullable().optional(),
     material_id: z.number().int().positive().nullable().optional(),
     form_id: z.number().int().positive().nullable().optional(),
+    construction_type_id: z.number().int().positive().nullable().optional(),
+    surface_finish_id: z.number().int().positive().nullable().optional(),
     title: z.string().max(255).nullable().optional(),
     size: z.string().max(50).nullable().optional(),
     dimensions: z.string().max(100).nullable().optional(),
@@ -366,7 +368,7 @@ const ConstructionTypeSchemaBase = z
   .object({
     construction_type_id: z.number().int().positive(),
     name: NameOrTitle,
-    description: OptionalShortDescription
+    description: OptionalShortDescription,
   })
   .describe("ConstructionTypeSchema");
 
@@ -376,14 +378,13 @@ export const ConstructionTypeSchema = createSchemaWithMeta(ConstructionTypeSchem
   dbSchema: "dbo",
 } as const);
 
-
 // ===== SurfaceFinish (dbo.surface_finishes) =====
 
 const SurfaceFinishSchemaBase = z
   .object({
     surface_finish_id: z.number().int().positive(),
     name: NameOrTitle,
-    description: OptionalShortDescription
+    description: OptionalShortDescription,
   })
   .describe("SurfaceFinishSchema");
 
@@ -576,7 +577,7 @@ export const AllBrandedSchemas = {
   FormSchema,
   ProductTypeSchema,
   SurfaceFinishSchema,
-  ConstructionTypeSchema
+  ConstructionTypeSchema,
 } as const;
 
 // ===== HELPER EXPORT =====

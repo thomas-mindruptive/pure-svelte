@@ -14,6 +14,8 @@ import { log } from "$lib/utils/logger";
 import { parseUrlPathSegments } from "$lib/utils/url";
 import { error, type LoadEvent } from "@sveltejs/kit";
 import type { OfferingDetail_LoadDataAsync } from "./offeringDetail.types";
+import { getConstructionTypeApi } from "$lib/api/client/constructionType";
+import { getSurfaceFinishApi } from "$lib/api/client/surfaceFinish";
 
 /**
  * Load the basis data for offering detail pages.
@@ -39,6 +41,8 @@ export function loadOfferingDetailBasisData({
   const categoryApi = getCategoryApi(client);
   const materialApi = getMaterialApi(client);
   const formApi = getFormApi(client);
+  const constructionTypeApi = getConstructionTypeApi(client);
+  const surfaceFinishesApi = getSurfaceFinishApi(client);
 
   // --- MODE and ROUTE CONTEXT and VALIDATION ----------------------------------------------------
 
@@ -103,6 +107,8 @@ export function loadOfferingDetailBasisData({
 
   materials = materialApi.loadMaterials();
   forms = formApi.loadForms();
+  const constructionTypes = constructionTypeApi.loadConstructionTypes();
+  const surfaceFinishes = surfaceFinishesApi.loadSurfaceFinishes();
 
   // --- RETURN LOADDATA --------------------------------------------------------------------------
 
@@ -121,7 +127,9 @@ export function loadOfferingDetailBasisData({
       availableProducts,
       availableSuppliers,
       materials,
-      forms
+      forms,
+      constructionTypes,
+      surfaceFinishes
     };
     return asyncLoadData;
   } else {
@@ -160,7 +168,9 @@ export function loadOfferingDetailBasisData({
       availableProducts,
       availableSuppliers,
       materials,
-      forms
+      forms,
+      constructionTypes,
+      surfaceFinishes
     };
     log.info(`(OfferDetailLinksPage) Kicked off loading promises offeringId: ${offeringId}`);
     return asyncLoadData;

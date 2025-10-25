@@ -40,13 +40,15 @@
       resolvedData = null;
 
       try {
-        const [offering, availableProducts, availableSuppliers, materials, forms] = await Promise.all([
+        const [offering, availableProducts, availableSuppliers, materials, forms, constructionTypes, surfaceFinishes] = await Promise.all([
           data.offering,
           //⚠️NOTE: We load the links directly with the offering! => not needed: data.links,
           data.availableProducts,
           data.availableSuppliers,
           data.materials,
           data.forms,
+          data.constructionTypes,
+          data.surfaceFinishes
         ]);
         log.debug(`All promises resolved: `, { offering, availableProducts, availableSuppliers });
 
@@ -60,6 +62,8 @@
           availableSuppliers,
           materials,
           forms,
+          constructionTypes,
+          surfaceFinishes
         };
 
         if (offering && (offering as any).error) {

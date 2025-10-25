@@ -1,8 +1,10 @@
 import {
   AttributeSchema,
+  ConstructionTypeSchema,
   FormSchema,
   MaterialSchema,
   ProductDefinitionSchema,
+  SurfaceFinishSchema,
   WholesalerOfferingAttribute_AttributeSchema,
   WholesalerSchema,
   Wio_PDef_Cat_Supp_WithLinks_Schema
@@ -23,6 +25,8 @@ export const OfferingDetail_LoadDataSchema = z.object({
     availableSuppliers: z.array(WholesalerSchema).nullable().optional(),                     // This is only needed for the "create" mode: We need the available suppliers for the combobox.
     materials: z.array(MaterialSchema).nullable().optional(),
     forms: z.array(FormSchema).nullable().optional(),
+    constructionTypes: z.array(ConstructionTypeSchema),
+    surfaceFinishes: z.array(SurfaceFinishSchema),
     isCreateMode: z.boolean(),                                                               // Derived. true if we are on "new" route
     isSuppliersRoute: z.boolean(),                                                           // Derived. true if in route context "/suppliers"  
     isCategoriesRoute: z.boolean()                                                           // Derived. true if in route context "/categories"

@@ -50,15 +50,18 @@
       resolvedData = null;
 
       try {
-        const [offering, assignedAttributes, availableAttributes, availableProducts, availableSuppliers, materials, forms] = await Promise.all([
-          data.offering,
-          data.assignedAttributes,
-          data.availableAttributes,
-          data.availableProducts,
-          data.availableSuppliers,
-          data.materials,
-          data.forms
-        ]);
+        const [offering, assignedAttributes, availableAttributes, availableProducts, availableSuppliers, materials, forms, constructionTypes, surfaceFinishes] =
+          await Promise.all([
+            data.offering,
+            data.assignedAttributes,
+            data.availableAttributes,
+            data.availableProducts,
+            data.availableSuppliers,
+            data.materials,
+            data.forms,
+            data.constructionTypes,
+            data.surfaceFinishes
+          ]);
 
         if (aborted) return;
 
@@ -70,12 +73,14 @@
           availableProducts,
           availableSuppliers,
           materials,
-          forms
+          forms,
+          constructionTypes,
+          surfaceFinishes,
         };
 
         if ((offering as any).error) {
           addNotification(`Cannot load offering: ${getErrorMessage((offering as any).error)}`);
-          throw ((offering as any).error);
+          throw (offering as any).error;
         }
 
         const validationResult = OfferingDetailAttributes_LoadDataSchema.safeParse(dataToValidate);

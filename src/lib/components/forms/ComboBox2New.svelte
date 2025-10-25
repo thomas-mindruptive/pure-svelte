@@ -218,7 +218,7 @@
               class="dropdown-item"
               onclick={() => select(item)}
               role="option"
-              aria-selected={item === value}
+              aria-selected={getItemKey(item) === getItemKey(value)}
             >
               {getItemLabel(item)}
             </button>

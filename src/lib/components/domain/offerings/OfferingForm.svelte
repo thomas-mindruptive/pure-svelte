@@ -5,26 +5,26 @@
    */
 
   // ===== IMPORTS =====
-  import FormShell, { type FieldsSnippetProps } from "$lib/components/forms/FormShell.svelte";
-  import { log } from "$lib/utils/logger";
-  import type { WholesalerItemOffering, Wio_PDef_Cat_Supp } from "$lib/domain/domainTypes";
   import { ApiClient } from "$lib/api/client/ApiClient";
-  import "$lib/components/styles/form.css";
-  import "$lib/components/styles/grid.css";
-  import type {
-    SubmittedCallback,
-    SubmitErrorCallback,
-    CancelledCallback,
-    ChangedCallback,
-    ValidateResult,
-    Errors,
-  } from "$lib/components/forms/forms.types";
-  import { type OfferingDetail_LoadData, OfferingDetail_LoadDataSchema } from "$lib/components/domain/offerings/offeringDetail.types";
-  import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
-  import { assertDefined } from "$lib/utils/assertions";
   import { getOfferingApi } from "$lib/api/client/offering";
+  import { type OfferingDetail_LoadData, OfferingDetail_LoadDataSchema } from "$lib/components/domain/offerings/offeringDetail.types";
   import Field from "$lib/components/forms/Field.svelte";
   import FormComboBox2 from "$lib/components/forms/FormComboBox2.svelte";
+  import type {
+      CancelledCallback,
+      ChangedCallback,
+      Errors,
+      SubmitErrorCallback,
+      SubmittedCallback,
+      ValidateResult,
+  } from "$lib/components/forms/forms.types";
+  import FormShell, { type FieldsSnippetProps } from "$lib/components/forms/FormShell.svelte";
+  import "$lib/components/styles/form.css";
+  import "$lib/components/styles/grid.css";
+  import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
+  import type { WholesalerItemOffering, Wio_PDef_Cat_Supp } from "$lib/domain/domainTypes";
+  import { assertDefined } from "$lib/utils/assertions";
+  import { log } from "$lib/utils/logger";
 
   // ===== INTERNAL TYPES =====
 
@@ -341,7 +341,7 @@
 {/snippet}
 
 <!--
-  -- Render surfaceFinish combo 
+  -- Render surfaceFinish combo
   -->
 {#snippet surfaceFinishCombo(fieldProps: FieldsSnippetProps<WholesalerItemOffering>)}
   <FormComboBox2
@@ -350,10 +350,46 @@
     path={["surface_finish_id"]}
     labelPath={["name"]}
     valuePath={["surface_finish_id"]}
-    placeholder="Search construction types ..."
+    placeholder="Search surface finishes..."
     label="Surface Type"
-    onChange={(value, constructionType) => {
-      log.debug("Construction type selected via Combobox:", { value, construction_type_name: constructionType?.name });
+    onChange={(value, surfaceFinish) => {
+      log.debug("Surface finish selected via Combobox:", { value, surface_finish_name: surfaceFinish?.name });
+    }}
+  />
+{/snippet}
+
+<!--
+  -- Render product definition combo
+  -->
+{#snippet productDefinitionCombo(fieldProps: FieldsSnippetProps<WholesalerItemOffering>)}
+  <FormComboBox2
+    {fieldProps}
+    items={availableProducts ?? []}
+    path={["product_def_id"]}
+    labelPath={["title"]}
+    valuePath={["product_def_id"]}
+    placeholder="Search products..."
+    label="Product"
+    onChange={(value, product) => {
+      log.debug("Product selected via Combobox:", { value, product_title: product?.title });
+    }}
+  />
+{/snippet}
+
+<!--
+  -- Render supplier/wholesaler combo
+  -->
+{#snippet supplierCombo(fieldProps: FieldsSnippetProps<WholesalerItemOffering>)}
+  <FormComboBox2
+    {fieldProps}
+    items={availableSuppliers ?? []}
+    path={["wholesaler_id"]}
+    labelPath={["name"]}
+    valuePath={["wholesaler_id"]}
+    placeholder="Search suppliers..."
+    label="Supplier"
+    onChange={(value, supplier) => {
+      log.debug("Supplier selected via Combobox:", { value, supplier_name: supplier?.name });
     }}
   />
 {/snippet}
@@ -398,7 +434,7 @@
 
     <!--- FIELDS --------------------------------------------------------------------------------->
     {#snippet fields(fieldProps)}
-      {@const { getS, set, markTouched, validationErrors: errors } = fieldProps}
+      {@const { getS} = fieldProps}
       <div class="form-body">
         <div class="form-row-grid">
           <!-- title ----------------------------------------------------------------------------->
@@ -413,39 +449,18 @@
           />
 
           <!-- "product defs" combo -------------------------------------------------------------->
-          <div class="form-group span-2">
+          <div class="control-group span-2">
             <!--- Create mode and suppliers route => render "productdefs" combo --->
             {#if isCreateMode}
               {#if isSuppliersRoute}
-                <label for="offering-product">Product *</label>
-                <select
-                  id="offering-product"
-                  name="product_def_id"
-                  required
-                  value={getS("product_def_id")}
-                  onchange={(e) => {
-                    log.debug(`onchange: Product selected: ${(e.currentTarget as HTMLSelectElement).value}`);
-                    set(["product_def_id"], Number((e.currentTarget as HTMLSelectElement).value));
-                  }}
-                  onblur={() => markTouched("product_def_id")}
-                >
-                  <option
-                    value=""
-                    disabled
-                  >
-                    Select a product...
-                  </option>
-                  {#each availableProducts ?? [] as product (product.product_def_id)}
-                    <option value={product.product_def_id}>{product.title}</option>
-                  {/each}
-                </select>
+                {@render productDefinitionCombo(fieldProps)}
               {:else}
                 <p>
                   {getS("product_def_title") ?? "product_def_title missing"}
                 </p>
               {/if}
             {:else}
-              <!--- Not create mode => Render static text for prodcuct def --->
+              <!--- Not create mode => Render static text for product def --->
               <p>
                 {getS("product_def_title") ?? "product_def_title missing"}
               </p>
@@ -456,36 +471,11 @@
 
         <div class="form-row-grid">
           <!-- "suppliers" combo ----------------------------------------------------------------->
-          <div class="form-group span-2">
+          <div class="control-group span-2">
             <!--- Create mode and categories route => render "suppliers" combo --->
             {#if isCreateMode}
               {#if isCategoriesRoute}
-                <label for="offering-supplier">Supplier</label>
-                <select
-                  id="offering-supplier"
-                  name="wholesaler_id"
-                  class:error={errors.wholesaler_id}
-                  required
-                  value={getS("wholesaler_id")}
-                  onchange={(e) => {
-                    log.debug(`onchange: Supplier selected: ${(e.currentTarget as HTMLSelectElement).value}`);
-                    set(["wholesaler_id"], Number((e.currentTarget as HTMLSelectElement).value));
-                  }}
-                  onblur={() => markTouched("wholesaler_id")}
-                >
-                  <option
-                    value=""
-                    disabled
-                  >
-                    Select a supplier...
-                  </option>
-                  {#each availableSuppliers ?? [] as supplier (supplier.wholesaler_id)}
-                    <option value={supplier.wholesaler_id}>{supplier.name}</option>
-                  {/each}
-                </select>
-                {#if errors.wholesaler_id}
-                  <div class="error-text">{errors.wholesaler_id[0]}</div>
-                {/if}
+                {@render supplierCombo(fieldProps)}
               {/if}
             {:else}
               <!--- Not create mode => Render static text for supplier --->

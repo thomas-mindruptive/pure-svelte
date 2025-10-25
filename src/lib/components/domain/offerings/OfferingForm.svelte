@@ -11,12 +11,12 @@
   import Field from "$lib/components/forms/Field.svelte";
   import FormComboBox2 from "$lib/components/forms/FormComboBox2.svelte";
   import type {
-      CancelledCallback,
-      ChangedCallback,
-      Errors,
-      SubmitErrorCallback,
-      SubmittedCallback,
-      ValidateResult,
+    CancelledCallback,
+    ChangedCallback,
+    Errors,
+    SubmitErrorCallback,
+    SubmittedCallback,
+    ValidateResult,
   } from "$lib/components/forms/forms.types";
   import FormShell, { type FieldsSnippetProps } from "$lib/components/forms/FormShell.svelte";
   import "$lib/components/styles/form.css";
@@ -89,6 +89,7 @@
           category_id: data.categoryId,
           product_def_id: data.productDefId,
           wholesaler_id: data.supplierId,
+          ...data.offering
         } as Wio_PDef_Cat_Supp;
       }
     }
@@ -434,7 +435,7 @@
 
     <!--- FIELDS --------------------------------------------------------------------------------->
     {#snippet fields(fieldProps)}
-      {@const { getS} = fieldProps}
+      {@const { getS } = fieldProps}
       <div class="form-body">
         <div class="form-row-grid">
           <!-- title ----------------------------------------------------------------------------->
@@ -446,6 +447,15 @@
             required
             placeholder="Title"
             class="span-2"
+          />
+
+          <Field
+            {fieldProps}
+            path={["is_assortment"]}
+            label="Im Sortiment?"
+            type="checkbox"
+            placeholder="Im Sortiment?"
+            class="span-1"
           />
 
           <!-- "product defs" combo -------------------------------------------------------------->
@@ -468,6 +478,7 @@
             {/if}
           </div>
         </div>
+        <!-- end row ----------------------------------------------------------------------------->
 
         <div class="form-row-grid">
           <!-- "suppliers" combo ----------------------------------------------------------------->
@@ -496,6 +507,7 @@
             class="span-2"
           />
         </div>
+        <!-- end row ----------------------------------------------------------------------------->
 
         <div class="form-row-grid">
           <!-- material -------------------------------------------------------------------------->
@@ -518,6 +530,7 @@
             {@render surfaceFinishCombo(fieldProps)}
           </div>
         </div>
+        <!-- end row ----------------------------------------------------------------------------->
 
         <div class="form-row-grid">
           <!-- price ----------------------------------------------------------------------------->
@@ -576,6 +589,7 @@
             class="span-1"
           />
         </div>
+        <!-- end row ----------------------------------------------------------------------------->
 
         <div class="form-row-grid">
           <!-- comment --------------------------------------------------------------------------->
@@ -589,6 +603,7 @@
             class="span-4"
           />
         </div>
+        <!-- end row ----------------------------------------------------------------------------->
       </div>
     {/snippet}
 

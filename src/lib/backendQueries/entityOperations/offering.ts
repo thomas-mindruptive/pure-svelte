@@ -69,6 +69,7 @@ export async function loadNestedOfferingsWithJoinsAndLinks(
         wio.currency,
         wio.comment,
         wio.created_at,
+        wio.is_assortment,
         -- Product definition (nested via dotted alias)
         pd.product_def_id AS 'product_def.product_def_id',
         pd.category_id AS 'product_def.category_id',
@@ -195,6 +196,7 @@ export async function loadFlatOfferingsWithJoinsAndLinks(
         wio.currency,
         wio.comment,
         wio.created_at,
+        wio.is_assortment,
         pd.title AS product_def_title,
         pd.description AS product_def_description,
         pc.name AS category_name,

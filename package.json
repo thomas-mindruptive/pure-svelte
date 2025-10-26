@@ -16,6 +16,7 @@
 		"tools:build": "tsc -p tools/tsconfig.json",
 		"tools:watch": "tsc -p tools/tsconfig.json --watch",
 		"scaffold:page": "npm run tools:build && node tools/dist/scaffold-page.js",
+		"parse-ddl": "npm run tools:build && node tools/dist/parse-ddl.js",
 		"// --- TESTS ---": "",
 		"test": "vitest",
 		"test:run": "vitest run"

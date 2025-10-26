@@ -40,7 +40,7 @@ export interface DbErrorMapper {
   /**
    * Maps a database error to HTTP status and message
    * @param error - Database error object (DB-specific format)
-   * @returns Object with HTTP status code and user-friendly message
+   * @returns Object with HTTP status code and original database error message
    */
   mapToHttpError(error: unknown): { status: number; message: string };
 }
@@ -103,13 +103,12 @@ interface MssqlError {
 
 /**
  * MSSQL Error Mapper Implementation
- * 
+ *
  * @description Handles MSSQL-specific error codes and translates them to HTTP responses.
- * This class encapsulates all MSSQL error handling logic and provides a clean
- * interface for API endpoints.
+ * Returns the original database error message for transparency and debugging.
  */
 export class MssqlErrorMapper implements DbErrorMapper {
-  
+
   /**
    * Type guard to check if an error is an MSSQL error
    * @param error - Unknown error object
@@ -127,102 +126,17 @@ export class MssqlErrorMapper implements DbErrorMapper {
   }
 
   /**
-   * Extracts constraint name from MSSQL constraint violation message
-   * @param error - MSSQL error object
-   * @returns Extracted constraint name or generic description
-   */
-  private extractConstraintName(error: MssqlError): string {
-    const message = error.message;
-
-    // Pattern for unique index (error 2601): "with unique index 'UX_pdef_category_title'"
-    const indexMatch = message.match(/unique index '([^']+)'/i);
-    if (indexMatch) {
-      return this.humanizeConstraintName(indexMatch[1]);
-    }
-
-    // Pattern for unique constraint: "Violation of UNIQUE KEY constraint 'UQ_wholesalers_name'"
-    const uniqueMatch = message.match(/UNIQUE KEY constraint '([^']+)'/i);
-    if (uniqueMatch) {
-      return this.humanizeConstraintName(uniqueMatch[1]);
-    }
-    
-    // Pattern for check constraint: "The CHECK constraint 'CK_wholesalers_status' was violated"
-    const checkMatch = message.match(/CHECK constraint '([^']+)'/i);
-    if (checkMatch) {
-      return this.humanizeConstraintName(checkMatch[1]);
-    }
-    
-    // Pattern for foreign key: "conflicted with the FOREIGN KEY constraint 'FK_wholesalers_category'"
-    const fkMatch = message.match(/FOREIGN KEY constraint '([^']+)'/i);
-    if (fkMatch) {
-      return this.humanizeConstraintName(fkMatch[1]);
-    }
-
-    // Pattern for reference constraint: "conflicted with the REFERENCE constraint \"FK_order_items_offering\""
-    const refMatch = message.match(/REFERENCE constraint "([^"]+)"/i);
-    if (refMatch) {
-      return this.humanizeConstraintName(refMatch[1]);
-    }
-
-    return 'database constraint';
-  }
-
-  /**
-   * Converts technical constraint names to user-friendly descriptions
-   * @param constraintName - Technical constraint name from database
-   * @returns Human-readable constraint description
-   */
-  private humanizeConstraintName(constraintName: string): string {
-    const name = constraintName.toLowerCase();
-    
-    // Common patterns in constraint names
-    if (name.includes('name') && name.includes('unique')) {
-      return 'supplier name (must be unique)';
-    }
-    if (name.includes('email') && name.includes('unique')) {
-      return 'email address (must be unique)';
-    }
-    if (name.includes('status')) {
-      return 'status value (invalid option)';
-    }
-    if (name.includes('dropship')) {
-      return 'dropship setting';
-    }
-    if (name.includes('website')) {
-      return 'website URL format';
-    }
-    
-    // Generic fallback
-    // NOTE: We do not try to geplace any special characters because this makes the error unreadable.
-    return constraintName;
-    // DO NOT replace special caracters: return constraintName.replace(/^(UQ_|CK_|FK_|PK_)/, '').replace(/_/g, ' ');
-  }
-
-  /**
-   * Extracts column name from NOT NULL violation message
-   * @param error - MSSQL error object
-   * @returns Column name that cannot be null
-   */
-  private extractNullColumn(error: MssqlError): string {
-    const message = error.message;
-    
-    // Pattern: "Cannot insert the value NULL into column 'name', table 'wholesalers'"
-    const match = message.match(/column '([^']+)'/i);
-    return match ? match[1] : 'required field';
-  }
-
-  /**
    * Maps MSSQL database errors to appropriate HTTP status codes and messages
-   * 
+   *
    * @param error - Unknown error object (potentially from MSSQL)
-   * @returns Object with HTTP status code and user-friendly message
-   * 
+   * @returns Object with HTTP status code and original database error message
+   *
    * @httpStatusCodes
    * - 400: Bad Request (constraint violations, invalid data)
    * - 401: Unauthorized (authentication failures)
    * - 403: Forbidden (permission denied)
    * - 404: Not Found (invalid table/column names)
-   * - 409: Conflict (unique constraint violations)
+   * - 409: Conflict (unique constraint violations, FK violations)
    * - 422: Unprocessable Entity (data truncation)
    * - 500: Internal Server Error (unknown database errors)
    * - 503: Service Unavailable (timeout, connection issues)
@@ -231,17 +145,17 @@ export class MssqlErrorMapper implements DbErrorMapper {
     // Handle non-MSSQL errors
     if (!this.isMssqlError(error)) {
       log.warn("Non-MSSQL error encountered in MssqlErrorMapper", { error });
-      
+
       if (error instanceof Error) {
-        return { 
-          status: 500, 
-          message: 'Database operation failed' 
+        return {
+          status: 500,
+          message: error.message
         };
       }
-      
-      return { 
-        status: 500, 
-        message: `Unknown database error occurred. ${coerceErrorMessage(error)}`
+
+      return {
+        status: 500,
+        message: coerceErrorMessage(error)
       };
     }
 
@@ -258,92 +172,69 @@ export class MssqlErrorMapper implements DbErrorMapper {
     switch (error.number) {
       case MSSQL_ERROR_CODES.UNIQUE_INDEX_VIOLATION:
       case MSSQL_ERROR_CODES.UNIQUE_CONSTRAINT_VIOLATION:
-      case MSSQL_ERROR_CODES.PRIMARY_KEY_VIOLATION: {
-        const constraintName = this.extractConstraintName(error);
+      case MSSQL_ERROR_CODES.PRIMARY_KEY_VIOLATION:
         return {
           status: 409,
-          message: `This ${constraintName} already exists. Please use a different value.\n${error.message}`
+          message: error.message
         };
-      }
 
-      case 547: {
-        // Error 547 is BOTH CHECK constraint AND FK constraint!
-        // We must analyze the message to distinguish them.
-        const message = error.message.toLowerCase();
-        const constraintName = this.extractConstraintName(error);
+      case MSSQL_ERROR_CODES.CHECK_CONSTRAINT_VIOLATION:
+      case MSSQL_ERROR_CODES.FOREIGN_KEY_VIOLATION:
+        // Error 547 can be CHECK or FK constraint - return original message
+        return {
+          status: 409,
+          message: error.message
+        };
 
-        if (message.includes('reference constraint') || message.includes('foreign key')) {
-          // FK constraint violation
-          return {
-            status: 409,
-            message: `This record is still referenced by ${constraintName}.`
-          };
-        } else {
-          // CHECK constraint violation
-          return {
-            status: 400,
-            message: `Invalid value for ${constraintName}. Please check the allowed values.`
-          };
-        }
-      }
-
-      case MSSQL_ERROR_CODES.NOT_NULL_VIOLATION: {
-        const columnName = this.extractNullColumn(error);
+      case MSSQL_ERROR_CODES.NOT_NULL_VIOLATION:
         return {
           status: 400,
-          message: `${columnName} is required and cannot be empty.`
+          message: error.message
         };
-      }
 
-      case MSSQL_ERROR_CODES.STRING_TRUNCATION: {
+      case MSSQL_ERROR_CODES.STRING_TRUNCATION:
         return {
           status: 422,
-          message: 'One or more values are too long for their fields. Please shorten your input.'
+          message: error.message
         };
-      }
 
       case MSSQL_ERROR_CODES.INVALID_COLUMN_NAME:
-      case MSSQL_ERROR_CODES.INVALID_OBJECT_NAME: {
+      case MSSQL_ERROR_CODES.INVALID_OBJECT_NAME:
         return {
           status: 404,
-          message: 'Requested resource or field does not exist.'
+          message: error.message
         };
-      }
 
-      case MSSQL_ERROR_CODES.PERMISSION_DENIED: {
+      case MSSQL_ERROR_CODES.PERMISSION_DENIED:
         return {
           status: 403,
-          message: 'Access denied. Insufficient permissions for this operation.'
+          message: error.message
         };
-      }
 
-      case MSSQL_ERROR_CODES.LOGIN_FAILED: {
+      case MSSQL_ERROR_CODES.LOGIN_FAILED:
         return {
           status: 401,
-          message: 'Database authentication failed.'
+          message: error.message
         };
-      }
 
-      case MSSQL_ERROR_CODES.TIMEOUT_EXPIRED: {
+      case MSSQL_ERROR_CODES.TIMEOUT_EXPIRED:
         return {
           status: 503,
-          message: 'Database operation timed out. Please try again.'
+          message: error.message
         };
-      }
 
-      default: {
+      default:
         // Log unknown MSSQL errors for future handling
         log.warn("Unknown MSSQL error code encountered", {
           errorNumber: error.number,
           message: error.message,
           severity: error.severity
         });
-        
+
         return {
           status: 500,
-          message: `A database error occurred. ${error.message}`
+          message: error.message
         };
-      }
     }
   }
 }

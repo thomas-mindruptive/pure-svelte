@@ -25,6 +25,7 @@ import { deleteOffering } from "$lib/backendQueries/cascadingDeleteOperations";
 import { checkOfferingDependencies } from "$lib/backendQueries/dependencyChecks";
 import { loadFlatOfferingWithJoinsAndLinksForId } from "$lib/backendQueries/entityOperations/offering";
 import { rollbackTransaction } from "$lib/backendQueries/transactionWrapper";
+import { validateOfferingConstraints } from "$lib/backendQueries/validations/valOffering";
 
 /**
  * GET /api/offerings/[id]
@@ -110,6 +111,10 @@ export const GET: RequestHandler = async ({ params }) => {
 /**
  * PUT /api/offerings/[id]
  * @description Dynamically updates an existing offering based on provided fields.
+ *
+ * Business rule validation:
+ * - Offerings cannot override material/form/surface/construction fields
+ *   if they are already set in the parent Product Definition
  */
 export const PUT: RequestHandler = async ({ params, request }) => {
   const operationId = uuidv4();
@@ -126,7 +131,14 @@ export const PUT: RequestHandler = async ({ params, request }) => {
     const requestData = await request.json();
     log.info(`[${operationId}] Parsed request body`, { fields: Object.keys(requestData) });
 
-    return validateAndUpdateEntity(Wio_Schema, offering_id, "offering_id", requestData, "offering");
+    return validateAndUpdateEntity(
+      Wio_Schema,
+      offering_id,
+      "offering_id",
+      requestData,
+      "offering",
+      validateOfferingConstraints
+    );
   } catch (err: unknown) {
     return buildUnexpectedError(err, info);
   }

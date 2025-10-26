@@ -16,6 +16,7 @@ import { v4 as uuidv4 } from "uuid";
 import type { ApiSuccessResponse, DeleteConflictResponse, DeleteRequest, DeleteSuccessResponse } from "$lib/api/api.types";
 import { deleteProductDefinition } from "$lib/backendQueries/cascadingDeleteOperations";
 import { rollbackTransaction } from "$lib/backendQueries/transactionWrapper";
+import { validateProductDefConstraints } from "$lib/backendQueries/validations/valProductDefinition";
 
 /**
  * GET /api/product-definitions/[id]
@@ -59,6 +60,10 @@ export const GET: RequestHandler = async ({ params }) => {
 /**
  * PUT /api/product-definitions/[id]
  * @description Dynamically updates an existing product definition based on provided fields.
+ *
+ * Business rule validation:
+ * - Cannot set material/form/surface/construction fields if existing offerings
+ *   already have conflicting values for those fields
  */
 export const PUT: RequestHandler = async ({ params, request }) => {
   const operationId = uuidv4();
@@ -75,7 +80,14 @@ export const PUT: RequestHandler = async ({ params, request }) => {
     const requestData = await request.json();
     log.info(`[${operationId}] Parsed request body`, { fields: Object.keys(requestData) });
 
-    return validateAndUpdateEntity(ProductDefinitionSchema, product_def_id, "product_def_id", requestData, "productDefinition");
+    return validateAndUpdateEntity(
+      ProductDefinitionSchema,
+      product_def_id,
+      "product_def_id",
+      requestData,
+      "productDefinition",
+      validateProductDefConstraints
+    );
   } catch (err: unknown) {
     return buildUnexpectedError(err, info);
   }

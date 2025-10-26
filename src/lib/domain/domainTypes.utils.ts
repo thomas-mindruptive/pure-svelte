@@ -99,7 +99,7 @@ export type DbTableNames = GetFullTableName<(typeof AllBrandedSchemas)[keyof typ
  * Validates entity and potential dependencies.
  * E.g., used as optional param to "validateAndUpdateEntity" and "validateAndUpdateEntity"
  */
-export type EntityValidationFunc<T> = (entity: T, transaction: Transaction) => ValidationResultFor<z.ZodAny>;
+export type EntityValidationFunc<T> = (entity: T, transaction: Transaction) => Promise<ValidationResultFor<z.ZodAny>>;
 
 // ===== UTIL FUNCTIONS =====
 

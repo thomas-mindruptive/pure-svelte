@@ -11,6 +11,7 @@ import { type RequestHandler } from "@sveltejs/kit";
 import { log } from "$lib/utils/logger";
 import { buildUnexpectedError, validateAndInsertEntity } from "$lib/backendQueries/genericEntityOperations";
 import { WholesalerItemOfferingForCreateSchema } from "$lib/domain/domainTypes";
+import { validateOfferingConstraints } from "$lib/backendQueries/validations/valOffering";
 import { v4 as uuidv4 } from "uuid";
 
 /**
@@ -18,6 +19,10 @@ import { v4 as uuidv4 } from "uuid";
  * Foreign key constraints in the database ensure referential integrity:
  * - wholesaler_id, category_id, product_def_id must exist
  * - wholesaler_categories assignment is enforced by FK
+ *
+ * Business rule validation:
+ * - Offerings cannot override material/form/surface/construction fields
+ *   if they are already set in the parent Product Definition
  */
 export const POST: RequestHandler = async ({ request }) => {
   const operationId = uuidv4();
@@ -28,7 +33,12 @@ export const POST: RequestHandler = async ({ request }) => {
     const requestData = await request.json();
     log.info(`[${operationId}] Parsed request body`, { fields: Object.keys(requestData) });
 
-    return validateAndInsertEntity(WholesalerItemOfferingForCreateSchema, requestData, "offering");
+    return validateAndInsertEntity(
+      WholesalerItemOfferingForCreateSchema,
+      requestData,
+      "offering",
+      validateOfferingConstraints
+    );
   } catch (err: unknown) {
     return buildUnexpectedError(err, info);
   }

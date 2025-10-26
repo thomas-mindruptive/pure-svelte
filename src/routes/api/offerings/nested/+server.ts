@@ -15,7 +15,7 @@ import {
   type WholesalerItemOffering,
   type Wio_PDef_Cat_Supp_Nested_WithLinks,
 } from "$lib/domain/domainTypes";
-import { validateEntity } from "$lib/domain/domainTypes.utils";
+import { validateEntityBySchema } from "$lib/domain/domainTypes.utils";
 import { log } from "$lib/utils/logger";
 import { json, type RequestHandler } from "@sveltejs/kit";
 import { v4 as uuidv4 } from "uuid";
@@ -77,7 +77,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
       for (let i = 0; i < offeringsArray.length; i++) {
         const offering = offeringsArray[i];
-        const validation = validateEntity(Wio_PDef_Cat_Supp_Nested_WithLinks_Schema, offering);
+        const validation = validateEntityBySchema(Wio_PDef_Cat_Supp_Nested_WithLinks_Schema, offering);
 
         if (!validation.isValid) {
           validationErrors.push({ index: i, errors: validation.errors });

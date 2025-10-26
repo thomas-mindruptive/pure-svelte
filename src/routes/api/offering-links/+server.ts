@@ -13,7 +13,7 @@ import { db } from '$lib/backendQueries/db';
 import { log } from '$lib/utils/logger';
 import { buildUnexpectedError } from '$lib/backendQueries/genericEntityOperations';
 import { WholesalerOfferingLinkForCreateSchema, type WholesalerItemOffering, type WholesalerOfferingLink } from '$lib/domain/domainTypes';
-import { validateEntity } from "$lib/domain/domainTypes.utils";
+import { validateEntityBySchema } from "$lib/domain/domainTypes.utils";
 import { v4 as uuidv4 } from 'uuid';
 
 import type {
@@ -72,7 +72,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
 
         // 2. Validate the incoming data in 'create' mode.
-        const validation = validateEntity(WholesalerOfferingLinkForCreateSchema, linkData);
+        const validation = validateEntityBySchema(WholesalerOfferingLinkForCreateSchema, linkData);
         if (!validation.isValid) {
             const errRes: ApiErrorResponse = {
                 success: false,
@@ -182,7 +182,7 @@ export const PUT: RequestHandler = async ({ request }) => {
             return json(errRes, { status: 400 });
         }
 
-        const validation = validateEntity(WholesalerOfferingLinkForCreateSchema, { ...requestData, link_id });
+        const validation = validateEntityBySchema(WholesalerOfferingLinkForCreateSchema, { ...requestData, link_id });
         if (!validation.isValid) {
             const errRes: ApiErrorResponse = {
                 success: false,

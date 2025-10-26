@@ -5,6 +5,7 @@ import z from "zod";
 import { AllBrandedSchemas } from "./domainTypes";
 import type { ValidationErrors, ValidationErrorTree } from "$lib/components/validation/validation.types";
 import type { GetSchemaAlias } from "./domainTypes";
+import type { Transaction } from "mssql";
 
 // ===== TYPE DEFINITIONS FOR BRANDED SCHEMAS =====
 
@@ -42,24 +43,22 @@ export type QualifiedColumnsFromBrandedSchema<T extends BrandedSchema> =
 export type QualifiedColumnsFromBrandedSchemaWithJoins<T extends z.ZodObject<z.ZodRawShape>> =
   T extends z.ZodObject<infer Shape>
     ? {
-        [K in keyof Shape]:
-          // --- Part 1: Handles nested BrandedSchemas (for JOINs) ---
-          Shape[K] extends BrandedSchema
-            ? GetSchemaAlias<Shape[K]> extends string
-              // Results in e.g., "pd.title"
-              ? `${GetSchemaAlias<Shape[K]>}.${Extract<keyof z.infer<Shape[K]>, string>}`
-              : never
-
-            // --- Part 2: Handles direct properties of the base schema (T) ---
-            : K extends string
-              // Checks if the base schema (T) itself has an alias thanks to copyMetaFrom's return type
-              ? GetSchemaAlias<T> extends string
-                // If yes, allow BOTH the unqualified key (e.g., "sub_seller")
+        [K in keyof Shape]: // --- Part 1: Handles nested BrandedSchemas (for JOINs) ---
+        Shape[K] extends BrandedSchema
+          ? GetSchemaAlias<Shape[K]> extends string
+            ? // Results in e.g., "pd.title"
+              `${GetSchemaAlias<Shape[K]>}.${Extract<keyof z.infer<Shape[K]>, string>}`
+            : never
+          : // --- Part 2: Handles direct properties of the base schema (T) ---
+            K extends string
+            ? // Checks if the base schema (T) itself has an alias thanks to copyMetaFrom's return type
+              GetSchemaAlias<T> extends string
+              ? // If yes, allow BOTH the unqualified key (e.g., "sub_seller")
                 // AND the qualified key (e.g., "wio.sub_seller")
-                ? K | `${GetSchemaAlias<T>}.${K & string}`
-                // If no, only allow the unqualified key
-                : K
-              : never;
+                K | `${GetSchemaAlias<T>}.${K & string}`
+              : // If no, only allow the unqualified key
+                K
+            : never;
       }[keyof Shape]
     : never;
 
@@ -94,6 +93,13 @@ export type AllAliasedColumns = `${AllQualifiedColumns} AS ${string}`;
 export type AliasKeys = GetSchemaAlias<(typeof AllBrandedSchemas)[keyof typeof AllBrandedSchemas]>;
 
 export type DbTableNames = GetFullTableName<(typeof AllBrandedSchemas)[keyof typeof AllBrandedSchemas]>;
+
+/**
+ * Validation function for entity.
+ * Validates entity and potential dependencies.
+ * E.g., used as optional param to "validateAndUpdateEntity" and "validateAndUpdateEntity"
+ */
+export type EntityValidationFunc<T> = (entity: T, transaction: Transaction) => ValidationResultFor<z.ZodAny>;
 
 // ===== UTIL FUNCTIONS =====
 
@@ -239,7 +245,7 @@ export type ValidationResultFor<S extends z.ZodTypeAny> =
 /**
  * Validates data against a Zod schema and returns a structured validation result.
  */
-export function validateEntity<S extends z.ZodTypeAny>(schema: S, data: unknown): ValidationResultFor<S> {
+export function validateEntityBySchema<S extends z.ZodTypeAny>(schema: S, data: unknown): ValidationResultFor<S> {
   const res = schema.safeParse(data);
   const validationResult = toValidationResult(res);
   log.debug(`Validated through ${schema.description}`, validationResult);
@@ -288,21 +294,21 @@ export function zodToValidationErrorTree(error: z.ZodError): ValidationErrorTree
   const zodTree = z.treeifyError(error);
 
   function convertNode(node: unknown): ValidationErrorTree {
-    if (!node || typeof node !== 'object') return {};
+    if (!node || typeof node !== "object") return {};
 
     const result: ValidationErrorTree = {};
 
-    if ('errors' in node && Array.isArray(node.errors) && node.errors.length > 0) {
+    if ("errors" in node && Array.isArray(node.errors) && node.errors.length > 0) {
       result.errors = node.errors as string[];
     }
 
-    if ('properties' in node && node.properties && typeof node.properties === 'object') {
+    if ("properties" in node && node.properties && typeof node.properties === "object") {
       for (const [key, value] of Object.entries(node.properties)) {
         result[key] = convertNode(value);
       }
     }
 
-    if ('items' in node && Array.isArray(node.items)) {
+    if ("items" in node && Array.isArray(node.items)) {
       for (let i = 0; i < node.items.length; i++) {
         result[i.toString()] = convertNode(node.items[i]);
       }
@@ -320,15 +326,15 @@ export function zodToValidationErrorTree(error: z.ZodError): ValidationErrorTree
 export function safeParseFirstN<T extends z.ZodTypeAny>(
   elementSchema: T,
   data: unknown,
-  n: number
-): ReturnType<z.ZodArray<T>['safeParse']> {
+  n: number,
+): ReturnType<z.ZodArray<T>["safeParse"]> {
   const arraySchema = z.array(elementSchema);
-  
+
   if (data === undefined || data === null || !Array.isArray(data)) {
     return arraySchema.safeParse(data);
   }
 
-  const issues: z.ZodError['issues'] = [];
+  const issues: z.ZodError["issues"] = [];
   const parsed: Array<z.infer<T>> = [];
   const len = data.length;
   const limit = n < len ? n : len;

@@ -1,13 +1,13 @@
 // File: src/lib/backendQueries/entityOperations.ts
 
-import { json } from "@sveltejs/kit";
-import { type z } from "zod";
+import type { ApiErrorResponse, ApiSuccessResponse, HttpStatusCode } from "$lib/api/api.types";
 import { db } from "$lib/backendQueries/db";
 import { mssqlErrorMapper } from "$lib/backendQueries/mssqlErrorMapper";
-import { validateEntity } from "$lib/domain/domainTypes.utils";
-import { log } from "$lib/utils/logger";
-import type { ApiErrorResponse, ApiSuccessResponse, HttpStatusCode } from "$lib/api/api.types";
+import { validateEntityBySchema, type EntityValidationFunc } from "$lib/domain/domainTypes.utils";
 import { coerceErrorMessage } from "$lib/utils/errorUtils";
+import { log } from "$lib/utils/logger";
+import { json } from "@sveltejs/kit";
+import { type z } from "zod";
 
 type BrandedSchema = z.ZodObject<z.ZodRawShape> & { __brandMeta?: { tableName: string; dbSchema: string } };
 
@@ -85,18 +85,23 @@ async function updateRecord<S extends BrandedSchema>(
 }
 
 /**
- * Validates data and creates an entity, returning a complete SvelteKit `Response`.
+ * Validate data through the schema and additionalValidation. 
+ * Ceate entity and return a complete SvelteKit `Response`.
  * This function orchestrates the entire process for a POST endpoint.
+ * 
+ * @param additionalValidation - Function to validate the entity beyonf the schema validation, 
+ *    e.g. cross-entity data consistencies.
  */
 export async function validateAndInsertEntity(
   schemaForCreate: BrandedSchema,
   rawData: unknown,
   successDataWrapperKey: string,
+  additionalValidation?: EntityValidationFunc<typeof schemaForCreate>
 ): Promise<Response> {
   const entityName = schemaForCreate.description || "entity";
   log.debug(`validateAndInsertEntity`, { entityName, successDataWrapperKey });
 
-  const validation = validateEntity(schemaForCreate, rawData);
+  const validation = validateEntityBySchema(schemaForCreate, rawData);
   if (!validation.isValid) {
     const errorResponse: ApiErrorResponse = {
       success: false,
@@ -132,8 +137,12 @@ export async function validateAndInsertEntity(
 }
 
 /**
- * Validates data and updates an entity, returning a complete SvelteKit `Response`.
+ * Validate data through schema and additionalValidation.
+ * Updates entity and return a complete SvelteKit `Response`.
  * This function orchestrates the entire process for a PUT endpoint.
+ * 
+ * @param additionalValidation - Function to validate the entity beyonf the schema validation, 
+ *    e.g. cross-entity data consistencies.
  */
 export async function validateAndUpdateEntity<S extends BrandedSchema>(
   schema: S,
@@ -141,11 +150,12 @@ export async function validateAndUpdateEntity<S extends BrandedSchema>(
   idColumn: keyof z.infer<S> & string,
   rawData: unknown,
   successDataWrapperKey: string,
+  additionalValidation?: EntityValidationFunc<z.infer<S>>,
 ): Promise<Response> {
   const entityName = schema.description || "entity";
   log.debug(`validateAndUpdateEntity`, { entityName, successDataWrapperKey });
 
-  const validation = validateEntity(schema.partial(), rawData);
+  const validation = validateEntityBySchema(schema.partial(), rawData);
   if (!validation.isValid) {
     const errorResponse: ApiErrorResponse = {
       success: false,
@@ -249,11 +259,16 @@ export function buildUnexpectedError(err: unknown, info?: string) {
       success: false,
       message: `${message}\n${errorMsg}`, // User-friendly DB message
       status_code: status as HttpStatusCode,
-      error_code: status === 400 ? "BAD_REQUEST" :
-                 status === 404 ? "NOT_FOUND" :
-                 status === 409 ? "CONFLICT" :
-                 status === 422 ? "VALIDATION_ERROR" :
-                 "DATABASE_ERROR",
+      error_code:
+        status === 400
+          ? "BAD_REQUEST"
+          : status === 404
+            ? "NOT_FOUND"
+            : status === 409
+              ? "CONFLICT"
+              : status === 422
+                ? "VALIDATION_ERROR"
+                : "DATABASE_ERROR",
       meta: { timestamp: new Date().toISOString() },
     };
     return json(errorResponse, { status });

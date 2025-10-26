@@ -14,7 +14,7 @@ import {
   type WholesalerItemOffering,
   type Wio_PDef_Cat_Supp_WithLinks
 } from "$lib/domain/domainTypes";
-import { validateEntity } from "$lib/domain/domainTypes.utils";
+import { validateEntityBySchema } from "$lib/domain/domainTypes.utils";
 import { log } from "$lib/utils/logger";
 import { json, type RequestHandler } from "@sveltejs/kit";
 import { v4 as uuidv4 } from "uuid";
@@ -62,7 +62,7 @@ export const GET: RequestHandler = async ({ params }) => {
       //const offeringWithJoinsAndLinks = offeringsArray[0];
 
       // TODO: all GET <path>/id endpoints should validate retrieved record.
-      const validation = validateEntity(Wio_PDef_Cat_Supp_WithLinks_Schema, parsedOffering);
+      const validation = validateEntityBySchema(Wio_PDef_Cat_Supp_WithLinks_Schema, parsedOffering);
       const debugError = false; // ONLY FOR DEBUG!
       if (!validation.isValid || debugError) {
         await rollbackTransaction(transaction);

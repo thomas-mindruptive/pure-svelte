@@ -8,7 +8,8 @@
       "WebSearch",
       "WebFetch(domain:commons.wikimedia.org)",
       "Bash(curl:*)",
-      "Read(//c/dev/pureenergyworks/pure-shopify/**)"
+      "Read(//c/dev/pureenergyworks/pure-shopify/**)",
+      "Read(//c/dev/pureenergyworks/**)"
     ],
     "deny": [],
     "ask": []

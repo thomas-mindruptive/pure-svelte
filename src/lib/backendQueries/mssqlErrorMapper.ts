@@ -193,7 +193,9 @@ export class MssqlErrorMapper implements DbErrorMapper {
     }
     
     // Generic fallback
-    return constraintName.replace(/^(UQ_|CK_|FK_|PK_)/, '').replace(/_/g, ' ');
+    // NOTE: We do not try to geplace any special characters because this makes the error unreadable.
+    return constraintName;
+    // DO NOT replace special caracters: return constraintName.replace(/^(UQ_|CK_|FK_|PK_)/, '').replace(/_/g, ' ');
   }
 
   /**
@@ -274,7 +276,7 @@ export class MssqlErrorMapper implements DbErrorMapper {
           // FK constraint violation
           return {
             status: 409,
-            message: `Cannot delete: This record is still referenced by ${constraintName}.`
+            message: `This record is still referenced by ${constraintName}.`
           };
         } else {
           // CHECK constraint violation

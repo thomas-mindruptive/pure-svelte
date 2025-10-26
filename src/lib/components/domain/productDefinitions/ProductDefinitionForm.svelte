@@ -19,6 +19,7 @@
     type Form,
     type Material,
     type ProductDefinition,
+    type ProductCategory,
     type SurfaceFinish,
   } from "$lib/domain/domainTypes";
   import { assertDefined } from "$lib/utils/assertions";
@@ -39,6 +40,7 @@
     forms: Form[];
     constructionTypes: ConstructionType[];
     surfaceFinishes: SurfaceFinish[];
+    categories: ProductCategory[];
     disabled?: boolean;
     isCreateMode: boolean;
     categoryId: number | null; // Needed for create-mode.
@@ -54,6 +56,7 @@
     forms,
     constructionTypes,
     surfaceFinishes,
+    categories,
     disabled = false,
     isCreateMode,
     categoryId,
@@ -215,7 +218,7 @@
 {/snippet}
 
 <!--
-  -- Render surfaceFinish combo 
+  -- Render surfaceFinish combo
   -->
 {#snippet surfaceFinishCombo(fieldProps: FieldsSnippetProps<ProductDefinition>)}
   <FormComboBox2
@@ -228,6 +231,24 @@
     label="Surface Type"
     onChange={(value, constructionType) => {
       log.debug("Construction type selected via Combobox:", { value, construction_type_name: constructionType?.name });
+    }}
+  />
+{/snippet}
+
+<!--
+  -- Render category combo
+  -->
+{#snippet categoryCombo(fieldProps: FieldsSnippetProps<ProductDefinition>)}
+  <FormComboBox2
+    {fieldProps}
+    items={categories}
+    path={["category_id"]}
+    labelPath={["name"]}
+    valuePath={["category_id"]}
+    placeholder="Search categories..."
+    label="Product Category"
+    onChange={(value, category) => {
+      log.debug("Category selected via Combobox:", { value, category_name: category?.name });
     }}
   />
 {/snippet}
@@ -285,6 +306,11 @@
         <!--END ROW -->
 
         <div class="form-row-grid">
+          <!-- PRODUCT CATEGORY ------------------------------------------------------------------>
+          <div class="control-group span-1">
+            {@render categoryCombo(fieldProps)}
+          </div>
+
           <!-- MATERIAL -------------------------------------------------------------------------->
           <div class="control-group span-1">
             {@render materialCombo2(fieldProps)}

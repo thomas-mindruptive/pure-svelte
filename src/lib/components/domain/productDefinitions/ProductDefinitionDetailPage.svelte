@@ -18,12 +18,10 @@
     type Wio_PDef_Cat_Supp,
     type ConstructionType,
     type SurfaceFinish,
-
     ConstructionTypeSchema,
-
-    SurfaceFinishSchema
-
-
+    SurfaceFinishSchema,
+    ProductCategorySchema,
+    type ProductCategory,
   } from "$lib/domain/domainTypes";
   import { addNotification } from "$lib/stores/notifications";
   import { log } from "$lib/utils/logger";
@@ -50,6 +48,7 @@
   import type { SortDescriptor } from "$lib/backendQueries/queryGrammar";
     import { getSurfaceFinishApi } from "$lib/api/client/surfaceFinish";
     import { getConstructionTypeApi } from "$lib/api/client/constructionType";
+    import { getProductCategoryApi } from "$lib/api/client/productCategory";
 
   // === PROPS ====================================================================================
 
@@ -73,6 +72,7 @@
   let surfaceFinishes: SurfaceFinish[] = $state([]);
   let materials: Material[] = $state([]);
   let forms: Form[] = $state([]);
+  let categories: ProductCategory[] = $state([]);
 
   // === API ======================================================================================
 
@@ -80,6 +80,7 @@
   const productDefinitionApi = getProductDefinitionApi(client);
   const surfaceFinishApi = getSurfaceFinishApi(client);
   const constructionTypeApi = getConstructionTypeApi(client);
+  const productCategoryApi = getProductCategoryApi(client);
   const offeringApi = getOfferingApi(client);
   const materialApi = getMaterialApi(client);
   const formApi = getFormApi(client);
@@ -131,6 +132,13 @@
           if (aborted) return;
           if (!surfaceFinishesVal.success) {
             errors.surfaceFinishes = zodToValidationErrorTree(surfaceFinishesVal.error);
+          }
+
+          categories = await productCategoryApi.loadProductCategories();
+          const categoriesVal = safeParseFirstN(ProductCategorySchema, categories, 3);
+          if (aborted) return;
+          if (!categoriesVal.success) {
+            errors.categories = zodToValidationErrorTree(categoriesVal.error);
           }
 
           log.debug(`Loaded productDefinition and offerings.`, { productDefinition, offerings });
@@ -295,6 +303,7 @@
           {materials}
           {constructionTypes}
           {surfaceFinishes}
+          {categories}
           onSubmitted={handleFormSubmitted}
           onSubmitError={handleFormSubmitError}
           onCancelled={handleFormCancelled}

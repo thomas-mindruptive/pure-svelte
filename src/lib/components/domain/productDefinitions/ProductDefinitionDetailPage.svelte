@@ -67,7 +67,7 @@
     loadEventFetch: typeof fetch;
   };
 
-  const { productDefId, categoryId, isCreateMode, loadEventFetch }: ProductDefPageProps = $props();
+  const { productDefId, categoryId, isCreateMode, loadEventFetch, activeChildPath }: ProductDefPageProps = $props();
 
   // === STATE ====================================================================================
 
@@ -266,6 +266,8 @@
 
   // === IMAGES GRID ==============================================================================
 
+  ANPASSEN!
+  
   const imagesColumns: ColumnDef<typeof ProductDefinitionImage_Image_ProductDef_Schema>[] = [
     { key: "image_id", header: "ID", accessor: null, sortable: true },
     { key: "img.filename", header: "Wholesaler", accessor: (image) => image.image.filename, sortable: true },
@@ -386,10 +388,11 @@
   </div>
 {/snippet}
 
+
 {#snippet imagesSection()}
   <div class="grid-section">
     {#if !isCreateMode}
-      <h2>Offerings for this Product</h2>
+      <h2>Images for this Product</h2>
       <button
         class="pc-grid__createbtn"
         onclick={handleOfferingCreate}
@@ -397,14 +400,14 @@
         Create Offering
       </button>
       <OfferingGrid
-        rows={offerings}
-        loading={$offeringLoadingState}
-        {deleteStrategy}
-        {rowActionStrategy}
-        onSort={handleOfferingsSort}
+        rows={images}
+        loading={imagesLoadingState}
+        {imagesDeleteStrategy}
+        {imagesRowActionStrategy}
+        onSort={handleImagesSort}
       />
     {:else}
-      <p>Offerings will be displayed here after the product definition has been saved.</p>
+      <p>Images will be displayed here after the product definition has been saved.</p>
     {/if}
   </div>
 {/snippet}
@@ -438,8 +441,16 @@
         />
       </div>
 
-      <!-- Offerings -->
-      {@render offeringsSection()}
+      {#if "offerings" === activeChildPath}
+        <!-- Offerings -->
+        {@render offeringsSection()}
+      {:else if "images" === activeChildPath}
+        {@render imagesSection()}
+      {:else}
+        <div class="error-boundary">
+          <p>Wrong active child path, must be "offerings" or "images" but was: {activeChildPath}</p>
+        </div>
+      {/if}
     </div>
   {/if}
 </ValidationWrapper>

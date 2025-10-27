@@ -569,12 +569,14 @@ const tempImageForCreate = ImageSchema.omit({
 export const ImageForCreateSchema = copyMetaFrom(ImageSchema, tempImageForCreate);
 
 // ===== PRODUCT DEFINITION IMAGE (dbo.product_definition_images) =====
+// OOP Inheritance Pattern: ProductDefinitionImage extends Image
+// - image_id is PRIMARY KEY (same as the inherited Image)
+// - Adds product context and variant dimensions
 
 const ProductDefinitionImageSchemaBase = z
   .object({
-    product_definition_image_id: z.number().int().positive(),
+    image_id: z.number().int().positive(),  // PK + FK: OOP inheritance pattern
     product_def_id: z.number().int().positive(),
-    image_id: z.number().int().positive(),
     size_range: z.string().max(50).nullable().optional(),
     quality_grade: z.string().max(10).nullable().optional(),
     color_variant: z.string().max(50).nullable().optional(),
@@ -593,15 +595,20 @@ export const ProductDefinitionImage_Schema = createSchemaWithMeta(ProductDefinit
 
 /**
  * Schema for creating a new ProductDefinitionImage.
- * Omits server-generated fields.
+ * Omits server-generated fields (created_at).
+ * NOTE: image_id is required and comes from the parent Image insert.
  */
 const tempProductDefinitionImageForCreate = ProductDefinitionImage_Schema.omit({
-  product_definition_image_id: true,
   created_at: true,
 }).describe("ProductDefinitionImageForCreateSchema");
 export const ProductDefinitionImageForCreateSchema = copyMetaFrom(ProductDefinitionImage_Schema, tempProductDefinitionImageForCreate);
 
 // ===== PRODUCT DEFINITION IMAGE with JOINS =====
+
+const tempProductDefinitionImageWithImage = ProductDefinitionImage_Schema.extend({
+  image: ImageSchema,
+});
+export const ProductDefinitionImage_Image_Schema = copyMetaFrom(ProductDefinitionImage_Schema, tempProductDefinitionImageWithImage);
 
 const tempProductDefinitionImageNested = ProductDefinitionImage_Schema.extend({
   image: ImageSchema,
@@ -638,6 +645,7 @@ export type OrderItem = z.infer<typeof OrderItemSchema>;
 export type OrderItem_ProdDef_Category = z.infer<typeof OrderItem_ProdDef_Category_Schema>;
 export type Image = z.infer<typeof ImageSchema>;
 export type ProductDefinitionImage = z.infer<typeof ProductDefinitionImage_Schema>;
+export type ProductDefinitionImage_Image = z.infer<typeof ProductDefinitionImage_Image_Schema>;
 export type ProductDefinitionImage_Image_ProductDef = z.infer<typeof ProductDefinitionImage_Image_ProductDef_Schema>;
 
 // ===== ALL BRANDED SCHEMAS (= with meta info)  =====

@@ -89,7 +89,7 @@ type BrandedSchema = z.ZodObject<z.ZodRawShape> & { __brandMeta?: { tableName: s
 /**
  * Inserts a pre-validated entity record within a transaction.
  */
-async function insertRecordWithTransaction<S extends BrandedSchema>(
+export async function insertRecordWithTransaction<S extends BrandedSchema>(
   schema: S,
   data: z.output<S>,
   transaction: Transaction
@@ -124,7 +124,7 @@ async function insertRecordWithTransaction<S extends BrandedSchema>(
 /**
  * Updates a pre-validated entity record within a transaction. Returns null if not found.
  */
-async function updateRecordWithTransaction<S extends BrandedSchema>(
+export async function updateRecordWithTransaction<S extends BrandedSchema>(
   schema: S,
   id: number | string,
   idColumn: keyof z.infer<S> & string,

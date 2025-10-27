@@ -533,6 +533,82 @@ const tempOrderItemNested = OrderItemSchema.extend({
 });
 export const OrderItem_ProdDef_Category_Schema = copyMetaFrom(OrderItemSchema, tempOrderItemNested);
 
+// ===== IMAGE (dbo.images) =====
+
+const ImageSchemaBase = z
+  .object({
+    image_id: z.number().int().positive(),
+    filename: z.string().max(255),
+    filepath: z.string().max(500),
+    file_hash: z.string().max(64).nullable().optional(),
+    file_size_bytes: z.number().int().positive().nullable().optional(),
+    width_px: z.number().int().positive().nullable().optional(),
+    height_px: z.number().int().positive().nullable().optional(),
+    mime_type: z.string().max(50).nullable().optional(),
+    shopify_url: z.string().max(500).nullable().optional(),
+    shopify_media_id: z.string().max(100).nullable().optional(),
+    uploaded_to_shopify_at: z.string().nullable().optional(), // ISO datetime string
+    created_at: z.string().optional(),
+  })
+  .describe("ImageSchema");
+
+export const ImageSchema = createSchemaWithMeta(ImageSchemaBase, {
+  alias: "img",
+  tableName: "images",
+  dbSchema: "dbo",
+} as const);
+
+/**
+ * Schema for creating a new Image.
+ * Omits server-generated fields.
+ */
+const tempImageForCreate = ImageSchema.omit({
+  image_id: true,
+  created_at: true,
+}).describe("ImageForCreateSchema");
+export const ImageForCreateSchema = copyMetaFrom(ImageSchema, tempImageForCreate);
+
+// ===== PRODUCT DEFINITION IMAGE (dbo.product_definition_images) =====
+
+const ProductDefinitionImageSchemaBase = z
+  .object({
+    product_definition_image_id: z.number().int().positive(),
+    product_def_id: z.number().int().positive(),
+    image_id: z.number().int().positive(),
+    size_range: z.string().max(50).nullable().optional(),
+    quality_grade: z.string().max(10).nullable().optional(),
+    color_variant: z.string().max(50).nullable().optional(),
+    image_type: z.string().max(50).nullable().optional(),
+    sort_order: z.number().int().nonnegative().default(0),
+    is_primary: z.boolean().default(false),
+    created_at: z.string().optional(),
+  })
+  .describe("ProductDefinitionImageSchema");
+
+export const ProductDefinitionImage_Schema = createSchemaWithMeta(ProductDefinitionImageSchemaBase, {
+  alias: "pdi",
+  tableName: "product_definition_images",
+  dbSchema: "dbo",
+} as const);
+
+/**
+ * Schema for creating a new ProductDefinitionImage.
+ * Omits server-generated fields.
+ */
+const tempProductDefinitionImageForCreate = ProductDefinitionImage_Schema.omit({
+  product_definition_image_id: true,
+  created_at: true,
+}).describe("ProductDefinitionImageForCreateSchema");
+export const ProductDefinitionImageForCreateSchema = copyMetaFrom(ProductDefinitionImage_Schema, tempProductDefinitionImageForCreate);
+
+// ===== PRODUCT DEFINITION IMAGE with JOINS =====
+
+const tempProductDefinitionImageNested = ProductDefinitionImage_Schema.extend({
+  image: ImageSchema,
+  product_def: ProductDefinitionSchema,
+});
+export const ProductDefinitionImage_Image_ProductDef_Schema = copyMetaFrom(ProductDefinitionImage_Schema, tempProductDefinitionImageNested);
+
 // ===== SCHEMAS => TYPES  =====
 
 export type Wholesaler = z.infer<typeof WholesalerSchema>;
@@ -560,6 +636,9 @@ export type Order = z.infer<typeof OrderSchema>;
 export type Order_Wholesaler = z.infer<typeof Order_Wholesaler_Schema>;
 export type OrderItem = z.infer<typeof OrderItemSchema>;
 export type OrderItem_ProdDef_Category = z.infer<typeof OrderItem_ProdDef_Category_Schema>;
+export type Image = z.infer<typeof ImageSchema>;
+export type ProductDefinitionImage = z.infer<typeof ProductDefinitionImage_Schema>;
+export type ProductDefinitionImage_Image_ProductDef = z.infer<typeof ProductDefinitionImage_Image_ProductDef_Schema>;
 
 // ===== ALL BRANDED SCHEMAS (= with meta info)  =====
 
@@ -579,6 +658,8 @@ export const AllBrandedSchemas = {
   ProductTypeSchema,
   SurfaceFinishSchema,
   ConstructionTypeSchema,
+  ImageSchema,
+  ProductDefinitionImageSchema: ProductDefinitionImage_Schema,
 } as const;
 
 // ===== HELPER EXPORT =====

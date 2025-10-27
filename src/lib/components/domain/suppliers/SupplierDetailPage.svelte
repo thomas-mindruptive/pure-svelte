@@ -43,7 +43,7 @@
   // === TYPES ====================================================================================
 
   // TODO: Validate through typing, derived from navigationHierarchieConfig.
-  export type ChildRelationships = "categories" | "orders";
+  export type SupplierChildRelationships = "categories" | "orders";
 
   // === PROPS ====================================================================================
 
@@ -52,7 +52,7 @@
   export interface SupplierDetailPageProps {
     supplierId: number;
     isCreateMode: boolean;
-    activeChildPath: ChildRelationships;
+    activeChildPath: SupplierChildRelationships;
     loadEventFetch: typeof fetch;
     params: Record<string, number | string>;
   }
@@ -315,7 +315,7 @@
     assignedCategories = await supplierApi.loadCategoriesForSupplier(supplier.wholesaler_id, null, sortState);
   }
 
-  // === ORDERS GRID FUNCTIONS ====================================================================
+  // === ORDERS GRID ==============================================================================
 
   const ordersColumns: ColumnDef<typeof Order_Wholesaler_Schema>[] = [
     { key: "order_id", header: "ID", accessor: null, sortable: true },

@@ -4,7 +4,7 @@
   import { goto } from "$app/navigation";
   import { ApiClient } from "$lib/api/client/ApiClient";
   import { getOfferingApi, offeringLoadingState } from "$lib/api/client/offering";
-  import type { DeleteStrategy, ID, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
+  import type { ColumnDef, DeleteStrategy, ID, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
   import {
     FormSchema,
     MaterialSchema,
@@ -22,6 +22,8 @@
     SurfaceFinishSchema,
     ProductCategorySchema,
     type ProductCategory,
+    ProductDefinitionImage_Image_ProductDef_Schema,
+    type ProductDefinitionImage_Image_ProductDef,
   } from "$lib/domain/domainTypes";
   import { addNotification } from "$lib/stores/notifications";
   import { log } from "$lib/utils/logger";
@@ -46,9 +48,14 @@
   import { error } from "@sveltejs/kit";
   import { getErrorMessage } from "$lib/api/client/common";
   import type { SortDescriptor } from "$lib/backendQueries/queryGrammar";
-    import { getSurfaceFinishApi } from "$lib/api/client/surfaceFinish";
-    import { getConstructionTypeApi } from "$lib/api/client/constructionType";
-    import { getProductCategoryApi } from "$lib/api/client/productCategory";
+  import { getSurfaceFinishApi } from "$lib/api/client/surfaceFinish";
+  import { getConstructionTypeApi } from "$lib/api/client/constructionType";
+  import { getProductCategoryApi } from "$lib/api/client/productCategory";
+
+  // === TYPES ====================================================================================
+
+  // TODO: Validate through typing, derived from navigationHierarchieConfig.
+  export type ProductDefChildRelationships = "offerings" | "images";
 
   // === PROPS ====================================================================================
 
@@ -56,6 +63,7 @@
     productDefId: number;
     categoryId: number;
     isCreateMode: boolean;
+    activeChildPath: ProductDefChildRelationships;
     loadEventFetch: typeof fetch;
   };
 
@@ -73,6 +81,7 @@
   let materials: Material[] = $state([]);
   let forms: Form[] = $state([]);
   let categories: ProductCategory[] = $state([]);
+  let allowForceCascadingDelete = $state(true);
 
   // === API ======================================================================================
 
@@ -198,7 +207,7 @@
     log.info("Local state for offerings updated.");
   }
 
-  // === GRID/BUSINESS LOGIC ======================================================================
+  // === OFFERINGS GRID/BUSINESS LOGIC ============================================================
 
   function handleOfferingCreate(): void {
     log.info(`Navigating to create new offering.`);
@@ -255,6 +264,66 @@
     doubleClick: handleOfferingSelect,
   };
 
+  // === IMAGES GRID ==============================================================================
+
+  const imagesColumns: ColumnDef<typeof ProductDefinitionImage_Image_ProductDef_Schema>[] = [
+    { key: "image_id", header: "ID", accessor: null, sortable: true },
+    { key: "img.filename", header: "Wholesaler", accessor: (image) => image.image.filename, sortable: true },
+  ];
+  const getImagesRowId = (image: ProductDefinitionImage_Image_ProductDef) => image.image_id;
+
+  async function handleOrderDelete(ids: ID[]): Promise<void> {
+    log.info(`Deleting orders`, { ids });
+    assertDefined(ids, "ids");
+    let dataChanged = false;
+
+    if (isCreateMode) {
+      log.error("Cannot delete in create mode.");
+      addNotification("Cannot delete in create mode.", "error");
+      return;
+    }
+
+    assertDefined(productDefinition, "productDefinition");
+    const idsAsNumber = stringsToNumbers(ids);
+    dataChanged = await cascadeDelete(
+      idsAsNumber,
+      orderApi.deleteOrder,
+      {
+        domainObjectName: "Order",
+        hardDepInfo: "Order has hard dependencies. Delete?",
+        softDepInfo: "Order has soft dependencies. Delete?",
+      },
+      allowForceCascadingDelete,
+    );
+
+    if (dataChanged) {
+      // Reload and change state.
+      reloadCategories();
+    }
+  }
+
+  function handleOrderCreate() {
+    log.info(`Going to DetailPage with "new"`);
+    goto(buildChildUrl(page.url.pathname, "orders", "new"));
+  }
+
+  function handleOrderSelect(order: Order_Wholesaler) {
+    goto(buildChildUrl(page.url.pathname, "orders", order.order_id));
+  }
+
+  const ordersDeleteStrategy: DeleteStrategy<Order_Wholesaler> = {
+    execute: handleOrderDelete,
+  };
+
+  const ordersRowActionStrategy: RowActionStrategy<Order_Wholesaler> = {
+    click: handleOrderSelect,
+  };
+
+  async function handleOrdersSort(sortState: SortDescriptor<Order_Wholesaler>[] | null) {
+    assertDefined(supplier, "supplier");
+    orders = await supplierApi.loadOrdersForSupplier(supplier.wholesaler_id, null, sortState);
+  }
+
   // === FORM EVENT HANDLERS =======================================================================
 
   function handleFormSubmitted(event: { data: ProductDefinition; result: unknown }) {
@@ -288,6 +357,64 @@
   }
 </script>
 
+<!------------------------------------------------------------------------------------------------
+  SNIPPETS 
+  ------------------------------------------------------------------------------------------------>
+
+<!-- Offerings ----------------------------------------------------------------------------------->
+
+{#snippet offeringsSection()}
+  <div class="grid-section">
+    {#if !isCreateMode}
+      <h2>Offerings for this Product</h2>
+      <button
+        class="pc-grid__createbtn"
+        onclick={handleOfferingCreate}
+      >
+        Create Offering
+      </button>
+      <OfferingGrid
+        rows={offerings}
+        loading={$offeringLoadingState}
+        {deleteStrategy}
+        {rowActionStrategy}
+        onSort={handleOfferingsSort}
+      />
+    {:else}
+      <p>Offerings will be displayed here after the product definition has been saved.</p>
+    {/if}
+  </div>
+{/snippet}
+
+{#snippet imagesSection()}
+  <div class="grid-section">
+    {#if !isCreateMode}
+      <h2>Offerings for this Product</h2>
+      <button
+        class="pc-grid__createbtn"
+        onclick={handleOfferingCreate}
+      >
+        Create Offering
+      </button>
+      <OfferingGrid
+        rows={offerings}
+        loading={$offeringLoadingState}
+        {deleteStrategy}
+        {rowActionStrategy}
+        onSort={handleOfferingsSort}
+      />
+    {:else}
+      <p>Offerings will be displayed here after the product definition has been saved.</p>
+    {/if}
+  </div>
+{/snippet}
+
+<!-- Images -------------------------------------------------------------------------------------->
+
+<!------------------------------------------------------------------------------------------------
+  TEMPLATE 
+  ------------------------------------------------------------------------------------------------>
+
 <ValidationWrapper {errors}>
   {#if isLoading}
     <div class="detail-page-layout">Loading details...</div>
@@ -311,27 +438,8 @@
         />
       </div>
 
-      <!-- Section 2: Grid of associated Offerings -->
-      <div class="grid-section">
-        {#if !isCreateMode}
-          <h2>Offerings for this Product</h2>
-          <button
-            class="pc-grid__createbtn"
-            onclick={handleOfferingCreate}
-          >
-            Create Offering
-          </button>
-          <OfferingGrid
-            rows={offerings}
-            loading={$offeringLoadingState}
-            {deleteStrategy}
-            {rowActionStrategy}
-            onSort={handleOfferingsSort}
-          />
-        {:else}
-          <p>Offerings will be displayed here after the product definition has been saved.</p>
-        {/if}
-      </div>
+      <!-- Offerings -->
+      {@render offeringsSection()}
     </div>
   {/if}
 </ValidationWrapper>

@@ -1,8 +1,11 @@
 // File: src/lib/components/domain/productDefinitions/productDefinitionDetailPage.ts
 
+import { findNodeByKeyRecursive } from "$lib/components/sidebarAndNav/hierarchyUtils";
+import { productCategoriesHierarchyConfig } from "$lib/routes/navHierarchyConfig";
 import { log } from "$lib/utils/logger";
+import { parseUrlPathSegments } from "$lib/utils/url";
 import { error, type LoadEvent } from "@sveltejs/kit";
-import type { ProductDefPageProps } from "./ProductDefinitionDetailPage.svelte";
+import type { ProductDefChildRelationships, ProductDefPageProps } from "./ProductDefinitionDetailPage.svelte";
 
 /**
  * Loads all data for the Product Definition Detail Page using the non-blocking "app shell" pattern.
@@ -12,7 +15,7 @@ import type { ProductDefPageProps } from "./ProductDefinitionDetailPage.svelte";
  * @param loadEventFetch The context-aware fetch function from SvelteKit.
  * @returns An object where each property is a promise for the required data.
  */
-export function load({ params, fetch: loadEventFetch }: LoadEvent): ProductDefPageProps {
+export function load({ params, url, fetch: loadEventFetch }: LoadEvent): ProductDefPageProps {
   log.debug(`load`, { params });
 
   const productDefId = Number(params.productDefId);
@@ -28,10 +31,28 @@ export function load({ params, fetch: loadEventFetch }: LoadEvent): ProductDefPa
     throw error(400, "categoryId must be passed in params.");
   }
 
+    // ===== EXTRACT CHILD PATH  ====================================================================
+  
+    // Extract child path from URL
+    const urlSegments = parseUrlPathSegments(url);
+    // ['categories', 1, 'productdefinitions', '1', 'offerings'] → take index 4
+    const prodDefNode = findNodeByKeyRecursive(productCategoriesHierarchyConfig.rootItem, "productDefinition");
+    if (!prodDefNode) {
+      throw error(500, `Cannot find node for "productdefinitions" in productCategoriesHierarchyConfig.`);
+    }
+    const defaultChild = prodDefNode?.defaultChild;
+    if (!defaultChild) {
+      throw error(500, `No default child defined for "productDefinition"`);
+    }
+  
+    const activeChildPath: ProductDefChildRelationships = (urlSegments[4] as ProductDefChildRelationships) || defaultChild;
+    log.debug(`Extracted child path:`, {activeChildPath, urlSegments});
+    
   return {
     categoryId,
     productDefId,
     isCreateMode,
     loadEventFetch,
+    activeChildPath
   };
 }

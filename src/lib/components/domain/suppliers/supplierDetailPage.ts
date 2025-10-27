@@ -4,7 +4,7 @@ import { supplierHierarchyConfig } from "$lib/routes/navHierarchyConfig";
 import { log } from "$lib/utils/logger";
 import { parseUrlPathSegments } from "$lib/utils/url";
 import { error, type LoadEvent } from "@sveltejs/kit";
-import type { ChildRelationships, SupplierDetailPageProps } from "./SupplierDetailPage.svelte";
+import type { SupplierChildRelationships, SupplierDetailPageProps } from "./SupplierDetailPage.svelte";
 
 // ===== LOAD =====================================================================================
 
@@ -44,7 +44,7 @@ export function load(loadEvent: LoadEvent): SupplierDetailPageProps {
     throw error(500, `No default child defined for ${JSON.stringify(supplierNode)}`);
   }
 
-  const activeChildPath: ChildRelationships = (urlSegments[2] as ChildRelationships) || defaultChild;
+  const activeChildPath: SupplierChildRelationships = (urlSegments[2] as SupplierChildRelationships) || defaultChild;
   log.debug(`Extracted child path:`, {activeChildPath, urlSegments});
 
 

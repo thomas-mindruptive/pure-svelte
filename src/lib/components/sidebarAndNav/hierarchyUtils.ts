@@ -26,61 +26,6 @@ interface GenericStaticNode {
   defaultChild?: string;
 }
 
-// === CORE UTILITIES ============================================================================
-
-/**
- * Resolves a urlParamValue from parameters based on a urlParamName.
- * @param urlParamName The parameter name (e.g., "supplierId", "categoryId", "leaf").
- * @param params The parameters object from the URL.
- * @returns The resolved value or "leaf" if the parameter is not found.
- */
-function resolveUrlParamValue(urlParamName: string, params: Record<string, string | number | null>): string | number | "leaf" {
-  if (urlParamName === "leaf") {
-    return "leaf";
-  }
-  const value = params[urlParamName];
-  return value ?? "leaf"; // Fallback to "leaf" if parameter not found
-}
-
-// === PARAMETER UPDATE LOGIC ====================================================================
-
-/**
- * Recursively updates the urlParamValue of a node and its children in-place.
- * @param node The runtime node to update.
- * @param params The URL parameters object.
- */
-function updateNodeParameters(node: RuntimeHierarchyTreeNode, params: Record<string, string | number | null>): void {
-  // Only attempt to resolve and set a value if the urlParamName is defined on the current node.
-  if (node.item.urlParamName) {
-    node.item.urlParamValue = resolveUrlParamValue(node.item.urlParamName, params);
-  }
-
-  // ALWAYS continue the traversal to process all descendants.
-  // This is crucial to find all nested Object nodes in the tree.
-  if (node.children) {
-    for (const child of node.children) {
-      updateNodeParameters(child, params);
-    }
-  }
-}
-
-/**
- * Updates an existing array of RuntimeHierarchyTrees with new URL parameters.
- * This is the efficient way to update a cached tree without rebuilding its structure.
- * @param runtimeHierarchies The existing runtime hierarchies to update.
- * @param params The new URL parameters.
- * @returns The same, but modified, array of runtime hierarchies.
- */
-export function old_updateRuntimeHierarchyParameters(
-  runtimeHierarchies: RuntimeHierarchyTree[],
-  params: Record<string, string | number | null>,
-): RuntimeHierarchyTree[] {
-  for (const tree of runtimeHierarchies) {
-    updateNodeParameters(tree.rootItem, params);
-  }
-  return runtimeHierarchies;
-}
-
 // === INITIAL CREATION LOGIC ====================================================================
 
 /**
@@ -135,8 +80,6 @@ export function convertToRuntimeTree(staticTree: HierarchyTree): {
 
   return { errors, runtimeTree };
 }
-
-// === COMBINED BUILD FUNCTION ===================================================================
 
 // === HIERARCHY UTILITIES =======================================================================
 
@@ -196,7 +139,10 @@ export function resolveAllHrefsInTree(node: RuntimeHierarchyTreeNode, urlParams:
  * @param key The key to search for.
  * @returns The found node or null.
  */
-export function findNodeByKeyRecursive(node: RuntimeHierarchyTreeNode, key: string): RuntimeHierarchyTreeNode | null {
+export function findNodeByKeyRecursive(
+  node: RuntimeHierarchyTreeNode | HierarchyTreeNode<any, any>,
+  key: string,
+): RuntimeHierarchyTreeNode | HierarchyTreeNode<any, any> | null {
   if (node.item.key === key) {
     return node;
   }
@@ -219,11 +165,14 @@ export function findNodeByKeyRecursive(node: RuntimeHierarchyTreeNode, key: stri
  * @param key The key of the node to find.
  * @returns The found RuntimeHierarchyTreeNode or null if not found.
  */
-export function findNodeByKeyInHierarchies(hierarchies: RuntimeHierarchyTree[], key: string): RuntimeHierarchyTreeNode | null {
+export function findNodeByKeyInHierarchies(
+  hierarchies: RuntimeHierarchyTree[] | HierarchyTree[],
+  key: string,
+): RuntimeHierarchyTreeNode | HierarchyTreeNode<any, any> | null {
   for (const tree of hierarchies) {
     const found = findNodeByKeyRecursive(tree.rootItem, key);
     if (found) {
-      return found; // Den ersten Treffer sofort zurückgeben.
+      return found; // Return first match.
     }
   }
   return null;
@@ -666,7 +615,7 @@ export function validateTreeAsTree(tree: RuntimeHierarchyTree | HierarchyTree): 
 
   function validateNode(
     node: RuntimeHierarchyTreeNode | HierarchyTreeNode<string, HierarchyTreeNode<any, any>[]>,
-    pathParts: string[]
+    pathParts: string[],
   ): void {
     // Basic property checks
     if (!node.item.key) {

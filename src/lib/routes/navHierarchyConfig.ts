@@ -116,8 +116,20 @@ export const productCategoriesHierarchyConfig: HierarchyTree = {
               children: [
                 // ProductDef Object - Hidden, represents the selected product definition. Has urlParamName.
                 createHierarchyNode({
-                  item: { key: "productDefintition", type: "object", href: "/categories/[categoryId]/productdefinitions/[productDefId]", label: "Product Definition", display: false, urlParamName: "productDefId" },
+                  item: { key: "productDefinition", type: "object", href: "/categories/[categoryId]/productdefinitions/[productDefId]", label: "Product Definition", display: false, urlParamName: "productDefId" },
+                  defaultChild: "offerings",
                   children: [
+                    // Images List - Visible images list for product definition.
+                    createHierarchyNode({
+                      item: { key: "images", type: "list", href: "/categories/[categoryId]/productdefinitions/[productDefId]/images", label: "Images" },
+                      children: [
+                        // Image Object - Hidden, represents the selected image. Has urlParamName.
+                        createHierarchyNode({
+                          item: { key: "image", type: "object", href: "/categories/[categoryId]/productdefinitions/[productDefId]/images/[imageId]", label: "Image", display: false, urlParamName: "imageId" },
+                          children: []
+                        }),
+                      ]
+                    }),
                     // Offering List - Visible offerings list for product definition.
                     createHierarchyNode({
                       item: { key: "offerings", type: "list", href: "/categories/[categoryId]/productdefinitions/[productDefId]/offerings", label: "Offerings", urlParamName: "offeringId" },

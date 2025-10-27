@@ -13,8 +13,9 @@ import type { ProductDefinitionImage_Image } from "$lib/domain/domainTypes";
 
 import type { ApiClient } from "./ApiClient";
 import { createJsonBody, createJsonAndWrapInPayloadPartial, getErrorMessage } from "./common";
-import type { QueryResponseData } from "$lib/api/api.types";
+import type { QueryResponseData, DeleteApiResponse, DeleteRequest } from "$lib/api/api.types";
 import { LoadingState } from "./loadingState";
+import { assertDefined } from "$lib/utils/assertions";
 
 const productDefinitionImageLoadingManager = new LoadingState();
 export const productDefinitionImageLoadingState = productDefinitionImageLoadingManager.isLoadingStore;
@@ -24,7 +25,7 @@ export const productDefinitionImageLoadingOperations = productDefinitionImageLoa
  * The default query payload used when fetching product definition images.
  */
 export const DEFAULT_PRODUCT_DEFINITION_IMAGE_QUERY: Partial<QueryPayload<ProductDefinitionImage_Image>> = {
-  orderBy: [{ key: "sort_order" as keyof ProductDefinitionImage_Image, direction: "asc" }],
+  orderBy: [{ key: "pdi.sort_order" as keyof ProductDefinitionImage_Image, direction: "asc" }],
   limit: 100,
 };
 
@@ -78,7 +79,7 @@ export function getProductDefinitionImageApi(client: ApiClient) {
             whereCondOp: "=",
             val: productDefId,
           },
-          orderBy: [{ key: "sort_order" as keyof ProductDefinitionImage_Image, direction: "asc" }],
+          orderBy: [{ key: "pdi.sort_order" as keyof ProductDefinitionImage_Image, direction: "asc" }],
         };
         const responseData = await client.apiFetch<QueryResponseData<ProductDefinitionImage_Image>>(
           "/api/product-definition-images",
@@ -170,26 +171,29 @@ export function getProductDefinitionImageApi(client: ApiClient) {
      * - product_definition_images (subclass)
      * - images (base class)
      */
-    async deleteProductDefinitionImage(imageId: number): Promise<{
-      deleted_product_definition_image: any;
-      deleted_image: any;
-      message: string;
-    }> {
+    async deleteProductDefinitionImage(
+      imageId: number,
+      cascade = false,
+      forceCascade = false
+    ): Promise<DeleteApiResponse<ProductDefinitionImage_Image, string[]>> {
+      assertDefined(imageId, "imageId");
       const operationId = `deleteProductDefinitionImage-${imageId}`;
       productDefinitionImageLoadingOperations.start(operationId);
       try {
-        const responseData = await client.apiFetch<{
-          deleted_product_definition_image: any;
-          deleted_image: any;
-          message: string;
-        }>(
+        const deleteRequest: DeleteRequest<ProductDefinitionImage_Image> = {
+          id: imageId,
+          cascade,
+          forceCascade,
+        };
+        const body = createJsonBody(deleteRequest);
+
+        return await client.apiFetchUnion<DeleteApiResponse<ProductDefinitionImage_Image, string[]>>(
           `/api/product-definition-images/${imageId}`,
-          { method: "DELETE" },
+          { method: "DELETE", body },
           { context: operationId },
         );
-        return responseData;
       } catch (err) {
-        log.error(`[${operationId}] Failed.`, { imageId, error: getErrorMessage(err) });
+        log.error(`[${operationId}] Failed.`, { imageId, cascade, forceCascade, error: getErrorMessage(err) });
         throw err;
       } finally {
         productDefinitionImageLoadingOperations.finish(operationId);

@@ -4,6 +4,7 @@
   import { goto } from "$app/navigation";
   import { ApiClient } from "$lib/api/client/ApiClient";
   import { getOfferingApi, offeringLoadingState } from "$lib/api/client/offering";
+  import { getProductDefinitionImageApi, productDefinitionImageLoadingState } from "$lib/api/client/productDefinitionImage";
   import type { ColumnDef, DeleteStrategy, ID, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
   import {
     FormSchema,
@@ -22,14 +23,16 @@
     SurfaceFinishSchema,
     ProductCategorySchema,
     type ProductCategory,
+    ProductDefinitionImage_Image_Schema,
+    type ProductDefinitionImage_Image,
     ProductDefinitionImage_Image_ProductDef_Schema,
-    type ProductDefinitionImage_Image_ProductDef,
   } from "$lib/domain/domainTypes";
   import { addNotification } from "$lib/stores/notifications";
   import { log } from "$lib/utils/logger";
   // Component Imports
   import OfferingGrid from "$lib/components/domain/offerings/OfferingGrid.svelte";
   import ProductDefinitionForm from "./ProductDefinitionForm.svelte";
+  import Datagrid from "$lib/components/grids/Datagrid.svelte";
   // The new form component
   import "$lib/components/styles/detail-page-layout.css";
   import "$lib/components/styles/grid-section.css";
@@ -47,7 +50,8 @@
   import { buildChildUrl, buildSiblingUrl } from "$lib/utils/url";
   import { error } from "@sveltejs/kit";
   import { getErrorMessage } from "$lib/api/client/common";
-  import type { SortDescriptor } from "$lib/backendQueries/queryGrammar";
+  import type { SortDescriptor, QueryPayload } from "$lib/backendQueries/queryGrammar";
+  import { ComparisonOperator } from "$lib/backendQueries/queryGrammar";
   import { getSurfaceFinishApi } from "$lib/api/client/surfaceFinish";
   import { getConstructionTypeApi } from "$lib/api/client/constructionType";
   import { getProductCategoryApi } from "$lib/api/client/productCategory";
@@ -76,6 +80,7 @@
   const allowForceCascadingDelte = $state(true);
   let productDefinition: ProductDefinition | null = $state(null);
   let offerings: Wio_PDef_Cat_Supp_Nested_WithLinks[] = $state([]);
+  let images: ProductDefinitionImage_Image[] = $state([]);
   let constructionTypes: ConstructionType[] = $state([]);
   let surfaceFinishes: SurfaceFinish[] = $state([]);
   let materials: Material[] = $state([]);
@@ -93,6 +98,7 @@
   const offeringApi = getOfferingApi(client);
   const materialApi = getMaterialApi(client);
   const formApi = getFormApi(client);
+  const productDefinitionImageApi = getProductDefinitionImageApi(client);
 
   // === LOAD DATA ================================================================================
 
@@ -127,6 +133,13 @@
           const offeringsVal = safeParseFirstN(Wio_PDef_Cat_Supp_Nested_WithLinks_Schema, offerings, 3);
           if (!offeringsVal.success) {
             errors.offerings = zodToValidationErrorTree(offeringsVal.error);
+          }
+
+          images = await productDefinitionImageApi.loadProductDefinitionImagesForProduct(productDefId);
+          if (aborted) return;
+          const imagesVal = safeParseFirstN(ProductDefinitionImage_Image_Schema, images, 3);
+          if (!imagesVal.success) {
+            errors.images = zodToValidationErrorTree(imagesVal.error);
           }
 
           constructionTypes = await constructionTypeApi.loadConstructionTypes();
@@ -266,65 +279,91 @@
 
   // === IMAGES GRID ==============================================================================
 
-  ANPASSEN!
-  
-  const imagesColumns: ColumnDef<typeof ProductDefinitionImage_Image_ProductDef_Schema>[] = [
-    { key: "image_id", header: "ID", accessor: null, sortable: true },
-    { key: "img.filename", header: "Wholesaler", accessor: (image) => image.image.filename, sortable: true },
-  ];
-  const getImagesRowId = (image: ProductDefinitionImage_Image_ProductDef) => image.image_id;
-
-  async function handleOrderDelete(ids: ID[]): Promise<void> {
-    log.info(`Deleting orders`, { ids });
-    assertDefined(ids, "ids");
-    let dataChanged = false;
-
-    if (isCreateMode) {
-      log.error("Cannot delete in create mode.");
-      addNotification("Cannot delete in create mode.", "error");
-      return;
-    }
-
+  async function reloadImages() {
     assertDefined(productDefinition, "productDefinition");
+    assertDefined(productDefId, "productDefId");
+
+    log.info(`Re-fetching images for productDefId: ${productDefId}`);
+    const updatedImages = await productDefinitionImageApi.loadProductDefinitionImagesForProduct(productDefId);
+    images = updatedImages;
+    log.info("Local state for images updated.");
+  }
+
+  function handleImageCreate(): void {
+    log.info(`Navigating to create new image.`);
+    goto(buildChildUrl(page.url.pathname, "images", "new"));
+  }
+
+  function handleImageSelect(image: ProductDefinitionImage_Image) {
+    log.info(`Selected image: `, image);
+    const { image_id } = image;
+    if (image_id) {
+      const targetUrl = buildChildUrl(page.url.pathname, "images", image_id);
+      log.debug(`Going to: ${targetUrl}`);
+      goto(targetUrl);
+    } else {
+      log.error("Cannot navigate to image, missing image_id", { image });
+      addNotification("Cannot navigate: image data is incomplete.", "error");
+    }
+  }
+
+  async function handleImageDelete(ids: ID[]): Promise<void> {
+    let dataChanged = false;
     const idsAsNumber = stringsToNumbers(ids);
+
     dataChanged = await cascadeDelete(
       idsAsNumber,
-      orderApi.deleteOrder,
+      productDefinitionImageApi.deleteProductDefinitionImage,
       {
-        domainObjectName: "Order",
-        hardDepInfo: "Order has hard dependencies. Delete?",
-        softDepInfo: "Order has soft dependencies. Delete?",
+        domainObjectName: "Image",
+        softDepInfo: "Image has soft dependencies.",
+        hardDepInfo: "Image has hard dependencies.",
       },
       allowForceCascadingDelete,
     );
 
     if (dataChanged) {
-      // Reload and change state.
-      reloadCategories();
+      await reloadImages();
     }
   }
 
-  function handleOrderCreate() {
-    log.info(`Going to DetailPage with "new"`);
-    goto(buildChildUrl(page.url.pathname, "orders", "new"));
+  async function handleImagesSort(sortState: SortDescriptor<ProductDefinitionImage_Image>[] | null) {
+    try {
+      const query: Partial<QueryPayload<ProductDefinitionImage_Image>> = {
+        where: {
+          key: "pdi.product_def_id" as keyof ProductDefinitionImage_Image,
+          whereCondOp: "=" as ComparisonOperator,
+          val: productDefId,
+        },
+        ...(sortState && { orderBy: sortState }),
+      };
+      images = await productDefinitionImageApi.loadProductDefinitionImages(query);
+    } catch (e: unknown) {
+      addNotification(`Error during sorting API: ${getErrorMessage(e)}`);
+    }
   }
 
-  function handleOrderSelect(order: Order_Wholesaler) {
-    goto(buildChildUrl(page.url.pathname, "orders", order.order_id));
-  }
-
-  const ordersDeleteStrategy: DeleteStrategy<Order_Wholesaler> = {
-    execute: handleOrderDelete,
+  const imagesDeleteStrategy: DeleteStrategy<ProductDefinitionImage_Image> = {
+    execute: handleImageDelete,
   };
 
-  const ordersRowActionStrategy: RowActionStrategy<Order_Wholesaler> = {
-    click: handleOrderSelect,
+  const imagesRowActionStrategy: RowActionStrategy<ProductDefinitionImage_Image> = {
+    click: handleImageSelect,
+    doubleClick: handleImageSelect,
   };
 
-  async function handleOrdersSort(sortState: SortDescriptor<Order_Wholesaler>[] | null) {
-    assertDefined(supplier, "supplier");
-    orders = await supplierApi.loadOrdersForSupplier(supplier.wholesaler_id, null, sortState);
-  }
+  const imagesColumns: ColumnDef<typeof ProductDefinitionImage_Image_ProductDef_Schema>[] = [
+    { key: "image_id", header: "ID", accessor: null, sortable: true },
+    { key: "img.filename", header: "Filename", accessor: (img) => img.image.filename || "—", sortable: true },
+    { key: "image_type", header: "Type", accessor: (img) => img.image_type || "—", sortable: true },
+    { key: "size_range", header: "Size Range", accessor: (img) => img.size_range || "—", sortable: true },
+    { key: "quality_grade", header: "Quality", accessor: (img) => img.quality_grade || "—", sortable: true },
+    { key: "color_variant", header: "Color", accessor: (img) => img.color_variant || "—", sortable: true },
+    { key: "sort_order", header: "Sort", accessor: null, sortable: true },
+    { key: "is_primary", header: "Primary", accessor: (img) => img.is_primary ? "Yes" : "No", sortable: true },
+  ];
+
+  const getImageRowId = (image: ProductDefinitionImage_Image) => image.image_id;
 
   // === FORM EVENT HANDLERS =======================================================================
 
@@ -395,15 +434,19 @@
       <h2>Images for this Product</h2>
       <button
         class="pc-grid__createbtn"
-        onclick={handleOfferingCreate}
+        onclick={handleImageCreate}
       >
-        Create Offering
+        Create Image
       </button>
-      <OfferingGrid
+      <Datagrid
         rows={images}
-        loading={imagesLoadingState}
-        {imagesDeleteStrategy}
-        {imagesRowActionStrategy}
+        columns={imagesColumns}
+        getId={getImageRowId}
+        loading={$productDefinitionImageLoadingState}
+        gridId="images"
+        entity="image"
+        deleteStrategy={imagesDeleteStrategy}
+        rowActionStrategy={imagesRowActionStrategy}
         onSort={handleImagesSort}
       />
     {:else}

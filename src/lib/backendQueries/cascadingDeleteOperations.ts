@@ -74,10 +74,34 @@ export async function deleteProductDefinition(
         WHERE o.product_def_id = @${productDefIdParam};
 
         DECLARE
+          @deletedImages      INT = 0,
+          @deletedPdImages    INT = 0,
           @deletedLinks       INT = 0,
           @deletedAttributes  INT = 0,
           @deletedOfferings   INT = 0,
           @deletedPdefs       INT = 0;
+
+        -- 0) Delete product definition images (OOP inheritance pattern)
+        -- First, collect the image_ids to delete
+        IF OBJECT_ID('tempdb..#ImagesToDelete') IS NOT NULL DROP TABLE #ImagesToDelete;
+        CREATE TABLE #ImagesToDelete (image_id INT NOT NULL PRIMARY KEY);
+
+        INSERT INTO #ImagesToDelete (image_id)
+        SELECT image_id
+        FROM dbo.product_definition_images
+        WHERE product_def_id = @${productDefIdParam};
+
+        -- Delete from product_definition_images (subclass)
+        DELETE PDI
+        FROM dbo.product_definition_images AS PDI
+        WHERE PDI.product_def_id = @${productDefIdParam};
+        SET @deletedPdImages = @@ROWCOUNT;
+
+        -- Delete from images (base class) using the collected IDs
+        DELETE I
+        FROM dbo.images AS I
+        JOIN #ImagesToDelete AS IMG ON IMG.image_id = I.image_id;
+        SET @deletedImages = @@ROWCOUNT;
 
         -- 1) Delete indirect dependencies: links
         DELETE L
@@ -105,6 +129,8 @@ export async function deleteProductDefinition(
 
         -- Return deletion stats for logging
         SELECT
+          @deletedImages     AS deletedImages,
+          @deletedPdImages   AS deletedProductDefinitionImages,
           @deletedLinks      AS deletedLinks,
           @deletedAttributes AS deletedAttributes,
           @deletedOfferings  AS deletedOfferings,
@@ -116,10 +142,17 @@ export async function deleteProductDefinition(
       if (res?.recordset?.[0]) {
         stats = res.recordset[0];
         // "total" = sum of children (not including the master row)
-        stats.total = (stats.deletedLinks ?? 0) + (stats.deletedAttributes ?? 0) + (stats.deletedOfferings ?? 0);
+        stats.total =
+          (stats.deletedImages ?? 0) +
+          (stats.deletedProductDefinitionImages ?? 0) +
+          (stats.deletedLinks ?? 0) +
+          (stats.deletedAttributes ?? 0) +
+          (stats.deletedOfferings ?? 0);
       } else {
         stats = {
           total: 0,
+          deletedImages: 0,
+          deletedProductDefinitionImages: 0,
           deletedLinks: 0,
           deletedAttributes: 0,
           deletedOfferings: 0,
@@ -129,6 +162,7 @@ export async function deleteProductDefinition(
 
       log.debug(
         `(delete) Cascade stats for ProductDefinition ${id}: ` +
+          `images=${stats.deletedImages}, pdImages=${stats.deletedProductDefinitionImages}, ` +
           `links=${stats.deletedLinks}, attrs=${stats.deletedAttributes}, ` +
           `offerings=${stats.deletedOfferings}, pdefs=${stats.deletedProductDefinitions}`,
       );

@@ -233,13 +233,14 @@ export async function checkProductCategoryMasterDependencies(
  * This is used before deleting a product_definitions record to see if it would
  * orphan any offerings, which is not allowed.
  * @param productDefId The ID of the product definition to check.
- * @returns An array of strings describing the found dependencies.
+ * @returns An object with hard dependencies (offerings) and soft dependencies (images).
  */
 export async function checkProductDefinitionDependencies(
   productDefId: number,
   transaction: Transaction | null,
 ): Promise<{ hard: string[]; soft: string[] }> {
-  const dependencies: string[] = [];
+  const hardDependencies: string[] = [];
+  const softDependencies: string[] = [];
   log.info(`(dependencyChecks) Checking master dependencies for productDefId: ${productDefId}`);
 
   const transWrapper = new TransWrapper(transaction, null);
@@ -247,14 +248,25 @@ export async function checkProductDefinitionDependencies(
 
   try {
     // Hard Dependency: Offerings (dbo.wholesaler_item_offerings)
-    const offeringsCheck = await db.request().input("productDefId", productDefId).query`
-      SELECT COUNT(*) as count 
+    const offeringsCheck = await transWrapper.request().input("productDefId", productDefId).query`
+      SELECT COUNT(*) as count
       FROM dbo.wholesaler_item_offerings
       WHERE product_def_id = @productDefId
     `;
 
     if (offeringsCheck.recordset[0].count > 0) {
-      dependencies.push(`${offeringsCheck.recordset[0].count} product offerings`);
+      hardDependencies.push(`${offeringsCheck.recordset[0].count} product offerings`);
+    }
+
+    // Soft Dependency: Product Definition Images (dbo.product_definition_images)
+    const imagesCheck = await transWrapper.request().input("productDefId", productDefId).query`
+      SELECT COUNT(*) as count
+      FROM dbo.product_definition_images
+      WHERE product_def_id = @productDefId
+    `;
+
+    if (imagesCheck.recordset[0].count > 0) {
+      softDependencies.push(`${imagesCheck.recordset[0].count} product images`);
     }
 
     transWrapper.commit();
@@ -263,9 +275,10 @@ export async function checkProductDefinitionDependencies(
   }
 
   log.info(`(dependencyChecks) Found dependencies for productDefId: ${productDefId}`, {
-    dependencies,
+    hard: hardDependencies,
+    soft: softDependencies,
   });
-  return { hard: dependencies, soft: [] };
+  return { hard: hardDependencies, soft: softDependencies };
 }
 
 /**
@@ -450,4 +463,36 @@ export async function checkOrderItemDependencies(
   log.info(`(dependencyChecks) Found dependencies for orderItemId: ${orderItemId}`, { soft: softDependencies });
   // OrderItems are leaf nodes - no hard dependencies that would prevent deletion
   return { hard: [], soft: softDependencies };
+}
+
+/**
+ * Checks for dependencies on a ProductDefinitionImage.
+ * Images are typically leaf nodes with no dependencies, but this function
+ * is provided for consistency with the dependency checking pattern.
+ * @param imageId The image_id (PK for both images and product_definition_images tables)
+ * @param transaction The active database transaction object.
+ * @returns An object containing lists of hard and soft dependencies (typically empty).
+ */
+export async function checkProductDefinitionImageDependencies(
+  imageId: number,
+  transaction: Transaction | null,
+): Promise<{ hard: string[]; soft: string[] }> {
+  log.info(`(dependencyChecks) Checking dependencies for imageId: ${imageId}`);
+
+  const transWrapper = new TransWrapper(transaction, null);
+  transWrapper.begin();
+
+  try {
+    // Product definition images are leaf nodes in the data model
+    // They don't have any dependencies that would prevent deletion
+    // This check is here for pattern consistency and future extensibility
+
+    transWrapper.commit();
+  } catch {
+    transWrapper.rollback();
+  }
+
+  log.info(`(dependencyChecks) Found dependencies for imageId: ${imageId}`, { hard: [], soft: [] });
+  // Images are leaf nodes - no dependencies that would prevent deletion
+  return { hard: [], soft: [] };
 }

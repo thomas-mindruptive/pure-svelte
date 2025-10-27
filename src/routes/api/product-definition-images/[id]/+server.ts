@@ -18,6 +18,7 @@ import {
   loadProductDefinitionImagesWithImage,
   deleteProductDefinitionImageWithImage,
 } from "$lib/backendQueries/entityOperations/image";
+import { checkProductDefinitionImageDependencies } from "$lib/backendQueries/dependencyChecks";
 import type { ProductDefinitionImage_Image } from "$lib/domain/domainTypes";
 import { v4 as uuidv4 } from "uuid";
 import { ComparisonOperator, LogicalOperator, type QueryPayload } from "$lib/backendQueries/queryGrammar";
@@ -26,6 +27,9 @@ import type {
   ApiSuccessResponse,
   QueryRequest,
   QuerySuccessResponse,
+  DeleteRequest,
+  DeleteSuccessResponse,
+  DeleteConflictResponse,
 } from "$lib/api/api.types";
 
 /**
@@ -193,7 +197,7 @@ export const PUT: RequestHandler = async ({ params, request }) => {
  * - product_definition_images (subclass)
  * - images (base class)
  */
-export const DELETE: RequestHandler = async ({ params }) => {
+export const DELETE: RequestHandler = async ({ params, request }) => {
   const operationId = uuidv4();
   const info = `DELETE /api/product-definition-images/${params.id} - ${operationId}`;
   log.infoHeader(info);
@@ -207,21 +211,53 @@ export const DELETE: RequestHandler = async ({ params }) => {
       return errorResponse;
     }
 
+    const requestBody = (await request.json()) as DeleteRequest<ProductDefinitionImage_Image>;
+    const { cascade = false, forceCascade = false } = requestBody;
+    log.info(`[${operationId}] Delete request with cascade=${cascade}, forceCascade=${forceCascade}`);
+
     await tw.begin();
+    log.info(`[${operationId}] Transaction started for product definition image deletion.`);
+
+    // === CHECK DEPENDENCIES =====================================================================
+
+    const { hard, soft } = await checkProductDefinitionImageDependencies(id, tw.trans);
+    log.info(`Product definition image has dependent objects:`, { hard, soft });
+
+    if ((soft.length > 0 && !cascade) || (hard.length > 0 && !forceCascade)) {
+      await tw.rollback();
+      const conflictResponse: DeleteConflictResponse<string[]> = {
+        success: false,
+        message: "Cannot delete product definition image: It is still in use by other entities.",
+        status_code: 409,
+        error_code: "DEPENDENCY_CONFLICT",
+        dependencies: { hard, soft },
+        cascade_available: hard.length === 0,
+        meta: { timestamp: new Date().toISOString() },
+      };
+      log.warn(`[${operationId}] FN_FAILURE: Deletion blocked by dependencies.`, { dependencies: { hard, soft } });
+      return json(conflictResponse, { status: 409 });
+    }
+
+    // === DELETE =================================================================================
+
+    const dependenciesCleared = hard.length + soft.length;
+    log.info(`[${operationId}] Proceeding with deletion. Dependencies to clear: ${dependenciesCleared}`);
+
     const { deletedPdi, deletedImage } = await deleteProductDefinitionImageWithImage(tw.trans, id);
     await tw.commit();
 
-    const response: ApiSuccessResponse<{
-      deleted_product_definition_image: any;
-      deleted_image: any;
-      message: string;
-    }> = {
+    const deletedResource: ProductDefinitionImage_Image = {
+      ...deletedPdi,
+      image: deletedImage,
+    };
+
+    const response: DeleteSuccessResponse<ProductDefinitionImage_Image> = {
       success: true,
       message: `Product definition image (ID: ${id}) deleted completely from both tables (OOP inheritance).`,
       data: {
-        deleted_product_definition_image: deletedPdi,
-        deleted_image: deletedImage,
-        message: "Both base class (Image) and subclass (ProductDefinitionImage) records deleted atomically."
+        deleted_resource: deletedResource,
+        cascade_performed: cascade || forceCascade,
+        dependencies_cleared: dependenciesCleared,
       },
       meta: { timestamp: new Date().toISOString() },
     };

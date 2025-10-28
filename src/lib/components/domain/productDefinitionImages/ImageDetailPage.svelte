@@ -8,6 +8,8 @@
   import { addNotification } from "$lib/stores/notifications";
   import { log } from "$lib/utils/logger";
   import { browser } from "$app/environment";
+  import "$lib/components/styles/detail-page-layout.css";
+  import "$lib/components/styles/form-elements.css";
 
   // === TYPES ====================================================================================
 
@@ -79,15 +81,15 @@
 
 <!-- TEMPLATE -->
 
-<div class="image-detail-page">
-  <div class="page-header">
-    <h1>{isCreateMode ? "Create New Image" : `Edit Image ${imageId}`}</h1>
-    <button onclick={handleBack}>Back to Images</button>
-  </div>
+{#if isLoading}
+  <div class="detail-page-layout">Loading image details...</div>
+{:else}
+  <div class="detail-page-layout">
+    <div class="page-header">
+      <h1>{isCreateMode ? "Create New Image" : `Edit Image ${imageId}`}</h1>
+      <button class="secondary-button" onclick={handleBack}>Back to Images</button>
+    </div>
 
-  {#if isLoading}
-    <div class="loading">Loading image details...</div>
-  {:else}
     <div class="placeholder">
       <p>Image Detail Form - Coming Soon</p>
       <p>imageId: {imageId}</p>
@@ -97,8 +99,8 @@
         <pre>{JSON.stringify(image, null, 2)}</pre>
       {/if}
     </div>
-  {/if}
-</div>
+  </div>
+{/if}
 
 <style>
   .image-detail-page {

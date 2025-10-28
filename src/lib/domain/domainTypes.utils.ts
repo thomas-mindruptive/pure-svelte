@@ -178,6 +178,95 @@ export function genTypedQualifiedColumns<T extends z.ZodObject<z.ZodRawShape>>(
   return columns as QualifiedColumnsFromBrandedSchemaWithJoins<T>[];
 }
 
+/**
+ * Generates qualified columns for FOR JSON PATH queries.
+ * Uses field names in AS clause to create nested JSON structure directly.
+ *
+ * Example: `pd.title AS 'product_def.title'`
+ * → FOR JSON PATH produces: {product_def: {title: "..."}}
+ *
+ * Compared to genTypedQualifiedColumns which produces:
+ * `pd.title AS 'pd.title'` → FOR JSON PATH produces: {pd: {title: "..."}}
+ *
+ * @param schema - Zod schema with branded nested schemas
+ * @param qualifyAllColsFully - If true, qualify base table columns too
+ * @returns Array of SQL column expressions for FOR JSON PATH
+ */
+export function genColumnsForJsonPath<T extends z.ZodObject<z.ZodRawShape>>(
+  schema: T,
+  qualifyAllColsFully = false,
+): string[] {
+  const columns: string[] = [];
+  const shape = schema.shape;
+  const baseMeta = (schema as any).__brandMeta;
+  const baseAlias = baseMeta?.alias;
+
+  if (qualifyAllColsFully && !baseAlias) {
+    throw new Error(
+      `qualifyAllColsFully=true requires base schema to have metadata with alias. ` +
+        `Use copyMetaFrom() after .extend() to preserve metadata from the base schema.`,
+    );
+  }
+
+  for (const [fieldName, zodType] of Object.entries(shape)) {
+    if (zodType instanceof z.ZodObject) {
+      const brandedZodType = zodType as BrandedSchemaWithDef;
+      const meta = (brandedZodType as any).__brandMeta;
+
+      if (!meta?.alias) {
+        const schemaKeys = zodType.keyof().options as readonly string[];
+
+        log.debug(`Trying to match schema for field '${fieldName}' with keys:`, schemaKeys);
+        log.debug(
+          "Available schemas in map:",
+          Array.from(schemaByAlias.entries()).map(([alias, s]) => ({
+            alias,
+            keys: s.keyof().options,
+          })),
+        );
+
+        const schemaEntry = Array.from(schemaByAlias.entries()).find(([alias, s]) => {
+          const mapSchemaKeys = s.keyof().options as readonly string[];
+          const match = mapSchemaKeys.length === schemaKeys.length && schemaKeys.every((key) => mapSchemaKeys.includes(key));
+          if (match) {
+            log.debug(`Found matching schema with alias '${alias}'`);
+          }
+          return match;
+        });
+
+        if (schemaEntry) {
+          const [alias] = schemaEntry;
+          // Use field name in AS clause for nested JSON structure
+          columns.push(...schemaKeys.map((key) => `${alias}.${key} AS '${fieldName}.${key}'`));
+          continue;
+        }
+
+        throw new Error(
+          `Schema for nested field '${fieldName}' has no meta.alias and could not be matched. ` +
+            `Schema keys: [${schemaKeys.join(", ")}]. ` +
+            `Available aliases in map: [${Array.from(schemaByAlias.keys()).join(", ")}]. ` +
+            `All nested schemas must be branded schemas created with createSchemaWithMeta.`,
+        );
+      }
+
+      const nestedKeys = zodType.keyof().options as readonly string[];
+      // Use field name in AS clause for nested JSON structure
+      columns.push(...nestedKeys.map((key) => `${meta.alias}.${key} AS '${fieldName}.${key}'`));
+    } else {
+      if (qualifyAllColsFully && baseAlias) {
+        // Base table columns without nested prefix
+        columns.push(`${baseAlias}.${fieldName} AS '${fieldName}'`);
+      } else {
+        columns.push(fieldName);
+      }
+    }
+  }
+
+  log.info(`Generated columns for JSON PATH:`, columns);
+
+  return columns;
+}
+
 // ===== LOOKUP UTILS =====
 
 /**

@@ -1,6 +1,6 @@
 // File: src/lib/backendQueries/entityOperations/image.ts
 
-import { validateEntityBySchema, genTypedQualifiedColumns } from "$lib/domain/domainTypes.utils";
+import { validateEntityBySchema, genColumnsForJsonPath } from "$lib/domain/domainTypes.utils";
 import {
   ProductDefinitionImage_Image_Schema,
   ImageForCreateSchema,
@@ -356,7 +356,7 @@ export async function loadProductDefinitionImagesWithImage(
         }
       }
     ],
-    select: genTypedQualifiedColumns(ProductDefinitionImage_Image_Schema, true),
+    select: genColumnsForJsonPath(ProductDefinitionImage_Image_Schema, true),
     orderBy: [{ key: "pdi.sort_order" as keyof ProductDefinitionImage_Image, direction: "asc" }]
   };
 

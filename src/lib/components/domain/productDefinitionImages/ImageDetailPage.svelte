@@ -3,13 +3,14 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import { ApiClient } from "$lib/api/client/ApiClient";
-  import { getProductDefinitionImageApi } from "$lib/api/client/productDefinitionImage";
+  import { getProductDefinitionImageApi, productDefinitionImageLoadingState } from "$lib/api/client/productDefinitionImage";
   import type { ProductDefinitionImage_Image } from "$lib/domain/domainTypes";
   import { addNotification } from "$lib/stores/notifications";
   import { log } from "$lib/utils/logger";
   import { browser } from "$app/environment";
   import "$lib/components/styles/detail-page-layout.css";
   import "$lib/components/styles/form-elements.css";
+  import ImageForm from "./ImageForm.svelte";
 
   // === TYPES ====================================================================================
 
@@ -50,8 +51,28 @@
           if (aborted) return;
           log.debug(`Loaded image`, { image });
         } else {
-          // Create mode - initialize empty
-          image = null;
+          // Create mode - initialize with empty structure and defaults
+          image = {
+            product_def_id: productDefId,
+            sort_order: 0,
+            is_primary: false,
+            image_type: null,
+            size_range: null,
+            quality_grade: null,
+            color_variant: null,
+            image: {
+              filename: "",
+              filepath: "",
+              file_hash: null,
+              file_size_bytes: null,
+              width_px: null,
+              height_px: null,
+              mime_type: null,
+              shopify_url: null,
+              shopify_media_id: null,
+              uploaded_to_shopify_at: null,
+            },
+          } as Partial<ProductDefinitionImage_Image> as ProductDefinitionImage_Image;
         }
       } catch (err: any) {
         if (aborted) return;
@@ -77,6 +98,42 @@
   function handleBack() {
     goto(`/categories/${categoryId}/productdefinitions/${productDefId}/images`);
   }
+
+  async function handleFormSubmitted(info: { data: ProductDefinitionImage_Image; result: unknown }) {
+    log.info(`Image ${isCreateMode ? "created" : "updated"} successfully`, info.result);
+    addNotification(`Image ${isCreateMode ? "created" : "updated"} successfully.`, "success");
+
+    if (isCreateMode) {
+      // After creating, navigate to the edit page for the new image
+      const createdImage = info.result as ProductDefinitionImage_Image;
+      if (createdImage?.image_id) {
+        goto(`/categories/${categoryId}/productdefinitions/${productDefId}/images/${createdImage.image_id}`);
+      } else {
+        addNotification("Could not redirect to edit page, returning to image list.", "error");
+        handleBack();
+      }
+    } else {
+      // In edit mode, reload the image to show updated data
+      if (typeof imageId === "number") {
+        image = await imageApi.loadProductDefinitionImage(imageId);
+      }
+    }
+  }
+
+  async function handleFormSubmitError(info: { data: ProductDefinitionImage_Image; error: unknown }) {
+    log.error(`Image submit error`, info.error);
+    addNotification(`Image submit error: ${info.error}`, "error");
+  }
+
+  async function handleFormCancelled(info: { data: ProductDefinitionImage_Image; reason?: string }) {
+    log.debug(`Image form cancelled`);
+    addNotification(`Form cancelled.`, "info");
+    handleBack();
+  }
+
+  async function handleFormChanged(event: { data: Record<string, any> }) {
+    log.debug(`Image form changed`);
+  }
 </script>
 
 <!-- TEMPLATE -->
@@ -90,45 +147,39 @@
       <button class="secondary-button" onclick={handleBack}>Back to Images</button>
     </div>
 
-    <div class="placeholder">
-      <p>Image Detail Form - Coming Soon</p>
-      <p>imageId: {imageId}</p>
-      <p>productDefId: {productDefId}</p>
-      <p>categoryId: {categoryId}</p>
-      {#if image}
-        <pre>{JSON.stringify(image, null, 2)}</pre>
-      {/if}
+    <div class="form-section">
+      <ImageForm
+        initial={image}
+        {productDefId}
+        {isCreateMode}
+        disabled={$productDefinitionImageLoadingState}
+        onSubmitted={handleFormSubmitted}
+        onSubmitError={handleFormSubmitError}
+        onCancelled={handleFormCancelled}
+        onChanged={handleFormChanged}
+      />
     </div>
   </div>
 {/if}
 
 <style>
-  .image-detail-page {
-    padding: 2rem;
-  }
-
+  /* Page-specific header layout with button */
   .page-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--color-border);
   }
 
-  .loading {
-    padding: 2rem;
-    text-align: center;
+  .page-header h1 {
+    margin: 0;
   }
 
-  .placeholder {
-    padding: 2rem;
-    border: 2px dashed var(--color-border);
-    border-radius: 8px;
-  }
-
-  pre {
+  /* Form container styling */
+  .form-section {
     background: var(--color-background);
-    padding: 1rem;
-    border-radius: 4px;
-    overflow: auto;
+    border-radius: 8px;
+    border: 1px solid var(--color-border);
   }
 </style>

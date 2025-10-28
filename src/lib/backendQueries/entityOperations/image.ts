@@ -19,6 +19,104 @@ import { buildQuery } from "../queryBuilder";
 import { JoinType, LogicalOperator, ComparisonOperator, type QueryPayload } from "../queryGrammar";
 import type { QueryConfig } from "../queryConfig";
 
+// Node.js modules for file metadata extraction
+import * as path from 'path';
+import * as fs from 'fs/promises';
+import { existsSync } from 'fs';
+import * as crypto from 'crypto';
+import * as mime from 'mime-types';
+import sharp from 'sharp';
+
+// ===== HELPER FUNCTIONS: Image Metadata Enrichment =====
+
+/**
+ * Calculates SHA-256 hash of a file.
+ * @param filepath - Absolute path to the file
+ * @returns Hex-encoded SHA-256 hash
+ */
+async function calculateFileHash(filepath: string): Promise<string> {
+  const fileBuffer = await fs.readFile(filepath);
+  const hashSum = crypto.createHash('sha256');
+  hashSum.update(fileBuffer);
+  return hashSum.digest('hex');
+}
+
+/**
+ * Extracts and enriches image metadata from a file based on filepath.
+ *
+ * Automatically sets:
+ * - filename (extracted from filepath)
+ * - file_hash (SHA-256)
+ * - file_size_bytes (file size)
+ * - mime_type (detected from extension)
+ * - width_px, height_px (for image files only)
+ *
+ * @param imageData - Partial Image object with at least filepath
+ * @returns Enriched Image object with calculated metadata
+ * @throws Error 400 if filepath is missing or file not found
+ */
+async function enrichImageMetadata(
+  imageData: Partial<Image>
+): Promise<Partial<Image>> {
+  const { filepath } = imageData;
+
+  if (!filepath) {
+    throw error(400, "filepath is required for metadata enrichment");
+  }
+
+  // Extract filename from filepath
+  const filename = path.basename(filepath);
+
+  // Check if file exists
+  if (!existsSync(filepath)) {
+    throw error(400, `File not found at path: ${filepath}`);
+  }
+
+  // 1. File Stats (size)
+  const stats = await fs.stat(filepath);
+  const file_size_bytes = stats.size;
+
+  // 2. File Hash (SHA-256)
+  const file_hash = await calculateFileHash(filepath);
+
+  // 3. MIME Type
+  const mime_type = mime.lookup(filepath) || null;
+
+  // 4. Image Dimensions (only for image files)
+  let width_px: number | null = null;
+  let height_px: number | null = null;
+  if (mime_type?.startsWith('image/')) {
+    try {
+      const metadata = await sharp(filepath).metadata();
+      width_px = metadata.width || null;
+      height_px = metadata.height || null;
+    } catch (err) {
+      log.warn("Could not extract image dimensions", { filepath, error: err });
+      // Non-fatal: continue without dimensions
+    }
+  }
+
+  log.debug("enrichImageMetadata", {
+    filepath,
+    filename,
+    file_size_bytes,
+    mime_type,
+    dimensions: width_px && height_px ? `${width_px}x${height_px}` : null,
+  });
+
+  return {
+    ...imageData,
+    filename,
+    file_hash,
+    file_size_bytes,
+    width_px,
+    height_px,
+    mime_type,
+  };
+}
+
+// ===== ENTITY OPERATIONS =====
+
 /**
  * Inserts a new ProductDefinitionImage (which extends Image using OOP inheritance).
  * Validates the complete nested object, then inserts both records atomically.
@@ -56,14 +154,46 @@ export async function insertProductDefinitionImageWithImage(
 
   const sanitized = validation.sanitized as any;
 
-  // 2. Insert Image (base class)
-  log.debug("Inserting image", { filename: sanitized.image.filename });
-  const insertedImage = (await insertRecordWithTransaction(ImageForCreateSchema, sanitized.image, transaction)) as Image;
+  // 2. Enrich Image metadata (filename, hash, size, dimensions, mime type)
+  log.debug("Enriching image metadata", { filepath: sanitized.image.filepath });
+  const enrichedImageData = await enrichImageMetadata(sanitized.image);
 
-  // 3. Insert ProductDefinitionImage (subclass) with THE SAME image_id (OOP inheritance)
+  // 3. Check if Image already exists (UNIQUE constraint on filepath)
+  // If exists, reuse it instead of creating duplicate
+  const checkExistingRequest = transaction.request();
+  checkExistingRequest.input('filepath', enrichedImageData.filepath);
+  const existingResult = await checkExistingRequest.query(
+    'SELECT image_id FROM dbo.images WHERE filepath = @filepath'
+  );
+
+  let insertedImage: Image;
+  if (existingResult.recordset.length > 0) {
+    // Reuse existing image
+    const existingImageId = existingResult.recordset[0].image_id;
+    log.debug("Reusing existing image", { image_id: existingImageId, filepath: enrichedImageData.filepath });
+
+    // Load the existing image data
+    const loadRequest = transaction.request();
+    loadRequest.input('id', existingImageId);
+    const loadResult = await loadRequest.query('SELECT * FROM dbo.images WHERE image_id = @id');
+    insertedImage = loadResult.recordset[0] as Image;
+  } else {
+    // Insert new Image (base class) with enriched metadata
+    log.debug("Inserting new image", { filename: enrichedImageData.filename });
+    // Type assertion: enrichedImageData now has all required fields after enrichment
+    insertedImage = (await insertRecordWithTransaction(ImageForCreateSchema, enrichedImageData as any, transaction)) as Image;
+  }
+
+  // 4. Insert ProductDefinitionImage (subclass) with THE SAME image_id (OOP inheritance)
   const pdiData = {
     image_id: insertedImage.image_id,  // ← Same ID as parent (inheritance pattern)
     product_def_id: sanitized.product_def_id,
+    // Variant Matching Fields
+    material_id: sanitized.material_id,
+    form_id: sanitized.form_id,
+    surface_finish_id: sanitized.surface_finish_id,
+    construction_type_id: sanitized.construction_type_id,
+    // Image Metadata
     size_range: sanitized.size_range,
     quality_grade: sanitized.quality_grade,
     color_variant: sanitized.color_variant,
@@ -131,6 +261,12 @@ export async function updateProductDefinitionImageWithImage(
 
   // 2. Update Image (base class) if image data provided
   if (sanitized.image && Object.keys(sanitized.image).length > 0) {
+    // Re-enrich metadata if filepath changed
+    if (sanitized.image.filepath) {
+      log.debug("Filepath changed, re-enriching metadata", { filepath: sanitized.image.filepath });
+      sanitized.image = await enrichImageMetadata(sanitized.image);
+    }
+
     log.debug("Updating image (base class)", { image_id: sanitized.image_id });
     await updateRecordWithTransaction(ImageSchema, sanitized.image_id, "image_id", sanitized.image, transaction);
   }

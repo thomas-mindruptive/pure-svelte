@@ -2,6 +2,7 @@
   import { ApiClient } from "$lib/api/client/ApiClient";
   import { getProductDefinitionImageApi } from "$lib/api/client/productDefinitionImage";
   import Field from "$lib/components/forms/Field.svelte";
+  import StaticFieldValue from "$lib/components/forms/StaticFieldValue.svelte";
   import type {
     CancelledCallback,
     ChangedCallback,
@@ -10,13 +11,14 @@
     SubmittedCallback,
     ValidateResult,
   } from "$lib/components/forms/forms.types";
-  import FormShell, { type FieldsSnippetProps } from "$lib/components/forms/FormShell.svelte";
+  import FormShell from "$lib/components/forms/FormShell.svelte";
   import "$lib/components/styles/form.css";
   import "$lib/components/styles/grid.css";
   import type { ValidationErrorTree } from "$lib/components/validation/validation.types";
   import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
   import {
     ProductDefinitionImage_Image_Schema,
+    ImageSizeRange,
     type ProductDefinitionImage_Image,
   } from "$lib/domain/domainTypes";
   import { zodToValidationErrorTree } from "$lib/domain/domainTypes.utils";
@@ -54,6 +56,38 @@
   const client = new ApiClient(fetch);
   const imageApi = getProductDefinitionImageApi(client);
 
+  // === HELPER FUNCTIONS =========================================================================
+
+  /**
+   * Formats file size from bytes to human-readable format (KB, MB, GB)
+   */
+  function formatFileSize(bytes: number | null | undefined): string {
+    if (bytes === null || bytes === undefined) return 'N/A';
+    if (bytes === 0) return '0 Bytes';
+
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
+  }
+
+  /**
+   * Truncates a hash to first 16 characters + ellipsis
+   */
+  function truncateHash(hash: string | null | undefined): string {
+    if (!hash) return 'N/A';
+    return hash.length > 16 ? `${hash.substring(0, 16)}...` : hash;
+  }
+
+  /**
+   * Formats image dimensions as "width x height px"
+   */
+  function formatDimensions(data: { w: number | null; h: number | null }): string {
+    if (!data.w || !data.h) return 'N/A';
+    return `${data.w} × ${data.h} px`;
+  }
+
   // === VALIDATE =================================================================================
 
   const { zodErrors, formData } = $derived.by(() => {
@@ -87,13 +121,12 @@
 
   function validateImage(raw: Record<string, any>): ValidateResult<ProductDefinitionImage_Image> {
     const data = raw as ProductDefinitionImage_Image;
-    const errors: Errors<ProductDefinitionImage_Image> = {};
+    const errors: Record<string, string[]> = {};
 
     // Validate image fields
+    // NOTE: filename, file_hash, file_size_bytes, width_px, height_px, mime_type are server-calculated
+    // Only filepath is required from the user
     if (data.image) {
-      if (!data.image.filename?.trim()) {
-        errors["image.filename"] = ["Filename is required"];
-      }
       if (!data.image.filepath?.trim()) {
         errors["image.filepath"] = ["Filepath is required"];
       }
@@ -106,7 +139,7 @@
 
     return {
       valid: Object.keys(errors).length === 0,
-      errors,
+      errors: errors as Errors<ProductDefinitionImage_Image>,
     };
   }
 
@@ -189,106 +222,132 @@
 
     <!-- Fields ---------------------------------------------------------------------------------->
     {#snippet fields(fieldProps)}
+      {@const image = fieldProps.data as ProductDefinitionImage_Image}
       <div class="form-body">
         <div class="form-row-grid">
           <!-- ===== IMAGE FIELDS ===== -->
 
-          <!-- Filename ---------------------------------------------------------------------->
-          <Field
-            {fieldProps}
-            path={["image", "filename"]}
-            label="Filename"
-            placeholder="Enter filename"
-            required
-            class="span-2"
-          />
-
-          <!-- Filepath ---------------------------------------------------------------------->
+          <!-- Filepath (REQUIRED - user enters) --------------------------------------------->
           <Field
             {fieldProps}
             path={["image", "filepath"]}
             label="Filepath"
-            placeholder="Enter filepath or URL"
+            placeholder="Enter absolute filepath (e.g., C:\images\rose-quartz.jpg)"
             required
-            class="span-2"
+            class="span-5"
           />
 
-          <!-- MIME Type --------------------------------------------------------------------->
-          <Field
-            {fieldProps}
-            path={["image", "mime_type"]}
-            label="MIME Type"
-            placeholder="e.g., image/jpeg"
-          />
+          <!-- Readonly Metadata (EDIT MODE ONLY - server-calculated) ----------------------->
+          {#if !isCreateMode}
+            <!-- Filename (readonly, extracted from filepath) -->
+            <StaticFieldValue
+              label="Filename"
+              value={image?.image?.filename}
+              class="span-2"
+            />
 
-          <!-- File Size --------------------------------------------------------------------->
+            <!-- File Hash (readonly, SHA-256) -->
+            <StaticFieldValue
+              label="File Hash (SHA-256)"
+              value={image?.image?.file_hash}
+              formatter={truncateHash}
+              hint="Truncated"
+              class="span-2"
+            />
+
+            <!-- File Size (readonly, bytes → KB/MB) -->
+            <StaticFieldValue
+              label="File Size"
+              value={image?.image?.file_size_bytes}
+              formatter={formatFileSize}
+            />
+
+            <!-- Dimensions (readonly, width x height) -->
+            <StaticFieldValue
+              label="Dimensions"
+              value={{w: image?.image?.width_px, h: image?.image?.height_px}}
+              formatter={formatDimensions}
+            />
+
+            <!-- MIME Type (readonly, detected from extension) -->
+            <StaticFieldValue
+              label="MIME Type"
+              value={image?.image?.mime_type}
+            />
+          {/if}
+
+          <!-- ===== VARIANT MATCHING FIELDS (for image matching logic) ===== -->
+
+          <!-- Material (e.g., Rose Quartz, Amethyst) ---------------------------------------->
           <Field
             {fieldProps}
-            path={["image", "file_size_bytes"]}
-            label="File Size (bytes)"
+            path={["material_id"]}
+            label="Material (optional)"
             type="number"
-            placeholder="File size in bytes"
+            placeholder="Material ID"
           />
 
-          <!-- Width ------------------------------------------------------------------------->
+          <!-- Form (e.g., Sphere, Pyramid, Heart) ------------------------------------------->
           <Field
             {fieldProps}
-            path={["image", "width_px"]}
-            label="Width (px)"
+            path={["form_id"]}
+            label="Form (optional)"
             type="number"
-            placeholder="Image width"
+            placeholder="Form ID"
           />
 
-          <!-- Height ------------------------------------------------------------------------>
+          <!-- Surface Finish (e.g., Polished, Tumbled) -------------------------------------->
           <Field
             {fieldProps}
-            path={["image", "height_px"]}
-            label="Height (px)"
+            path={["surface_finish_id"]}
+            label="Surface Finish (optional)"
             type="number"
-            placeholder="Image height"
+            placeholder="Surface Finish ID"
           />
 
-          <!-- File Hash --------------------------------------------------------------------->
+          <!-- Construction Type (e.g., Threaded, Pendant) ----------------------------------->
           <Field
             {fieldProps}
-            path={["image", "file_hash"]}
-            label="File Hash"
-            placeholder="SHA-256 hash"
-            class="span-2"
+            path={["construction_type_id"]}
+            label="Construction Type (optional)"
+            type="number"
+            placeholder="Construction Type ID"
           />
+
+          <!-- Color Variant (e.g., pink, purple, deep pink) -------------------------------->
+          <Field
+            {fieldProps}
+            path={["color_variant"]}
+            label="Color Variant"
+            placeholder="e.g., pink, purple (optional)"
+          />
+
+          <!-- Size Range (XS, S, M, L, XL, S-M, M-L, L-XL) ---------------------------------->
+          <div class="form-group">
+            <label for="size-range-select">Size Range</label>
+            <select
+              id="size-range-select"
+              value={fieldProps.get(["size_range"]) ?? ""}
+              onchange={(e) => {
+                const value = e.currentTarget.value;
+                fieldProps.set(["size_range"], value === "" ? null : value as typeof ImageSizeRange[keyof typeof ImageSizeRange]);
+              }}
+            >
+              <option value="">-- No Size Restriction --</option>
+              {#each Object.values(ImageSizeRange) as size}
+                <option value={size}>{size}</option>
+              {/each}
+            </select>
+          </div>
 
           <!-- ===== PRODUCT DEFINITION IMAGE FIELDS ===== -->
 
-          <!-- Image Type -------------------------------------------------------------------->
+          <!-- Image Type (product, detail, lifestyle) --------------------------------------->
           <Field
             {fieldProps}
             path={["image_type"]}
             label="Image Type"
             placeholder="e.g., product, detail, lifestyle"
-          />
-
-          <!-- Size Range -------------------------------------------------------------------->
-          <Field
-            {fieldProps}
-            path={["size_range"]}
-            label="Size Range"
-            placeholder="e.g., S-XL, 100-300W"
-          />
-
-          <!-- Quality Grade ----------------------------------------------------------------->
-          <Field
-            {fieldProps}
-            path={["quality_grade"]}
-            label="Quality Grade"
-            placeholder="e.g., A, B, premium"
-          />
-
-          <!-- Color Variant ----------------------------------------------------------------->
-          <Field
-            {fieldProps}
-            path={["color_variant"]}
-            label="Color Variant"
-            placeholder="e.g., black, silver"
           />
 
           <!-- Sort Order --------------------------------------------------------------------->

@@ -263,6 +263,7 @@ const Wio_BaseSchema = z
     form_id: z.number().int().positive().nullable().optional(),
     construction_type_id: z.number().int().positive().nullable().optional(),
     surface_finish_id: z.number().int().positive().nullable().optional(),
+    color_variant: z.string().max(100).nullable().optional(), // For image matching
     title: z.string().max(255).nullable().optional(),
     size: z.string().max(50).nullable().optional(),
     dimensions: z.string().max(100).nullable().optional(),
@@ -566,24 +567,63 @@ export const ImageSchema = createSchemaWithMeta(ImageSchemaBase, {
 
 /**
  * Schema for creating a new Image.
- * Omits server-generated fields.
+ * Omits server-generated fields (including auto-calculated metadata).
  */
 const tempImageForCreate = ImageSchema.omit({
   image_id: true,
   created_at: true,
+  // Server-calculated fields (enrichImageMetadata):
+  filename: true,
+  file_hash: true,
+  file_size_bytes: true,
+  width_px: true,
+  height_px: true,
+  mime_type: true,
 }).describe("ImageForCreateSchema");
 export const ImageForCreateSchema = copyMetaFrom(ImageSchema, tempImageForCreate);
+
+// ===== IMAGE SIZE RANGE ENUM =====
+
+/**
+ * Size range enum for images (matching DB CHECK constraint).
+ * Used for matching images to offerings based on size.
+ */
+export const ImageSizeRange = {
+  XS: 'XS',
+  S: 'S',
+  M: 'M',
+  L: 'L',
+  XL: 'XL',
+  S_M: 'S-M',
+  M_L: 'M-L',
+  L_XL: 'L-XL',
+} as const;
+
+export type ImageSizeRange = typeof ImageSizeRange[keyof typeof ImageSizeRange];
+
+export const ImageSizeRangeEnum = z.enum([
+  'XS', 'S', 'M', 'L', 'XL', 'S-M', 'M-L', 'L-XL'
+]);
 
 // ===== PRODUCT DEFINITION IMAGE (dbo.product_definition_images) =====
 // OOP Inheritance Pattern: ProductDefinitionImage extends Image
 // - image_id is PRIMARY KEY (same as the inherited Image)
 // - Adds product context and variant dimensions
+// - Includes variant matching fields for offering image matching
 
 const ProductDefinitionImageSchemaBase = z
   .object({
     image_id: z.number().int().positive(), // PK + FK: OOP inheritance pattern
     product_def_id: z.number().int().positive(),
-    size_range: z.string().max(50).nullable().optional(),
+
+    // Variant Matching Fields (for findBestMatchingImage)
+    material_id: z.number().int().positive().nullable().optional(),
+    form_id: z.number().int().positive().nullable().optional(),
+    surface_finish_id: z.number().int().positive().nullable().optional(),
+    construction_type_id: z.number().int().positive().nullable().optional(),
+
+    // Image Metadata
+    size_range: ImageSizeRangeEnum.nullable().optional(),
     quality_grade: z.string().max(10).nullable().optional(),
     color_variant: z.string().max(50).nullable().optional(),
     image_type: z.string().max(50).nullable().optional(),

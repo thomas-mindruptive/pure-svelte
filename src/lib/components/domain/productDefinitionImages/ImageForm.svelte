@@ -3,6 +3,7 @@
   import { getProductDefinitionImageApi } from "$lib/api/client/productDefinitionImage";
   import Field from "$lib/components/forms/Field.svelte";
   import StaticFieldValue from "$lib/components/forms/StaticFieldValue.svelte";
+  import FormComboBox2 from "$lib/components/forms/FormComboBox2.svelte";
   import type {
     CancelledCallback,
     ChangedCallback,
@@ -11,7 +12,7 @@
     SubmittedCallback,
     ValidateResult,
   } from "$lib/components/forms/forms.types";
-  import FormShell from "$lib/components/forms/FormShell.svelte";
+  import FormShell, { type FieldsSnippetProps } from "$lib/components/forms/FormShell.svelte";
   import "$lib/components/styles/form.css";
   import "$lib/components/styles/grid.css";
   import type { ValidationErrorTree } from "$lib/components/validation/validation.types";
@@ -20,6 +21,10 @@
     ProductDefinitionImage_Image_Schema,
     ImageSizeRange,
     type ProductDefinitionImage_Image,
+    type Material,
+    type Form,
+    type ConstructionType,
+    type SurfaceFinish,
   } from "$lib/domain/domainTypes";
   import { zodToValidationErrorTree } from "$lib/domain/domainTypes.utils";
   import { assertDefined } from "$lib/utils/assertions";
@@ -32,6 +37,10 @@
   export type Props = {
     initial?: ProductDefinitionImage_Image | undefined | null;
     productDefId: number;
+    materials: Material[];
+    forms: Form[];
+    constructionTypes: ConstructionType[];
+    surfaceFinishes: SurfaceFinish[];
     disabled?: boolean;
     isCreateMode: boolean;
     onSubmitted?: SubmittedCallback;
@@ -43,6 +52,10 @@
   const {
     initial: initialData,
     productDefId,
+    materials,
+    forms,
+    constructionTypes,
+    surfaceFinishes,
     disabled = false,
     onSubmitted,
     isCreateMode,
@@ -183,6 +196,80 @@
   }
 </script>
 
+<!-- SNIPPETS ------------------------------------------------------------------------------------>
+
+<!--
+  -- Material combo
+  -->
+{#snippet materialCombo(fieldProps: FieldsSnippetProps<ProductDefinitionImage_Image>)}
+  <FormComboBox2
+    {fieldProps}
+    items={materials}
+    path={["material_id"]}
+    labelPath={["name"]}
+    valuePath={["material_id"]}
+    placeholder="Search materials..."
+    label="Material (optional)"
+    onChange={(value, material) => {
+      log.debug("Material selected:", { value, material_name: material?.name });
+    }}
+  />
+{/snippet}
+
+<!--
+  -- Form combo
+  -->
+{#snippet formCombo(fieldProps: FieldsSnippetProps<ProductDefinitionImage_Image>)}
+  <FormComboBox2
+    {fieldProps}
+    items={forms}
+    path={["form_id"]}
+    labelPath={["name"]}
+    valuePath={["form_id"]}
+    placeholder="Search forms..."
+    label="Form (optional)"
+    onChange={(value, form) => {
+      log.debug("Form selected:", { value, form_name: form?.name });
+    }}
+  />
+{/snippet}
+
+<!--
+  -- Surface Finish combo
+  -->
+{#snippet surfaceFinishCombo(fieldProps: FieldsSnippetProps<ProductDefinitionImage_Image>)}
+  <FormComboBox2
+    {fieldProps}
+    items={surfaceFinishes}
+    path={["surface_finish_id"]}
+    labelPath={["name"]}
+    valuePath={["surface_finish_id"]}
+    placeholder="Search surface finishes..."
+    label="Surface Finish (optional)"
+    onChange={(value, surfaceFinish) => {
+      log.debug("Surface Finish selected:", { value, surface_finish_name: surfaceFinish?.name });
+    }}
+  />
+{/snippet}
+
+<!--
+  -- Construction Type combo
+  -->
+{#snippet constructionTypeCombo(fieldProps: FieldsSnippetProps<ProductDefinitionImage_Image>)}
+  <FormComboBox2
+    {fieldProps}
+    items={constructionTypes}
+    path={["construction_type_id"]}
+    labelPath={["name"]}
+    valuePath={["construction_type_id"]}
+    placeholder="Search construction types..."
+    label="Construction Type (optional)"
+    onChange={(value, constructionType) => {
+      log.debug("Construction Type selected:", { value, construction_type_name: constructionType?.name });
+    }}
+  />
+{/snippet}
+
 <!-- TEMPLATE ------------------------------------------------------------------------------------>
 
 <ValidationWrapper errors={zodErrors}>
@@ -279,40 +366,16 @@
           <!-- ===== VARIANT MATCHING FIELDS (for image matching logic) ===== -->
 
           <!-- Material (e.g., Rose Quartz, Amethyst) ---------------------------------------->
-          <Field
-            {fieldProps}
-            path={["material_id"]}
-            label="Material (optional)"
-            type="number"
-            placeholder="Material ID"
-          />
+          {@render materialCombo(fieldProps)}
 
           <!-- Form (e.g., Sphere, Pyramid, Heart) ------------------------------------------->
-          <Field
-            {fieldProps}
-            path={["form_id"]}
-            label="Form (optional)"
-            type="number"
-            placeholder="Form ID"
-          />
+          {@render formCombo(fieldProps)}
 
           <!-- Surface Finish (e.g., Polished, Tumbled) -------------------------------------->
-          <Field
-            {fieldProps}
-            path={["surface_finish_id"]}
-            label="Surface Finish (optional)"
-            type="number"
-            placeholder="Surface Finish ID"
-          />
+          {@render surfaceFinishCombo(fieldProps)}
 
           <!-- Construction Type (e.g., Threaded, Pendant) ----------------------------------->
-          <Field
-            {fieldProps}
-            path={["construction_type_id"]}
-            label="Construction Type (optional)"
-            type="number"
-            placeholder="Construction Type ID"
-          />
+          {@render constructionTypeCombo(fieldProps)}
 
           <!-- Color Variant (e.g., pink, purple, deep pink) -------------------------------->
           <Field

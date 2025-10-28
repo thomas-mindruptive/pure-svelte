@@ -4,7 +4,11 @@
   import { goto } from "$app/navigation";
   import { ApiClient } from "$lib/api/client/ApiClient";
   import { getProductDefinitionImageApi, productDefinitionImageLoadingState } from "$lib/api/client/productDefinitionImage";
-  import type { ProductDefinitionImage_Image } from "$lib/domain/domainTypes";
+  import { getMaterialApi } from "$lib/api/client/material";
+  import { getFormApi } from "$lib/api/client/form";
+  import { getConstructionTypeApi } from "$lib/api/client/constructionType";
+  import { getSurfaceFinishApi } from "$lib/api/client/surfaceFinish";
+  import type { ProductDefinitionImage_Image, Material, Form, ConstructionType, SurfaceFinish } from "$lib/domain/domainTypes";
   import { addNotification } from "$lib/stores/notifications";
   import { log } from "$lib/utils/logger";
   import { browser } from "$app/environment";
@@ -27,11 +31,19 @@
 
   let isLoading = $state(true);
   let image: ProductDefinitionImage_Image | null = $state(null);
+  let materials: Material[] = $state([]);
+  let forms: Form[] = $state([]);
+  let constructionTypes: ConstructionType[] = $state([]);
+  let surfaceFinishes: SurfaceFinish[] = $state([]);
 
   // === API ======================================================================================
 
   const client = new ApiClient(fetch);
   const imageApi = getProductDefinitionImageApi(client);
+  const materialApi = getMaterialApi(client);
+  const formApi = getFormApi(client);
+  const constructionTypeApi = getConstructionTypeApi(client);
+  const surfaceFinishApi = getSurfaceFinishApi(client);
 
   // === LOAD DATA ================================================================================
 
@@ -46,9 +58,26 @@
       isLoading = true;
 
       try {
-        if (!isCreateMode && typeof imageId === "number") {
-          image = await imageApi.loadProductDefinitionImage(imageId);
-          if (aborted) return;
+        // Load lookups and image data in parallel
+        const [materialsData, formsData, constructionTypesData, surfaceFinishesData, imageData] = await Promise.all([
+          materialApi.loadMaterials(),
+          formApi.loadForms(),
+          constructionTypeApi.loadConstructionTypes(),
+          surfaceFinishApi.loadSurfaceFinishes(),
+          !isCreateMode && typeof imageId === "number"
+            ? imageApi.loadProductDefinitionImage(imageId)
+            : Promise.resolve(null),
+        ]);
+
+        if (aborted) return;
+
+        materials = materialsData;
+        forms = formsData;
+        constructionTypes = constructionTypesData;
+        surfaceFinishes = surfaceFinishesData;
+
+        if (!isCreateMode && imageData) {
+          image = imageData;
           log.debug(`Loaded image`, { image });
         } else {
           // Create mode - initialize with empty structure and defaults
@@ -76,7 +105,7 @@
         }
       } catch (err: any) {
         if (aborted) return;
-        const message = err.message || "Failed to load image.";
+        const message = err.message || "Failed to load image or lookup data.";
         addNotification(`Error: ${message}`, "error");
         log.error("Failed to load image", { err });
       } finally {
@@ -152,6 +181,10 @@
         initial={image}
         {productDefId}
         {isCreateMode}
+        {materials}
+        {forms}
+        {constructionTypes}
+        {surfaceFinishes}
         disabled={$productDefinitionImageLoadingState}
         onSubmitted={handleFormSubmitted}
         onSubmitError={handleFormSubmitError}

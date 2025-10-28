@@ -27,7 +27,7 @@
   --color-primary-lighter: color-mix(in srgb, var(--color-primary) 10%, white);
 
   /* Gedämpftes Grau für Untertexte */
-  --color-muted: #b8cbe6;
+  --color-muted: #8ca7cd;
 
   /* Helles Grau für Ränder */
   --color-border: #e2e8f0;

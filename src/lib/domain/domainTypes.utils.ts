@@ -195,7 +195,7 @@ export function genTypedQualifiedColumns<T extends z.ZodObject<z.ZodRawShape>>(
 export function genColumnsForJsonPath<T extends z.ZodObject<z.ZodRawShape>>(
   schema: T,
   qualifyAllColsFully = false,
-): string[] {
+): QualifiedColumnsFromBrandedSchemaWithJoins<T>[] {
   const columns: string[] = [];
   const shape = schema.shape;
   const baseMeta = (schema as any).__brandMeta;
@@ -264,7 +264,7 @@ export function genColumnsForJsonPath<T extends z.ZodObject<z.ZodRawShape>>(
 
   log.info(`Generated columns for JSON PATH:`, columns);
 
-  return columns;
+  return columns as QualifiedColumnsFromBrandedSchemaWithJoins<T>[];
 }
 
 // ===== LOOKUP UTILS =====

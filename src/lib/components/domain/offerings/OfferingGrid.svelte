@@ -41,7 +41,7 @@
       accessor: (offering) => offering.product_def.title || "Unnamed Product",
     },
     {
-      key: "title",
+      key: "wio.title",
       header: "Offering",
       sortable: true,
     },
@@ -58,7 +58,7 @@
       accessor: (offering) => offering.sub_seller || "—",
     },
     {
-      key: "price",
+      key: "wio.price",
       header: "Price",
       sortable: true,
       accessor: (offering) => {

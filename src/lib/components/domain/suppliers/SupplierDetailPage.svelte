@@ -318,7 +318,7 @@
   // === ORDERS GRID ==============================================================================
 
   const ordersColumns: ColumnDef<typeof Order_Wholesaler_Schema>[] = [
-    { key: "order_id", header: "ID", accessor: null, sortable: true },
+    { key: "ord.order_id", header: "ID", accessor: null, sortable: true },
     { key: "w.name", header: "Wholesaler", accessor: (order) => order.wholesaler.name, sortable: true },
   ];
   const getOrdersRowId = (o: Order) => o.order_id;

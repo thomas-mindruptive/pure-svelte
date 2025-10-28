@@ -9,7 +9,8 @@
       "WebFetch(domain:commons.wikimedia.org)",
       "Bash(curl:*)",
       "Read(//c/dev/pureenergyworks/pure-shopify/**)",
-      "Read(//c/dev/pureenergyworks/**)"
+      "Read(//c/dev/pureenergyworks/**)",
+      "mcp__ide__getDiagnostics"
     ],
     "deny": [],
     "ask": []

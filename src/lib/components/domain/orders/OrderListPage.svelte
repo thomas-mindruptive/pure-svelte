@@ -142,8 +142,8 @@
 
   const columns: ColumnDef<typeof Order_Wholesaler_Schema>[] = [
     { key: "w.name", header: "Wholesaler", accessor: (order) => order.wholesaler.name, sortable: true },
-    { key: "order_id", header: "ID", accessor: null, sortable: true },
-    { key: "order_date", header: "Date", accessor: (order) => isoDateStringToLocale(order.order_date), sortable: true },
+    { key: "ord.order_id", header: "ID", accessor: null, sortable: true },
+    { key: "ord.order_date", header: "Date", accessor: (order) => isoDateStringToLocale(order.order_date), sortable: true },
   ];
 
   const getId = (r: Order_Wholesaler) => r.order_id;

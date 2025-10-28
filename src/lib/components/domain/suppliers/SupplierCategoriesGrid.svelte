@@ -29,14 +29,14 @@
   const columns = $derived.by((): ColumnDef<typeof WholesalerCategory_CategorySchema>[] => {
     if (showOfferingCount) {
       const colsWithAccessor: ColumnDef<typeof WholesalerCategory_CategorySchema>[] = [
-        { key: "category_name", header: "Category Name", sortable: true, width: "3fr", accessor: null },
+        { key: "pc.name", header: "Category Name", sortable: true, width: "3fr", accessor: null },
         { key: "comment", header: "Comment", sortable: false, width: "2fr", accessor: null },
         { key: "link", header: "Link", sortable: false, width: "2fr", accessor: null },
       ];
       return colsWithAccessor;
     } else {
       const colsDirect: ColumnDef<typeof WholesalerCategory_CategorySchema>[] = [
-        { key: "category_name", header: "Category Name", sortable: true, width: "3fr" },
+        { key: "pc.name", header: "Category Name", sortable: true, width: "3fr" },
         { key: "comment", header: "Comment", sortable: false, width: "2fr" },
         { key: "link", header: "Link", sortable: false, width: "2fr" },
       ];

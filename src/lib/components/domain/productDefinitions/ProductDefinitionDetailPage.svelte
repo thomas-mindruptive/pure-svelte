@@ -353,14 +353,14 @@
   };
 
   const imagesColumns: ColumnDef<typeof ProductDefinitionImage_Image_ProductDef_Schema>[] = [
-    { key: "image_id", header: "ID", accessor: null, sortable: true },
+    { key: "pdi.image_id", header: "ID", accessor: null, sortable: true },
     { key: "img.filename", header: "Filename", accessor: (img) => img.image.filename || "—", sortable: true },
-    { key: "image_type", header: "Type", accessor: (img) => img.image_type || "—", sortable: true },
-    { key: "size_range", header: "Size Range", accessor: (img) => img.size_range || "—", sortable: true },
-    { key: "quality_grade", header: "Quality", accessor: (img) => img.quality_grade || "—", sortable: true },
-    { key: "color_variant", header: "Color", accessor: (img) => img.color_variant || "—", sortable: true },
-    { key: "sort_order", header: "Sort", accessor: null, sortable: true },
-    { key: "is_primary", header: "Primary", accessor: (img) => img.is_primary ? "Yes" : "No", sortable: true },
+    { key: "pdi.image_type", header: "Type", accessor: (img) => img.image_type || "—", sortable: true },
+    { key: "pdi.size_range", header: "Size Range", accessor: (img) => img.size_range || "—", sortable: true },
+    { key: "pdi.quality_grade", header: "Quality", accessor: (img) => img.quality_grade || "—", sortable: true },
+    { key: "pdi.color_variant", header: "Color", accessor: (img) => img.color_variant || "—", sortable: true },
+    { key: "pdi.sort_order", header: "Sort", accessor: null, sortable: true },
+    { key: "pdi.is_primary", header: "Primary", accessor: (img) => img.is_primary ? "Yes" : "No", sortable: true },
   ];
 
   const getImageRowId = (image: ProductDefinitionImage_Image) => image.image_id;

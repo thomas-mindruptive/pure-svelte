@@ -279,8 +279,6 @@ const nestedObjects = transformToNestedObjects(
 // }]
 ```
 
-**Reference Implementation:** `src/lib/api/client/orderItem.ts:41-77`, `src/lib/api/client/supplier.ts:387-414`
-
 ## Legacy Pattern: Flat Schemas (Deprecated)
 
 **Avoid:** Creating flat schemas with aliased fields. This duplicates field definitions and loses type safety.
@@ -295,6 +293,50 @@ export const OrderItem_Flat_Schema = z.object({
 ```
 
 Use nested schemas with `transformToNestedObjects` instead.
+
+## Best Practice: defaultOrderBy in API Functions
+
+When implementing sortable queries with optional user-provided sorting, avoid duplicate ORDER BY columns:
+
+```typescript
+async function loadItems(
+  itemId: number,
+  where?: WhereConditionGroup<Item> | null,
+  orderBy?: SortDescriptor<Item>[] | null
+): Promise<Item[]> {
+  // ✅ CORRECT: Use user orderBy OR default (mutually exclusive)
+  const completeOrderBy: SortDescriptor<Item>[] =
+    orderBy && orderBy.length > 0
+      ? orderBy
+      : [{ key: "item.created_at", direction: "desc" }];
+
+  const request: PredefinedQueryRequest<Item> = {
+    namedQuery: "items_query",
+    payload: {
+      where: { key: "item.parent_id", whereCondOp: "=", val: itemId },
+      orderBy: completeOrderBy
+    }
+  };
+  // ...
+}
+```
+
+**Anti-Pattern** (creates SQL errors with duplicate columns):
+```typescript
+// ❌ WRONG - Always appends default, even if user already sorted by that column
+const defaultOrderBy = [{ key: "item.created_at", direction: "desc" }];
+const completeOrderBy = [];
+if (orderBy) completeOrderBy.push(...orderBy);
+completeOrderBy.push(...defaultOrderBy); // BUG: Creates duplicate if orderBy contains same key!
+
+// Example: If user sorts by "item.created_at" ascending:
+// Result: ORDER BY item.created_at ASC, item.created_at DESC  ❌
+// SQL Server error: "ORDER BY items must be unique"
+```
+
+**Reference Implementations:**
+- `src/lib/api/client/supplier.ts` (`loadCategoriesForSupplier`, `loadOrdersForSupplier`)
+- `src/lib/api/client/order.ts` (`loadOrderItemsForOrder`)
 
 ## Architecture Benefits
 

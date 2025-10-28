@@ -294,10 +294,10 @@ export function getOrderApi(client: ApiClient) {
           completeWhereGroup = orderFilterWhere;
         }
 
-        const defaultOrderBy: SortDescriptor<OrderItem_ProdDef_Category>[] = [{ key: "pc.name", direction: "asc" }];
-        const completeOrderBy: SortDescriptor<OrderItem_ProdDef_Category>[] = [];
-        if (orderBy) completeOrderBy.push(...orderBy);
-        completeOrderBy.push(...defaultOrderBy);
+        const completeOrderBy: SortDescriptor<OrderItem_ProdDef_Category>[] =
+          orderBy && orderBy.length > 0
+            ? orderBy
+            : [{ key: "pc.name", direction: "asc" }];
 
         const request: PredefinedQueryRequest<OrderItem_ProdDef_Category> = {
           namedQuery: "order->order_items->product_def->category",

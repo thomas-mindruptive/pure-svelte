@@ -24,7 +24,7 @@
     ProductCategorySchema,
     type Wholesaler,
     type WholesalerCategory,
-    type WholesalerCategory_Category,
+    type WholesalerCategory_Category_Nested,
     WholesalerSchema,
   } from "$lib/domain/domainTypes";
   // Schemas
@@ -62,7 +62,7 @@
   // === STATE ====================================================================================
 
   let supplier = $state<Wholesaler | null>(null);
-  let assignedCategories = $state<WholesalerCategory_Category[]>([]);
+  let assignedCategories = $state<WholesalerCategory_Category_Nested[]>([]);
   let availableCategories = $state<ProductCategory[]>([]);
   let orders = $state<Order_Wholesaler[]>([]);
 
@@ -297,20 +297,20 @@
   /**
    * Navigates to the next hierarchy level (offerings for a category).
    */
-  function handleCategorySelect(category: WholesalerCategory_Category) {
+  function handleCategorySelect(category: WholesalerCategory_Category_Nested) {
     goto(buildChildUrl(page.url.pathname, "categories", category.category_id));
   }
 
   // Strategy objects for the CategoryGrid component.
-  const categoriesDeleteStrategy: DeleteStrategy<WholesalerCategory_Category> = {
+  const categoriesDeleteStrategy: DeleteStrategy<WholesalerCategory_Category_Nested> = {
     execute: handleCategoryDelete,
   };
 
-  const categoriesRowActionStrategy: RowActionStrategy<WholesalerCategory_Category> = {
+  const categoriesRowActionStrategy: RowActionStrategy<WholesalerCategory_Category_Nested> = {
     click: handleCategorySelect,
   };
 
-  async function handleCategoriesSort(sortState: SortDescriptor<WholesalerCategory_Category>[] | null) {
+  async function handleCategoriesSort(sortState: SortDescriptor<WholesalerCategory_Category_Nested>[] | null) {
     assertDefined(supplier, "supplier");
     assignedCategories = await supplierApi.loadCategoriesForSupplier(supplier.wholesaler_id, null, sortState);
   }

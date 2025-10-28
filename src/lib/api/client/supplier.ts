@@ -26,6 +26,8 @@ import {
   type WholesalerCategory_Category,
   type WholesalerCategoryWithCount,
   type Wio_PDef_Cat_Supp_Nested,
+  WholesalerCategory_Category_Nested_Schema,
+  type WholesalerCategory_Category_Nested,
 } from "$lib/domain/domainTypes";
 import { log } from "$lib/utils/logger";
 
@@ -216,9 +218,9 @@ export function getSupplierApi(client: ApiClient) {
      */
     async loadCategoriesForSupplier(
       supplierId: number,
-      where?: WhereConditionGroup<WholesalerCategoryWithCount> | null,
-      orderBy?: SortDescriptor<WholesalerCategoryWithCount>[] | null,
-    ): Promise<WholesalerCategoryWithCount[]> {
+      where?: WhereConditionGroup<WholesalerCategory_Category_Nested> | null,
+      orderBy?: SortDescriptor<WholesalerCategory_Category_Nested>[] | null,
+    ): Promise<WholesalerCategory_Category_Nested[]> {
       const operationId = `loadCategoriesForSupplier-${supplierId}`;
       supplierLoadingOperations.start(operationId);
       try {
@@ -228,7 +230,9 @@ export function getSupplierApi(client: ApiClient) {
           val: supplierId,
         };
 
-        let completeWhereGroup: WhereCondition<WholesalerCategoryWithCount> | WhereConditionGroup<WholesalerCategoryWithCount>;
+        let completeWhereGroup:
+          | WhereCondition<WholesalerCategory_Category_Nested>
+          | WhereConditionGroup<WholesalerCategory_Category_Nested>;
         if (where) {
           completeWhereGroup = {
             whereCondOp: "AND",
@@ -238,15 +242,14 @@ export function getSupplierApi(client: ApiClient) {
           completeWhereGroup = supplierFilterWhere;
         }
 
-        const defaultOrderBy: SortDescriptor<WholesalerCategoryWithCount>[] = [{ key: "pc.name", direction: "asc" }];
-        const completeOrderBy: SortDescriptor<WholesalerCategoryWithCount>[] = [];
-        if (orderBy) completeOrderBy.push(...orderBy);
-        completeOrderBy.push(...defaultOrderBy);
+        const completeOrderBy: SortDescriptor<WholesalerCategory_Category_Nested>[] =
+          orderBy && orderBy.length > 0 ? orderBy : [{ key: "pc.name", direction: "asc" }];
 
-        const request: PredefinedQueryRequest<WholesalerCategoryWithCount> = {
+        const cols = genTypedQualifiedColumns(WholesalerCategory_Category_Nested_Schema, true);
+        const request: PredefinedQueryRequest<WholesalerCategory_Category_Nested> = {
           namedQuery: "supplier_categories",
           payload: {
-            select: ["w.wholesaler_id", "wc.category_id", "pc.name AS category_name", "wc.comment", "wc.link"],
+            select: cols, //["w.wholesaler_id", "wc.category_id", "pc.name AS category_name", "wc.comment", "wc.link"],
             where: completeWhereGroup,
             orderBy: completeOrderBy,
           },
@@ -256,7 +259,8 @@ export function getSupplierApi(client: ApiClient) {
           { method: "POST", body: createJsonBody(request) },
           { context: operationId },
         );
-        return responseData.results as WholesalerCategoryWithCount[];
+        const nestedRes = transformToNestedObjects(responseData.results, WholesalerCategory_Category_Nested_Schema);
+        return nestedRes;
       } catch (err) {
         log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
         throw err;
@@ -474,10 +478,7 @@ export function getSupplierApi(client: ApiClient) {
           { context: operationId },
         );
         // Transform flat recordset to nested objects
-        const transformed = transformToNestedObjects(
-          responseData.results as Record<string, unknown>[],
-          Wio_PDef_Cat_Supp_Nested_Schema,
-        );
+        const transformed = transformToNestedObjects(responseData.results as Record<string, unknown>[], Wio_PDef_Cat_Supp_Nested_Schema);
         return transformed;
       } catch (err) {
         log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
@@ -516,10 +517,10 @@ export function getSupplierApi(client: ApiClient) {
           completeWhereGroup = supplierFilterWhere;
         }
 
-        const defaultOrderBy: SortDescriptor<Order_Wholesaler>[] = [{ key: "ord.created_at", direction: "desc" }];
-        const completeOrderBy: SortDescriptor<Order_Wholesaler>[] = [];
-        if (orderBy) completeOrderBy.push(...orderBy);
-        completeOrderBy.push(...defaultOrderBy);
+        const completeOrderBy: SortDescriptor<Order_Wholesaler>[] =
+          orderBy && orderBy.length > 0
+            ? orderBy
+            : [{ key: "ord.created_at", direction: "desc" }];
 
         const request: PredefinedQueryRequest<Order_Wholesaler> = {
           namedQuery: "order->wholesaler",

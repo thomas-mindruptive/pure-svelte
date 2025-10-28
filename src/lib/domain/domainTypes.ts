@@ -205,14 +205,20 @@ export const WholesalerCategoryForCreateSchema = copyMetaFrom(WholesalerCategory
 
 // ===== WHOLESALER CATEGORY including joins (dbo.wholesaler_categories) =====
 
-export const WholesalerCategory_CategorySchema = WholesalerCategorySchema.extend({
+export const WholesalerCategory_Category_Schema = WholesalerCategorySchema.extend({
   category_name: NameOrTitle,
   category_description: z.string().nullable().optional(),
-}).describe("WholesalerCategory_CategorySchema");
+}).describe("WholesalerCategory_Category_Schema");
+
+const tempWholesalerCategoryNested = WholesalerCategorySchema.extend({
+  category: ProductCategorySchema,
+}).describe("WholesalerCategory_Category_NestedSchema");
+
+export const WholesalerCategory_Category_Nested_Schema = copyMetaFrom(WholesalerCategorySchema, tempWholesalerCategoryNested);
 
 // ===== EXTENDED TYPES FOR MOCK DATA =====
 
-export const WholesalerCategoryWithCountSchema = WholesalerCategory_CategorySchema.extend({
+export const WholesalerCategoryWithCountSchema = WholesalerCategory_Category_Schema.extend({
   offering_count: z.number().int().nonnegative().optional(),
 }).describe("WholesalerCategoryWithCountSchema");
 
@@ -575,7 +581,7 @@ export const ImageForCreateSchema = copyMetaFrom(ImageSchema, tempImageForCreate
 
 const ProductDefinitionImageSchemaBase = z
   .object({
-    image_id: z.number().int().positive(),  // PK + FK: OOP inheritance pattern
+    image_id: z.number().int().positive(), // PK + FK: OOP inheritance pattern
     product_def_id: z.number().int().positive(),
     size_range: z.string().max(50).nullable().optional(),
     quality_grade: z.string().max(10).nullable().optional(),
@@ -622,27 +628,34 @@ export type Wholesaler = z.infer<typeof WholesalerSchema>;
 export type ProductCategory = z.infer<typeof ProductCategorySchema>;
 export type Attribute = z.infer<typeof AttributeSchema>;
 export type ProductDefinition = z.infer<typeof ProductDefinitionSchema>;
+
 export type WholesalerCategory = z.infer<typeof WholesalerCategorySchema>;
-export type WholesalerCategory_Category = z.infer<typeof WholesalerCategory_CategorySchema>;
+export type WholesalerCategory_Category = z.infer<typeof WholesalerCategory_Category_Schema>;
 export type WholesalerCategoryWithCount = z.infer<typeof WholesalerCategoryWithCountSchema>;
+export type WholesalerCategory_Category_Nested = z.infer<typeof WholesalerCategory_Category_Nested_Schema>;
+
 export type WholesalerItemOffering = z.infer<typeof Wio_Schema>;
 export type Wio_PDef = z.infer<typeof Wio_PDef_Schema>;
 export type Wio_PDef_Cat_Supp = z.infer<typeof Wio_PDef_Cat_Supp_Schema>;
 export type Wio_PDef_Cat_Supp_Nested = z.infer<typeof Wio_PDef_Cat_Supp_Nested_Schema>;
 export type Wio_PDef_Cat_Supp_WithLinks = z.infer<typeof Wio_PDef_Cat_Supp_WithLinks_Schema>;
 export type Wio_PDef_Cat_Supp_Nested_WithLinks = z.infer<typeof Wio_PDef_Cat_Supp_Nested_WithLinks_Schema>;
+
 export type WholesalerOfferingLink = z.infer<typeof WholesalerOfferingLinkSchema>;
 export type WholesalerOfferingAttribute = z.infer<typeof WholesalerOfferingAttributeSchema>;
 export type WholesalerOfferingAttribute_Attribute = z.infer<typeof WholesalerOfferingAttribute_AttributeSchema>;
+
 export type ProductType = z.infer<typeof ProductTypeSchema>;
 export type ConstructionType = z.infer<typeof ConstructionTypeSchema>;
 export type SurfaceFinish = z.infer<typeof SurfaceFinishSchema>;
 export type Material = z.infer<typeof MaterialSchema>;
 export type Form = z.infer<typeof FormSchema>;
+
 export type Order = z.infer<typeof OrderSchema>;
 export type Order_Wholesaler = z.infer<typeof Order_Wholesaler_Schema>;
 export type OrderItem = z.infer<typeof OrderItemSchema>;
 export type OrderItem_ProdDef_Category = z.infer<typeof OrderItem_ProdDef_Category_Schema>;
+
 export type Image = z.infer<typeof ImageSchema>;
 export type ProductDefinitionImage = z.infer<typeof ProductDefinitionImage_Schema>;
 export type ProductDefinitionImage_Image = z.infer<typeof ProductDefinitionImage_Image_Schema>;

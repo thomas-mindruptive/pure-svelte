@@ -2,50 +2,36 @@
   // Thin wrapper around Datagrid for categoriesAA
 
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
-  import type {
-      ColumnDef,
-      DeleteStrategy,
-      RowActionStrategy,
-      SortFunc
-  } from "$lib/components/grids/Datagrid.types";
+  import type { ColumnDef, DeleteStrategy, RowActionStrategy, SortFunc } from "$lib/components/grids/Datagrid.types";
 
-  import type { WholesalerCategory_Category, WholesalerCategory_CategorySchema } from "$lib/domain/domainTypes";
+  import type {
+      WholesalerCategory_Category_Nested,
+      WholesalerCategory_Category_Nested_Schema
+  } from "$lib/domain/domainTypes";
 
   // === PROPS ====================================================================================
 
   export type SupplierCategoriesGridProps = {
-    rows: WholesalerCategory_Category[];
+    rows: WholesalerCategory_Category_Nested[];
     loading?: boolean;
     showOfferingCount?: boolean;
-    deleteStrategy: DeleteStrategy<WholesalerCategory_Category>;
-    rowActionStrategy?: RowActionStrategy<WholesalerCategory_Category>;
-    onSort?: SortFunc<WholesalerCategory_Category> | undefined;
+    deleteStrategy: DeleteStrategy<WholesalerCategory_Category_Nested>;
+    rowActionStrategy?: RowActionStrategy<WholesalerCategory_Category_Nested>;
+    onSort?: SortFunc<WholesalerCategory_Category_Nested> | undefined;
   };
 
-  const { rows, loading = false, showOfferingCount = true, deleteStrategy, rowActionStrategy, onSort }: SupplierCategoriesGridProps = $props();
+  const { rows, loading = false, deleteStrategy, rowActionStrategy, onSort }: SupplierCategoriesGridProps = $props();
 
   // === COLUMNS ==================================================================================
 
-  const columns = $derived.by((): ColumnDef<typeof WholesalerCategory_CategorySchema>[] => {
-    if (showOfferingCount) {
-      const colsWithAccessor: ColumnDef<typeof WholesalerCategory_CategorySchema>[] = [
-        { key: "pc.name", header: "Category Name", sortable: true, width: "3fr", accessor: null },
-        { key: "comment", header: "Comment", sortable: false, width: "2fr", accessor: null },
-        { key: "link", header: "Link", sortable: false, width: "2fr", accessor: null },
-      ];
-      return colsWithAccessor;
-    } else {
-      const colsDirect: ColumnDef<typeof WholesalerCategory_CategorySchema>[] = [
-        { key: "pc.name", header: "Category Name", sortable: true, width: "3fr" },
-        { key: "comment", header: "Comment", sortable: false, width: "2fr" },
-        { key: "link", header: "Link", sortable: false, width: "2fr" },
-      ];
-      return colsDirect;
-    }
-  });
+  const columns: ColumnDef<typeof WholesalerCategory_Category_Nested_Schema>[] = [
+    { key: "pc.name", header: "Category Name", sortable: true, accessor: (wc) => wc.category.name },
+    { key: "wc.comment", header: "Comment", sortable: false, accessor: (wc) => wc.comment },
+    { key: "wc.link", header: "Link", sortable: false, accessor: (wc) => wc.link },
+  ];
 
   // Composite key for categories (wholesaler_id + category_id)
-  const getId = (r: WholesalerCategory_Category) => r.category_id;
+  const getId = (r: WholesalerCategory_Category_Nested) => r.category_id;
 </script>
 
 <Datagrid

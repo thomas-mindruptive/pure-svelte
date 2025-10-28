@@ -7,7 +7,7 @@
 
 import { z } from 'zod';
 import {
-	WholesalerCategory_CategorySchema,
+	WholesalerCategory_Category_Schema,
 	Wio_PDef_Cat_Supp_Nested_Schema
 } from '$lib/domain/domainTypes';
 import type { PromisifyComplex } from '$lib/utils/typeUtils';
@@ -24,7 +24,7 @@ export const SupplierCategoryDetailPage_LoadDataSchema = z.object({
 	 * This includes category name, description, and assignment-specific data like comments.
 	 * Can be null if the assignment is not found.
 	 */
-	assignmentDetails: WholesalerCategory_CategorySchema.nullable(),
+	assignmentDetails: WholesalerCategory_Category_Schema.nullable(),
 
 	/**
 	 * The list of offerings for this specific supplier and category.

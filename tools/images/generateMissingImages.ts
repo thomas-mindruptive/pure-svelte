@@ -16,17 +16,29 @@ import dotenv from "dotenv";
 import { db } from "$lib/backendQueries/db";
 import { log } from "$lib/utils/logger";
 import { analyzeOfferingsForImages, type OfferingWithImageAnalysis } from "$lib/backendQueries/offeringImageAnalysis";
-import { insertProductDefinitionImageWithImage } from "$lib/backendQueries/entityOperations/image";
+import { insertProductDefinitionImageWithImage, loadProductDefinitionImagesWithImage } from "$lib/backendQueries/entityOperations/image";
 import { loadConfig, type ImageGenerationConfig } from "./generateMissingImages.config";
 import { buildPrompt, generateImageFilename } from "./promptBuilder";
 import { initializeFalAi, generateImage, estimateCost } from "./falAiClient";
 import { downloadAndSaveImage, verifyImageDirectory } from "./imageProcessor";
+import { extractMatchCriteriaFromOffering, findBestMatchingImage } from "$lib/backendQueries/imageMatching";
+import { ComparisonOperator } from "$lib/backendQueries/queryGrammar";
+import type { ProductDefinitionImage_Image } from "$lib/domain/domainTypes";
+import type { Transaction } from "mssql";
 
 // Load environment variables
 dotenv.config();
 
 // Track start time
 const startTime = Date.now();
+
+/**
+ * Extended offering with generation plan flags
+ */
+interface OfferingWithGenerationPlan extends OfferingWithImageAnalysis {
+  willGenerate: boolean;
+  matchedInBatch: boolean;
+}
 
 
 /**
@@ -54,17 +66,115 @@ Examples:
 }
 
 /**
+ * Process offerings with cache simulation to prevent duplicate generations.
+ *
+ * Uses a cache to simulate "what if we generated images for previous offerings?"
+ * - If an offering matches an existing image (from DB or cache), mark willGenerate=false
+ * - If no match, mark willGenerate=true and add placeholder image to cache
+ *
+ * This prevents generating duplicate images for offerings with identical criteria
+ * within the same batch.
+ *
+ * @param offerings - Offerings that need image generation
+ * @param transaction - Active database transaction
+ * @returns Offerings with willGenerate and matchedInBatch flags
+ */
+async function processOfferingsWithCache(
+  offerings: OfferingWithImageAnalysis[],
+  transaction: Transaction,
+): Promise<OfferingWithGenerationPlan[]> {
+  // Cache: product_def_id -> Array of images (real + placeholders)
+  const imageCache = new Map<number, ProductDefinitionImage_Image[]>();
+
+  const results: OfferingWithGenerationPlan[] = [];
+
+  for (const offering of offerings) {
+    const product_def_id = offering.product_def.product_def_id;
+
+    // Get images from cache or load from DB
+    let availableImages = imageCache.get(product_def_id);
+
+    if (!availableImages) {
+      // Not cached yet - load from DB
+      const imagesJson = await loadProductDefinitionImagesWithImage(transaction, {
+        where: {
+          key: "pdi.product_def_id",
+          whereCondOp: ComparisonOperator.EQUALS,
+          val: product_def_id,
+        },
+      });
+      availableImages = JSON.parse(imagesJson) as ProductDefinitionImage_Image[];
+
+      // Store in cache
+      imageCache.set(product_def_id, availableImages);
+    }
+
+    // Check matching with ALL images in cache (real + placeholders)
+    const criteria = extractMatchCriteriaFromOffering(offering.offering);
+    const bestMatch = findBestMatchingImage(criteria, availableImages);
+
+    if (bestMatch) {
+      // Match found (either from DB or from previous offering in batch)
+      results.push({
+        ...offering,
+        willGenerate: false,
+        matchedInBatch: true,
+      });
+    } else {
+      // No match - must generate
+      results.push({
+        ...offering,
+        willGenerate: true,
+        matchedInBatch: false,
+      });
+
+      // Add placeholder image to cache for next offerings
+      const placeholderImage: ProductDefinitionImage_Image = {
+        image_id: -1, // Placeholder ID
+        product_def_id: product_def_id,
+        material_id: offering.offering.material_id,
+        form_id: offering.offering.form_id,
+        surface_finish_id: offering.offering.surface_finish_id,
+        construction_type_id: offering.offering.construction_type_id,
+        color_variant: offering.offering.color_variant,
+        image_type: "ai_generated",
+        is_primary: false,
+        sort_order: 999,
+        created_at: new Date().toISOString(),
+        // Nested image object (placeholder values - never committed to DB)
+        image: {
+          image_id: -1,
+          filename: "placeholder.jpg",
+          filepath: "placeholder.jpg",
+          file_hash: "placeholder",
+          file_size_bytes: 0,
+          width_px: null,
+          height_px: null,
+          mime_type: "image/jpeg",
+          created_at: new Date().toISOString(),
+        },
+      };
+
+      availableImages.push(placeholderImage);
+      // Cache is updated - next offering with same criteria will find this placeholder
+    }
+  }
+
+  return results;
+}
+
+/**
  * Print dry-run summary table
  */
-function printDryRunSummary(analysis: OfferingWithImageAnalysis[], config: ImageGenerationConfig) {
-  const toGenerate = analysis.filter((a) => a.needs_generation).slice(0, config.generation.batch_size);
+function printDryRunSummary(processedOfferings: OfferingWithGenerationPlan[], config: ImageGenerationConfig) {
+  const willGenerate = processedOfferings.filter((o) => o.willGenerate);
+  const willSkip = processedOfferings.filter((o) => !o.willGenerate);
 
   console.log("\n📊 Analysis Results:");
-  console.log(`- ${analysis.filter((a) => a.match_quality === "exact").length} offerings with exact match ✅`);
-  console.log(`- ${analysis.filter((a) => a.match_quality === "generic_fallback").length} offerings with generic fallback 🔄`);
-  console.log(`- ${analysis.filter((a) => a.match_quality === "none").length} offerings without images ❌`);
+  console.log(`- ${willGenerate.length} images would be generated ✅`);
+  console.log(`- ${willSkip.length} duplicates would be skipped ⏭️`);
 
-  console.log(`\n🎨 Would generate images for ${toGenerate.length} offerings:\n`);
+  console.log(`\n🎨 Processing plan for ${processedOfferings.length} offerings:\n`);
 
   const idWidth = 6;
   const titleWidth = 30;
@@ -74,6 +184,7 @@ function printDryRunSummary(analysis: OfferingWithImageAnalysis[], config: Image
   const constructionWidth = 12;
   const matchWidth = 8;
   const imagesWidth = 6;
+  const willGenWidth = 8;
 
   // Print table header
   console.log(
@@ -84,11 +195,12 @@ function printDryRunSummary(analysis: OfferingWithImageAnalysis[], config: Image
     "| Surface".padEnd(surfaceWidth + 3) +
     "| Constr".padEnd(constructionWidth + 3) +
     "| Match".padEnd(matchWidth + 3) +
-    "| Imgs".padEnd(imagesWidth + 3)
+    "| Imgs".padEnd(imagesWidth + 3) +
+    "| WillGen".padEnd(willGenWidth + 3)
   );
 
   // Print table rows
-  for (const item of toGenerate) {
+  for (const item of processedOfferings) {
     const prompt = buildPrompt(
       item.offering,
       item.product_def,
@@ -131,7 +243,11 @@ function printDryRunSummary(analysis: OfferingWithImageAnalysis[], config: Image
     // Available images count
     const imagesCount = item.available_images.length.toString().padEnd(imagesWidth);
 
-    console.log(`│ ${id} │ ${title} │ ${material} │ ${form} │ ${surface} │ ${construction} │ ${matchFormatted} │ ${imagesCount} │`);
+    // Will generate flag
+    const willGenIcon = item.willGenerate ? "✅" : "⏭️";
+    const willGenFormatted = willGenIcon.padEnd(willGenWidth);
+
+    console.log(`│ ${id} │ ${title} │ ${material} │ ${form} │ ${surface} │ ${construction} │ ${matchFormatted} │ ${imagesCount} │ ${willGenFormatted} │`);
 
     // Log full details if verbose
     if (config.verbose) {
@@ -153,9 +269,9 @@ function printDryRunSummary(analysis: OfferingWithImageAnalysis[], config: Image
     }
   }
 
-  const estimatedCost = estimateCost(toGenerate.length, config.generation.model);
+  const estimatedCost = estimateCost(willGenerate.length, config.generation.model);
   console.log(
-    `\n💰 Estimated cost: $${estimatedCost.toFixed(2)} (${toGenerate.length} images × $${(estimatedCost / toGenerate.length).toFixed(2)})`,
+    `\n💰 Estimated cost: $${estimatedCost.toFixed(2)} (${willGenerate.length} images × $${willGenerate.length > 0 ? (estimatedCost / willGenerate.length).toFixed(2) : "0.00"})`,
   );
 
   console.log("\nℹ️  This is a dry run. No images were generated.");
@@ -253,17 +369,24 @@ async function main() {
       return;
     }
 
+    // Process with cache simulation to prevent duplicates
+    const toProcess = needsGeneration.slice(0, config.generation.batch_size);
+    log.info(`🔄 Processing ${toProcess.length} offerings with cache simulation...`);
+    const processedOfferings = await processOfferingsWithCache(toProcess, transaction);
+    log.info(`✅ Cache simulation complete`);
+
     // Dry run mode: print summary and exit
     if (config.generation.dry_run) {
-      printDryRunSummary(offeringsToGenerate, config);
+      printDryRunSummary(processedOfferings, config);
       await transaction.rollback();
       await pool.close();
       return;
     }
 
     // Production mode: generate images
-    const toGenerate = needsGeneration.slice(0, config.generation.batch_size);
-    log.info(`\n🎨 Generating images for ${toGenerate.length} offerings...\n`);
+    const toGenerate = processedOfferings.filter((o) => o.willGenerate);
+    const toSkip = processedOfferings.filter((o) => !o.willGenerate);
+    log.info(`\n🎨 Generating images for ${toGenerate.length} offerings (skipping ${toSkip.length} duplicates)...\n`);
 
     // Initialize FAL client (only in production)
     initializeFalAi(process.env.FAL_KEY!);
@@ -346,12 +469,14 @@ async function main() {
     log.info("=" + "=".repeat(60));
     log.info("✅ Summary:");
     log.info(`   - ${successCount} images generated`);
+    log.info(`   - ${toSkip.length} duplicates skipped`);
     log.info(`   - ${failCount} failures`);
     log.info(`   - Total cost: $${totalCost.toFixed(2)}`);
     log.info(`   - Total time: ${elapsed}s`);
 
-    if (needsGeneration.length > toGenerate.length) {
-      log.info(`\n💡 ${needsGeneration.length - toGenerate.length} more offerings still need images.`);
+    const remainingCount = needsGeneration.length - processedOfferings.length;
+    if (remainingCount > 0) {
+      log.info(`\n💡 ${remainingCount} more offerings still need images.`);
       log.info("   Run the tool again to generate more.");
     } else {
       log.info("\n🎉 All offerings now have images!");

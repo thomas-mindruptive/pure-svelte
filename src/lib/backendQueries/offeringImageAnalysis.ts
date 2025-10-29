@@ -10,29 +10,22 @@
  * - Determining which offerings need image generation
  */
 
-import type { Transaction } from "mssql";
-import {
-  loadOfferingsForImageAnalysis,
-  type ImageAnalysisFilters
-} from "./entityOperations/offering.js";
-import { loadProductDefinitionImagesWithImage } from "./entityOperations/image.js";
-import {
-  extractMatchCriteriaFromOffering,
-  findBestMatchingImage,
-  type ImageMatchCriteria
-} from "./imageMatching.js";
 import type {
-  WholesalerItemOffering,
+  ConstructionType,
+  Form,
+  Material,
+  //WholesalerItemOffering,
   ProductDefinition,
   ProductDefinitionImage_Image,
-  Material,
-  Form,
   SurfaceFinish,
-  ConstructionType
+  Wio_pdef_mat_form_surf_constr_Nested,
 } from "$lib/domain/domainTypes";
 import { log } from "$lib/utils/logger";
+import type { Transaction } from "mssql";
+import { loadProductDefinitionImagesWithImage } from "./entityOperations/image.js";
+import { loadOfferingsForImageAnalysis, type ImageAnalysisFilters } from "./entityOperations/offering.js";
+import { extractMatchCriteriaFromOffering, findBestMatchingImage, type ImageMatchCriteria } from "./imageMatching.js";
 import { ComparisonOperator } from "./queryGrammar.js";
-import type { ProdDefLog } from "./imageGenTypes.js";
 
 /**
  * Match quality classification
@@ -43,7 +36,7 @@ export type MatchQuality = "exact" | "generic_fallback" | "none";
  * Complete analysis result for one offering
  */
 export interface OfferingWithImageAnalysis {
-  offering: WholesalerItemOffering;
+  offering: Wio_pdef_mat_form_surf_constr_Nested;
   product_def: ProductDefinition;
   material: Material | null;
   form: Form | null;
@@ -65,7 +58,7 @@ export interface OfferingWithImageAnalysis {
 function determineMatchQuality(
   bestMatch: ProductDefinitionImage_Image | null,
   criteria: ImageMatchCriteria,
-  availableImages: ProductDefinitionImage_Image[]
+  availableImages: ProductDefinitionImage_Image[],
 ): MatchQuality {
   if (!bestMatch) {
     return "none";
@@ -103,14 +96,13 @@ function determineMatchQuality(
  */
 export async function analyzeOfferingsForImages(
   transaction: Transaction,
-  filters: ImageAnalysisFilters = {},
-  verboseLog: ProdDefLog[],
+  filters: ImageAnalysisFilters = {}
 ): Promise<OfferingWithImageAnalysis[]> {
   log.info("analyzeOfferingsForImages: Starting analysis", { filters });
 
   // Step 1: Load offerings with all lookup data
   const offeringsJson = await loadOfferingsForImageAnalysis(transaction, filters);
-  const offerings = JSON.parse(offeringsJson) as any[];
+  const offerings = JSON.parse(offeringsJson) as Wio_pdef_mat_form_surf_constr_Nested[];
 
   log.info(`analyzeOfferingsForImages: Loaded ${offerings.length} offerings`);
 
@@ -118,27 +110,26 @@ export async function analyzeOfferingsForImages(
     return [];
   }
 
+  // TODO: Optimize queries: Iterate over all pdefs and then over offerings.
+
   // Step 2: Analyze each offering
   const results: OfferingWithImageAnalysis[] = [];
 
   for (const offering of offerings) {
     try {
       // 2a. Load available images for this product_def
-      const imagesJson = await loadProductDefinitionImagesWithImage(
-        transaction,
-        {
-          where: {
-            key: "pdi.product_def_id",
-            whereCondOp: ComparisonOperator.EQUALS,
-            val: offering.product_def_id
-          }
-        }
-      );
+      const imagesJson = await loadProductDefinitionImagesWithImage(transaction, {
+        where: {
+          key: "pdi.product_def_id",
+          whereCondOp: ComparisonOperator.EQUALS,
+          val: offering.product_def_id,
+        },
+      });
 
       const availableImages = JSON.parse(imagesJson) as ProductDefinitionImage_Image[];
 
       // 2b. Extract match criteria from offering
-      const criteria = extractMatchCriteriaFromOffering(offering as WholesalerItemOffering);
+      const criteria = extractMatchCriteriaFromOffering(offering as Wio_pdef_mat_form_surf_constr_Nested);
 
       // 2c. Find best matching image
       const bestMatch = findBestMatchingImage(criteria, availableImages);
@@ -146,44 +137,44 @@ export async function analyzeOfferingsForImages(
       // 2d. Determine match quality
       const matchQuality = determineMatchQuality(bestMatch, criteria, availableImages);
 
-      // 2e. Build analysis result
+      // 2e. Build analysis result with COALESCE logic
+      // If offering doesn't have material/form/etc, inherit from product_def
       results.push({
-        offering: offering as WholesalerItemOffering,
+        offering: offering as Wio_pdef_mat_form_surf_constr_Nested,
         product_def: offering.product_def as ProductDefinition,
-        material: offering.material || null,
-        form: offering.form || null,
-        surface_finish: offering.surface_finish || null,
-        construction_type: offering.construction_type || null,
+        material: offering.material || offering.product_def.material || null,
+        form: offering.form || offering.product_def.form || null,
+        surface_finish: offering.surface_finish || offering.product_def.surface_finish || null,
+        construction_type: offering.construction_type || offering.product_def.construction_type || null,
         available_images: availableImages,
         best_match: bestMatch,
         match_quality: matchQuality,
-        needs_generation: matchQuality === "none"
+        needs_generation: matchQuality === "none",
       });
 
       log.debug(`analyzeOfferingsForImages: Analyzed offering ${offering.offering_id}`, {
         offering_id: offering.offering_id,
         match_quality: matchQuality,
         best_match_id: bestMatch?.image_id,
-        available_images_count: availableImages.length
+        available_images_count: availableImages.length,
       });
-
     } catch (error) {
       log.error(`analyzeOfferingsForImages: Failed to analyze offering ${offering.offering_id}`, {
         offering_id: offering.offering_id,
-        error: String(error)
+        error: String(error),
       });
       // Continue with next offering instead of failing completely
     }
   }
 
-  const needsGenerationCount = results.filter(r => r.needs_generation).length;
+  const needsGenerationCount = results.filter((r) => r.needs_generation).length;
 
   log.info("analyzeOfferingsForImages: Analysis complete", {
     total_offerings: results.length,
     needs_generation: needsGenerationCount,
-    exact_matches: results.filter(r => r.match_quality === "exact").length,
-    generic_fallbacks: results.filter(r => r.match_quality === "generic_fallback").length,
-    no_images: results.filter(r => r.match_quality === "none").length
+    exact_matches: results.filter((r) => r.match_quality === "exact").length,
+    generic_fallbacks: results.filter((r) => r.match_quality === "generic_fallback").length,
+    no_images: results.filter((r) => r.match_quality === "none").length,
   });
 
   return results;

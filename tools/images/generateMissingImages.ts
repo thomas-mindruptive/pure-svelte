@@ -15,16 +15,12 @@
 import dotenv from "dotenv";
 import { db } from "$lib/backendQueries/db";
 import { log } from "$lib/utils/logger";
-import {
-  analyzeOfferingsForImages,
-  type OfferingWithImageAnalysis
-} from "$lib/backendQueries/offeringImageAnalysis";
+import { analyzeOfferingsForImages, type OfferingWithImageAnalysis } from "$lib/backendQueries/offeringImageAnalysis";
 import { insertProductDefinitionImageWithImage } from "$lib/backendQueries/entityOperations/image";
 import { loadConfig, type ImageGenerationConfig } from "./generateMissingImages.config";
 import { buildPrompt, generateImageFilename } from "./promptBuilder";
 import { initializeFalAi, generateImage, estimateCost } from "./falAiClient";
 import { downloadAndSaveImage, verifyImageDirectory } from "./imageProcessor";
-import type { ProdDefLog } from "../../src/lib/backendQueries/imageGenTypes";
 
 // Load environment variables
 dotenv.config();
@@ -32,8 +28,6 @@ dotenv.config();
 // Track start time
 const startTime = Date.now();
 
-// Verbose logging all offerings.
-const verboseLog: ProdDefLog[] = [];
 
 /**
  * Show help message
@@ -63,21 +57,35 @@ Examples:
  * Print dry-run summary table
  */
 function printDryRunSummary(analysis: OfferingWithImageAnalysis[], config: ImageGenerationConfig) {
-  const toGenerate = analysis
-    .filter(a => a.needs_generation)
-    .slice(0, config.generation.batch_size);
+  const toGenerate = analysis.filter((a) => a.needs_generation).slice(0, config.generation.batch_size);
 
   console.log("\n📊 Analysis Results:");
-  console.log(`- ${analysis.filter(a => a.match_quality === "exact").length} offerings with exact match ✅`);
-  console.log(`- ${analysis.filter(a => a.match_quality === "generic_fallback").length} offerings with generic fallback 🔄`);
-  console.log(`- ${analysis.filter(a => a.match_quality === "none").length} offerings without images ❌`);
+  console.log(`- ${analysis.filter((a) => a.match_quality === "exact").length} offerings with exact match ✅`);
+  console.log(`- ${analysis.filter((a) => a.match_quality === "generic_fallback").length} offerings with generic fallback 🔄`);
+  console.log(`- ${analysis.filter((a) => a.match_quality === "none").length} offerings without images ❌`);
 
   console.log(`\n🎨 Would generate images for ${toGenerate.length} offerings:\n`);
 
+  const idWidth = 6;
+  const titleWidth = 30;
+  const materialWidth = 12;
+  const formWidth = 12;
+  const surfaceWidth = 12;
+  const constructionWidth = 12;
+  const matchWidth = 8;
+  const imagesWidth = 6;
+
   // Print table header
-  console.log("┌─────────┬──────────────────────────────────┬────────────────────────────────────────────────────┐");
-  console.log("│ ID      │ Title                            │ Generated Prompt (preview)                        │");
-  console.log("├─────────┼──────────────────────────────────┼────────────────────────────────────────────────────┤");
+  console.log(
+    "| ID".padEnd(idWidth + 3) +
+    "| Title".padEnd(titleWidth + 3) +
+    "| Material".padEnd(materialWidth + 3) +
+    "| Form".padEnd(formWidth + 3) +
+    "| Surface".padEnd(surfaceWidth + 3) +
+    "| Constr".padEnd(constructionWidth + 3) +
+    "| Match".padEnd(matchWidth + 3) +
+    "| Imgs".padEnd(imagesWidth + 3)
+  );
 
   // Print table rows
   for (const item of toGenerate) {
@@ -88,34 +96,67 @@ function printDryRunSummary(analysis: OfferingWithImageAnalysis[], config: Image
       item.form,
       item.surface_finish,
       item.construction_type,
-      config.prompt
+      config.prompt,
     );
 
-    const id = item.offering.offering_id.toString().padEnd(7);
-    const title = (item.offering.title || "Untitled").substring(0, 32).padEnd(32);
-    const promptPreview = prompt.length > 50 ? prompt.substring(0, 47) + "..." : prompt.padEnd(50);
+    const id = item.offering.offering_id.toString().padEnd(idWidth);
+    const title = (item.offering.title + "- " + item.offering.product_def.title || "Untitled").substring(0, titleWidth).padEnd(titleWidth);
 
-    console.log(`│ ${id} │ ${title} │ ${promptPreview} │`);
+    // Material with inheritance indicator (*) if inherited from product_def
+    const materialName = item.material?.name || "-";
+    const materialInherited = !item.offering.material && item.material ? "*" : "";
+    const material = (materialName + materialInherited).substring(0, materialWidth).padEnd(materialWidth);
+
+    // Form with inheritance indicator
+    const formName = item.form?.name || "-";
+    const formInherited = !item.offering.form && item.form ? "*" : "";
+    const form = (formName + formInherited).substring(0, formWidth).padEnd(formWidth);
+
+    // Surface Finish with inheritance indicator
+    const surfaceName = item.surface_finish?.name || "-";
+    const surfaceInherited = !item.offering.surface_finish && item.surface_finish ? "*" : "";
+    const surface = (surfaceName + surfaceInherited).substring(0, surfaceWidth).padEnd(surfaceWidth);
+
+    // Construction Type with inheritance indicator
+    const constructionName = item.construction_type?.name || "-";
+    const constructionInherited = !item.offering.construction_type && item.construction_type ? "*" : "";
+    const construction = (constructionName + constructionInherited).substring(0, constructionWidth).padEnd(constructionWidth);
+
+    // Match quality
+    const matchQuality = item.match_quality === "exact" ? "✅" :
+                        item.match_quality === "generic_fallback" ? "🔄" :
+                        "❌";
+    const matchFormatted = matchQuality.padEnd(matchWidth);
+
+    // Available images count
+    const imagesCount = item.available_images.length.toString().padEnd(imagesWidth);
+
+    console.log(`│ ${id} │ ${title} │ ${material} │ ${form} │ ${surface} │ ${construction} │ ${matchFormatted} │ ${imagesCount} │`);
 
     // Log full details if verbose
     if (config.verbose) {
       log.info(`  Offering Details:`, {
         offering_id: item.offering.offering_id,
         product_def: item.product_def.title,
-        material: item.material?.name || 'none',
-        form: item.form?.name || 'none',
-        surface_finish: item.surface_finish?.name || 'none',
-        construction_type: item.construction_type?.name || 'none',
+        material: item.material?.name || "none",
+        material_inherited: !item.offering.material && item.material,
+        form: item.form?.name || "none",
+        form_inherited: !item.offering.form && item.form,
+        surface_finish: item.surface_finish?.name || "none",
+        surface_inherited: !item.offering.surface_finish && item.surface_finish,
+        construction_type: item.construction_type?.name || "none",
+        construction_inherited: !item.offering.construction_type && item.construction_type,
+        match_quality: item.match_quality,
         available_images: item.available_images.length,
-        full_prompt: prompt
+        full_prompt: prompt,
       });
     }
   }
 
-  console.log("└─────────┴──────────────────────────────────┴────────────────────────────────────────────────────┘");
-
   const estimatedCost = estimateCost(toGenerate.length, config.generation.model);
-  console.log(`\n💰 Estimated cost: $${estimatedCost.toFixed(2)} (${toGenerate.length} images × $${(estimatedCost / toGenerate.length).toFixed(2)})`);
+  console.log(
+    `\n💰 Estimated cost: $${estimatedCost.toFixed(2)} (${toGenerate.length} images × $${(estimatedCost / toGenerate.length).toFixed(2)})`,
+  );
 
   console.log("\nℹ️  This is a dry run. No images were generated.");
   console.log("   Run with --no-dry-run to generate images.");
@@ -151,12 +192,12 @@ async function main() {
   try {
     // Log the filters being used
     log.info("🔍 Filter Configuration:");
-    log.info(`   - is_assortment: ${config.filters.is_assortment ?? 'any'}`);
-    log.info(`   - min_price: ${config.filters.min_price ?? 'none'}`);
-    log.info(`   - max_price: ${config.filters.max_price ?? 'none'}`);
-    log.info(`   - category_ids: ${config.filters.category_ids?.join(', ') ?? 'all'}`);
-    log.info(`   - material_ids: ${config.filters.material_ids?.join(', ') ?? 'all'}`);
-    log.info(`   - wholesaler_ids: ${config.filters.wholesaler_ids?.join(', ') ?? 'all'}`);
+    log.info(`   - is_assortment: ${config.filters.is_assortment ?? "any"}`);
+    log.info(`   - min_price: ${config.filters.min_price ?? "none"}`);
+    log.info(`   - max_price: ${config.filters.max_price ?? "none"}`);
+    log.info(`   - category_ids: ${config.filters.category_ids?.join(", ") ?? "all"}`);
+    log.info(`   - material_ids: ${config.filters.material_ids?.join(", ") ?? "all"}`);
+    log.info(`   - wholesaler_ids: ${config.filters.wholesaler_ids?.join(", ") ?? "all"}`);
     log.info("=" + "=".repeat(60));
 
     // First, let's check how many offerings exist in total
@@ -180,18 +221,14 @@ async function main() {
 
     // Analyze offerings to find which need images
     log.info("📦 Analyzing offerings for missing images...");
-    const offeringsToGenerate = await analyzeOfferingsForImages(
-      transaction,
-      config.filters,
-      verboseLog
-    );
+    const offeringsToGenerate = await analyzeOfferingsForImages(transaction, config.filters);
 
     log.info(`✅ Analysis complete: ${offeringsToGenerate.length} offerings analyzed`);
 
     // Log breakdown
-    const needsGeneration = offeringsToGenerate.filter(a => a.needs_generation);
-    const exactMatches = offeringsToGenerate.filter(a => a.match_quality === "exact");
-    const genericFallbacks = offeringsToGenerate.filter(a => a.match_quality === "generic_fallback");
+    const needsGeneration = offeringsToGenerate.filter((a) => a.needs_generation);
+    const exactMatches = offeringsToGenerate.filter((a) => a.match_quality === "exact");
+    const genericFallbacks = offeringsToGenerate.filter((a) => a.match_quality === "generic_fallback");
 
     log.info("📈 Results breakdown:");
     log.info(`   - Exact image matches: ${exactMatches.length}`);
@@ -245,7 +282,7 @@ async function main() {
           material: item.material?.name,
           form: item.form?.name,
           surface_finish: item.surface_finish?.name,
-          construction_type: item.construction_type?.name
+          construction_type: item.construction_type?.name,
         });
       }
 
@@ -258,7 +295,7 @@ async function main() {
           item.form,
           item.surface_finish,
           item.construction_type,
-          config.prompt
+          config.prompt,
         );
 
         log.info(`  ├─ Prompt: "${prompt.substring(0, 100)}..."`);
@@ -292,7 +329,6 @@ async function main() {
 
         log.info(`  └─ ✅ Success! Image ID: ${result.image_id}\n`);
         successCount++;
-
       } catch (error: any) {
         log.error(`  └─ ❌ Failed: ${error.message}\n`);
         failCount++;
@@ -320,7 +356,6 @@ async function main() {
     } else {
       log.info("\n🎉 All offerings now have images!");
     }
-
   } catch (error: any) {
     log.error("❌ Error:", error);
     await transaction.rollback();

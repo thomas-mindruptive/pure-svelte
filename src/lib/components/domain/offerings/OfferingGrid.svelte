@@ -43,6 +43,7 @@
     {
       key: "wio.title",
       header: "Offering",
+      accessor: (offering) => offering.title,
       sortable: true,
     },
     {

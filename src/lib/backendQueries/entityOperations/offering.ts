@@ -1,4 +1,6 @@
 import type { WholesalerItemOffering } from "$lib/domain/domainTypes";
+import { Wio_pdef_mat_form_surf_constr_Nested_Schema } from "$lib/domain/domainTypes";
+import { genColumnsForJsonPath } from "$lib/domain/domainTypes.utils";
 import type { Transaction } from "mssql";
 import { buildWhereClause, type BuildContext } from "../queryBuilder";
 import type { WhereCondition, WhereConditionGroup, SortDescriptor } from "../queryGrammar";
@@ -338,6 +340,22 @@ export async function loadOfferingsForImageAnalysis(
         pd.for_liquids AS 'product_def.for_liquids',
         pd.created_at AS 'product_def.created_at',
 
+        -- Product definition's lookups (nested in product_def)
+        pd_m.material_id AS 'product_def.material.material_id',
+        pd_m.name AS 'product_def.material.name',
+        pd_m.essence_type AS 'product_def.material.essence_type',
+
+        pd_f.form_id AS 'product_def.form.form_id',
+        pd_f.name AS 'product_def.form.name',
+
+        pd_sf.surface_finish_id AS 'product_def.surface_finish.surface_finish_id',
+        pd_sf.name AS 'product_def.surface_finish.name',
+        pd_sf.description AS 'product_def.surface_finish.description',
+
+        pd_ct.construction_type_id AS 'product_def.construction_type.construction_type_id',
+        pd_ct.name AS 'product_def.construction_type.name',
+        pd_ct.description AS 'product_def.construction_type.description',
+
         -- Material (nested)
         m.material_id AS 'material.material_id',
         m.name AS 'material.name',
@@ -363,9 +381,14 @@ export async function loadOfferingsForImageAnalysis(
     LEFT JOIN dbo.forms f ON wio.form_id = f.form_id
     LEFT JOIN dbo.surface_finishes sf ON wio.surface_finish_id = sf.surface_finish_id
     LEFT JOIN dbo.construction_types ct ON wio.construction_type_id = ct.construction_type_id
+    -- Product definition's lookups (for COALESCE inheritance)
+    LEFT JOIN dbo.materials pd_m ON pd.material_id = pd_m.material_id
+    LEFT JOIN dbo.forms pd_f ON pd.form_id = pd_f.form_id
+    LEFT JOIN dbo.surface_finishes pd_sf ON pd.surface_finish_id = pd_sf.surface_finish_id
+    LEFT JOIN dbo.construction_types pd_ct ON pd.construction_type_id = pd_ct.construction_type_id
     ${whereClause}
     ORDER BY wio.offering_id ASC
-    FOR JSON PATH, INCLUDE_NULL_VALUES
+    FOR JSON PATH
   `);
 
   if (!result.recordset?.length) {

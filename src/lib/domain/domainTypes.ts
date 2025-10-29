@@ -222,6 +222,98 @@ export const WholesalerCategoryWithCountSchema = WholesalerCategory_Category_Sch
   offering_count: z.number().int().nonnegative().optional(),
 }).describe("WholesalerCategoryWithCountSchema");
 
+// ===== MATERIAL (dbo.materials) =====
+
+const MaterialSchemaBase = z
+  .object({
+    material_id: z.number().int().positive(),
+    name: NameOrTitle,
+  })
+  .describe("MaterialSchema");
+
+export const MaterialSchema = createSchemaWithMeta(MaterialSchemaBase, {
+  alias: "m",
+  tableName: "materials",
+  dbSchema: "dbo",
+} as const);
+
+/**
+ * Schema for creating a new Material.
+ */
+const tempMaterialForCreate = MaterialSchema.omit({
+  material_id: true,
+}).describe("MaterialForCreateSchema");
+export const MaterialForCreateSchema = copyMetaFrom(MaterialSchema, tempMaterialForCreate);
+
+// ===== FORM (dbo.forms) =====
+
+const FormSchemaBase = z
+  .object({
+    form_id: z.number().int().positive(),
+    name: NameOrTitle,
+  })
+  .describe("FormSchema");
+
+export const FormSchema = createSchemaWithMeta(FormSchemaBase, {
+  alias: "f",
+  tableName: "forms",
+  dbSchema: "dbo",
+} as const);
+
+/**
+ * Schema for creating a new Form.
+ */
+const tempFormForCreate = FormSchema.omit({
+  form_id: true,
+}).describe("FormForCreateSchema");
+export const FormForCreateSchema = copyMetaFrom(FormSchema, tempFormForCreate);
+
+// ===== ConstructionType (dbo.construction_types) =====
+
+const ConstructionTypeSchemaBase = z
+  .object({
+    construction_type_id: z.number().int().positive(),
+    name: NameOrTitle,
+    description: OptionalShortDescription,
+  })
+  .describe("ConstructionTypeSchema");
+
+export const ConstructionTypeSchema = createSchemaWithMeta(ConstructionTypeSchemaBase, {
+  alias: "ct",
+  tableName: "construction_types",
+  dbSchema: "dbo",
+} as const);
+
+// ===== SurfaceFinish (dbo.surface_finishes) =====
+
+const SurfaceFinishSchemaBase = z
+  .object({
+    surface_finish_id: z.number().int().positive(),
+    name: NameOrTitle,
+    description: OptionalShortDescription,
+  })
+  .describe("SurfaceFinishSchema");
+
+export const SurfaceFinishSchema = createSchemaWithMeta(SurfaceFinishSchemaBase, {
+  alias: "sf",
+  tableName: "surface_finishes",
+  dbSchema: "dbo",
+} as const);
+
+// ===== PRODUCT DEFINITION WITH LOOKUPS (for image generation analysis) =====
+
+/**
+ * NESTED SCHEMA with all lookup data for product definitions.
+ * Used for image generation analysis when offerings inherit from product_def.
+ */
+const tempProdDefMatFormSurfConstrNested = ProductDefinitionSchema.extend({
+  material: MaterialSchema.nullable().optional(),
+  form: FormSchema.nullable().optional(),
+  surface_finish: SurfaceFinishSchema.nullable().optional(),
+  construction_type: ConstructionTypeSchema.nullable().optional(),
+}).describe("ProductDefinition_Material_Form_SurfaceFinish_ConstructionType_NestedSchema");
+export const ProdDef_mat_form_surf_constr_Nested_Schema = copyMetaFrom(ProductDefinitionSchema, tempProdDefMatFormSurfConstrNested);
+
 // ===== WHOLESALER OFFERING LINK (dbo.wholesaler_offering_links) =====
 
 const WholesalerOfferingLinkSchemaBase = z
@@ -340,6 +432,20 @@ const tempWioNestedWithLinks = Wio_PDef_Cat_Supp_Nested_Schema.extend({
 }).describe("WholesalerItemOffering_ProductDef_Category_Supplier_Nested_WithLinksSchema");
 export const Wio_PDef_Cat_Supp_Nested_WithLinks_Schema = copyMetaFrom(Wio_Schema, tempWioNestedWithLinks);
 
+/**
+ * NESTED SCHEMA with all lookup data for AI image generation analysis.
+ * Used by loadOfferingsForImageAnalysis() which includes JOINs for:
+ * product_def (with its lookups), material, form, surface_finish, construction_type.
+ */
+const tempWioPdefMatFormSurfConstrNested = Wio_Schema.extend({
+  product_def: ProdDef_mat_form_surf_constr_Nested_Schema,
+  material: MaterialSchema.nullable().optional(),
+  form: FormSchema.nullable().optional(),
+  surface_finish: SurfaceFinishSchema.nullable().optional(),
+  construction_type: ConstructionTypeSchema.nullable().optional(),
+}).describe("WholesalerItemOffering_ProductDef_Material_Form_SurfaceFinish_ConstructionType_NestedSchema");
+export const Wio_pdef_mat_form_surf_constr_Nested_Schema = copyMetaFrom(Wio_Schema, tempWioPdefMatFormSurfConstrNested);
+
 // ===== WHOLESALER OFFERING ATTRIBUTE (dbo.wholesaler_offering_attributes) =====
 
 const WholesalerOfferingAttributeSchemaBase = z
@@ -370,37 +476,7 @@ export const WholesalerOfferingAttribute_AttributeSchema = WholesalerOfferingAtt
   attribute_description: z.string().nullable().optional(),
 }).describe("WholesalerOfferingAttribute_AttributeSchema");
 
-// ===== ConstructionType (dbo.construction_types) =====
 
-const ConstructionTypeSchemaBase = z
-  .object({
-    construction_type_id: z.number().int().positive(),
-    name: NameOrTitle,
-    description: OptionalShortDescription,
-  })
-  .describe("ConstructionTypeSchema");
-
-export const ConstructionTypeSchema = createSchemaWithMeta(ConstructionTypeSchemaBase, {
-  alias: "ct",
-  tableName: "construction_types",
-  dbSchema: "dbo",
-} as const);
-
-// ===== SurfaceFinish (dbo.surface_finishes) =====
-
-const SurfaceFinishSchemaBase = z
-  .object({
-    surface_finish_id: z.number().int().positive(),
-    name: NameOrTitle,
-    description: OptionalShortDescription,
-  })
-  .describe("SurfaceFinishSchema");
-
-export const SurfaceFinishSchema = createSchemaWithMeta(SurfaceFinishSchemaBase, {
-  alias: "sf",
-  tableName: "surface_finishes",
-  dbSchema: "dbo",
-} as const);
 
 // ===== ProductType (dbo.product_types) =====
 
@@ -417,51 +493,7 @@ export const ProductTypeSchema = createSchemaWithMeta(ProductTypeSchemaBase, {
   dbSchema: "dbo",
 } as const);
 
-// ===== MATERIAL (dbo.materials) =====
 
-const MaterialSchemaBase = z
-  .object({
-    material_id: z.number().int().positive(),
-    name: NameOrTitle,
-  })
-  .describe("MaterialSchema");
-
-export const MaterialSchema = createSchemaWithMeta(MaterialSchemaBase, {
-  alias: "m",
-  tableName: "materials",
-  dbSchema: "dbo",
-} as const);
-
-/**
- * Schema for creating a new Material.
- */
-const tempMaterialForCreate = MaterialSchema.omit({
-  material_id: true,
-}).describe("MaterialForCreateSchema");
-export const MaterialForCreateSchema = copyMetaFrom(MaterialSchema, tempMaterialForCreate);
-
-// ===== FORM (dbo.forms) =====
-
-const FormSchemaBase = z
-  .object({
-    form_id: z.number().int().positive(),
-    name: NameOrTitle,
-  })
-  .describe("FormSchema");
-
-export const FormSchema = createSchemaWithMeta(FormSchemaBase, {
-  alias: "f",
-  tableName: "forms",
-  dbSchema: "dbo",
-} as const);
-
-/**
- * Schema for creating a new Form.
- */
-const tempFormForCreate = FormSchema.omit({
-  form_id: true,
-}).describe("FormForCreateSchema");
-export const FormForCreateSchema = copyMetaFrom(FormSchema, tempFormForCreate);
 
 // ===== ORDER (dbo.orders) =====
 
@@ -668,6 +700,7 @@ export type Wholesaler = z.infer<typeof WholesalerSchema>;
 export type ProductCategory = z.infer<typeof ProductCategorySchema>;
 export type Attribute = z.infer<typeof AttributeSchema>;
 export type ProductDefinition = z.infer<typeof ProductDefinitionSchema>;
+export type ProdDef_mat_form_surf_constr_Nested = z.infer<typeof ProdDef_mat_form_surf_constr_Nested_Schema>;
 
 export type WholesalerCategory = z.infer<typeof WholesalerCategorySchema>;
 export type WholesalerCategory_Category = z.infer<typeof WholesalerCategory_Category_Schema>;
@@ -680,6 +713,7 @@ export type Wio_PDef_Cat_Supp = z.infer<typeof Wio_PDef_Cat_Supp_Schema>;
 export type Wio_PDef_Cat_Supp_Nested = z.infer<typeof Wio_PDef_Cat_Supp_Nested_Schema>;
 export type Wio_PDef_Cat_Supp_WithLinks = z.infer<typeof Wio_PDef_Cat_Supp_WithLinks_Schema>;
 export type Wio_PDef_Cat_Supp_Nested_WithLinks = z.infer<typeof Wio_PDef_Cat_Supp_Nested_WithLinks_Schema>;
+export type Wio_pdef_mat_form_surf_constr_Nested = z.infer<typeof Wio_pdef_mat_form_surf_constr_Nested_Schema>;
 
 export type WholesalerOfferingLink = z.infer<typeof WholesalerOfferingLinkSchema>;
 export type WholesalerOfferingAttribute = z.infer<typeof WholesalerOfferingAttributeSchema>;

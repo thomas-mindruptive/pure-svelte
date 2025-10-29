@@ -176,6 +176,13 @@
       oninput={() => {
         showAllMode = false;
         open();
+        // Clear value when search term is empty
+        if (searchTerm === "" || searchTerm === null) {
+          value = null;
+          if (onChange) {
+            onChange(null);
+          }
+        }
       }}
       onkeydown={(e) => {
         if (e.key === "Escape") close();

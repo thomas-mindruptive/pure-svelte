@@ -175,8 +175,8 @@ export const defaultConfig: ImageGenerationConfig = {
     // 4 steps = fast, 8 steps = higher quality
     num_inference_steps: 4,
 
-    // Generate 10 images per run (adjust as needed)
-    batch_size: 10,
+    // Generate N images per run (adjust as needed)
+    batch_size: 150,
 
     // Start with dry run to see what would be generated
     dry_run: true,

@@ -9,7 +9,7 @@
  * IMPORTANT: Images are only matched within the same product_def_id!
  */
 
-import type { ProductDefinitionImage_Image, WholesalerItemOffering } from "$lib/domain/domainTypes";
+import type { ProductDefinitionImage_Image, Wio_pdef_mat_form_surf_constr_Nested } from "$lib/domain/domainTypes";
 import { log } from "$lib/utils/logger";
 
 /**
@@ -273,17 +273,19 @@ function calculateOptionalScore(
 /**
  * Convenience: Extracts matching criteria from an Offering.
  *
- * @param offering - Wholesaler Item Offering
+ * COALESCE logic: If offering doesn't have a value, inherit from product_def.
+ *
+ * @param offering - Wholesaler Item Offering (with product_def nested)
  * @returns ImageMatchCriteria for use with findBestMatchingImage
  */
 export function extractMatchCriteriaFromOffering(
-  offering: WholesalerItemOffering
+  offering: Wio_pdef_mat_form_surf_constr_Nested
 ): ImageMatchCriteria {
   return {
-    material_id: offering.material_id ?? null,
-    form_id: offering.form_id ?? null,
-    surface_finish_id: offering.surface_finish_id ?? null,
-    construction_type_id: offering.construction_type_id ?? null,
+    material_id: offering.material_id ?? offering.product_def.material_id ?? null,
+    form_id: offering.form_id ?? offering.product_def.form_id ?? null,
+    surface_finish_id: offering.surface_finish_id ?? offering.product_def.surface_finish_id ?? null,
+    construction_type_id: offering.construction_type_id ?? offering.product_def.construction_type_id ?? null,
     color_variant: offering.color_variant ?? null,
     size: offering.size ?? null,
   };

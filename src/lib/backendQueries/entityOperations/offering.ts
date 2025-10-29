@@ -242,3 +242,139 @@ export async function loadFlatOfferingWithJoinsAndLinksForId(transaction: Transa
 
   return results[0];
 }
+
+/**
+ * Loads offerings with all lookup data needed for AI image generation analysis.
+ * Includes JOINs for: product_def, material, form, surface_finish, construction_type.
+ * Uses FOR JSON PATH to return nested structure.
+ *
+ * @param transaction - Active database transaction
+ * @param filters - Filter criteria for image generation
+ * @returns JSON string with offerings including all lookup data
+ */
+export interface ImageAnalysisFilters {
+  is_assortment?: boolean;
+  min_price?: number;
+  max_price?: number;
+  category_ids?: number[];
+  material_ids?: number[];
+  wholesaler_ids?: number[];
+}
+
+export async function loadOfferingsForImageAnalysis(
+  transaction: Transaction,
+  filters: ImageAnalysisFilters = {}
+): Promise<string> {
+  assertDefined(transaction, "transaction");
+
+  const request = transaction.request();
+
+  // Build WHERE conditions dynamically
+  const whereConditions: string[] = [];
+
+  if (filters.is_assortment !== undefined) {
+    request.input('is_assortment', filters.is_assortment);
+    whereConditions.push('wio.is_assortment = @is_assortment');
+  }
+
+  if (filters.min_price !== undefined) {
+    request.input('min_price', filters.min_price);
+    whereConditions.push('wio.price >= @min_price');
+  }
+
+  if (filters.max_price !== undefined) {
+    request.input('max_price', filters.max_price);
+    whereConditions.push('wio.price <= @max_price');
+  }
+
+  if (filters.category_ids && filters.category_ids.length > 0) {
+    whereConditions.push(`pd.category_id IN (${filters.category_ids.join(',')})`);
+  }
+
+  if (filters.material_ids && filters.material_ids.length > 0) {
+    whereConditions.push(`wio.material_id IN (${filters.material_ids.join(',')})`);
+  }
+
+  if (filters.wholesaler_ids && filters.wholesaler_ids.length > 0) {
+    whereConditions.push(`wio.wholesaler_id IN (${filters.wholesaler_ids.join(',')})`);
+  }
+
+  const whereClause = whereConditions.length > 0
+    ? `WHERE ${whereConditions.join(' AND ')}`
+    : '';
+
+  const result = await request.query(`
+    SELECT
+        -- Main offering columns
+        wio.offering_id,
+        wio.wholesaler_id,
+        wio.category_id,
+        wio.product_def_id,
+        wio.sub_seller,
+        wio.material_id,
+        wio.form_id,
+        wio.surface_finish_id,
+        wio.construction_type_id,
+        wio.color_variant,
+        wio.title,
+        wio.size,
+        wio.dimensions,
+        wio.weight_grams,
+        wio.price,
+        wio.currency,
+        wio.comment,
+        wio.created_at,
+        wio.is_assortment,
+
+        -- Product definition (nested)
+        pd.product_def_id AS 'product_def.product_def_id',
+        pd.category_id AS 'product_def.category_id',
+        pd.title AS 'product_def.title',
+        pd.description AS 'product_def.description',
+        pd.material_id AS 'product_def.material_id',
+        pd.form_id AS 'product_def.form_id',
+        pd.construction_type_id AS 'product_def.construction_type_id',
+        pd.surface_finish_id AS 'product_def.surface_finish_id',
+        pd.for_liquids AS 'product_def.for_liquids',
+        pd.created_at AS 'product_def.created_at',
+
+        -- Material (nested)
+        m.material_id AS 'material.material_id',
+        m.name AS 'material.name',
+        m.essence_type AS 'material.essence_type',
+
+        -- Form (nested)
+        f.form_id AS 'form.form_id',
+        f.name AS 'form.name',
+
+        -- Surface Finish (nested)
+        sf.surface_finish_id AS 'surface_finish.surface_finish_id',
+        sf.name AS 'surface_finish.name',
+        sf.description AS 'surface_finish.description',
+
+        -- Construction Type (nested)
+        ct.construction_type_id AS 'construction_type.construction_type_id',
+        ct.name AS 'construction_type.name',
+        ct.description AS 'construction_type.description'
+
+    FROM dbo.wholesaler_item_offerings AS wio
+    INNER JOIN dbo.product_definitions pd ON wio.product_def_id = pd.product_def_id
+    LEFT JOIN dbo.materials m ON wio.material_id = m.material_id
+    LEFT JOIN dbo.forms f ON wio.form_id = f.form_id
+    LEFT JOIN dbo.surface_finishes sf ON wio.surface_finish_id = sf.surface_finish_id
+    LEFT JOIN dbo.construction_types ct ON wio.construction_type_id = ct.construction_type_id
+    ${whereClause}
+    ORDER BY wio.offering_id ASC
+    FOR JSON PATH, INCLUDE_NULL_VALUES
+  `);
+
+  if (!result.recordset?.length) {
+    return "[]"; // Return empty array if no results
+  }
+
+  // FOR JSON PATH returns JSON in the first column of the first row
+  const firstRow = result.recordset[0];
+  const jsonString = firstRow[Object.keys(firstRow)[0]];
+
+  return jsonString || "[]";
+}

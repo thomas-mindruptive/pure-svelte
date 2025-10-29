@@ -184,15 +184,63 @@ export async function insertProductDefinitionImageWithImage(
     insertedImage = (await insertRecordWithTransaction(ImageForCreateSchema, enrichedImageData as any, transaction)) as Image;
   }
 
-  // 4. Insert ProductDefinitionImage (subclass) with THE SAME image_id (OOP inheritance)
-  const pdiData = {
-    image_id: insertedImage.image_id,  // ← Same ID as parent (inheritance pattern)
-    product_def_id: sanitized.product_def_id,
-    // Variant Matching Fields
+  // 4. SNAPSHOT: Inherit values from product_definition if not provided
+  // This is a one-time copy on first save - values will NOT change if product_def changes
+  let inheritedValues = {
     material_id: sanitized.material_id,
     form_id: sanitized.form_id,
     surface_finish_id: sanitized.surface_finish_id,
     construction_type_id: sanitized.construction_type_id,
+  };
+
+  // Only inherit if fields are NULL/undefined
+  if (!inheritedValues.material_id || !inheritedValues.form_id ||
+      !inheritedValues.surface_finish_id || !inheritedValues.construction_type_id) {
+
+    log.debug("Some fields are NULL, checking product_definition for inheritance");
+
+    // Load product_definition to get default values
+    const prodDefRequest = transaction.request();
+    prodDefRequest.input('product_def_id', sanitized.product_def_id);
+    const prodDefResult = await prodDefRequest.query(`
+      SELECT material_id, form_id, surface_finish_id, construction_type_id
+      FROM dbo.product_definitions
+      WHERE product_def_id = @product_def_id
+    `);
+
+    if (prodDefResult.recordset.length > 0) {
+      const productDef = prodDefResult.recordset[0];
+
+      // COALESCE logic: provided value ?? product_def value ?? null
+      inheritedValues = {
+        material_id: sanitized.material_id ?? productDef.material_id ?? null,
+        form_id: sanitized.form_id ?? productDef.form_id ?? null,
+        surface_finish_id: sanitized.surface_finish_id ?? productDef.surface_finish_id ?? null,
+        construction_type_id: sanitized.construction_type_id ?? productDef.construction_type_id ?? null,
+      };
+
+      log.debug("Inherited values from product_definition", {
+        original: {
+          material_id: sanitized.material_id,
+          form_id: sanitized.form_id,
+          surface_finish_id: sanitized.surface_finish_id,
+          construction_type_id: sanitized.construction_type_id,
+        },
+        inherited: inheritedValues,
+        product_def: productDef
+      });
+    }
+  }
+
+  // 5. Insert ProductDefinitionImage (subclass) with THE SAME image_id (OOP inheritance)
+  const pdiData = {
+    image_id: insertedImage.image_id,  // ← Same ID as parent (inheritance pattern)
+    product_def_id: sanitized.product_def_id,
+    // Variant Matching Fields - with SNAPSHOT inheritance
+    material_id: inheritedValues.material_id,
+    form_id: inheritedValues.form_id,
+    surface_finish_id: inheritedValues.surface_finish_id,
+    construction_type_id: inheritedValues.construction_type_id,
     // Image Metadata
     size_range: sanitized.size_range,
     quality_grade: sanitized.quality_grade,

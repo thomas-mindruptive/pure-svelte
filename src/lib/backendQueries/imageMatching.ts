@@ -4,11 +4,68 @@
  * Image Matching Logic for Offerings
  *
  * Finds the best matching image for an offering based on variant properties.
- * Used primarily for Shopify upload to select the correct image for each offering.
+ * Used primarily for Shopify upload and AI image generation to select the correct image for each offering.
+ *
+ * IMPORTANT: Images are only matched within the same product_def_id!
  */
 
 import type { ProductDefinitionImage_Image, WholesalerItemOffering } from "$lib/domain/domainTypes";
 import { log } from "$lib/utils/logger";
+
+/**
+ * Configuration for image matching behavior
+ */
+export interface ImageMatchConfig {
+  /**
+   * Fields that MUST match exactly (unless NULL)
+   */
+  required_fields: Array<keyof ImageMatchCriteria>;
+
+  /**
+   * Fields that contribute to matching score with weights
+   */
+  optional_fields: Partial<Record<keyof ImageMatchCriteria, number>>;
+
+  /**
+   * Minimum score (0.0-1.0) for optional fields to consider a match
+   */
+  min_optional_score: number;
+
+  /**
+   * How to handle NULL values
+   */
+  null_behavior: {
+    /**
+     * If true, NULL in image acts as wildcard (matches any value)
+     * If false, NULL in image only matches NULL in offering
+     */
+    image_null_is_wildcard: boolean;
+
+    /**
+     * If true, NULL in offering accepts any value (including non-NULL)
+     * If false, NULL in offering only matches NULL in image
+     */
+    offering_null_accepts_all: boolean;
+  };
+}
+
+/**
+ * Default configuration for image matching
+ */
+export const DEFAULT_MATCH_CONFIG: ImageMatchConfig = {
+  required_fields: ['material_id'], // Material MUST match
+  optional_fields: {
+    form_id: 0.4,
+    surface_finish_id: 0.3,
+    construction_type_id: 0.2,
+    color_variant: 0.1
+  },
+  min_optional_score: 0.5, // At least 50% of optional fields should match
+  null_behavior: {
+    image_null_is_wildcard: false, // NULL in image is NOT a wildcard anymore!
+    offering_null_accepts_all: true // NULL in offering accepts any value
+  }
+};
 
 /**
  * Criteria for matching images to offerings.
@@ -24,165 +81,193 @@ export interface ImageMatchCriteria {
 }
 
 /**
+ * Result of image matching with score
+ */
+interface ScoredImage {
+  image: ProductDefinitionImage_Image;
+  score: number;
+  requiredFieldsMatch: boolean;
+  optionalScore: number;
+}
+
+/**
  * Finds the best matching image for an offering from available Product Definition Images.
  *
- * **Matching Priority:**
- * All visual properties are CRITICAL - if specified, they must match or return null:
- * 1. material_id (CRITICAL - completely different color/appearance, e.g., Rose Quartz vs Amethyst)
- * 2. form_id (CRITICAL - completely different shape, e.g., Sphere vs Pyramid)
- * 3. surface_finish_id (CRITICAL - different texture, e.g., Polished vs Tumbled)
- * 4. construction_type_id (CRITICAL - different assembly, e.g., Threaded beads vs Pendant)
- * 5. color_variant (OPTIONAL - subtle color nuance, e.g., "pink" vs "deep pink")
- * 6. size_range (NICE-TO-HAVE - size preference, e.g., "S" matches "S-M")
+ * IMPORTANT: Images should already be filtered by product_def_id before calling this function!
  *
- * **Fallback Logic:**
- * - Images with NULL values are considered "generic" and match any offering
- * - If no exact match for critical fields: fallback to NULL-valued images (generic)
- * - If still no match: return null
- *
- * **Note:** In practice, Product Definitions are often structured to encode critical variants
- * in the definition itself (e.g., "Necklace Threaded" vs "Necklace Pendant" as separate
- * product_def_ids), so matching happens within the same product_def_id context.
- *
- * **Tiebreaker:**
- * - Prefer is_primary = true
- * - Then sort by sort_order ASC
+ * Matching process:
+ * 1. Check required fields - must all match exactly
+ * 2. Calculate score for optional fields
+ * 3. Return highest scoring image that meets minimum requirements
  *
  * @param criteria - Offering properties to match against
- * @param images - Available Product Definition Images
+ * @param images - Available Product Definition Images (from SAME product_def)
+ * @param config - Matching configuration (optional, uses DEFAULT_MATCH_CONFIG if not provided)
  * @returns The best matching image or null if no suitable match found
- *
- * @example
- * ```typescript
- * const criteria = extractMatchCriteriaFromOffering(offering);
- * const bestImage = findBestMatchingImage(criteria, productDefImages);
- * ```
  */
 export function findBestMatchingImage(
   criteria: ImageMatchCriteria,
-  images: ProductDefinitionImage_Image[]
+  images: ProductDefinitionImage_Image[],
+  config: ImageMatchConfig = DEFAULT_MATCH_CONFIG
 ): ProductDefinitionImage_Image | null {
   if (!images || images.length === 0) {
     log.warn("findBestMatchingImage: No images available");
     return null;
   }
 
-  let matches = [...images];
+  // Score all images
+  const scoredImages: ScoredImage[] = [];
 
-  // 1. Material Match (CRITICAL)
-  matches = filterByFieldOrNull(matches, 'material_id', criteria.material_id);
-  if (matches.length === 0) {
-    log.warn("findBestMatchingImage: No material match found", {
-      material_id: criteria.material_id
-    });
-    return null; // Material mismatch = fundamentally wrong image
-  }
+  for (const image of images) {
+    // Step 1: Check required fields
+    const requiredFieldsMatch = checkRequiredFields(image, criteria, config);
 
-  // 2. Form Match (CRITICAL)
-  matches = filterByFieldOrNull(matches, 'form_id', criteria.form_id);
-  if (matches.length === 0) {
-    log.warn("findBestMatchingImage: No form match found", {
-      form_id: criteria.form_id
-    });
-    return null;
-  }
-
-  // 3. Surface Finish Match (IMPORTANT)
-  matches = filterByFieldOrNull(matches, 'surface_finish_id', criteria.surface_finish_id);
-  if (matches.length === 0) {
-    log.warn("findBestMatchingImage: No surface finish match found", {
-      surface_finish_id: criteria.surface_finish_id
-    });
-    return null;
-  }
-
-  // 4. Construction Type Match (IMPORTANT)
-  matches = filterByFieldOrNull(matches, 'construction_type_id', criteria.construction_type_id);
-  if (matches.length === 0) {
-    log.warn("findBestMatchingImage: No construction type match found", {
-      construction_type_id: criteria.construction_type_id
-    });
-    return null;
-  }
-
-  // 5. Color Variant Match (OPTIONAL - only if specified)
-  if (criteria.color_variant) {
-    const colorMatches = filterByFieldOrNull(matches, 'color_variant', criteria.color_variant);
-    if (colorMatches.length > 0) {
-      matches = colorMatches;
+    if (!requiredFieldsMatch) {
+      continue; // Skip images that don't match required fields
     }
-    // If no color match: continue with existing matches (not critical)
+
+    // Step 2: Calculate optional fields score
+    const optionalScore = calculateOptionalScore(image, criteria, config);
+
+    // Step 3: Calculate total score (required fields are binary, optional adds to score)
+    const totalScore = optionalScore;
+
+    scoredImages.push({
+      image,
+      score: totalScore,
+      requiredFieldsMatch,
+      optionalScore
+    });
   }
 
-  // 6. Size Range Match (NICE-TO-HAVE)
-  if (criteria.size) {
-    const sizeMatches = matches.filter(img =>
-      // Match if image has no size restriction (NULL)
-      img.size_range === null ||
-      // Or exact size match
-      img.size_range === criteria.size ||
-      // Or size is included in range (e.g., "S" matches "S-M")
-      (img.size_range && criteria.size ? img.size_range.includes(criteria.size) : false)
-    );
-    if (sizeMatches.length > 0) {
-      matches = sizeMatches;
+  // Filter by minimum optional score
+  const validImages = scoredImages.filter(s => s.optionalScore >= config.min_optional_score);
+
+  if (validImages.length === 0) {
+    log.warn("findBestMatchingImage: No images meet minimum requirements", {
+      criteria,
+      totalImages: images.length,
+      scoredImages: scoredImages.length,
+      minOptionalScore: config.min_optional_score
+    });
+    return null;
+  }
+
+  // Sort by score (highest first), then by primary flag, then by sort order
+  validImages.sort((a, b) => {
+    // Higher score wins
+    if (a.score !== b.score) {
+      return b.score - a.score;
     }
-  }
 
-  // 7. Tiebreaker: is_primary first, then sort_order ascending
-  matches.sort((a, b) => {
     // Primary images first
-    if (a.is_primary !== b.is_primary) {
-      return b.is_primary ? 1 : -1; // b.is_primary = true → b comes first (return 1)
+    if (a.image.is_primary !== b.image.is_primary) {
+      return b.image.is_primary ? 1 : -1;
     }
+
     // Lower sort_order first
-    return (a.sort_order || 0) - (b.sort_order || 0);
+    return (a.image.sort_order || 0) - (b.image.sort_order || 0);
   });
 
-  const result = matches[0];
+  const result = validImages[0];
 
   log.debug("findBestMatchingImage", {
     criteria,
     totalImages: images.length,
-    matchedImages: matches.length,
-    selectedImageId: result?.image_id,
-    selectedImageFilename: result?.image?.filename,
+    scoredImages: scoredImages.length,
+    validImages: validImages.length,
+    bestMatch: {
+      imageId: result.image.image_id,
+      filename: result.image.image?.filename,
+      score: result.score,
+      optionalScore: result.optionalScore
+    }
   });
 
-  return result;
+  return result.image;
 }
 
 /**
- * Helper: Filters images by field match OR NULL (generic).
- *
- * **Logic:**
- * - First: Look for exact matches (image.field === value)
- * - Fallback: Accept NULL/undefined images (generic, matches anything)
- * - If neither: return empty array
- *
- * @param items - Images to filter
- * @param field - Field to match on
- * @param value - Value to match against
- * @returns Filtered images (exact matches or generic fallbacks)
+ * Check if all required fields match
  */
-function filterByFieldOrNull<T extends Record<string, any>>(
-  items: T[],
-  field: keyof T,
-  value: any
-): T[] {
-  // Exact matches
-  const exactMatches = items.filter(item => item[field] === value);
+function checkRequiredFields(
+  image: ProductDefinitionImage_Image,
+  criteria: ImageMatchCriteria,
+  config: ImageMatchConfig
+): boolean {
+  for (const field of config.required_fields) {
+    const imageValue = image[field as keyof ProductDefinitionImage_Image];
+    const criteriaValue = criteria[field];
 
-  if (exactMatches.length > 0) {
-    return exactMatches;
+    // Handle NULL cases based on configuration
+    if (imageValue === null || imageValue === undefined) {
+      if (!config.null_behavior.image_null_is_wildcard) {
+        // NULL in image only matches NULL in criteria
+        if (criteriaValue !== null && criteriaValue !== undefined) {
+          return false;
+        }
+      }
+      // If image_null_is_wildcard is true, NULL matches anything
+    } else if (criteriaValue === null || criteriaValue === undefined) {
+      if (!config.null_behavior.offering_null_accepts_all) {
+        // NULL in criteria only matches NULL in image
+        return false;
+      }
+      // If offering_null_accepts_all is true, NULL accepts anything
+    } else if (imageValue !== criteriaValue) {
+      // Both have values, they must match
+      return false;
+    }
   }
 
-  // Fallback: NULL/undefined (generic images)
-  const genericMatches = items.filter(item =>
-    item[field] === null || item[field] === undefined
-  );
+  return true;
+}
 
-  return genericMatches.length > 0 ? genericMatches : [];
+/**
+ * Calculate matching score for optional fields
+ */
+function calculateOptionalScore(
+  image: ProductDefinitionImage_Image,
+  criteria: ImageMatchCriteria,
+  config: ImageMatchConfig
+): number {
+  let score = 0;
+  let maxScore = 0;
+
+  for (const [field, weight] of Object.entries(config.optional_fields)) {
+    maxScore += weight;
+
+    const imageValue = image[field as keyof ProductDefinitionImage_Image];
+    const criteriaValue = criteria[field as keyof ImageMatchCriteria];
+
+    // Handle NULL cases
+    if (imageValue === null || imageValue === undefined) {
+      if (config.null_behavior.image_null_is_wildcard) {
+        // NULL in image matches anything
+        score += weight;
+      } else if (criteriaValue === null || criteriaValue === undefined) {
+        // Both are NULL
+        score += weight;
+      }
+    } else if (criteriaValue === null || criteriaValue === undefined) {
+      if (config.null_behavior.offering_null_accepts_all) {
+        // NULL in criteria accepts anything
+        score += weight;
+      }
+    } else if (imageValue === criteriaValue) {
+      // Exact match
+      score += weight;
+    }
+    // Special case for size matching (partial match)
+    else if (field === 'size' && typeof imageValue === 'string' && typeof criteriaValue === 'string') {
+      // Check if size is included in range (e.g., "S" matches "S-M")
+      if (imageValue.includes(criteriaValue) || criteriaValue.includes(imageValue)) {
+        score += weight * 0.5; // Partial score for partial match
+      }
+    }
+  }
+
+  return maxScore > 0 ? score / maxScore : 0;
 }
 
 /**

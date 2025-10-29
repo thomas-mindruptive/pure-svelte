@@ -1,21 +1,38 @@
 {
+    "extends": "../tsconfig.json",
     "compilerOptions": {
-        "target": "ES2022",
-        "module": "NodeNext",
-        "moduleResolution": "NodeNext",
-        "strict": true,
-        "esModuleInterop": true,
-        "outDir": "dist",
-        "rootDir": ".",
-        "sourceMap": true,
-        "skipLibCheck": true
+        "module": "ESNext",
+        "moduleResolution": "Bundler",
+        "rootDir": "..",
+        "outDir": "./dist",
+        "noEmit": false,
+        "skipLibCheck": true,
+        "exactOptionalPropertyTypes": false,
+        "noUnusedLocals": false,
+        "baseUrl": "..",
+        "paths": {
+            "$lib": ["src/lib"],
+            "$lib/*": ["src/lib/*"],
+            "$app/environment": ["tools/lib/app-environment.js"]
+        }
     },
-    // KORREKTUR: Diese Zeile stellt sicher, dass ALLE .ts-Dateien
-    // im tools-Verzeichnis und seinen Unterverzeichnissen gefunden werden.
     "include": [
-        "**/*.ts"
+        "./**/*.ts",
+        "../src/**/*.ts"
     ],
     "exclude": [
-        "node_modules"
+        "node_modules",
+        "dist",
+        "../node_modules",
+        "../**/*.svelte",
+        "../**/*.test.ts",
+        "../**/*.spec.ts",
+        "../src/lib/components/**",
+        "../src/lib/stores/**",
+        "../src/routes/**",
+        "../src/lib/components/domain/productDefinitionImages/imageDetailPage.ts",
+        "../src/lib/components/domain/productDefinitions/productDefinitionDetailPage.ts",
+        "../src/lib/components/domain/suppliers/supplierDetailPage.ts",
+        "../src/lib/components/domain/suppliers/supplierListPage.ts"
     ]
 }

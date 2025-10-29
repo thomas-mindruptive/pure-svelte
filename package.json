@@ -13,15 +13,18 @@
 		"lint": "eslint . --ext .ts,.svelte",
 		"lint:fix": "eslint . --ext .ts,.svelte --fix",
 		"// --- TOOL SCRIPTS ---": "",
-		"tools:build": "tsc -p tools/tsconfig.json",
+		"tools:build": "tsc -p tools/tsconfig.json && tsc-alias -p tools/tsconfig.json --resolve-full-paths",
 		"tools:watch": "tsc -p tools/tsconfig.json --watch",
-		"scaffold:page": "npm run tools:build && node tools/dist/scaffold-page.js",
-		"parse-ddl": "npm run tools:build && node tools/dist/parse-ddl.js",
+		"scaffold:page": "npm run tools:build && node tools/dist/tools/scaffold-page.js",
+		"parse-ddl": "npm run tools:build && node tools/dist/tools/parse-ddl.js",
+		"/// --- IMAGES ---": "",
+		"generate-images": "npm run tools:build && node tools/dist/tools/images/generateMissingImages.js",
 		"// --- TESTS ---": "",
 		"test": "vitest",
 		"test:run": "vitest run"
 	},
 	"devDependencies": {
+		"@fal-ai/serverless-client": "^0.14.3",
 		"@sveltejs/adapter-auto": "^6.0.0",
 		"@sveltejs/eslint-config": "^8.3.4",
 		"@sveltejs/kit": "^2.22.0",
@@ -42,6 +45,8 @@
 		"svelte": "^5.0.0",
 		"svelte-check": "^4.0.0",
 		"ts-node": "^10.9.2",
+		"tsc-alias": "^1.8.16",
+		"tsx": "^4.7.0",
 		"typescript": "^5.9.2",
 		"vite": "^7.0.4",
 		"vitest": "^3.2.4"
@@ -49,6 +54,7 @@
 	"dependencies": {
 		"bits-ui": "^2.11.4",
 		"devalue": "^5.1.1",
+		"dotenv": "^16.4.5",
 		"lodash-es": "^4.17.21",
 		"mime-types": "^3.0.1",
 		"mssql": "^11.0.1",

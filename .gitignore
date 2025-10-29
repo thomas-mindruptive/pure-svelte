@@ -4,6 +4,10 @@ scaffolding-generated
 
 tools/dist
 
+# Prevent TypeScript compilation artifacts in src/
+/src/**/*.js
+/src/**/*.js.map
+
 # Output
 .output
 .vercel

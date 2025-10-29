@@ -10,7 +10,13 @@
       "Bash(curl:*)",
       "Read(//c/dev/pureenergyworks/pure-shopify/**)",
       "Read(//c/dev/pureenergyworks/**)",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "Bash(npm run tools:build:*)",
+      "Bash(node tools/dist/tools/images/generateMissingImages.js:*)",
+      "Bash(node test-db-check.js:*)",
+      "Bash(node check-image-matching.js:*)",
+      "Bash(node dist/tools/images/generateMissingImages.js:*)",
+      "Bash(node tools/check-image-matching.js:*)"
     ],
     "deny": [],
     "ask": []

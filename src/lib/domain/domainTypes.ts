@@ -314,7 +314,7 @@ export const Wio_PDef_Cat_Supp_Schema = Wio_Schema.extend({
 
 /**
  * Extended schema with links for GET /id endpoint only.
- * This includes the links array which is populated via a separate query.
+ * This includes the links array.
  */
 const tempWioPdcWithLinks = Wio_PDef_Cat_Supp_Schema.extend({
   links: z.array(WholesalerOfferingLinkSchema).nullable().optional(),

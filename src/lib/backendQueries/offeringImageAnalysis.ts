@@ -17,6 +17,7 @@ import type {
   //WholesalerItemOffering,
   ProductDefinition,
   ProductDefinitionImage_Image,
+  ProductType,
   SurfaceFinish,
   Wio_pdef_mat_form_surf_constr_Nested,
 } from "$lib/domain/domainTypes";
@@ -42,6 +43,7 @@ export interface OfferingWithImageAnalysis {
   form: Form | null;
   surface_finish: SurfaceFinish | null;
   construction_type: ConstructionType | null;
+  product_type: ProductType | null;
   available_images: ProductDefinitionImage_Image[];
   best_match: ProductDefinitionImage_Image | null;
   match_quality: MatchQuality;
@@ -144,6 +146,7 @@ export async function analyzeOfferingsForImages(
         form: offering.form || offering.product_def.form || null,
         surface_finish: offering.surface_finish || offering.product_def.surface_finish || null,
         construction_type: offering.construction_type || offering.product_def.construction_type || null,
+        product_type: offering.product_def.product_type || null,
         available_images: availableImages,
         best_match: bestMatch,
         match_quality: matchQuality,

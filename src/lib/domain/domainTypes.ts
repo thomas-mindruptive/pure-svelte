@@ -311,7 +311,8 @@ const tempProdDefMatFormSurfConstrNested = ProductDefinitionSchema.extend({
   form: FormSchema.nullable().optional(),
   surface_finish: SurfaceFinishSchema.nullable().optional(),
   construction_type: ConstructionTypeSchema.nullable().optional(),
-}).describe("ProductDefinition_Material_Form_SurfaceFinish_ConstructionType_NestedSchema");
+  product_type: ProductTypeSchema.nullable().optional(),
+}).describe("ProductDefinition_Material_Form_SurfaceFinish_ConstructionType_ProductType_NestedSchema");
 export const ProdDef_mat_form_surf_constr_Nested_Schema = copyMetaFrom(ProductDefinitionSchema, tempProdDefMatFormSurfConstrNested);
 
 // ===== WHOLESALER OFFERING LINK (dbo.wholesaler_offering_links) =====

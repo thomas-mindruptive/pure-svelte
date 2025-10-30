@@ -158,7 +158,7 @@ export const defaultConfig: ImageGenerationConfig = {
   },
 
   matching: {
-    required_fields: ["construction_type_id", "material_id", "form_id", "surface_finish_id"],
+    required_fields: ["construction_type_id", "material_id", "form_id", "surface_finish_id", "product_type_id"],
 
     // Optional fields with scoring weights
     optional_fields: {

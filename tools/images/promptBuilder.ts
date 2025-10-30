@@ -16,13 +16,14 @@ import type {
   Form,
   SurfaceFinish,
   ConstructionType,
+  ProductType,
 } from "../../src/lib/domain/domainTypes.js";
 import type { ImageGenerationConfig } from "./generateMissingImages.config.js";
 import type { OfferingWithGenerationPlan } from "./generateMissingImages.js";
 
 export function buildPrompt(item: OfferingWithGenerationPlan, config: ImageGenerationConfig["prompt"]) {
   assertDefined(item, "item");
-  return _buildPrompt(item.offering, null, item.material, item.form, item.surface_finish, item.construction_type, config);
+  return _buildPrompt(item.offering, null, item.material, item.form, item.surface_finish, item.construction_type, item.product_type, config);
 }
 
 /**
@@ -35,6 +36,7 @@ function _buildPrompt(
   form: Form | null,
   surfaceFinish: SurfaceFinish | null,
   constructionType: ConstructionType | null,
+  productType: ProductType | null,
   config: ImageGenerationConfig["prompt"],
 ): string {
   const parts: string[] = [];
@@ -48,41 +50,46 @@ function _buildPrompt(
     parts.push("Artistic product visualization");
   }
 
-  // 2. Material
+  // 2. Product Type (e.g., "bracelet", "necklace", "pendant")
+  if (productType?.name) {
+    parts.push(productType.name.toLowerCase());
+  }
+
+  // 3. Material
   if (material?.name) {
     const materialText = material.name.toLowerCase();
     parts.push(materialText);
   }
 
-  // 3. Form
+  // 4. Form
   if (form?.name) {
     parts.push(form.name.toLowerCase());
   }
 
-  // 4. Size (if available)
+  // 5. Size (if available)
   if (offering?.size) {
     parts.push(offering.size.toLowerCase());
   }
 
-  // 5. Surface finish
+  // 6. Surface finish
   if (surfaceFinish?.name) {
     parts.push(surfaceFinish.name.toLowerCase());
   }
 
-  // 6. Construction type (if relevant)
+  // 7. Construction type (if relevant)
   if (constructionType?.name) {
     parts.push(constructionType.name.toLowerCase());
   }
 
-  // 7. Color variant (if specified)
+  // 8. Color variant (if specified)
   if (offering?.color_variant) {
     parts.push(`${offering.color_variant.toLowerCase()} variant`);
   }
 
-  // 8. Background setting
+  // 9. Background setting
   parts.push(`${config.background} background`);
 
-  // 9. Quality keywords
+  // 10. Quality keywords
   if (config.style === "product_photography") {
     parts.push("studio lighting");
     parts.push("high detail");
@@ -97,7 +104,7 @@ function _buildPrompt(
     parts.push("aesthetic");
   }
 
-  // 10. Optional: Metaphysical properties (use sparingly!)
+  // 11. Optional: Metaphysical properties (use sparingly!)
   if (config.include_metaphysical && material) {
     // This is very experimental and may not produce good results
     // Only enable if you want more abstract/spiritual imagery

@@ -1226,6 +1226,19 @@ The primary difference lies in how complex computations are handled.
   ```
 In this pattern, the entire object `{ validatedData, errors }` is recomputed and its properties are destructured into reactive variables whenever `initialData` changes.
 
+### Schema-Path vs DB-Alias Migration (See Full Guide)
+
+**Current Challenge:** The codebase has an impedance mismatch between DB-aliases (`"pd.title"`) used in SQL and schema-paths (`"product_def.title"`) natural to JavaScript objects.
+
+**Migration Strategy:** A comprehensive migration guide is available in [`README-Migration-Schema-Paths.md`](./README-Migration-Schema-Paths.md) that outlines:
+- The problem analysis and current inconsistencies
+- A phased migration approach with no breaking changes
+- Support for both flat and nested data structures
+- Progressive grid-by-grid migration patterns
+- Type-safe conversion utilities
+
+**Key Principle:** The migration is fully backward compatible. Existing code continues to work while new code can use the cleaner schema-path notation.
+
 ### Loading State Management: Local vs. Global
 
 **Rule:** DetailPage components should use **local `isLoading` state** for their own data loading lifecycle, NOT global LoadingState stores.

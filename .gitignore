@@ -4,6 +4,8 @@ scaffolding-generated
 
 tools/dist
 
+log
+
 # Prevent TypeScript compilation artifacts in src/
 /src/**/*.js
 /src/**/*.js.map

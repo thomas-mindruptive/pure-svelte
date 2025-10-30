@@ -27,6 +27,7 @@ import type { ProductDefinitionImage_Image } from "$lib/domain/domainTypes";
 import type { Transaction } from "mssql";
 import { rollbackTransaction } from "$lib/backendQueries/transactionWrapper";
 import * as path from "path";
+import * as fs from "fs";
 
 // Load environment variables
 dotenv.config();
@@ -46,6 +47,60 @@ export interface OfferingWithGenPlanAndImage extends OfferingWithGenerationPlan 
   filePath: string;
   imageUrl: string;
   prompt: string;
+}
+
+/**
+ * Helper: Write to both console and logfile
+ */
+let logFileStream: fs.WriteStream | null = null;
+
+function initLogFile(logfilePath: string, deleteBeforeWrite: boolean): void {
+  try {
+    // Ensure directory exists
+    const logDir = path.dirname(logfilePath);
+    if (!fs.existsSync(logDir)) {
+      fs.mkdirSync(logDir, { recursive: true });
+      log.info(`📁 Created log directory: ${logDir}`);
+    }
+
+    // Delete existing log file if requested
+    if (deleteBeforeWrite && fs.existsSync(logfilePath)) {
+      fs.unlinkSync(logfilePath);
+      log.info(`🗑️  Deleted previous log file`);
+    }
+
+    // Create write stream (append mode)
+    logFileStream = fs.createWriteStream(logfilePath, { flags: "a" });
+
+    // Write session header
+    const timestamp = new Date().toISOString();
+    logFileStream.write(`\n${"=".repeat(80)}\n`);
+    logFileStream.write(`Session started: ${timestamp}\n`);
+    logFileStream.write(`${"=".repeat(80)}\n\n`);
+
+    log.info(`📄 Logging to: ${logfilePath}`);
+  } catch (error: any) {
+    log.error(`⚠️  Failed to initialize log file: ${error.message}`);
+    log.warn("   Continuing without file logging...");
+  }
+}
+
+function closeLogFile(): void {
+  if (logFileStream) {
+    const timestamp = new Date().toISOString();
+    logFileStream.write(`\n${"=".repeat(80)}\n`);
+    logFileStream.write(`Session ended: ${timestamp}\n`);
+    logFileStream.write(`${"=".repeat(80)}\n\n`);
+    logFileStream.end();
+    logFileStream = null;
+  }
+}
+
+function logBoth(message: string): void {
+  console.log(message);
+  if (logFileStream) {
+    logFileStream.write(message + "\n");
+  }
 }
 
 /**
@@ -177,11 +232,11 @@ function printDryRunSummary(processedOfferings: OfferingWithGenPlanAndImage[], c
   const willGenerate = processedOfferings.filter((o) => o.willGenerate);
   const willSkip = processedOfferings.filter((o) => !o.willGenerate);
 
-  console.log("\n📊 Analysis Results:");
-  console.log(`- ${willGenerate.length} images would be generated ✅`);
-  console.log(`- ${willSkip.length} duplicates would be skipped ⏭️`);
+  logBoth("\n📊 Analysis Results:");
+  logBoth(`- ${willGenerate.length} images would be generated ✅`);
+  logBoth(`- ${willSkip.length} duplicates would be skipped ⏭️`);
 
-  console.log(`\n🎨 Processing plan for ${processedOfferings.length} offerings:\n`);
+  logBoth(`\n🎨 Processing plan for ${processedOfferings.length} offerings:\n`);
 
   const idWidth = 6;
   const titleWidth = 30;
@@ -197,7 +252,7 @@ function printDryRunSummary(processedOfferings: OfferingWithGenPlanAndImage[], c
   const imageUrlWidth = 30;
 
   // Print table header
-  console.log(
+  logBoth(
     "│ ID".padEnd(idWidth + 3) +
       "│ Title".padEnd(titleWidth + 3) +
       "│ Material".padEnd(materialWidth + 3) +
@@ -253,8 +308,8 @@ function printDryRunSummary(processedOfferings: OfferingWithGenPlanAndImage[], c
 
     const filePathFormatted = item.filePath.substring(0, filePathWidth).padEnd(filePathWidth);
     const imageUrlFormatted = item.imageUrl.substring(0, imageUrlWidth).padEnd(imageUrlWidth);
-    
-    console.log(
+
+    logBoth(
       `│ ${id} │ ${title} │ ${material} │ ${form} │ ${surface} │ ${construction} │ ${matchFormatted} │ ${imagesCount} │ ${willGenFormatted} │ ${promptFormatted} │ ${filePathFormatted} │ ${imageUrlFormatted}`
     );
 
@@ -279,12 +334,14 @@ function printDryRunSummary(processedOfferings: OfferingWithGenPlanAndImage[], c
   }
 
   const estimatedCost = estimateCost(willGenerate.length, config.generation.model);
-  console.log(
+  logBoth(
     `\n💰 Estimated cost: $${estimatedCost.toFixed(2)} (${willGenerate.length} images × $${willGenerate.length > 0 ? (estimatedCost / willGenerate.length).toFixed(2) : "0.00"})`,
   );
 
-  console.log("\nℹ️  This is a dry run. No images were generated.");
-  console.log("   Run with --no-dry-run to generate images.");
+  logBoth("\nℹ️  This is a dry run. No images were generated.");
+  logBoth("   Run with --no-dry-run to generate images.");
+
+
 }
 
 /**
@@ -293,11 +350,15 @@ function printDryRunSummary(processedOfferings: OfferingWithGenPlanAndImage[], c
 async function main() {
   const config = await loadConfig();
 
+  // Initialize log file
+  initLogFile(config.log.logfile, config.log.deleteLogfile);
+
   log.info("🚀 AI Image Generation CLI Tool");
   log.info("=" + "=".repeat(60));
 
   if (config.help) {
     showHelp();
+    closeLogFile();
     return;
   }
 
@@ -305,6 +366,7 @@ async function main() {
   if (!process.env.FAL_KEY && !config.generation.dry_run) {
     log.error("❌ FAL_KEY not found in .env file");
     log.info("Please add your FAL API key to the .env file");
+    closeLogFile();
     process.exit(1);
   }
 
@@ -368,6 +430,7 @@ async function main() {
       log.info("   - Check specific category_ids");
       await transaction.rollback();
       await pool.close();
+      closeLogFile();
       return;
     }
 
@@ -375,6 +438,7 @@ async function main() {
       log.info("✅ All offerings have matching images! Nothing to generate.");
       await transaction.rollback();
       await pool.close();
+      closeLogFile();
       return;
     }
 
@@ -519,11 +583,13 @@ async function main() {
     throw error;
   } finally {
     await pool.close();
+    closeLogFile();
   }
 }
 
 // Run main function
 main().catch((error) => {
   log.error("❌ Fatal error:", error);
+  closeLogFile();
   process.exit(1);
 });

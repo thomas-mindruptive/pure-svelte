@@ -112,6 +112,22 @@ export interface ImageGenerationConfig {
      */
     include_metaphysical?: boolean;
   };
+
+  /**
+   * Logging configuration
+   */
+  log: {
+    /**
+     * Path to log file where dry-run summary will be written
+     */
+    logfile: string;
+
+    /**
+     * Delete log file before writing (fresh log each run)
+     * If false, will append to existing log file
+     */
+    deleteLogfile: boolean;
+  };
 }
 
 /**
@@ -142,14 +158,14 @@ export const defaultConfig: ImageGenerationConfig = {
   },
 
   matching: {
-    required_fields: ['construction_type_id', 'material_id', 'form_id', 'surface_finish_id'],
+    required_fields: ["construction_type_id", "material_id", "form_id", "surface_finish_id"],
 
     // Optional fields with scoring weights
     optional_fields: {
       //form_id: 0.4,           // Form is quite important (e.g., beads vs raw stone)
       //surface_finish_id: 0.3,  // Surface finish matters (polished vs raw)
       //construction_type_id: 0.2, // Construction type (threaded vs pendant)
-      color_variant: 0.1       // Color variant is less important
+      color_variant: 0.1, // Color variant is less important
     },
 
     // Need at least 50% match on optional fields
@@ -157,9 +173,9 @@ export const defaultConfig: ImageGenerationConfig = {
 
     // NULL handling - strict mode!
     null_behavior: {
-      image_null_is_wildcard: false,  // NULL in image does NOT match everything
-      offering_null_accepts_all: true  // NULL in offering can accept any value
-    }
+      image_null_is_wildcard: false, // NULL in image does NOT match everything
+      offering_null_accepts_all: true, // NULL in offering can accept any value
+    },
   },
 
   generation: {
@@ -195,6 +211,14 @@ export const defaultConfig: ImageGenerationConfig = {
     // Skip metaphysical properties (keep it product-focused)
     include_metaphysical: false,
   },
+
+  log: {
+    // Path to log file
+    logfile: "C:/dev/pureenergyworks/pure-svelte/log/genImageLog.txt",
+
+    // Delete log file before each run (fresh log)
+    deleteLogfile: true,
+  }
 };
 
 /**
@@ -264,5 +288,8 @@ export async function loadConfig(): Promise<ImageGenerationConfig> {
       ...defaultConfig.prompt,
       ...cliArgs.prompt,
     },
+    log: {
+      ...defaultConfig.log,
+    }
   };
 }

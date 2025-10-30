@@ -8,27 +8,34 @@
  *  white background, studio lighting, high detail, e-commerce style"
  */
 
+import { assertDefined } from "$lib/utils/assertions.js";
 import type {
   WholesalerItemOffering,
   ProductDefinition,
   Material,
   Form,
   SurfaceFinish,
-  ConstructionType
+  ConstructionType,
 } from "../../src/lib/domain/domainTypes.js";
 import type { ImageGenerationConfig } from "./generateMissingImages.config.js";
+import type { OfferingWithGenerationPlan } from "./generateMissingImages.js";
+
+export function buildPrompt(item: OfferingWithGenerationPlan, config: ImageGenerationConfig["prompt"]) {
+  assertDefined(item, "item");
+  return _buildPrompt(item.offering, null, item.material, item.form, item.surface_finish, item.construction_type, config);
+}
 
 /**
  * Builds a fal.ai prompt from offering and lookup data
  */
-export function buildPrompt(
+function _buildPrompt(
   offering: WholesalerItemOffering,
-  productDef: ProductDefinition,
+  productDef: ProductDefinition | null,
   material: Material | null,
   form: Form | null,
   surfaceFinish: SurfaceFinish | null,
   constructionType: ConstructionType | null,
-  config: ImageGenerationConfig['prompt']
+  config: ImageGenerationConfig["prompt"],
 ): string {
   const parts: string[] = [];
 
@@ -107,11 +114,7 @@ export function buildPrompt(
  * Format: {material}_{form}_{size}_{timestamp}.png
  * Example: rose_quartz_sphere_5cm_1704123456.png
  */
-export function generateImageFilename(
-  offering: WholesalerItemOffering,
-  material: Material | null,
-  form: Form | null
-): string {
+export function generateImageFilename(offering: WholesalerItemOffering, material: Material | null, form: Form | null): string {
   const parts: string[] = [];
 
   // Material (sanitized)

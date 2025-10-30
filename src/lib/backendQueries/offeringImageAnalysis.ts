@@ -137,9 +137,7 @@ export async function analyzeOfferingsForImages(
       // 2d. Determine match quality
       const matchQuality = determineMatchQuality(bestMatch, criteria, availableImages);
 
-      // 2e. Build analysis result with COALESCE logic
-      // If offering doesn't have material/form/etc, inherit from product_def
-      results.push({
+      const item: OfferingWithImageAnalysis = {
         offering: offering as Wio_pdef_mat_form_surf_constr_Nested,
         product_def: offering.product_def as ProductDefinition,
         material: offering.material || offering.product_def.material || null,
@@ -149,8 +147,12 @@ export async function analyzeOfferingsForImages(
         available_images: availableImages,
         best_match: bestMatch,
         match_quality: matchQuality,
-        needs_generation: matchQuality === "none",
-      });
+        needs_generation: matchQuality === "none"
+      }
+
+      // 2e. Build analysis result with COALESCE logic
+      // If offering doesn't have material/form/etc, inherit from product_def
+      results.push(item);
 
       log.debug(`analyzeOfferingsForImages: Analyzed offering ${offering.offering_id}`, {
         offering_id: offering.offering_id,

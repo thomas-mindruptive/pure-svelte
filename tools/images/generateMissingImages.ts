@@ -25,6 +25,8 @@ import { extractMatchCriteriaFromOffering, findBestMatchingImage } from "$lib/ba
 import { ComparisonOperator } from "$lib/backendQueries/queryGrammar";
 import type { ProductDefinitionImage_Image } from "$lib/domain/domainTypes";
 import type { Transaction } from "mssql";
+import { rollbackTransaction } from "$lib/backendQueries/transactionWrapper";
+import * as path from "path";
 
 // Load environment variables
 dotenv.config();
@@ -35,11 +37,16 @@ const startTime = Date.now();
 /**
  * Extended offering with generation plan flags
  */
-interface OfferingWithGenerationPlan extends OfferingWithImageAnalysis {
+export interface OfferingWithGenerationPlan extends OfferingWithImageAnalysis {
   willGenerate: boolean;
   matchedInBatch: boolean;
 }
 
+export interface OfferingWithGenPlanAndImage extends OfferingWithGenerationPlan {
+  filePath: string;
+  imageUrl: string;
+  prompt: string;
+}
 
 /**
  * Show help message
@@ -166,7 +173,7 @@ async function processOfferingsWithCache(
 /**
  * Print dry-run summary table
  */
-function printDryRunSummary(processedOfferings: OfferingWithGenerationPlan[], config: ImageGenerationConfig) {
+function printDryRunSummary(processedOfferings: OfferingWithGenPlanAndImage[], config: ImageGenerationConfig) {
   const willGenerate = processedOfferings.filter((o) => o.willGenerate);
   const willSkip = processedOfferings.filter((o) => !o.willGenerate);
 
@@ -185,32 +192,28 @@ function printDryRunSummary(processedOfferings: OfferingWithGenerationPlan[], co
   const matchWidth = 8;
   const imagesWidth = 6;
   const willGenWidth = 8;
+  const promptWidth = 50;
+  const filePathWidth = 30;
+  const imageUrlWidth = 30;
 
   // Print table header
   console.log(
-    "| ID".padEnd(idWidth + 3) +
-    "| Title".padEnd(titleWidth + 3) +
-    "| Material".padEnd(materialWidth + 3) +
-    "| Form".padEnd(formWidth + 3) +
-    "| Surface".padEnd(surfaceWidth + 3) +
-    "| Constr".padEnd(constructionWidth + 3) +
-    "| Match".padEnd(matchWidth + 3) +
-    "| Imgs".padEnd(imagesWidth + 3) +
-    "| WillGen".padEnd(willGenWidth + 3)
+    "│ ID".padEnd(idWidth + 3) +
+      "│ Title".padEnd(titleWidth + 3) +
+      "│ Material".padEnd(materialWidth + 3) +
+      "│ Form".padEnd(formWidth + 3) +
+      "│ Surface".padEnd(surfaceWidth + 3) +
+      "│ Constr".padEnd(constructionWidth + 3) +
+      "│ Match".padEnd(matchWidth + 3) +
+      "│ Imgs".padEnd(imagesWidth + 3) +
+      "│ WillGen".padEnd(willGenWidth + 3) +
+      "│ Propmt".padEnd(promptWidth + 3), + 
+      "│ FilePath".padEnd(filePathWidth + 3), + 
+      "│ ImageUrl".padEnd(imageUrlWidth + 3)
   );
 
   // Print table rows
   for (const item of processedOfferings) {
-    const prompt = buildPrompt(
-      item.offering,
-      item.product_def,
-      item.material,
-      item.form,
-      item.surface_finish,
-      item.construction_type,
-      config.prompt,
-    );
-
     const id = item.offering.offering_id.toString().padEnd(idWidth);
     const title = (item.offering.title + "- " + item.offering.product_def.title || "Untitled").substring(0, titleWidth).padEnd(titleWidth);
 
@@ -235,9 +238,7 @@ function printDryRunSummary(processedOfferings: OfferingWithGenerationPlan[], co
     const construction = (constructionName + constructionInherited).substring(0, constructionWidth).padEnd(constructionWidth);
 
     // Match quality
-    const matchQuality = item.match_quality === "exact" ? "✅" :
-                        item.match_quality === "generic_fallback" ? "🔄" :
-                        "❌";
+    const matchQuality = item.match_quality === "exact" ? "✅" : item.match_quality === "generic_fallback" ? "🔄" : "❌";
     const matchFormatted = matchQuality.padEnd(matchWidth);
 
     // Available images count
@@ -247,7 +248,15 @@ function printDryRunSummary(processedOfferings: OfferingWithGenerationPlan[], co
     const willGenIcon = item.willGenerate ? "✅" : "⏭️";
     const willGenFormatted = willGenIcon.padEnd(willGenWidth);
 
-    console.log(`│ ${id} │ ${title} │ ${material} │ ${form} │ ${surface} │ ${construction} │ ${matchFormatted} │ ${imagesCount} │ ${willGenFormatted} │`);
+    const prompt = item.prompt;
+    const promptFormatted = prompt.substring(0, promptWidth).padEnd(promptWidth);
+
+    const filePathFormatted = item.filePath.substring(0, filePathWidth).padEnd(filePathWidth);
+    const imageUrlFormatted = item.imageUrl.substring(0, imageUrlWidth).padEnd(imageUrlWidth);
+    
+    console.log(
+      `│ ${id} │ ${title} │ ${material} │ ${form} │ ${surface} │ ${construction} │ ${matchFormatted} │ ${imagesCount} │ ${willGenFormatted} │ ${promptFormatted} │ ${filePathFormatted} │ ${imageUrlFormatted}`
+    );
 
     // Log full details if verbose
     if (config.verbose) {
@@ -376,15 +385,17 @@ async function main() {
     log.info(`✅ Cache simulation complete`);
 
     // Dry run mode: print summary and exit
-    if (config.generation.dry_run) {
-      printDryRunSummary(processedOfferings, config);
-      await transaction.rollback();
-      await pool.close();
-      return;
-    }
+    // if (config.generation.dry_run) {
+    //   printDryRunSummary(processedOfferings, config);
+    //   await transaction.rollback();
+    //   await pool.close();
+    //   return;
+    // }
 
     // Production mode: generate images
-    const toGenerate = processedOfferings.filter((o) => o.willGenerate);
+
+    // If dry run => Use all processed offering in order to print complete info table.
+    const toGenerate = config.generation.dry_run ? processedOfferings : processedOfferings.filter((o) => o.willGenerate);
     const toSkip = processedOfferings.filter((o) => !o.willGenerate);
     log.info(`\n🎨 Generating images for ${toGenerate.length} offerings (skipping ${toSkip.length} duplicates)...\n`);
 
@@ -395,8 +406,13 @@ async function main() {
     let successCount = 0;
     let failCount = 0;
 
+    const offeringsWithGenPlanAndImage: OfferingWithGenPlanAndImage[] = [];
+
     for (let i = 0; i < toGenerate.length; i++) {
       const item = toGenerate[i];
+      const itemWithGenPlanAndImage: OfferingWithGenPlanAndImage = { ...item, filePath: "", imageUrl: "", prompt: "" };
+      offeringsWithGenPlanAndImage.push(itemWithGenPlanAndImage);
+
       log.info(`[${i + 1}/${toGenerate.length}] Offering #${item.offering.offering_id}: ${item.offering.title || "Untitled"}`);
 
       if (config.verbose) {
@@ -411,47 +427,54 @@ async function main() {
 
       try {
         // Build prompt
-        const prompt = buildPrompt(
-          item.offering,
-          item.product_def,
-          item.material,
-          item.form,
-          item.surface_finish,
-          item.construction_type,
-          config.prompt,
-        );
+        const prompt = buildPrompt(item, config.prompt);
+        itemWithGenPlanAndImage.prompt = prompt;
 
         log.info(`  ├─ Prompt: "${prompt.substring(0, 100)}..."`);
 
         // Generate image with fal.ai
-        const imageUrl = await generateImage(prompt, config.generation);
+        let imageUrl = "Dry run -> No url";
+        if (!config.generation.dry_run) {
+          imageUrl = await generateImage(prompt, config.generation);
+        }
         log.info(`  ├─ Generated: ${imageUrl}`);
+        itemWithGenPlanAndImage.imageUrl = imageUrl;
 
         // Download and save image
         const filename = generateImageFilename(item.offering, item.material, item.form);
-        const filepath = await downloadAndSaveImage(imageUrl, filename, config.generation);
+        let filepath = "DRY - " + path.join(config.generation.image_directory, filename);
+        if (!config.generation.dry_run) {
+          filepath = await downloadAndSaveImage(imageUrl, filename, config.generation);
+        }
         log.info(`  ├─ Saved: ${filepath}`);
+        itemWithGenPlanAndImage.filePath = filepath;
 
         // Insert into database
-        log.info(`  ├─ Creating ProductDefinitionImage...`);
-        const result = await insertProductDefinitionImageWithImage(transaction, {
-          product_def_id: item.product_def.product_def_id,
-          material_id: item.offering.material_id,
-          form_id: item.offering.form_id,
-          surface_finish_id: item.offering.surface_finish_id,
-          construction_type_id: item.offering.construction_type_id,
-          color_variant: item.offering.color_variant,
-          image_type: "ai_generated",
-          is_primary: false,
-          sort_order: 999,
-          image: {
-            filepath: filepath,
-            // Auto-enrichment fills: filename, file_hash, file_size_bytes, width_px, height_px, mime_type
-          },
-        });
+        if (!config.generation.dry_run) {
+          log.info(`  ├─ Creating ProductDefinitionImage...`);
+          const result = await insertProductDefinitionImageWithImage(transaction, {
+            product_def_id: item.product_def.product_def_id,
+            material_id: item.offering.material_id,
+            form_id: item.offering.form_id,
+            surface_finish_id: item.offering.surface_finish_id,
+            construction_type_id: item.offering.construction_type_id,
+            color_variant: item.offering.color_variant,
+            image_type: "ai_generated",
+            is_primary: false,
+            sort_order: 999,
+            image: {
+              filepath: filepath,
+              // Auto-enrichment fills: filename, file_hash, file_size_bytes, width_px, height_px, mime_type
+            },
+          });
+          log.info(`  └─ ✅ Success! Image ID: ${result.image_id}\n`);
+        }
 
-        log.info(`  └─ ✅ Success! Image ID: ${result.image_id}\n`);
+        log.info(`  └─ ✅ Success! Image ID: DRY-RUN\n`);
         successCount++;
+
+        offeringsWithGenPlanAndImage.push(itemWithGenPlanAndImage);
+        //
       } catch (error: any) {
         log.error(`  └─ ❌ Failed: ${error.message}\n`);
         failCount++;
@@ -481,9 +504,12 @@ async function main() {
     } else {
       log.info("\n🎉 All offerings now have images!");
     }
+
+    printDryRunSummary(offeringsWithGenPlanAndImage, config);
+    //
   } catch (error: any) {
     log.error("❌ Error:", error);
-    await transaction.rollback();
+    await rollbackTransaction(transaction);
     throw error;
   } finally {
     await pool.close();

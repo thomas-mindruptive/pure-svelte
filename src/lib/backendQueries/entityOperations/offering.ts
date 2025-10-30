@@ -337,9 +337,16 @@ export async function loadOfferingsForImageAnalysis(
         pd.form_id AS 'product_def.form_id',
         pd.construction_type_id AS 'product_def.construction_type_id',
         pd.surface_finish_id AS 'product_def.surface_finish_id',
-        pd.product_type_id AS 'product_def.product_type_id',
         pd.for_liquids AS 'product_def.for_liquids',
         pd.created_at AS 'product_def.created_at',
+
+        -- Product definition's category with product_type
+        pc.category_id AS 'product_def.category.category_id',
+        pc.name AS 'product_def.category.name',
+        pc.product_type_id AS 'product_def.category.product_type_id',
+
+        pt.product_type_id AS 'product_def.category.product_type.product_type_id',
+        pt.name AS 'product_def.category.product_type.name',
 
         -- Product definition's lookups (nested in product_def)
         pd_m.material_id AS 'product_def.material.material_id',
@@ -356,10 +363,6 @@ export async function loadOfferingsForImageAnalysis(
         pd_ct.construction_type_id AS 'product_def.construction_type.construction_type_id',
         pd_ct.name AS 'product_def.construction_type.name',
         pd_ct.description AS 'product_def.construction_type.description',
-
-        pd_pt.product_type_id AS 'product_def.product_type.product_type_id',
-        pd_pt.name AS 'product_def.product_type.name',
-        pd_pt.description AS 'product_def.product_type.description',
 
         -- Material (nested)
         m.material_id AS 'material.material_id',
@@ -382,6 +385,10 @@ export async function loadOfferingsForImageAnalysis(
 
     FROM dbo.wholesaler_item_offerings AS wio
     INNER JOIN dbo.product_definitions pd ON wio.product_def_id = pd.product_def_id
+    -- Product definition's category and product_type
+    LEFT JOIN dbo.product_categories pc ON pd.category_id = pc.category_id
+    LEFT JOIN dbo.product_types pt ON pc.product_type_id = pt.product_type_id
+    -- Offering's own lookups
     LEFT JOIN dbo.materials m ON wio.material_id = m.material_id
     LEFT JOIN dbo.forms f ON wio.form_id = f.form_id
     LEFT JOIN dbo.surface_finishes sf ON wio.surface_finish_id = sf.surface_finish_id
@@ -391,7 +398,6 @@ export async function loadOfferingsForImageAnalysis(
     LEFT JOIN dbo.forms pd_f ON pd.form_id = pd_f.form_id
     LEFT JOIN dbo.surface_finishes pd_sf ON pd.surface_finish_id = pd_sf.surface_finish_id
     LEFT JOIN dbo.construction_types pd_ct ON pd.construction_type_id = pd_ct.construction_type_id
-    LEFT JOIN dbo.product_types pd_pt ON pd.product_type_id = pd_pt.product_type_id
     ${whereClause}
     ORDER BY wio.offering_id ASC
     FOR JSON PATH

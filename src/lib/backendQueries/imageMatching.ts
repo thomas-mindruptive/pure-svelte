@@ -55,10 +55,11 @@ export interface ImageMatchConfig {
 export const DEFAULT_MATCH_CONFIG: ImageMatchConfig = {
   required_fields: ['material_id'], // Material MUST match
   optional_fields: {
-    form_id: 0.4,
-    surface_finish_id: 0.3,
+    form_id: 0.3,
+    surface_finish_id: 0.25,
     construction_type_id: 0.2,
-    color_variant: 0.1
+    color_variant: 0.15,
+    size: 0.1
   },
   min_optional_score: 0.5, // At least 50% of optional fields should match
   null_behavior: {
@@ -70,6 +71,8 @@ export const DEFAULT_MATCH_CONFIG: ImageMatchConfig = {
 /**
  * Criteria for matching images to offerings.
  * Extracted from offering or manually specified.
+ * Note: product_type is NOT included as it's not a variant field -
+ * all images within a product_def share the same product_type via category.
  */
 export interface ImageMatchCriteria {
   material_id?: number | null;
@@ -77,7 +80,31 @@ export interface ImageMatchCriteria {
   surface_finish_id?: number | null;
   construction_type_id?: number | null;
   color_variant?: string | null;
-  size?: string | null; // From offering.size
+  size?: string | null; // From offering.size (maps to image.size_range)
+}
+
+/**
+ * Type-safe mapping between criteria fields and image fields
+ * Most fields have the same name, except size->size_range
+ */
+const CRITERIA_TO_IMAGE_FIELD_MAP: Record<keyof ImageMatchCriteria, keyof ProductDefinitionImage_Image> = {
+  material_id: 'material_id',
+  form_id: 'form_id',
+  surface_finish_id: 'surface_finish_id',
+  construction_type_id: 'construction_type_id',
+  color_variant: 'color_variant',
+  size: 'size_range', // This is the special mapping!
+} as const;
+
+/**
+ * Type-safe helper to get image field value based on criteria field name
+ */
+function getImageFieldValue(
+  image: ProductDefinitionImage_Image,
+  criteriaField: keyof ImageMatchCriteria
+): any {
+  const imageField = CRITERIA_TO_IMAGE_FIELD_MAP[criteriaField];
+  return image[imageField];
 }
 
 /**
@@ -196,7 +223,7 @@ function checkRequiredFields(
   config: ImageMatchConfig
 ): boolean {
   for (const field of config.required_fields) {
-    const imageValue = image[field as keyof ProductDefinitionImage_Image];
+    const imageValue = getImageFieldValue(image, field);
     const criteriaValue = criteria[field];
 
     // Handle NULL cases based on configuration
@@ -237,7 +264,7 @@ function calculateOptionalScore(
   for (const [field, weight] of Object.entries(config.optional_fields)) {
     maxScore += weight;
 
-    const imageValue = image[field as keyof ProductDefinitionImage_Image];
+    const imageValue = getImageFieldValue(image, field as keyof ImageMatchCriteria);
     const criteriaValue = criteria[field as keyof ImageMatchCriteria];
 
     // Handle NULL cases
@@ -258,11 +285,36 @@ function calculateOptionalScore(
       // Exact match
       score += weight;
     }
-    // Special case for size matching (partial match)
+    // Special case for size matching
+    // Now imageValue is size_range (e.g., "S-M") and criteriaValue is size (e.g., "S")
     else if (field === 'size' && typeof imageValue === 'string' && typeof criteriaValue === 'string') {
-      // Check if size is included in range (e.g., "S" matches "S-M")
-      if (imageValue.includes(criteriaValue) || criteriaValue.includes(imageValue)) {
-        score += weight * 0.5; // Partial score for partial match
+      // Size order mapping
+      const SIZE_ORDER: Record<string, number> = {
+        'XS': 1,
+        'S': 2,
+        'M': 3,
+        'L': 4,
+        'XL': 5,
+        'XXL': 6
+      };
+
+      // Check if it's a range (e.g., "S-M") or single size
+      if (imageValue.includes('-')) {
+        const [minSize, maxSize] = imageValue.split('-');
+        const minOrder = SIZE_ORDER[minSize];
+        const maxOrder = SIZE_ORDER[maxSize];
+        const criteriaOrder = SIZE_ORDER[criteriaValue];
+
+        // Check if criteria size is within the range
+        if (criteriaOrder && minOrder && maxOrder &&
+            criteriaOrder >= minOrder && criteriaOrder <= maxOrder) {
+          score += weight;
+        }
+      } else {
+        // Single size, must match exactly
+        if (imageValue === criteriaValue) {
+          score += weight;
+        }
       }
     }
   }

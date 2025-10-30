@@ -300,19 +300,46 @@ export const SurfaceFinishSchema = createSchemaWithMeta(SurfaceFinishSchemaBase,
   dbSchema: "dbo",
 } as const);
 
+// ===== ProductType (dbo.product_types) =====
+
+const ProductTypeSchemaBase = z
+  .object({
+    product_type_id: z.number().int().positive(),
+    name: NameOrTitle,
+  })
+  .describe("ProductTypeSchema");
+
+export const ProductTypeSchema = createSchemaWithMeta(ProductTypeSchemaBase, {
+  alias: "pt",
+  tableName: "product_types",
+  dbSchema: "dbo",
+} as const);
+
+// ===== PRODUCT CATEGORY WITH PRODUCT TYPE (nested) =====
+
+/**
+ * NESTED SCHEMA: ProductCategory with nested product_type.
+ * Used when we need product_type data alongside category info.
+ */
+const tempProductCategoryWithProductType = ProductCategorySchema.extend({
+  product_type: ProductTypeSchema.nullable().optional(),
+}).describe("ProductCategory_ProductType_NestedSchema");
+export const ProductCategory_ProductType_Nested_Schema = copyMetaFrom(ProductCategorySchema, tempProductCategoryWithProductType);
+
 // ===== PRODUCT DEFINITION WITH LOOKUPS (for image generation analysis) =====
 
 /**
  * NESTED SCHEMA with all lookup data for product definitions.
  * Used for image generation analysis when offerings inherit from product_def.
+ * Includes nested category with product_type.
  */
 const tempProdDefMatFormSurfConstrNested = ProductDefinitionSchema.extend({
+  category: ProductCategory_ProductType_Nested_Schema,
   material: MaterialSchema.nullable().optional(),
   form: FormSchema.nullable().optional(),
   surface_finish: SurfaceFinishSchema.nullable().optional(),
   construction_type: ConstructionTypeSchema.nullable().optional(),
-  product_type: ProductTypeSchema.nullable().optional(),
-}).describe("ProductDefinition_Material_Form_SurfaceFinish_ConstructionType_ProductType_NestedSchema");
+}).describe("ProductDefinition_Category_Material_Form_SurfaceFinish_ConstructionType_NestedSchema");
 export const ProdDef_mat_form_surf_constr_Nested_Schema = copyMetaFrom(ProductDefinitionSchema, tempProdDefMatFormSurfConstrNested);
 
 // ===== WHOLESALER OFFERING LINK (dbo.wholesaler_offering_links) =====
@@ -476,26 +503,6 @@ export const WholesalerOfferingAttribute_AttributeSchema = WholesalerOfferingAtt
   attribute_name: NameOrTitle.optional(),
   attribute_description: z.string().nullable().optional(),
 }).describe("WholesalerOfferingAttribute_AttributeSchema");
-
-
-
-// ===== ProductType (dbo.product_types) =====
-
-const ProductTypeSchemaBase = z
-  .object({
-    product_type_id: z.number().int().positive(),
-    name: NameOrTitle,
-  })
-  .describe("ProductTypeSchema");
-
-export const ProductTypeSchema = createSchemaWithMeta(ProductTypeSchemaBase, {
-  alias: "pt",
-  tableName: "product_types",
-  dbSchema: "dbo",
-} as const);
-
-
-
 // ===== ORDER (dbo.orders) =====
 
 export const OrderStatusSchema = z
@@ -656,7 +663,7 @@ const ProductDefinitionImageSchemaBase = z
     construction_type_id: z.number().int().positive().nullable().optional(),
 
     // Image Metadata
-    size_range: ImageSizeRangeEnum.nullable().optional(),
+    size_range: z.string().max(50).nullable().optional(), // Flexible size range like "XS-L", "S-XL", etc.
     quality_grade: z.string().max(10).nullable().optional(),
     color_variant: z.string().max(50).nullable().optional(),
     image_type: z.string().max(50).nullable().optional(),

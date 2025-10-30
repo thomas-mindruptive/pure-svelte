@@ -158,14 +158,14 @@ export const defaultConfig: ImageGenerationConfig = {
   },
 
   matching: {
-    required_fields: ["construction_type_id", "material_id", "form_id", "surface_finish_id", "product_type_id"],
+    // Fields that MUST match exactly (images with different values are unusable)
+    // Note: product_type is NOT a variant field - all images in a product_def share the same type via category
+    required_fields: ["construction_type_id", "material_id", "form_id", "surface_finish_id"],
 
-    // Optional fields with scoring weights
+    // Optional fields with scoring weights (nice-to-have but not critical)
     optional_fields: {
-      //form_id: 0.4,           // Form is quite important (e.g., beads vs raw stone)
-      //surface_finish_id: 0.3,  // Surface finish matters (polished vs raw)
-      //construction_type_id: 0.2, // Construction type (threaded vs pendant)
-      color_variant: 0.1, // Color variant is less important
+      color_variant: 0.6, // Color variant somewhat important ("pink" vs "deep pink")
+      size: 0.4, // Size less important ("5cm" vs "6cm" visually similar)
     },
 
     // Need at least 50% match on optional fields

@@ -146,7 +146,7 @@ export async function analyzeOfferingsForImages(
         form: offering.form || offering.product_def.form || null,
         surface_finish: offering.surface_finish || offering.product_def.surface_finish || null,
         construction_type: offering.construction_type || offering.product_def.construction_type || null,
-        product_type: offering.product_def.product_type || null,
+        product_type: offering.product_def.category?.product_type || null,
         available_images: availableImages,
         best_match: bestMatch,
         match_quality: matchQuality,

@@ -128,6 +128,72 @@ Examples:
 }
 
 /**
+ * Validates that a size_range string matches the DB CHECK constraint.
+ * Must match exactly what's allowed in the database.
+ */
+function validateSizeRange(size: string | null | undefined): string | null {
+  if (!size) return null;
+
+  // Valid values from DB CHECK constraint
+  const validSizeRanges = [
+    // Single sizes
+    'XS', 'S', 'M', 'L', 'XL', 'XXL',
+    // XS ranges
+    'XS-S', 'XS-M', 'XS-L', 'XS-XL', 'XS-XXL',
+    // S ranges
+    'S-M', 'S-L', 'S-XL', 'S-XXL',
+    // M ranges
+    'M-L', 'M-XL', 'M-XXL',
+    // L ranges
+    'L-XL', 'L-XXL',
+    // XL ranges
+    'XL-XXL'
+  ];
+
+  if (validSizeRanges.includes(size)) {
+    return size;
+  } else {
+    throw new Error(
+      `Invalid size range: "${size}". Must be one of: ${validSizeRanges.join(', ')}`
+    );
+  }
+}
+
+/**
+ * Helper function to build consistent image data for both placeholder and DB insert.
+ * This ensures 100% consistency between cache and database.
+ */
+function buildImageData(offering: OfferingWithImageAnalysis): {
+  product_def_id: number;
+  material_id: number | null;
+  form_id: number | null;
+  surface_finish_id: number | null;
+  construction_type_id: number | null;
+  color_variant: string | null;
+  size_range: string | null;
+  image_type: string;
+  is_primary: boolean;
+  sort_order: number;
+} {
+  // Validate and map offering.size to size_range
+  const size_range = validateSizeRange(offering.offering.size);
+
+  return {
+    product_def_id: offering.product_def.product_def_id,
+    // COALESCE: offering value or inherit from product_def
+    material_id: offering.offering.material_id ?? offering.product_def.material_id ?? null,
+    form_id: offering.offering.form_id ?? offering.product_def.form_id ?? null,
+    surface_finish_id: offering.offering.surface_finish_id ?? offering.product_def.surface_finish_id ?? null,
+    construction_type_id: offering.offering.construction_type_id ?? offering.product_def.construction_type_id ?? null,
+    color_variant: offering.offering.color_variant ?? null,
+    size_range: size_range, // Validated size range
+    image_type: "ai_generated",
+    is_primary: false,
+    sort_order: 999,
+  };
+}
+
+/**
  * Process offerings with cache simulation to prevent duplicate generations.
  *
  * Uses a cache to simulate "what if we generated images for previous offerings?"
@@ -191,17 +257,11 @@ async function processOfferingsWithCache(
       });
 
       // Add placeholder image to cache for next offerings
+      // Use buildImageData to ensure 100% consistency with DB insert!
+      const imageData = buildImageData(offering);
       const placeholderImage: ProductDefinitionImage_Image = {
         image_id: -1, // Placeholder ID
-        product_def_id: product_def_id,
-        material_id: offering.offering.material_id,
-        form_id: offering.offering.form_id,
-        surface_finish_id: offering.offering.surface_finish_id,
-        construction_type_id: offering.offering.construction_type_id,
-        color_variant: offering.offering.color_variant,
-        image_type: "ai_generated",
-        is_primary: false,
-        sort_order: 999,
+        ...imageData,
         created_at: new Date().toISOString(),
         // Nested image object (placeholder values - never committed to DB)
         image: {
@@ -226,9 +286,9 @@ async function processOfferingsWithCache(
 }
 
 /**
- * Print dry-run summary table
+ * Print run summary table
  */
-function printDryRunSummary(processedOfferings: OfferingWithGenPlanAndImage[], config: ImageGenerationConfig) {
+function printRunSummary(processedOfferings: OfferingWithGenPlanAndImage[], config: ImageGenerationConfig) {
   const willGenerate = processedOfferings.filter((o) => o.willGenerate);
   const willSkip = processedOfferings.filter((o) => !o.willGenerate);
 
@@ -240,6 +300,7 @@ function printDryRunSummary(processedOfferings: OfferingWithGenPlanAndImage[], c
 
   const idWidth = 6;
   const titleWidth = 30;
+  const productTypeWith = 20;
   const materialWidth = 12;
   const formWidth = 12;
   const surfaceWidth = 12;
@@ -247,7 +308,7 @@ function printDryRunSummary(processedOfferings: OfferingWithGenPlanAndImage[], c
   const matchWidth = 8;
   const imagesWidth = 6;
   const willGenWidth = 8;
-  const promptWidth = 50;
+  const promptWidth = 70;
   const filePathWidth = 90;
   const imageUrlWidth = 30;
 
@@ -255,6 +316,7 @@ function printDryRunSummary(processedOfferings: OfferingWithGenPlanAndImage[], c
   logBoth(
     "│ ID".padEnd(idWidth + 3) +
       "│ Title".padEnd(titleWidth + 3) +
+      "│ ProductType".padEnd(productTypeWith + 3) + 
       "│ Material".padEnd(materialWidth + 3) +
       "│ Form".padEnd(formWidth + 3) +
       "│ Surface".padEnd(surfaceWidth + 3) +
@@ -271,6 +333,8 @@ function printDryRunSummary(processedOfferings: OfferingWithGenPlanAndImage[], c
   for (const item of processedOfferings) {
     const id = item.offering.offering_id.toString().padEnd(idWidth);
     const title = (item.offering.title + "- " + item.offering.product_def.title || "Untitled").substring(0, titleWidth).padEnd(titleWidth);
+
+    const productTypeFormatted = item.product_type?.name.substring(0, productTypeWith).padEnd(productTypeWith); 
 
     // Material with inheritance indicator (*) if inherited from product_def
     const materialName = item.material?.name || "-";
@@ -310,7 +374,7 @@ function printDryRunSummary(processedOfferings: OfferingWithGenPlanAndImage[], c
     const imageUrlFormatted = item.imageUrl.substring(0, imageUrlWidth).padEnd(imageUrlWidth);
 
     logBoth(
-      `│ ${id} │ ${title} │ ${material} │ ${form} │ ${surface} │ ${construction} │ ${matchFormatted} │ ${imagesCount} │ ${willGenFormatted} │ ${promptFormatted} │ ${filePathFormatted} │ ${imageUrlFormatted}`
+      `│ ${id} │ ${title} │ ${productTypeFormatted} │ ${material} │ ${form} │ ${surface} │ ${construction} │ ${matchFormatted} │ ${imagesCount} │ ${willGenFormatted} │ ${promptFormatted} │ ${filePathFormatted} │ ${imageUrlFormatted}`
     );
 
     // Log full details if verbose
@@ -448,14 +512,6 @@ async function main() {
     const processedOfferings = await processOfferingsWithCache(toProcess, transaction);
     log.info(`✅ Cache simulation complete`);
 
-    // Dry run mode: print summary and exit
-    // if (config.generation.dry_run) {
-    //   printDryRunSummary(processedOfferings, config);
-    //   await transaction.rollback();
-    //   await pool.close();
-    //   return;
-    // }
-
     // Production mode: generate images
 
     // If dry run => Use all processed offering in order to print complete info table.
@@ -518,16 +574,10 @@ async function main() {
         // Insert into database
         if (!config.generation.dry_run) {
           log.info(`  ├─ Creating ProductDefinitionImage...`);
+          // Use buildImageData to ensure 100% consistency with placeholder!
+          const imageData = buildImageData(item);
           const result = await insertProductDefinitionImageWithImage(transaction, {
-            product_def_id: item.product_def.product_def_id,
-            material_id: item.offering.material_id,
-            form_id: item.offering.form_id,
-            surface_finish_id: item.offering.surface_finish_id,
-            construction_type_id: item.offering.construction_type_id,
-            color_variant: item.offering.color_variant,
-            image_type: "ai_generated",
-            is_primary: false,
-            sort_order: 999,
+            ...imageData,
             image: {
               filepath: filepath,
               // Auto-enrichment fills: filename, file_hash, file_size_bytes, width_px, height_px, mime_type
@@ -575,7 +625,7 @@ async function main() {
       log.info("\n🎉 All offerings now have images!");
     }
 
-    printDryRunSummary(offeringsWithGenPlanAndImage, config);
+    printRunSummary(offeringsWithGenPlanAndImage, config);
     //
   } catch (error: any) {
     log.error("❌ Error:", error);

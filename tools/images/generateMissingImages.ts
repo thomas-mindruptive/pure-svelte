@@ -193,7 +193,7 @@ function printDryRunSummary(processedOfferings: OfferingWithGenPlanAndImage[], c
   const imagesWidth = 6;
   const willGenWidth = 8;
   const promptWidth = 50;
-  const filePathWidth = 30;
+  const filePathWidth = 90;
   const imageUrlWidth = 30;
 
   // Print table header
@@ -207,8 +207,8 @@ function printDryRunSummary(processedOfferings: OfferingWithGenPlanAndImage[], c
       "│ Match".padEnd(matchWidth + 3) +
       "│ Imgs".padEnd(imagesWidth + 3) +
       "│ WillGen".padEnd(willGenWidth + 3) +
-      "│ Propmt".padEnd(promptWidth + 3), + 
-      "│ FilePath".padEnd(filePathWidth + 3), + 
+      "│ Prompt".padEnd(promptWidth + 3) +
+      "│ FilePath".padEnd(filePathWidth + 3) +
       "│ ImageUrl".padEnd(imageUrlWidth + 3)
   );
 
@@ -399,9 +399,11 @@ async function main() {
     const toSkip = processedOfferings.filter((o) => !o.willGenerate);
     log.info(`\n🎨 Generating images for ${toGenerate.length} offerings (skipping ${toSkip.length} duplicates)...\n`);
 
-    // Initialize FAL client (only in production)
-    initializeFalAi(process.env.FAL_KEY!);
-    await verifyImageDirectory(config.generation.image_directory);
+    // Initialize FAL client and verify directory (only in production)
+    if (!config.generation.dry_run) {
+      initializeFalAi(process.env.FAL_KEY!);
+      await verifyImageDirectory(config.generation.image_directory);
+    }
 
     let successCount = 0;
     let failCount = 0;
@@ -468,12 +470,11 @@ async function main() {
             },
           });
           log.info(`  └─ ✅ Success! Image ID: ${result.image_id}\n`);
+        } else {
+          log.info(`  └─ ✅ Success! (dry-run - not committed)\n`);
         }
 
-        log.info(`  └─ ✅ Success! Image ID: DRY-RUN\n`);
         successCount++;
-
-        offeringsWithGenPlanAndImage.push(itemWithGenPlanAndImage);
         //
       } catch (error: any) {
         log.error(`  └─ ❌ Failed: ${error.message}\n`);
@@ -481,9 +482,14 @@ async function main() {
       }
     }
 
-    // Commit transaction
-    await transaction.commit();
-    log.info("✅ Transaction committed\n");
+    // Commit or rollback transaction
+    if (config.generation.dry_run) {
+      await transaction.rollback();
+      log.info("✅ Transaction rolled back (dry-run)\n");
+    } else {
+      await transaction.commit();
+      log.info("✅ Transaction committed\n");
+    }
 
     // Print summary
     const totalCost = estimateCost(successCount, config.generation.model);

@@ -25,7 +25,7 @@ import { log } from "$lib/utils/logger";
 import type { Transaction } from "mssql";
 import { loadProductDefinitionImagesWithImage } from "./entityOperations/image.js";
 import { loadOfferingsForImageAnalysis, type ImageAnalysisFilters } from "./entityOperations/offering.js";
-import { extractMatchCriteriaFromOffering, findBestMatchingImage, type ImageMatchCriteria } from "./imageMatching.js";
+import { extractMatchCriteriaFromOffering, findBestMatchingImage, findBestMatchingImageWithScore, type ImageMatchCriteria } from "./imageMatching.js";
 import { ComparisonOperator } from "./queryGrammar.js";
 
 /**
@@ -47,6 +47,7 @@ export interface OfferingWithImageAnalysis {
   available_images: ProductDefinitionImage_Image[];
   best_match: ProductDefinitionImage_Image | null;
   match_quality: MatchQuality;
+  match_score: number | null; // Matching score (0.0-1.0) if image found, null otherwise
   needs_generation: boolean;
 }
 
@@ -133,8 +134,10 @@ export async function analyzeOfferingsForImages(
       // 2b. Extract match criteria from offering
       const criteria = extractMatchCriteriaFromOffering(offering as Wio_pdef_mat_form_surf_constr_Nested);
 
-      // 2c. Find best matching image
-      const bestMatch = findBestMatchingImage(criteria, availableImages);
+      // 2c. Find best matching image with score
+      const matchResult = findBestMatchingImageWithScore(criteria, availableImages);
+      const bestMatch = matchResult?.image || null;
+      const matchScore = matchResult?.score || null;
 
       // 2d. Determine match quality
       const matchQuality = determineMatchQuality(bestMatch, criteria, availableImages);
@@ -150,6 +153,7 @@ export async function analyzeOfferingsForImages(
         available_images: availableImages,
         best_match: bestMatch,
         match_quality: matchQuality,
+        match_score: matchScore,
         needs_generation: matchQuality === "none"
       }
 

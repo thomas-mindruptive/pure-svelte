@@ -82,6 +82,7 @@ export function printRunSummary(processedOfferings: OfferingWithGenPlanAndImage[
   const constructionWidth = 12;
   const sizeWith = 7;
   const matchWidth = 8;
+  const scoreWidth = 7; // NEW: Match score column
   const imagesWidth = 6;
   const willGenWidth = 8;
   const promptWidth = 70;
@@ -92,13 +93,14 @@ export function printRunSummary(processedOfferings: OfferingWithGenPlanAndImage[
   logBoth(
     "│ ID".padEnd(idWidth + 3) +
       "│ Title".padEnd(titleWidth + 3) +
-      "│ ProductType".padEnd(productTypeWith + 3) + 
+      "│ ProductType".padEnd(productTypeWith + 3) +
       "│ Material".padEnd(materialWidth + 3) +
       "│ Form".padEnd(formWidth + 3) +
       "│ Surface".padEnd(surfaceWidth + 3) +
       "│ Constr".padEnd(constructionWidth + 3) +
       "│ Size".padEnd(sizeWith + 3) +
       "│ Match".padEnd(matchWidth + 3) +
+      "│ Score".padEnd(scoreWidth + 3) + // NEW: Match score column
       "│ Imgs".padEnd(imagesWidth + 3) +
       "│ WillGen".padEnd(willGenWidth + 3) +
       "│ Prompt".padEnd(promptWidth + 3) +
@@ -140,6 +142,11 @@ export function printRunSummary(processedOfferings: OfferingWithGenPlanAndImage[
     const matchQuality = item.match_quality === "exact" ? "✅" : item.match_quality === "generic_fallback" ? "🔄" : "❌";
     const matchFormatted = matchQuality.padEnd(matchWidth);
 
+    // Match score (0.0-1.0, formatted as percentage)
+    const scoreFormatted = item.match_score !== null
+      ? `${(item.match_score * 100).toFixed(0)}%`.padEnd(scoreWidth)
+      : "-".padEnd(scoreWidth);
+
     // Available images count
     const imagesCount = item.available_images.length.toString().padEnd(imagesWidth);
 
@@ -154,7 +161,7 @@ export function printRunSummary(processedOfferings: OfferingWithGenPlanAndImage[
     const imageUrlFormatted = item.imageUrl.substring(0, imageUrlWidth).padEnd(imageUrlWidth);
 
     logBoth(
-      `│ ${id} │ ${title} │ ${productTypeFormatted} │ ${material} │ ${form} │ ${surface} │ ${construction} │ ${formattedSize} | ${matchFormatted} │ ${imagesCount} │ ${willGenFormatted} │ ${promptFormatted} │ ${filePathFormatted} │ ${imageUrlFormatted}`
+      `│ ${id} │ ${title} │ ${productTypeFormatted} │ ${material} │ ${form} │ ${surface} │ ${construction} │ ${formattedSize} | ${matchFormatted} │ ${scoreFormatted} │ ${imagesCount} │ ${willGenFormatted} │ ${promptFormatted} │ ${filePathFormatted} │ ${imageUrlFormatted}`
     );
 
     // Log full details if verbose
@@ -171,6 +178,7 @@ export function printRunSummary(processedOfferings: OfferingWithGenPlanAndImage[
         construction_type: item.construction_type?.name || "none",
         construction_inherited: !item.offering.construction_type && item.construction_type,
         match_quality: item.match_quality,
+        match_score: item.match_score !== null ? item.match_score.toFixed(2) : "none",
         available_images: item.available_images.length,
         full_prompt: prompt,
       });

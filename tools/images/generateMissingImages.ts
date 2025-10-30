@@ -14,7 +14,7 @@
 
 import { db } from "$lib/backendQueries/db";
 import { insertProductDefinitionImageWithImage, loadProductDefinitionImagesWithImage } from "$lib/backendQueries/entityOperations/image";
-import { extractMatchCriteriaFromOffering, findBestMatchingImage } from "$lib/backendQueries/imageMatching";
+import { DEFAULT_MATCH_CONFIG, extractMatchCriteriaFromOffering, findBestMatchingImage, findBestMatchingImageWithScore } from "$lib/backendQueries/imageMatching";
 import { analyzeOfferingsForImages, type OfferingWithImageAnalysis } from "$lib/backendQueries/offeringImageAnalysis";
 import { ComparisonOperator } from "$lib/backendQueries/queryGrammar";
 import { rollbackTransaction } from "$lib/backendQueries/transactionWrapper";
@@ -153,11 +153,13 @@ function buildImageData(offering: OfferingWithImageAnalysis): {
  *
  * @param offerings - Offerings that need image generation
  * @param transaction - Active database transaction
+ * @param matchConfig - Image matching configuration
  * @returns Offerings with willGenerate and matchedInBatch flags
  */
 async function processOfferingsWithCache(
   offerings: OfferingWithImageAnalysis[],
   transaction: Transaction,
+  matchConfig: Partial<import("$lib/backendQueries/imageMatching").ImageMatchConfig>,
 ): Promise<OfferingWithGenerationPlan[]> {
   // Cache: product_def_id -> Array of images (real + placeholders)
   const imageCache = new Map<number, ProductDefinitionImage_Image[]>();
@@ -190,12 +192,21 @@ async function processOfferingsWithCache(
 
     // Check matching with ALL images in cache (real + placeholders)
     const criteria = extractMatchCriteriaFromOffering(offering.offering);
-    const bestMatch = findBestMatchingImage(criteria, availableImages);
 
-    if (bestMatch) {
+    // Use merged config (defaults + user overrides)
+    const mergedConfig = {
+      ...DEFAULT_MATCH_CONFIG,
+      ...matchConfig,
+    };
+
+    const matchResult = findBestMatchingImageWithScore(criteria, availableImages, mergedConfig);
+
+    if (matchResult) {
       // Match found (either from DB or from previous offering in batch)
+      // Update match_score with the actual score from cache matching
       results.push({
         ...offering,
+        match_score: matchResult.score, // Update score based on cache match
         willGenerate: false,
         matchedInBatch: true,
       });
@@ -337,7 +348,7 @@ async function main() {
     // Process with cache simulation to prevent duplicates
     const toProcess = needsGeneration.slice(0, config.generation.batch_size);
     log.info(`🔄 Processing ${toProcess.length} offerings with cache simulation...`);
-    const processedOfferings = await processOfferingsWithCache(toProcess, transaction);
+    const processedOfferings = await processOfferingsWithCache(toProcess, transaction, config.matching || {});
     log.info(`✅ Cache simulation complete`);
 
     // Production mode: generate images

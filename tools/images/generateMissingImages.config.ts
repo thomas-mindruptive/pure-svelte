@@ -176,6 +176,18 @@ export const defaultConfig: ImageGenerationConfig = {
       image_null_is_wildcard: false, // NULL in image does NOT match everything
       offering_null_accepts_all: true, // NULL in offering can accept any value
     },
+
+    // Size matching score configuration
+    size_matching_scores: {
+      exact_match: 1.0,           // "S" == "S" or "S-M" == "S-M" (100%)
+      single_in_range: 0.8,       // "S" in "S-M" (80%)
+      range_fully_covered: 0.9,   // "S-M" fully in "S-L" (90%)
+      range_overlap_high: 0.6,    // >=50% overlap (60%)
+      range_overlap_low: 0.3      // <50% overlap (30%)
+    },
+
+    // Enable verbose matching logs for debugging
+    verbose_logging: false,
   },
 
   generation: {

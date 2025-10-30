@@ -47,6 +47,22 @@ export interface ImageMatchConfig {
      */
     offering_null_accepts_all: boolean;
   };
+
+  /**
+   * Size matching score multipliers
+   */
+  size_matching_scores?: {
+    exact_match: number;           // e.g., "S" == "S" or "S-M" == "S-M"
+    single_in_range: number;       // e.g., "S" in "S-M"
+    range_fully_covered: number;   // e.g., "S-M" fully in "S-L"
+    range_overlap_high: number;    // e.g., >=50% overlap
+    range_overlap_low: number;     // e.g., <50% overlap
+  };
+
+  /**
+   * Enable verbose logging for debugging
+   */
+  verbose_logging?: boolean;
 }
 
 /**
@@ -65,7 +81,15 @@ export const DEFAULT_MATCH_CONFIG: ImageMatchConfig = {
   null_behavior: {
     image_null_is_wildcard: false, // NULL in image is NOT a wildcard anymore!
     offering_null_accepts_all: true // NULL in offering accepts any value
-  }
+  },
+  size_matching_scores: {
+    exact_match: 1.0,           // "S" == "S" or "S-M" == "S-M" (100%)
+    single_in_range: 0.8,       // "S" in "S-M" (80%)
+    range_fully_covered: 0.9,   // "S-M" fully in "S-L" (90%)
+    range_overlap_high: 0.6,    // >=50% overlap (60%)
+    range_overlap_low: 0.3      // <50% overlap (30%)
+  },
+  verbose_logging: false
 };
 
 /**
@@ -137,6 +161,23 @@ export function findBestMatchingImage(
   images: ProductDefinitionImage_Image[],
   config: ImageMatchConfig = DEFAULT_MATCH_CONFIG
 ): ProductDefinitionImage_Image | null {
+  const result = findBestMatchingImageWithScore(criteria, images, config);
+  return result?.image || null;
+}
+
+/**
+ * Finds the best matching image and returns both the image and its match score.
+ *
+ * @param criteria - Offering properties to match against
+ * @param images - Available Product Definition Images (from SAME product_def)
+ * @param config - Matching configuration (optional, uses DEFAULT_MATCH_CONFIG if not provided)
+ * @returns Object with image and score, or null if no suitable match found
+ */
+export function findBestMatchingImageWithScore(
+  criteria: ImageMatchCriteria,
+  images: ProductDefinitionImage_Image[],
+  config: ImageMatchConfig = DEFAULT_MATCH_CONFIG
+): { image: ProductDefinitionImage_Image; score: number } | null {
   if (!images || images.length === 0) {
     log.warn("findBestMatchingImage: No images available");
     return null;
@@ -211,7 +252,7 @@ export function findBestMatchingImage(
     }
   });
 
-  return result.image;
+  return { image: result.image, score: result.score };
 }
 
 /**
@@ -285,35 +326,82 @@ function calculateOptionalScore(
       // Exact match
       score += weight;
     }
-    // Special case for size matching
-    // Now imageValue is size_range (e.g., "S-M") and criteriaValue is size (e.g., "S")
+    // Special case for size matching with configurable scores
     else if (field === 'size' && typeof imageValue === 'string' && typeof criteriaValue === 'string') {
+      const sizeScores = config.size_matching_scores || DEFAULT_MATCH_CONFIG.size_matching_scores!;
+
       // Size order mapping
       const SIZE_ORDER: Record<string, number> = {
-        'XS': 1,
-        'S': 2,
-        'M': 3,
-        'L': 4,
-        'XL': 5,
-        'XXL': 6
+        'XS': 0,
+        'S': 1,
+        'M': 2,
+        'L': 3,
+        'XL': 4,
+        'XXL': 5
       };
 
-      // Check if it's a range (e.g., "S-M") or single size
-      if (imageValue.includes('-')) {
-        const [minSize, maxSize] = imageValue.split('-');
-        const minOrder = SIZE_ORDER[minSize];
-        const maxOrder = SIZE_ORDER[maxSize];
-        const criteriaOrder = SIZE_ORDER[criteriaValue];
-
-        // Check if criteria size is within the range
-        if (criteriaOrder && minOrder && maxOrder &&
-            criteriaOrder >= minOrder && criteriaOrder <= maxOrder) {
-          score += weight;
+      // Parse size or range into min/max values
+      const parseRange = (size: string): { min: number; max: number; str: string } | null => {
+        if (size.includes('-')) {
+          const [minStr, maxStr] = size.split('-');
+          const min = SIZE_ORDER[minStr];
+          const max = SIZE_ORDER[maxStr];
+          return (min !== undefined && max !== undefined) ? { min, max, str: size } : null;
+        } else {
+          const order = SIZE_ORDER[size];
+          return (order !== undefined) ? { min: order, max: order, str: size } : null;
         }
-      } else {
-        // Single size, must match exactly
+      };
+
+      const imageRange = parseRange(imageValue);
+      const criteriaRange = parseRange(criteriaValue);
+
+      if (imageRange && criteriaRange) {
+        let matchScore = 0;
+        let matchType = '';
+
+        // 1. Exact match
         if (imageValue === criteriaValue) {
-          score += weight;
+          matchScore = sizeScores.exact_match;
+          matchType = 'exact_match';
+        }
+        // 2. Single size in range
+        else if (criteriaRange.min === criteriaRange.max) {
+          if (criteriaRange.min >= imageRange.min && criteriaRange.min <= imageRange.max) {
+            matchScore = sizeScores.single_in_range;
+            matchType = 'single_in_range';
+          }
+        }
+        // 3. Range vs Range
+        else {
+          const overlapStart = Math.max(imageRange.min, criteriaRange.min);
+          const overlapEnd = Math.min(imageRange.max, criteriaRange.max);
+
+          if (overlapStart <= overlapEnd) {
+            const overlapSize = overlapEnd - overlapStart + 1;
+            const criteriaSize = criteriaRange.max - criteriaRange.min + 1;
+            const overlapPercent = overlapSize / criteriaSize;
+
+            if (overlapPercent >= 1.0) {
+              matchScore = sizeScores.range_fully_covered;
+              matchType = 'range_fully_covered';
+            } else if (overlapPercent >= 0.5) {
+              matchScore = sizeScores.range_overlap_high;
+              matchType = `range_overlap_high (${Math.round(overlapPercent * 100)}%)`;
+            } else {
+              matchScore = sizeScores.range_overlap_low;
+              matchType = `range_overlap_low (${Math.round(overlapPercent * 100)}%)`;
+            }
+          }
+        }
+
+        if (matchScore > 0) {
+          score += weight * matchScore;
+          if (config.verbose_logging) {
+            log.debug(`Size matching: criteria="${criteriaValue}" vs image="${imageValue}" -> ${matchType} (score: ${matchScore})`);
+          }
+        } else if (config.verbose_logging) {
+          log.debug(`Size matching: criteria="${criteriaValue}" vs image="${imageValue}" -> no match`);
         }
       }
     }

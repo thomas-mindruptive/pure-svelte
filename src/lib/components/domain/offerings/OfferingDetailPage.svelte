@@ -19,6 +19,11 @@
   // API & Type Imports
   import { ApiClient } from "$lib/api/client/ApiClient";
   import { getOfferingApi, offeringLoadingState } from "$lib/api/client/offering";
+  import { getCategoryApi } from "$lib/api/client/category";
+  import { getMaterialApi } from "$lib/api/client/material";
+  import { getFormApi } from "$lib/api/client/form";
+  import { getConstructionTypeApi } from "$lib/api/client/constructionType";
+  import { getSurfaceFinishApi } from "$lib/api/client/surfaceFinish";
   import type { DeleteStrategy, ID, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
   import type {
     Attribute,
@@ -27,8 +32,29 @@
     WholesalerOfferingLink,
     Wio_PDef_Cat_Supp_WithLinks,
     Wio_PDef_Cat_Supp_Nested_WithLinks,
+    ProductDefinition,
+    Wholesaler,
+    Material,
+    Form,
+    ConstructionType,
+    SurfaceFinish,
+  } from "$lib/domain/domainTypes";
+  import {
+    Wio_PDef_Cat_Supp_WithLinks_Schema,
+    Wio_PDef_Cat_Supp_Nested_WithLinks_Schema,
+    ProductDefinitionSchema,
+    WholesalerSchema,
+    MaterialSchema,
+    FormSchema,
+    ConstructionTypeSchema,
+    SurfaceFinishSchema,
+    AttributeSchema,
+    WholesalerOfferingLinkSchema,
   } from "$lib/domain/domainTypes";
   import { getErrorMessage } from "$lib/api/client/common";
+  import type { ValidationErrorTree } from "$lib/components/validation/validation.types";
+  import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
+  import { safeParseFirstN, zodToValidationErrorTree } from "$lib/domain/domainTypes.utils";
 
   // === TYPES ====================================================================================
 
@@ -54,11 +80,22 @@
 
   // === STATE ====================================================================================
 
+  let isLoading = $state(true);
+  const errors = $state<Record<string, ValidationErrorTree>>({});
+
   let offering = $state<Wio_PDef_Cat_Supp_WithLinks | null>(null);
   let attributes = $state<WholesalerOfferingAttribute_Attribute[]>([]);
   let availableAttributes = $state<Attribute[]>([]);
   let links = $state<WholesalerOfferingLink[]>([]);
   let sourceOfferings = $state<Wio_PDef_Cat_Supp_Nested_WithLinks[]>([]);
+
+  // Form combobox data
+  let availableProducts = $state<ProductDefinition[]>([]);
+  let availableSuppliers = $state<Wholesaler[]>([]);
+  let materials = $state<Material[]>([]);
+  let forms = $state<Form[]>([]);
+  let constructionTypes = $state<ConstructionType[]>([]);
+  let surfaceFinishes = $state<SurfaceFinish[]>([]);
 
   // Dummy strategies for source offerings - no delete for now
   const sourceOfferingsDeleteStrategy: DeleteStrategy<Wio_PDef_Cat_Supp_Nested_WithLinks> = {
@@ -67,8 +104,6 @@
     }
   };
 
-  let isLoading = $state(true);
-
   // === API =====================================================================================
 
   if (!data.loadEventFetch) {
@@ -76,6 +111,11 @@
   }
   const client = new ApiClient(data.loadEventFetch);
   const offeringApi = getOfferingApi(client);
+  const categoryApi = getCategoryApi(client);
+  const materialApi = getMaterialApi(client);
+  const formApi = getFormApi(client);
+  const constructionTypeApi = getConstructionTypeApi(client);
+  const surfaceFinishApi = getSurfaceFinishApi(client);
 
   // === LOAD =====================================================================================
 
@@ -87,34 +127,115 @@
       isLoading = true;
 
       try {
-        // Load offering (always needed)
-        offering = await offeringApi.loadOffering(data.offeringId);
-        if (aborted) return;
-
-        // Load data based on activeChildPath
-        if ("attributes" === data.activeChildPath) {
-          attributes = await offeringApi.loadOfferingAttributes(data.offeringId);
-          if (aborted) return;
-          availableAttributes = await offeringApi.getAvailableAttributesForOffering(data.offeringId);
-          if (aborted) return;
-        } else if ("links" === data.activeChildPath) {
-          links = offering.links || [];
-        } else if ("source-offerings" === data.activeChildPath) {
-          // Only load source offerings if this is a shop offering (wholesaler_id = 99)
-          if (offering.wholesaler_id === 99) {
-            sourceOfferings = await offeringApi.loadSourceOfferingsForShopOffering(data.offeringId);
-            if (aborted) return;
+        // Load offering (not in create mode)
+        if (!data.isCreateMode) {
+          if (isNaN(data.offeringId) || data.offeringId < 0) {
+            throw error(400, "OfferingDetailPage::$effect: Invalid Offering ID. Must be a positive number.");
           }
-        } else {
-          const msg = `Invalid data.activeChildPath: ${data.activeChildPath}`;
-          log.error(msg);
+
+          offering = await offeringApi.loadOffering(data.offeringId);
+          if (aborted) return;
+          const offeringVal = Wio_PDef_Cat_Supp_WithLinks_Schema.nullable().safeParse(offering);
+          if (!offeringVal.success) {
+            errors.offering = zodToValidationErrorTree(offeringVal.error);
+          }
+        }
+
+        // Load form combobox data (always needed)
+        materials = await materialApi.loadMaterials();
+        if (aborted) return;
+        const materialsVal = safeParseFirstN(MaterialSchema, materials, 3);
+        if (!materialsVal.success) {
+          errors.materials = zodToValidationErrorTree(materialsVal.error);
+        }
+
+        forms = await formApi.loadForms();
+        if (aborted) return;
+        const formsVal = safeParseFirstN(FormSchema, forms, 3);
+        if (!formsVal.success) {
+          errors.forms = zodToValidationErrorTree(formsVal.error);
+        }
+
+        constructionTypes = await constructionTypeApi.loadConstructionTypes();
+        if (aborted) return;
+        const constructionTypesVal = safeParseFirstN(ConstructionTypeSchema, constructionTypes, 3);
+        if (!constructionTypesVal.success) {
+          errors.constructionTypes = zodToValidationErrorTree(constructionTypesVal.error);
+        }
+
+        surfaceFinishes = await surfaceFinishApi.loadSurfaceFinishes();
+        if (aborted) return;
+        const surfaceFinishesVal = safeParseFirstN(SurfaceFinishSchema, surfaceFinishes, 3);
+        if (!surfaceFinishesVal.success) {
+          errors.surfaceFinishes = zodToValidationErrorTree(surfaceFinishesVal.error);
+        }
+
+        // Load route-specific combobox data
+        if (data.isSuppliersRoute) {
+          // Load products for category (supplier is fixed)
+          availableProducts = await categoryApi.loadProductDefsForCategory(data.categoryId);
+          if (aborted) return;
+          const productsVal = safeParseFirstN(ProductDefinitionSchema, availableProducts, 3);
+          if (!productsVal.success) {
+            errors.availableProducts = zodToValidationErrorTree(productsVal.error);
+          }
+        } else if (data.isCategoriesRoute) {
+          // Load suppliers for category (product is fixed)
+          availableSuppliers = await categoryApi.loadSuppliersForCategory(data.categoryId);
+          if (aborted) return;
+          const suppliersVal = safeParseFirstN(WholesalerSchema, availableSuppliers, 3);
+          if (!suppliersVal.success) {
+            errors.availableSuppliers = zodToValidationErrorTree(suppliersVal.error);
+          }
+        }
+
+        // Load data based on activeChildPath (only in edit mode)
+        if (!data.isCreateMode) {
+          if ("attributes" === data.activeChildPath) {
+            attributes = await offeringApi.loadOfferingAttributes(data.offeringId);
+            if (aborted) return;
+            // Note: attributes are WholesalerOfferingAttribute_Attribute, no schema for now
+
+            availableAttributes = await offeringApi.getAvailableAttributesForOffering(data.offeringId);
+            if (aborted) return;
+            const availableAttrsVal = safeParseFirstN(AttributeSchema, availableAttributes, 3);
+            if (!availableAttrsVal.success) {
+              errors.availableAttributes = zodToValidationErrorTree(availableAttrsVal.error);
+            }
+          } else if ("links" === data.activeChildPath) {
+            links = offering?.links || [];
+            const linksVal = safeParseFirstN(WholesalerOfferingLinkSchema, links, 3);
+            if (!linksVal.success) {
+              errors.links = zodToValidationErrorTree(linksVal.error);
+            }
+          } else if ("source-offerings" === data.activeChildPath) {
+            // Only load source offerings if this is a shop offering (wholesaler_id = 99)
+            if (offering?.wholesaler_id === 99) {
+              sourceOfferings = await offeringApi.loadSourceOfferingsForShopOffering(data.offeringId);
+              if (aborted) return;
+              const sourceOfferingsVal = safeParseFirstN(Wio_PDef_Cat_Supp_Nested_WithLinks_Schema, sourceOfferings, 3);
+              if (!sourceOfferingsVal.success) {
+                errors.sourceOfferings = zodToValidationErrorTree(sourceOfferingsVal.error);
+              }
+            }
+          } else {
+            const msg = `Invalid data.activeChildPath: ${data.activeChildPath}`;
+            log.error(msg);
+          }
         }
       } catch (rawError: any) {
         if (aborted) return;
         const status = rawError.status ?? 500;
         const message = rawError.message || "Failed to load offering details.";
-        log.error("Promise processing failed", { rawError });
-        throw error(status, message);
+
+        // Store error in errors state, don't throw
+        if (rawError.errors) {
+          errors.unexpectedError = { message, status, validationErrors: rawError.errors };
+          log.error("Promise processing failed with validation errors", { rawError, validationErrors: rawError.errors });
+        } else {
+          errors.unexpectedError = { message, status };
+          log.error("Promise processing failed in OfferingDetailPage", { rawError });
+        }
       } finally {
         if (!aborted) {
           isLoading = false;
@@ -418,28 +539,30 @@
   <div class="detail-page-layout">
     <!-- Section 1: Offering details form -->
     <div class="form-section">
-      <OfferingForm
-        initialLoadedData={{
-          offering,
-          availableProducts: [],
-          availableSuppliers: [],
-          materials: [],
-          forms: [],
-          constructionTypes: [],
-          surfaceFinishes: [],
-          supplierId: data.supplierId,
-          categoryId: data.categoryId,
-          productDefId: data.productDefId,
-          isSuppliersRoute: data.isSuppliersRoute,
-          isCategoriesRoute: data.isCategoriesRoute,
-          isCreateMode: data.isCreateMode,
-          urlPathName: data.urlPathName,
-        }}
-        onSubmitted={handleFormSubmitted}
-        onSubmitError={handleSubmitError}
-        onCancelled={handleFormCancelled}
-        onChanged={handleFormChanged}
-      />
+      <ValidationWrapper {errors}>
+        <OfferingForm
+          initialLoadedData={{
+            offering,
+            availableProducts,
+            availableSuppliers,
+            materials,
+            forms,
+            constructionTypes,
+            surfaceFinishes,
+            supplierId: data.supplierId,
+            categoryId: data.categoryId,
+            productDefId: data.productDefId,
+            isSuppliersRoute: data.isSuppliersRoute,
+            isCategoriesRoute: data.isCategoriesRoute,
+            isCreateMode: data.isCreateMode,
+            urlPathName: data.urlPathName,
+          }}
+          onSubmitted={handleFormSubmitted}
+          onSubmitError={handleSubmitError}
+          onCancelled={handleFormCancelled}
+          onChanged={handleFormChanged}
+        />
+      </ValidationWrapper>
     </div>
 
     <!-- Section 2: Conditional grid based on activeChildPath -->

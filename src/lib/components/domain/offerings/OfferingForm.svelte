@@ -604,6 +604,80 @@
           />
         </div>
         <!-- end row ----------------------------------------------------------------------------->
+
+        <!-- SHOPIFY FIELDS (only for Shop Offerings with wholesaler_id = 99) -------------------->
+        {#if getS("wholesaler_id") === 99}
+          <div class="form-row-grid" style="margin-top: 2rem; padding-top: 1.5rem; border-top: 2px solid var(--color-border);">
+            <div class="span-4" style="margin-bottom: 1rem;">
+              <h4 style="margin: 0; color: var(--color-primary);">Shopify Integration</h4>
+              <p class="field-hint" style="margin-top: 0.5rem;">
+                These fields are used for syncing with Shopify. System fields are read-only.
+              </p>
+            </div>
+          </div>
+
+          <div class="form-row-grid">
+            <!-- shopify_sku ----------------------------------------------------------------------->
+            <Field
+              {fieldProps}
+              path={["shopify_sku"]}
+              label="Shopify SKU"
+              type="text"
+              placeholder="e.g., AME-BALL-3CM"
+              maxlength={100}
+              class="span-2"
+            />
+
+            <!-- shopify_price --------------------------------------------------------------------->
+            <Field
+              {fieldProps}
+              path={["shopify_price"]}
+              label="Shop Price"
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="e.g., 15.00"
+              class="span-2"
+            />
+          </div>
+          <!-- end row ----------------------------------------------------------------------------->
+
+          <div class="form-row-grid">
+            <!-- shopify_product_id (readonly) ----------------------------------------------------->
+            <Field
+              {fieldProps}
+              path={["shopify_product_id"]}
+              label="Shopify Product ID"
+              type="number"
+              disabled
+              placeholder="Auto-set by sync"
+              class="span-1"
+            />
+
+            <!-- shopify_variant_id (readonly) ----------------------------------------------------->
+            <Field
+              {fieldProps}
+              path={["shopify_variant_id"]}
+              label="Shopify Variant ID"
+              type="number"
+              disabled
+              placeholder="Auto-set by sync"
+              class="span-1"
+            />
+
+            <!-- shopify_synced_at (readonly) ------------------------------------------------------>
+            <Field
+              {fieldProps}
+              path={["shopify_synced_at"]}
+              label="Last Synced"
+              type="text"
+              disabled
+              placeholder="Not synced yet"
+              class="span-2"
+            />
+          </div>
+          <!-- end row ----------------------------------------------------------------------------->
+        {/if}
       </div>
     {/snippet}
 

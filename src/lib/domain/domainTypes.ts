@@ -392,6 +392,12 @@ const Wio_BaseSchema = z
     currency: z.string().length(3).nullable().optional(),
     comment: z.string().max(4000).nullable().optional(),
     is_assortment: z.boolean().nullable().optional(),
+    // Shopify integration fields (for shop offerings with wholesaler_id = 99)
+    shopify_product_id: z.number().int().positive().nullable().optional(),
+    shopify_variant_id: z.number().int().positive().nullable().optional(),
+    shopify_sku: z.string().max(100).nullable().optional(),
+    shopify_price: z.number().multipleOf(0.01).nullable().optional(),
+    shopify_synced_at: z.string().nullable().optional(), // ISO datetime string
     created_at: z.string().optional(),
   })
   .describe("WholesalerItemOfferingSchema");

@@ -1,0 +1,1 @@
+export { load } from '$lib/components/domain/offerings/offeringDetailPage';

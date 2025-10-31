@@ -25,7 +25,7 @@ import { log } from "$lib/utils/logger";
 import type { Transaction } from "mssql";
 import { loadProductDefinitionImagesWithImage } from "./entityOperations/image.js";
 import { loadOfferingsForImageAnalysis, type ImageAnalysisFilters } from "./entityOperations/offering.js";
-import { extractMatchCriteriaFromOffering, findBestMatchingImage, findBestMatchingImageWithScore, type ImageMatchCriteria } from "./imageMatching.js";
+import { extractMatchCriteriaFromOffering, findBestMatchingImageWithScore, type ImageMatchCriteria } from "./imageMatching.js";
 import { ComparisonOperator } from "./queryGrammar.js";
 
 /**

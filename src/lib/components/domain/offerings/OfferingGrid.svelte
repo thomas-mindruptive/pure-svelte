@@ -4,7 +4,6 @@
   import type { ColumnDef, DeleteStrategy, RowActionStrategy, SortFunc } from "$lib/components/grids/Datagrid.types";
   import type {
       WholesalerOfferingLink,
-      Wio_PDef_Cat_Supp_Nested,
       Wio_PDef_Cat_Supp_Nested_WithLinks,
       Wio_PDef_Cat_Supp_Nested_WithLinks_Schema,
   } from "$lib/domain/domainTypes";
@@ -12,12 +11,12 @@
   // === PROPS  ===================================================================================
 
   export type OfferingGridProps = {
-    rows: Wio_PDef_Cat_Supp_Nested[];
+    rows: Wio_PDef_Cat_Supp_Nested_WithLinks[];
     loading?: boolean;
-    deleteStrategy: DeleteStrategy<Wio_PDef_Cat_Supp_Nested>;
-    rowActionStrategy?: RowActionStrategy<Wio_PDef_Cat_Supp_Nested>;
+    deleteStrategy: DeleteStrategy<Wio_PDef_Cat_Supp_Nested_WithLinks>;
+    rowActionStrategy?: RowActionStrategy<Wio_PDef_Cat_Supp_Nested_WithLinks>;
     // Callback when sort state changes - parent loads data
-    onSort?: SortFunc<Wio_PDef_Cat_Supp_Nested> | undefined;
+    onSort?: SortFunc<Wio_PDef_Cat_Supp_Nested_WithLinks> | undefined;
   };
 
   const {

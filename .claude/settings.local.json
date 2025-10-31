@@ -16,7 +16,10 @@
       "Bash(node test-db-check.js:*)",
       "Bash(node check-image-matching.js:*)",
       "Bash(node dist/tools/images/generateMissingImages.js:*)",
-      "Bash(node tools/check-image-matching.js:*)"
+      "Bash(node tools/check-image-matching.js:*)",
+      "Bash(mkdir:*)",
+      "Bash(rm:*)",
+      "Bash(npm run check:*)"
     ],
     "deny": [],
     "ask": []

@@ -14,7 +14,8 @@ import type {
   WholesalerOfferingAttribute,
   WholesalerOfferingAttribute_Attribute,
   WholesalerOfferingLink,
-  Wio_PDef_Cat_Supp_WithLinks
+  Wio_PDef_Cat_Supp_WithLinks,
+  Wio_PDef_Cat_Supp_Nested_WithLinks
 } from "$lib/domain/domainTypes";
 import { log } from "$lib/utils/logger";
 
@@ -592,6 +593,64 @@ export function getOfferingApi(client: ApiClient) {
         log.error(`[${operationId}] Failed.`, {
           categoryId,
           supplierId,
+          error: getErrorMessage(err),
+        });
+        throw err;
+      } finally {
+        offeringLoadingManager.finish(operationId);
+      }
+    },
+
+    // ===== SHOP OFFERING FUNCTIONS =====
+
+    /**
+     * Loads source offerings for a shop offering (wholesaler_id = 99).
+     * Returns offerings linked via shop_offering_sources table, ordered by priority.
+     */
+    async loadSourceOfferingsForShopOffering(shopOfferingId: number): Promise<Wio_PDef_Cat_Supp_Nested_WithLinks[]> {
+      const operationId = `loadSourceOfferingsForShopOffering-${shopOfferingId}`;
+      offeringLoadingManager.start(operationId);
+      try {
+        const response = await fetch(`/api/offerings/${shopOfferingId}/sources`, { method: "GET" });
+        const jsonString = await response.text();
+
+        // Response is JSON string from FOR JSON PATH
+        const offerings = JSON.parse(jsonString) as Wio_PDef_Cat_Supp_Nested_WithLinks[];
+
+        log.info(`[${operationId}] Loaded ${offerings.length} source offerings for shop offering ${shopOfferingId}.`);
+        return offerings;
+      } catch (err) {
+        log.error(`[${operationId}] Failed.`, {
+          shopOfferingId,
+          error: getErrorMessage(err),
+        });
+        throw err;
+      } finally {
+        offeringLoadingManager.finish(operationId);
+      }
+    },
+
+    /**
+     * Copies an offering to create a shop offering (wholesaler_id = 99).
+     * Links the new shop offering to the source via shop_offering_sources table.
+     *
+     * @returns The newly created shop offering ID
+     */
+    async copyOfferingForShop(sourceOfferingId: number): Promise<number> {
+      const operationId = `copyOfferingForShop-${sourceOfferingId}`;
+      offeringLoadingManager.start(operationId);
+      try {
+        const responseData = await client.apiFetch<{ shop_offering_id: number }>(
+          `/api/offerings/${sourceOfferingId}/copy-for-shop`,
+          { method: "POST" },
+          { context: operationId }
+        );
+
+        log.info(`[${operationId}] Created shop offering ${responseData.shop_offering_id} from source ${sourceOfferingId}.`);
+        return responseData.shop_offering_id;
+      } catch (err) {
+        log.error(`[${operationId}] Failed.`, {
+          sourceOfferingId,
           error: getErrorMessage(err),
         });
         throw err;

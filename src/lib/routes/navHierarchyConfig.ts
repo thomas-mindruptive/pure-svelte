@@ -52,6 +52,10 @@ export const supplierHierarchyConfig: HierarchyTree = {
                             createHierarchyNode({
                               item: { key: "links", type: "list", href:"/suppliers/[supplierId]/categories/[categoryId]/offerings/[offeringId]/links", label: "Links" },
                             }),
+                            // Source Offerings List - Leaf node for shop offering sources.
+                            createHierarchyNode({
+                              item: { key: "source-offerings", type: "list", href:"/suppliers/[supplierId]/categories/[categoryId]/offerings/[offeringId]/source-offerings", label: "Source Offerings" },
+                            }),
                           ]
                         })
                       ]
@@ -146,6 +150,10 @@ export const productCategoriesHierarchyConfig: HierarchyTree = {
                             // Link List - Leaf node for offering links.
                             createHierarchyNode({
                               item: { key: "links", type: "list", href:"/categories/[categoryId]/productdefinitions/[productDefId]/offerings/[offeringId]/links", label: "Links" },
+                            }),
+                            // Source Offerings List - Leaf node for shop offering sources.
+                            createHierarchyNode({
+                              item: { key: "source-offerings", type: "list", href:"/categories/[categoryId]/productdefinitions/[productDefId]/offerings/[offeringId]/source-offerings", label: "Source Offerings" },
                             }),
                           ]
                         })

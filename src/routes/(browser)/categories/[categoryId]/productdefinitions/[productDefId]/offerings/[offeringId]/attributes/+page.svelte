@@ -1,7 +1,7 @@
 <script lang="ts">
-    import ProductDefinitionDetailPage from '$lib/components/domain/offerings/OfferDetailAttributesPage.svelte';
+    import OfferingDetailPage from '$lib/components/domain/offerings/OfferingDetailPage.svelte';
 
     let { data } = $props();
 </script>
 
-<ProductDefinitionDetailPage {data} />
+<OfferingDetailPage {data} />

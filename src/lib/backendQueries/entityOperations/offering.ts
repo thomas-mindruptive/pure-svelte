@@ -1,6 +1,4 @@
 import type { WholesalerItemOffering } from "$lib/domain/domainTypes";
-import { Wio_pdef_mat_form_surf_constr_Nested_Schema } from "$lib/domain/domainTypes";
-import { genColumnsForJsonPath } from "$lib/domain/domainTypes.utils";
 import type { Transaction } from "mssql";
 import { buildWhereClause, type BuildContext } from "../queryBuilder";
 import type { WhereCondition, WhereConditionGroup, SortDescriptor } from "../queryGrammar";
@@ -13,6 +11,7 @@ export async function loadNestedOfferingsWithJoinsAndLinks(
   aOrderBy?: SortDescriptor<WholesalerItemOffering>[],
   aLimit?: number,
   aOffset?: number,
+  aAdditionalJoins?: string,
 ): Promise<string> {
   assertDefined(transaction, "transaction");
 
@@ -112,6 +111,7 @@ export async function loadNestedOfferingsWithJoinsAndLinks(
     LEFT JOIN dbo.product_definitions pd ON wio.product_def_id = pd.product_def_id
     LEFT JOIN dbo.product_categories pc ON wio.category_id = pc.category_id
     LEFT JOIN dbo.wholesalers w ON wio.wholesaler_id = w.wholesaler_id
+    ${aAdditionalJoins || ''}
     ${whereClause}
     ${orderByClause}
     ${limitClause}

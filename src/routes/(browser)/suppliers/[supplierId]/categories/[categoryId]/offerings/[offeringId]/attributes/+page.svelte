@@ -1,5 +1,5 @@
 <script lang="ts">
-  import OfferDetailAttributesPage from '$lib/components/domain/offerings/OfferDetailAttributesPage.svelte';
+  import OfferingDetailPage from '$lib/components/domain/offerings/OfferingDetailPage.svelte';
   let { data } = $props();
 </script>
-<OfferDetailAttributesPage {data} />
+<OfferingDetailPage {data} />

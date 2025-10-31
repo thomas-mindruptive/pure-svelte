@@ -81,8 +81,9 @@ export function printRunSummary(processedOfferings: OfferingWithGenPlanAndImage[
   const surfaceWidth = 12;
   const constructionWidth = 12;
   const sizeWith = 7;
-  const matchWidth = 8;
-  const scoreWidth = 7; // NEW: Match score column
+  const dbMatchWidth = 6;    // DB match quality
+  const batchWidth = 7;       // Batch match indicator
+  const scoreWidth = 7;       // Match score column
   const imagesWidth = 6;
   const willGenWidth = 8;
   const promptWidth = 70;
@@ -99,8 +100,9 @@ export function printRunSummary(processedOfferings: OfferingWithGenPlanAndImage[
       "│ Surface".padEnd(surfaceWidth + 3) +
       "│ Constr".padEnd(constructionWidth + 3) +
       "│ Size".padEnd(sizeWith + 3) +
-      "│ Match".padEnd(matchWidth + 3) +
-      "│ Score".padEnd(scoreWidth + 3) + // NEW: Match score column
+      "│ DB".padEnd(dbMatchWidth + 3) +       // DB match quality
+      "│ Batch".padEnd(batchWidth + 3) +      // Batch match
+      "│ Score".padEnd(scoreWidth + 3) +      // Match score
       "│ Imgs".padEnd(imagesWidth + 3) +
       "│ WillGen".padEnd(willGenWidth + 3) +
       "│ Prompt".padEnd(promptWidth + 3) +
@@ -138,9 +140,13 @@ export function printRunSummary(processedOfferings: OfferingWithGenPlanAndImage[
     let formattedSize = item.offering.size || "-";
     formattedSize = formattedSize.padEnd(sizeWith);
 
-    // Match quality
-    const matchQuality = item.match_quality === "exact" ? "✅" : item.match_quality === "generic_fallback" ? "🔄" : "❌";
-    const matchFormatted = matchQuality.padEnd(matchWidth);
+    // DB match quality (from initial DB scan)
+    const dbMatchQuality = item.match_quality === "exact" ? "✅" : item.match_quality === "generic_fallback" ? "🔄" : "❌";
+    const dbMatchFormatted = dbMatchQuality.padEnd(dbMatchWidth);
+
+    // Batch match (matched during batch processing - either DB or placeholder)
+    const batchMatch = (!item.willGenerate && item.matchedInBatch) ? "✅" : "-";
+    const batchFormatted = batchMatch.padEnd(batchWidth);
 
     // Match score (0.0-1.0, formatted as percentage)
     const scoreFormatted = item.match_score !== null
@@ -161,7 +167,7 @@ export function printRunSummary(processedOfferings: OfferingWithGenPlanAndImage[
     const imageUrlFormatted = item.imageUrl.substring(0, imageUrlWidth).padEnd(imageUrlWidth);
 
     logBoth(
-      `│ ${id} │ ${title} │ ${productTypeFormatted} │ ${material} │ ${form} │ ${surface} │ ${construction} │ ${formattedSize} | ${matchFormatted} │ ${scoreFormatted} │ ${imagesCount} │ ${willGenFormatted} │ ${promptFormatted} │ ${filePathFormatted} │ ${imageUrlFormatted}`
+      `│ ${id} │ ${title} │ ${productTypeFormatted} │ ${material} │ ${form} │ ${surface} │ ${construction} │ ${formattedSize} | ${dbMatchFormatted} │ ${batchFormatted} │ ${scoreFormatted} │ ${imagesCount} │ ${willGenFormatted} │ ${promptFormatted} │ ${filePathFormatted} │ ${imageUrlFormatted}`
     );
 
     // Log full details if verbose
@@ -177,7 +183,8 @@ export function printRunSummary(processedOfferings: OfferingWithGenPlanAndImage[
         surface_inherited: !item.offering.surface_finish && item.surface_finish,
         construction_type: item.construction_type?.name || "none",
         construction_inherited: !item.offering.construction_type && item.construction_type,
-        match_quality: item.match_quality,
+        db_match_quality: item.match_quality,
+        batch_matched: item.matchedInBatch,
         match_score: item.match_score !== null ? item.match_score.toFixed(2) : "none",
         available_images: item.available_images.length,
         full_prompt: prompt,

@@ -123,7 +123,12 @@ export const POST: RequestHandler = async ({ params, request }) => {
     });
 
     return json(
-      { shop_offering_id: shopOfferingId },
+      {
+        success: true,
+        message: "Shop offering created successfully",
+        data: { shop_offering_id: shopOfferingId },
+        meta: { timestamp: new Date().toISOString() }
+      },
       { status: 201 }
     );
   } catch (err) {

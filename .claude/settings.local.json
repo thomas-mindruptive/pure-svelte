@@ -19,7 +19,8 @@
       "Bash(node tools/check-image-matching.js:*)",
       "Bash(mkdir:*)",
       "Bash(rm:*)",
-      "Bash(npm run check:*)"
+      "Bash(npm run check:*)",
+      "Bash(node -e:*)"
     ],
     "deny": [],
     "ask": []

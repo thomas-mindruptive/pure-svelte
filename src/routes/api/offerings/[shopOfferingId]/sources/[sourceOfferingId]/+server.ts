@@ -19,6 +19,14 @@ export const DELETE: RequestHandler = async ({ params }) => {
   const sourceId = parseInt(sourceOfferingId, 10);
 
   log.infoHeader(`DELETE /api/offerings/${shopOfferingId}/sources/${sourceOfferingId} - ${operationId}`);
+  log.debug(`[${operationId}] Parsed IDs:`, {
+    shopOfferingId,
+    sourceOfferingId,
+    shopId,
+    sourceId,
+    shopIdType: typeof shopId,
+    sourceIdType: typeof sourceId,
+  });
 
   if (isNaN(shopId) || isNaN(sourceId)) {
     const errRes: ApiErrorResponse = {
@@ -33,6 +41,7 @@ export const DELETE: RequestHandler = async ({ params }) => {
   }
 
   try {
+    log.debug(`[${operationId}] Checking if link exists`);
     // Check if link exists before deletion
     const checkResult = await db.request()
       .input("shopId", shopId)
@@ -42,6 +51,11 @@ export const DELETE: RequestHandler = async ({ params }) => {
         FROM dbo.shop_offering_sources
         WHERE shop_offering_id = @shopId AND source_offering_id = @sourceId
       `);
+
+    log.debug(`[${operationId}] Check result:`, {
+      recordCount: checkResult.recordset.length,
+      records: checkResult.recordset,
+    });
 
     if (checkResult.recordset.length === 0) {
       const errRes: ApiErrorResponse = {
@@ -56,8 +70,10 @@ export const DELETE: RequestHandler = async ({ params }) => {
     }
 
     const linkData = checkResult.recordset[0];
+    log.debug(`[${operationId}] Found link to delete:`, linkData);
 
     // Delete the link
+    log.debug(`[${operationId}] Executing DELETE query`);
     const deleteResult = await db.request()
       .input("shopId", shopId)
       .input("sourceId", sourceId)
@@ -70,10 +86,11 @@ export const DELETE: RequestHandler = async ({ params }) => {
       ? deleteResult.rowsAffected.reduce((a, b) => a + b, 0)
       : (deleteResult.rowsAffected ?? 0);
 
-    log.info(`[${operationId}] Successfully deleted source offering link`, {
+    log.info(`[${operationId}] FN_SUCCESS: Deleted source offering link`, {
       shopId,
       sourceId,
       rowsAffected,
+      linkData,
     });
 
     const successRes: DeleteApiResponse<typeof linkData, never> = {
@@ -87,9 +104,16 @@ export const DELETE: RequestHandler = async ({ params }) => {
       meta: { timestamp: new Date().toISOString() },
     };
 
+    log.debug(`[${operationId}] Returning success response:`, successRes);
     return json(successRes, { status: 200 });
   } catch (err) {
-    log.error(`[${operationId}] Failed to delete source offering link`, { error: err });
+    log.error(`[${operationId}] FN_FAILURE: Failed to delete source offering link`, {
+      shopId,
+      sourceId,
+      error: err,
+      errorMessage: err instanceof Error ? err.message : String(err),
+      errorStack: err instanceof Error ? err.stack : undefined,
+    });
     throw error(500, `Failed to delete source offering link: ${err}`);
   }
 };

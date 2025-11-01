@@ -90,6 +90,7 @@
   let availableAttributes = $state<Attribute[]>([]);
   let links = $state<WholesalerOfferingLink[]>([]);
   let sourceOfferings = $state<Wio_PDef_Cat_Supp_Nested_WithLinks[]>([]);
+  let copiedShopOfferingId = $state<number | null>(null);
 
   // Form combobox data
   let availableProducts = $state<ProductDefinition[]>([]);
@@ -275,6 +276,39 @@
     log.debug(`Form changed`, info);
   }
 
+  // === COPY FOR SHOP SECTION ====================================================================
+
+  async function handleCopyForShop() {
+    if (!offering || offering.wholesaler_id === 99) return;
+
+    try {
+      const shopOfferingId = await offeringApi.copyOfferingForShop(offering.offering_id);
+      copiedShopOfferingId = shopOfferingId;
+      addNotification(`Shop offering created successfully (ID: ${shopOfferingId})`, "success");
+    } catch (rawError: any) {
+      const message = rawError.message || "Failed to copy offering for shop.";
+      const status = rawError.status ?? 500;
+      errors.copyForShop = { message, status };
+      addNotification(`Failed to copy for shop: ${getErrorMessage(rawError)}`, "error");
+      log.error("Copy for shop failed", { rawError });
+    }
+  }
+
+  function navigateToShopOffering() {
+    if (!copiedShopOfferingId || !offering) return;
+
+    let targetUrl: string;
+
+    if (data.isSuppliersRoute) {
+      targetUrl = `/suppliers/99/categories/${offering.category_id}/offerings/${copiedShopOfferingId}/source-offerings`;
+    } else {
+      targetUrl = `/categories/${offering.category_id}/productdefinitions/${offering.product_def_id}/offerings/${copiedShopOfferingId}/source-offerings`;
+    }
+
+    goto(targetUrl);
+    copiedShopOfferingId = null;
+  }
+
   // === ATTRIBUTES SECTION =======================================================================
 
   let newAttributeId = $state<number | null>(null);
@@ -403,24 +437,69 @@
   }
 
   async function handleSourceOfferingUnlink(ids: ID[]): Promise<void> {
-    if (!offering) return;
+    if (!offering) {
+      log.warn("handleSourceOfferingUnlink: offering is undefined");
+      return;
+    }
+
+    log.info("handleSourceOfferingUnlink: Starting unlink operation", {
+      shopOfferingId: offering.offering_id,
+      sourceOfferingIds: ids,
+      count: ids.length,
+    });
+
     let dataChanged = false;
 
     for (const id of ids) {
-      const result = await offeringApi.removeSourceOfferingLink(offering.offering_id, Number(id));
-      if (result.success) {
-        dataChanged = true;
-      } else {
-        addNotification(
-          result.message ? `Server error: ${result.message}` : "Could not unlink source offering.",
-          "error"
-        );
+      const sourceOfferingId = Number(id);
+      log.debug("handleSourceOfferingUnlink: Processing unlink", {
+        shopOfferingId: offering.offering_id,
+        sourceOfferingId,
+      });
+
+      try {
+        const result = await offeringApi.removeSourceOfferingLink(offering.offering_id, sourceOfferingId);
+
+        log.info("handleSourceOfferingUnlink: Received result", {
+          shopOfferingId: offering.offering_id,
+          sourceOfferingId,
+          result,
+          success: result.success,
+        });
+
+        if (result.success) {
+          dataChanged = true;
+          log.info("handleSourceOfferingUnlink: Successfully unlinked", {
+            shopOfferingId: offering.offering_id,
+            sourceOfferingId,
+          });
+        } else {
+          const errorMessage = result.message ? `Server error: ${result.message}` : "Could not unlink source offering.";
+          log.error("handleSourceOfferingUnlink: Unlink failed (success=false)", {
+            shopOfferingId: offering.offering_id,
+            sourceOfferingId,
+            result,
+            errorMessage,
+          });
+          addNotification(errorMessage, "error");
+        }
+      } catch (err) {
+        log.error("handleSourceOfferingUnlink: Exception during unlink", {
+          shopOfferingId: offering.offering_id,
+          sourceOfferingId,
+          error: err,
+          errorMessage: getErrorMessage(err),
+        });
+        addNotification(`Error unlinking source offering: ${getErrorMessage(err)}`, "error");
       }
     }
 
     if (dataChanged) {
+      log.info("handleSourceOfferingUnlink: Reloading source offerings after successful unlink");
       addNotification("Source offering(s) unlinked.", "success");
       await reloadSourceOfferings();
+    } else {
+      log.warn("handleSourceOfferingUnlink: No changes made");
     }
   }
 
@@ -592,6 +671,44 @@
             Delete selected ({selectedIds.size})
           </button>
         {/snippet}
+
+        {#snippet rowActions({ row, id, isDeleting }: { row: Wio_PDef_Cat_Supp_Nested_WithLinks, id: ID | null, isDeleting: (id: ID) => boolean })}
+          <!-- DELETE (Standard) -->
+          <button
+            type="button"
+            class="pc-grid__btn pc-grid__btn--danger"
+            disabled={id === null || $offeringLoadingState}
+            onclick={async (e) => {
+              e.stopPropagation();
+              if (id !== null) {
+                await handleSourceOfferingDelete([id]);
+              }
+            }}
+            aria-busy={id !== null && isDeleting(id)}
+            title="Delete this source offering"
+          >
+            {#if id !== null && isDeleting(id)}
+              <span class="pc-grid__spinner" aria-hidden="true"></span>
+            {/if}
+            Delete
+          </button>
+
+          <!-- UNLINK (Custom) -->
+          <button
+            type="button"
+            class="row-action-btn"
+            onclick={async (e) => {
+              e.stopPropagation();
+              if (id !== null) {
+                await handleSourceOfferingUnlink([id]);
+              }
+            }}
+            disabled={$offeringLoadingState}
+            title="Unlink this source offering"
+          >
+            🔗 Unlink
+          </button>
+        {/snippet}
       </OfferingGrid>
     {/if}
   </div>
@@ -630,6 +747,40 @@
           onChanged={handleFormChanged}
         />
       </ValidationWrapper>
+
+      <!-- Copy for Shop Section -->
+      {#if offering && offering.wholesaler_id !== 99 && !data.isCreateMode}
+        <div class="copy-for-shop-section">
+          <h3>Shop Integration</h3>
+          <p class="hint">Create a shop offering from this source offering</p>
+
+          <ValidationWrapper errors={errors.copyForShop ? { copyForShop: errors.copyForShop } : {}}>
+            <button
+              type="button"
+              class="secondary-button"
+              onclick={handleCopyForShop}
+              disabled={$offeringLoadingState || copiedShopOfferingId !== null}
+            >
+              📋 Copy for Shop
+            </button>
+          </ValidationWrapper>
+
+          {#if copiedShopOfferingId}
+            <div class="success-action">
+              <p class="success-message">
+                ✓ Shop offering created (ID: {copiedShopOfferingId})
+              </p>
+              <button
+                type="button"
+                class="primary-button"
+                onclick={navigateToShopOffering}
+              >
+                Go to Shop Offering →
+              </button>
+            </div>
+          {/if}
+        </div>
+      {/if}
     </div>
 
     <!-- Section 2: Conditional grid based on activeChildPath -->
@@ -676,5 +827,50 @@
     border: 1px solid var(--color-info-border, #2196f3);
     border-radius: 4px;
     color: var(--color-info-text, #1565c0);
+  }
+  .copy-for-shop-section {
+    margin-top: 2rem;
+    padding: 1.5rem;
+    background: var(--color-background-secondary, #f8f9fa);
+    border: 1px dashed var(--color-border);
+    border-radius: 8px;
+  }
+  .copy-for-shop-section h3 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1rem;
+  }
+  .copy-for-shop-section .hint {
+    margin: 0 0 1rem 0;
+    font-size: 0.9rem;
+    color: var(--color-muted);
+  }
+  .success-action {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: var(--color-success-bg, #d4edda);
+    border: 1px solid var(--color-success-border, #c3e6cb);
+    border-radius: 4px;
+  }
+  .success-message {
+    margin: 0 0 0.75rem 0;
+    color: var(--color-success, #155724);
+    font-weight: 500;
+  }
+  .row-action-btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.85rem;
+    background: var(--color-secondary, #6c757d);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .row-action-btn:hover:not(:disabled) {
+    background: var(--color-secondary-hover, #5a6268);
+  }
+  .row-action-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 </style>

@@ -52,7 +52,7 @@ export async function loadNestedOfferingsWithJoinsAndLinks(
 
   // Using JOINs instead of subqueries for better performance.
   // JSON PATH automatically nests based on dotted aliases (e.g. 'product_def.title').
-  const result = await request.query(`
+  const sqlQuery = `
     SELECT
         -- Main offering columns
         wio.offering_id,
@@ -116,7 +116,15 @@ export async function loadNestedOfferingsWithJoinsAndLinks(
     ${orderByClause}
     ${limitClause}
     FOR JSON PATH, INCLUDE_NULL_VALUES
-  `);
+  `;
+
+  console.log('========================================');
+  console.log('COMPLETE SQL QUERY:');
+  console.log(sqlQuery);
+  console.log('PARAMETERS:', ctx.parameters);
+  console.log('========================================');
+
+  const result = await request.query(sqlQuery);
 
   if (!result.recordset?.length) {
     throw error(404, "No offerings found for the given criteria.");
@@ -131,7 +139,7 @@ export async function loadNestedOfferingsWithJoinsAndLinks(
 export async function loadNestedOfferingWithJoinsAndLinksForId(transaction: Transaction, id: number) {
   assertDefined(transaction, "transaction");
   assertDefined(id, "id");
-  const whereCondition: WhereCondition<WholesalerItemOffering> = { key: "offering_id", whereCondOp: "=", val: id };
+  const whereCondition: WhereCondition<WholesalerItemOffering> = { key: "wio.offering_id" as any, whereCondOp: "=", val: id };
   const jsonString = await loadNestedOfferingsWithJoinsAndLinks(transaction, whereCondition);
   return jsonString;
 }

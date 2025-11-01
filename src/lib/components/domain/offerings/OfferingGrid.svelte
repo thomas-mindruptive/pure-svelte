@@ -17,6 +17,12 @@
     deleteSelected: () => Promise<void> | void;
   };
 
+  type RowActionsSnippetProps = {
+    row: Wio_PDef_Cat_Supp_Nested_WithLinks;
+    id: ID | null;
+    isDeleting: (id: ID) => boolean;
+  };
+
   export type OfferingGridProps = {
     rows: Wio_PDef_Cat_Supp_Nested_WithLinks[];
     loading?: boolean;
@@ -26,6 +32,8 @@
     onSort?: SortFunc<Wio_PDef_Cat_Supp_Nested_WithLinks> | undefined;
     // Custom toolbar snippet
     toolbar?: Snippet<[ToolbarSnippetProps]>;
+    // Custom row actions snippet
+    rowActions?: Snippet<[RowActionsSnippetProps]>;
   };
 
   const {
@@ -38,6 +46,7 @@
     rowActionStrategy,
     onSort,
     toolbar,
+    rowActions,
   }: OfferingGridProps = $props();
 
   // === COLUMNS  =================================================================================
@@ -120,29 +129,16 @@
   const getId = (offering: Wio_PDef_Cat_Supp_Nested_WithLinks) => offering.offering_id;
 </script>
 
-{#if toolbar}
-  <Datagrid
-    {rows}
-    {columns}
-    {getId}
-    {loading}
-    gridId="offerings"
-    entity="offering"
-    {deleteStrategy}
-    {rowActionStrategy}
-    {onSort}
-    {toolbar}
-  />
-{:else}
-  <Datagrid
-    {rows}
-    {columns}
-    {getId}
-    {loading}
-    gridId="offerings"
-    entity="offering"
-    {deleteStrategy}
-    {rowActionStrategy}
-    {onSort}
-  />
-{/if}
+<Datagrid
+  {rows}
+  {columns}
+  {getId}
+  {loading}
+  gridId="offerings"
+  entity="offering"
+  {deleteStrategy}
+  {rowActionStrategy}
+  {onSort}
+  {toolbar}
+  {rowActions}
+/>

@@ -58,11 +58,11 @@
     rowActionStrategy?: RowActionStrategy<any> | undefined | null;
 
     // Snippets
-    toolbar?: Snippet<[ToolbarSnippetProps]>;
-    cell?: Snippet<[CellSnippetProps]>;
-    rowActions?: Snippet<[RowActionsSnippetProps]>;
-    empty?: Snippet<[]>;
-    meta?: Snippet<[MetaSnippetProps]>;
+    toolbar?: Snippet<[ToolbarSnippetProps]> | undefined;
+    cell?: Snippet<[CellSnippetProps]> | undefined;
+    rowActions?: Snippet<[RowActionsSnippetProps]> | undefined;
+    empty?: Snippet<[]> | undefined;
+    meta?: Snippet<[MetaSnippetProps]> | undefined;
   };
 
   // These define the data passed to customizable snippets
@@ -764,7 +764,11 @@
                     <input
                       type={selection === "single" ? "radio" : "checkbox"}
                       checked={rowIsSelected(row)}
-                      onchange={() => {
+                      onclick={(e) => {
+                        e.stopPropagation();
+                      }}
+                      onchange={(e) => {
+                        e.stopPropagation();
                         const id = safeGetId(row);
                         if (id != null) toggleSelect(id);
                       }}

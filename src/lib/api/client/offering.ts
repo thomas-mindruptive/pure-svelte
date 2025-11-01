@@ -610,19 +610,30 @@ export function getOfferingApi(client: ApiClient) {
     async loadSourceOfferingsForShopOffering(shopOfferingId: number): Promise<Wio_PDef_Cat_Supp_Nested_WithLinks[]> {
       const operationId = `loadSourceOfferingsForShopOffering-${shopOfferingId}`;
       offeringLoadingManager.start(operationId);
+
+      log.info(`[${operationId}] Starting request`, {
+        shopOfferingId,
+        url: `/api/offerings/${shopOfferingId}/sources`,
+      });
+
       try {
-        const response = await fetch(`/api/offerings/${shopOfferingId}/sources`, { method: "GET" });
-        const jsonString = await response.text();
+        const responseData = await client.apiFetch<QueryResponseData<Wio_PDef_Cat_Supp_Nested_WithLinks>>(
+          `/api/offerings/${shopOfferingId}/sources`,
+          { method: "GET" },
+          { context: operationId }
+        );
 
-        // Response is JSON string from FOR JSON PATH
-        const offerings = JSON.parse(jsonString) as Wio_PDef_Cat_Supp_Nested_WithLinks[];
-
-        log.info(`[${operationId}] Loaded ${offerings.length} source offerings for shop offering ${shopOfferingId}.`);
-        return offerings;
-      } catch (err) {
-        log.error(`[${operationId}] Failed.`, {
+        log.info(`[${operationId}] Successfully loaded source offerings`, {
           shopOfferingId,
-          error: getErrorMessage(err),
+          count: responseData.results.length,
+        });
+
+        return responseData.results as Wio_PDef_Cat_Supp_Nested_WithLinks[];
+      } catch (err) {
+        log.error(`[${operationId}] Failed to load source offerings`, {
+          shopOfferingId,
+          error: err,
+          errorMessage: getErrorMessage(err),
         });
         throw err;
       } finally {
@@ -640,14 +651,14 @@ export function getOfferingApi(client: ApiClient) {
       const operationId = `copyOfferingForShop-${sourceOfferingId}`;
       offeringLoadingManager.start(operationId);
       try {
-        const responseData = await client.apiFetch<{ shop_offering_id: number }>(
+        const data = await client.apiFetch<{ shop_offering_id: number }>(
           `/api/offerings/${sourceOfferingId}/copy-for-shop`,
           { method: "POST" },
           { context: operationId }
         );
 
-        log.info(`[${operationId}] Created shop offering ${responseData.shop_offering_id} from source ${sourceOfferingId}.`);
-        return responseData.shop_offering_id;
+        log.info(`[${operationId}] Created shop offering ${data.shop_offering_id} from source ${sourceOfferingId}.`);
+        return data.shop_offering_id;
       } catch (err) {
         log.error(`[${operationId}] Failed.`, {
           sourceOfferingId,
@@ -674,22 +685,26 @@ export function getOfferingApi(client: ApiClient) {
     ): Promise<DeleteApiResponse<any, any>> {
       const operationId = `removeSourceOfferingLink-${shopOfferingId}-${sourceOfferingId}`;
       offeringLoadingManager.start(operationId);
+
+      log.info(`[${operationId}] Starting unlink request`, {
+        shopOfferingId,
+        sourceOfferingId,
+        url: `/api/offerings/${shopOfferingId}/sources/${sourceOfferingId}`,
+      });
+
       try {
-        const responseData = (await client.apiFetch(
+        return await client.apiFetchUnion<DeleteApiResponse<any, any>>(
           `/api/offerings/${shopOfferingId}/sources/${sourceOfferingId}`,
           { method: "DELETE" },
           { context: operationId }
-        )) as DeleteApiResponse<any, any>;
-
-        log.info(
-          `[${operationId}] Removed source offering link: shop=${shopOfferingId}, source=${sourceOfferingId}.`
         );
-        return responseData;
       } catch (err) {
-        log.error(`[${operationId}] Failed.`, {
+        log.error(`[${operationId}] Failed to remove source offering link`, {
           shopOfferingId,
           sourceOfferingId,
-          error: getErrorMessage(err),
+          error: err,
+          errorMessage: getErrorMessage(err),
+          errorType: err instanceof Error ? err.constructor.name : typeof err,
         });
         throw err;
       } finally {

@@ -6,6 +6,9 @@ import { json, error } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
 import { v4 as uuidv4 } from "uuid";
 import { log } from "$lib/utils/logger";
+import type { ApiErrorResponse } from "$lib/api/api.types";
+import { buildUnexpectedError } from "$lib/backendQueries/genericEntityOperations";
+import { rollbackTransaction } from "$lib/backendQueries/transactionWrapper";
 
 /**
  * POST /api/offerings/[id]/copy-for-shop
@@ -44,10 +47,45 @@ export const POST: RequestHandler = async ({ params, request }) => {
 
     // 2. Check if source is already a shop offering
     if (sourceOffering.wholesaler_id === 99) {
-      throw error(400, "Cannot copy a shop offering to create another shop offering");
+      await rollbackTransaction(transaction);
+      const errRes: ApiErrorResponse = {
+        success: false,
+        message: "Cannot copy a shop offering to create another shop offering",
+        status_code: 400,
+        error_code: "BAD_REQUEST",
+        meta: { timestamp: new Date().toISOString() },
+      };
+      log.warn(`[${operationId}] FN_FAILURE: Source offering is already a shop offering`, { sourceOfferingId });
+      return json(errRes, { status: 400 });
     }
 
-    // 3. Create shop offering data (copy from source, set wholesaler_id = 99)
+    // 3. Check if shop offering already exists for this source
+    const duplicateCheckRequest = transaction.request();
+    duplicateCheckRequest.input("sourceId", sourceOfferingId);
+    const duplicateCheckResult = await duplicateCheckRequest.query(`
+      SELECT shop_offering_id, source_offering_id
+      FROM dbo.shop_offering_sources
+      WHERE source_offering_id = @sourceId
+    `);
+
+    if (duplicateCheckResult.recordset.length > 0) {
+      await rollbackTransaction(transaction);
+      const existingShopOfferingId = duplicateCheckResult.recordset[0].shop_offering_id;
+      const errRes: ApiErrorResponse = {
+        success: false,
+        message: `Shop offering already exists for this source offering (Shop Offering ID: ${existingShopOfferingId})`,
+        status_code: 409,
+        error_code: "ALREADY_EXISTS",
+        meta: { timestamp: new Date().toISOString() },
+      };
+      log.warn(`[${operationId}] FN_FAILURE: Shop offering already exists`, {
+        sourceOfferingId,
+        existingShopOfferingId,
+      });
+      return json(errRes, { status: 409 });
+    }
+
+    // 4. Create shop offering data (copy from source, set wholesaler_id = 99)
     const shopOfferingData: z.infer<typeof WholesalerItemOfferingForCreateSchema> = {
       wholesaler_id: 99, // Shop user
       category_id: sourceOffering.category_id,
@@ -68,7 +106,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
       is_assortment: sourceOffering.is_assortment,
     };
 
-    // 4. Validate and insert shop offering
+    // 5. Validate and insert shop offering
     const validated = WholesalerItemOfferingForCreateSchema.parse(shopOfferingData);
 
     const insertRequest = transaction.request();
@@ -106,7 +144,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
 
     const shopOfferingId = insertResult.recordset[0].offering_id;
 
-    // 5. Link shop offering to source via shop_offering_sources
+    // 6. Link shop offering to source via shop_offering_sources
     const linkRequest = transaction.request();
     linkRequest.input("shop_offering_id", shopOfferingId);
     linkRequest.input("source_offering_id", sourceOfferingId);
@@ -131,10 +169,9 @@ export const POST: RequestHandler = async ({ params, request }) => {
       },
       { status: 201 }
     );
-  } catch (err) {
-    await transaction.rollback();
-    console.error("Failed to copy offering for shop:", err);
-    log.error(`[${operationId}] Failed to copy offering for shop`, { error: String(err) });
-    throw error(500, `Failed to copy offering for shop: ${err}`);
+  } catch (err: unknown) {
+    await rollbackTransaction(transaction);
+    log.error(`[${operationId}] Failed to copy offering for shop`, { error: err });
+    return buildUnexpectedError(err, info);
   }
 };

@@ -55,6 +55,8 @@
   import type { ValidationErrorTree } from "$lib/components/validation/validation.types";
   import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
   import { safeParseFirstN, zodToValidationErrorTree } from "$lib/domain/domainTypes.utils";
+  import { cascadeDelete } from "$lib/api/client/cascadeDelete";
+  import { stringsToNumbers } from "$lib/utils/typeConversions";
 
   // === TYPES ====================================================================================
 
@@ -96,13 +98,6 @@
   let forms = $state<Form[]>([]);
   let constructionTypes = $state<ConstructionType[]>([]);
   let surfaceFinishes = $state<SurfaceFinish[]>([]);
-
-  // Dummy strategies for source offerings - no delete for now
-  const sourceOfferingsDeleteStrategy: DeleteStrategy<Wio_PDef_Cat_Supp_Nested_WithLinks> = {
-    execute: async (ids: ID[]) => {
-      addNotification("Delete source offerings not implemented yet", "info");
-    }
-  };
 
   // === API =====================================================================================
 
@@ -402,11 +397,55 @@
 
   // === SOURCE OFFERINGS SECTION =================================================================
 
-  // TODO: Implement reloadSourceOfferings function and connect to "Copy for Shop" button
-  // async function reloadSourceOfferings() {
-  //   assertDefined(offering, "reloadSourceOfferings: offering must be defined");
-  //   sourceOfferings = await offeringApi.loadSourceOfferingsForShopOffering(offering.offering_id);
-  // }
+  async function reloadSourceOfferings() {
+    assertDefined(offering, "reloadSourceOfferings: offering must be defined");
+    sourceOfferings = await offeringApi.loadSourceOfferingsForShopOffering(offering.offering_id);
+  }
+
+  async function handleSourceOfferingUnlink(ids: ID[]): Promise<void> {
+    if (!offering) return;
+    let dataChanged = false;
+
+    for (const id of ids) {
+      const result = await offeringApi.removeSourceOfferingLink(offering.offering_id, Number(id));
+      if (result.success) {
+        dataChanged = true;
+      } else {
+        addNotification(
+          result.message ? `Server error: ${result.message}` : "Could not unlink source offering.",
+          "error"
+        );
+      }
+    }
+
+    if (dataChanged) {
+      addNotification("Source offering(s) unlinked.", "success");
+      await reloadSourceOfferings();
+    }
+  }
+
+  async function handleSourceOfferingDelete(ids: ID[]): Promise<void> {
+    const idsAsNumber = stringsToNumbers(ids);
+
+    const dataChanged = await cascadeDelete(
+      idsAsNumber,
+      offeringApi.deleteOffering,
+      {
+        domainObjectName: "Source Offering",
+        softDepInfo: "This will also delete all assigned attributes and links.",
+        hardDepInfo: "",
+      },
+      true // allowForceCascade
+    );
+
+    if (dataChanged) {
+      await reloadSourceOfferings();
+    }
+  }
+
+  const sourceOfferingsDeleteStrategy: DeleteStrategy<Wio_PDef_Cat_Supp_Nested_WithLinks> = {
+    execute: handleSourceOfferingDelete,
+  };
 
   function handleOfferingSelect(selectedOffering: Wio_PDef_Cat_Supp_Nested_WithLinks) {
     // Navigate to offering detail page
@@ -525,7 +564,35 @@
         loading={$offeringLoadingState}
         deleteStrategy={sourceOfferingsDeleteStrategy}
         rowActionStrategy={offeringsRowActionStrategy}
-      />
+      >
+        {#snippet toolbar({ selectedIds, deleteSelected }: { selectedIds: Set<ID>, deleteSelected: () => Promise<void> | void })}
+          <button
+            class="pc-grid__btn pc-grid__btn--secondary"
+            disabled={selectedIds.size === 0 || $offeringLoadingState}
+            onclick={async () => {
+              const ids = Array.from(selectedIds) as ID[];
+              await handleSourceOfferingUnlink(ids);
+              selectedIds.clear();
+            }}
+            title={selectedIds.size === 0
+              ? "Select source offerings to unlink"
+              : `Unlink ${selectedIds.size} selected source offering${selectedIds.size > 1 ? "s" : ""}`}
+          >
+            Unlink selected ({selectedIds.size})
+          </button>
+
+          <button
+            class="pc-grid__btn pc-grid__btn--danger"
+            disabled={selectedIds.size === 0 || $offeringLoadingState}
+            onclick={deleteSelected}
+            title={selectedIds.size === 0
+              ? "Select source offerings to delete"
+              : `Delete ${selectedIds.size} selected source offering${selectedIds.size > 1 ? "s" : ""}`}
+          >
+            Delete selected ({selectedIds.size})
+          </button>
+        {/snippet}
+      </OfferingGrid>
     {/if}
   </div>
 {/snippet}

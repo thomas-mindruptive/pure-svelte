@@ -659,6 +659,44 @@ export function getOfferingApi(client: ApiClient) {
       }
     },
 
+    /**
+     * Removes the link between a shop offering and a source offering.
+     * Only deletes the entry in shop_offering_sources table.
+     * The source offering itself remains intact.
+     *
+     * @param shopOfferingId The shop offering ID (wholesaler_id = 99)
+     * @param sourceOfferingId The source offering ID to unlink
+     * @returns DeleteApiResponse with success status
+     */
+    async removeSourceOfferingLink(
+      shopOfferingId: number,
+      sourceOfferingId: number
+    ): Promise<DeleteApiResponse<any, any>> {
+      const operationId = `removeSourceOfferingLink-${shopOfferingId}-${sourceOfferingId}`;
+      offeringLoadingManager.start(operationId);
+      try {
+        const responseData = (await client.apiFetch(
+          `/api/offerings/${shopOfferingId}/sources/${sourceOfferingId}`,
+          { method: "DELETE" },
+          { context: operationId }
+        )) as DeleteApiResponse<any, any>;
+
+        log.info(
+          `[${operationId}] Removed source offering link: shop=${shopOfferingId}, source=${sourceOfferingId}.`
+        );
+        return responseData;
+      } catch (err) {
+        log.error(`[${operationId}] Failed.`, {
+          shopOfferingId,
+          sourceOfferingId,
+          error: getErrorMessage(err),
+        });
+        throw err;
+      } finally {
+        offeringLoadingManager.finish(operationId);
+      }
+    },
+
     // ===== UTILITY FUNCTIONS =====
   };
 

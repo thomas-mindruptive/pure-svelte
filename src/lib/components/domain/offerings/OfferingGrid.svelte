@@ -1,14 +1,21 @@
 <!-- src/lib/components/domain/offerings/OfferingGrid.svelte -->
 <script lang="ts">
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
-  import type { ColumnDef, DeleteStrategy, RowActionStrategy, SortFunc } from "$lib/components/grids/Datagrid.types";
+  import type { ColumnDef, DeleteStrategy, RowActionStrategy, SortFunc, ID } from "$lib/components/grids/Datagrid.types";
   import type {
       WholesalerOfferingLink,
       Wio_PDef_Cat_Supp_Nested_WithLinks,
       Wio_PDef_Cat_Supp_Nested_WithLinks_Schema,
   } from "$lib/domain/domainTypes";
+  import type { Snippet } from "svelte";
 
   // === PROPS  ===================================================================================
+
+  type ToolbarSnippetProps = {
+    selectedIds: Set<ID>;
+    deletingObjectIds: Set<ID>;
+    deleteSelected: () => Promise<void> | void;
+  };
 
   export type OfferingGridProps = {
     rows: Wio_PDef_Cat_Supp_Nested_WithLinks[];
@@ -17,6 +24,8 @@
     rowActionStrategy?: RowActionStrategy<Wio_PDef_Cat_Supp_Nested_WithLinks>;
     // Callback when sort state changes - parent loads data
     onSort?: SortFunc<Wio_PDef_Cat_Supp_Nested_WithLinks> | undefined;
+    // Custom toolbar snippet
+    toolbar?: Snippet<[ToolbarSnippetProps]>;
   };
 
   const {
@@ -28,6 +37,7 @@
     deleteStrategy,
     rowActionStrategy,
     onSort,
+    toolbar,
   }: OfferingGridProps = $props();
 
   // === COLUMNS  =================================================================================
@@ -110,14 +120,29 @@
   const getId = (offering: Wio_PDef_Cat_Supp_Nested_WithLinks) => offering.offering_id;
 </script>
 
-<Datagrid
-  {rows}
-  {columns}
-  {getId}
-  {loading}
-  gridId="offerings"
-  entity="offering"
-  {deleteStrategy}
-  {rowActionStrategy}
-  {onSort}
-/>
+{#if toolbar}
+  <Datagrid
+    {rows}
+    {columns}
+    {getId}
+    {loading}
+    gridId="offerings"
+    entity="offering"
+    {deleteStrategy}
+    {rowActionStrategy}
+    {onSort}
+    {toolbar}
+  />
+{:else}
+  <Datagrid
+    {rows}
+    {columns}
+    {getId}
+    {loading}
+    gridId="offerings"
+    entity="offering"
+    {deleteStrategy}
+    {rowActionStrategy}
+    {onSort}
+  />
+{/if}

@@ -679,7 +679,7 @@
           <!-- NEU: Fallback auf minmax statt leer -->
           <col style={col.width ? `width: ${col.width};` : "width: minmax(80px, 1fr);"} />
         {/each}
-        <col style="width: 120px;" />
+        <col style="width: 180px;" />
         <!-- Actions: Feste Breite statt auto -->
       </colgroup>
 

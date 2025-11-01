@@ -869,10 +869,10 @@
   .row-action-btn {
     padding: 0.25rem 0.5rem;
     font-size: 0.85rem;
-    background: var(--color-secondary, #6c757d);
+    background: var(--color-primary, #6c757d);
     color: white;
     border: none;
-    border-radius: 4px;
+    border-radius: 8px;
     cursor: pointer;
     transition: background 0.2s;
   }

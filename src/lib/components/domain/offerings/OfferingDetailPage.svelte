@@ -30,7 +30,6 @@
     WholesalerItemOffering,
     WholesalerOfferingAttribute_Attribute,
     WholesalerOfferingLink,
-    Wio_PDef_Cat_Supp_WithLinks,
     Wio_PDef_Cat_Supp_Nested_WithLinks,
     ProductDefinition,
     Wholesaler,
@@ -40,7 +39,6 @@
     SurfaceFinish,
   } from "$lib/domain/domainTypes";
   import {
-    Wio_PDef_Cat_Supp_WithLinks_Schema,
     Wio_PDef_Cat_Supp_Nested_WithLinks_Schema,
     ProductDefinitionSchema,
     WholesalerSchema,
@@ -85,7 +83,7 @@
   let isLoading = $state(true);
   const errors = $state<Record<string, ValidationErrorTree>>({});
 
-  let offering = $state<Wio_PDef_Cat_Supp_WithLinks | null>(null);
+  let offering = $state<Wio_PDef_Cat_Supp_Nested_WithLinks | null>(null);
   let attributes = $state<WholesalerOfferingAttribute_Attribute[]>([]);
   let availableAttributes = $state<Attribute[]>([]);
   let links = $state<WholesalerOfferingLink[]>([]);
@@ -131,7 +129,7 @@
 
           offering = await offeringApi.loadOffering(data.offeringId);
           if (aborted) return;
-          const offeringVal = Wio_PDef_Cat_Supp_WithLinks_Schema.nullable().safeParse(offering);
+          const offeringVal = Wio_PDef_Cat_Supp_Nested_WithLinks_Schema.nullable().safeParse(offering);
           if (!offeringVal.success) {
             errors.offering = zodToValidationErrorTree(offeringVal.error);
           }
@@ -295,14 +293,20 @@
   }
 
   function navigateToShopOffering() {
-    if (!copiedShopOfferingId || !offering) return;
+    if (!offering) return;
+
+    const shopOfferingId = offering.shop_offering?.offering_id ?? copiedShopOfferingId;
+    if (!shopOfferingId) return;
+
+    const categoryId = offering.category?.category_id ?? offering.category_id;
+    const productDefId = offering.product_def?.product_def_id ?? offering.product_def_id;
 
     let targetUrl: string;
 
     if (data.isSuppliersRoute) {
-      targetUrl = `/suppliers/99/categories/${offering.category_id}/offerings/${copiedShopOfferingId}/source-offerings`;
+      targetUrl = `/suppliers/99/categories/${categoryId}/offerings/${shopOfferingId}/source-offerings`;
     } else {
-      targetUrl = `/categories/${offering.category_id}/productdefinitions/${offering.product_def_id}/offerings/${copiedShopOfferingId}/source-offerings`;
+      targetUrl = `/categories/${categoryId}/productdefinitions/${productDefId}/offerings/${shopOfferingId}/source-offerings`;
     }
 
     goto(targetUrl);
@@ -752,23 +756,16 @@
       {#if offering && offering.wholesaler_id !== 99 && !data.isCreateMode}
         <div class="copy-for-shop-section">
           <h3>Shop Integration</h3>
-          <p class="hint">Create a shop offering from this source offering</p>
 
-          <ValidationWrapper errors={errors.copyForShop ? { copyForShop: errors.copyForShop } : {}}>
-            <button
-              type="button"
-              class="secondary-button"
-              onclick={handleCopyForShop}
-              disabled={$offeringLoadingState || copiedShopOfferingId !== null}
-            >
-              📋 Copy for Shop
-            </button>
-          </ValidationWrapper>
+          {#if offering.shop_offering || copiedShopOfferingId}
+            {@const shopOffering = offering.shop_offering}
+            {@const shopOfferingId = shopOffering?.offering_id ?? copiedShopOfferingId}
+            {@const shopOfferingTitle = shopOffering?.title ?? "Shop Offering"}
 
-          {#if copiedShopOfferingId}
+            <p class="hint">Linked shop offering</p>
             <div class="success-action">
               <p class="success-message">
-                ✓ Shop offering created (ID: {copiedShopOfferingId})
+                ✓ Shop offering: <strong>{shopOfferingTitle}</strong> (ID: {shopOfferingId})
               </p>
               <button
                 type="button"
@@ -778,6 +775,19 @@
                 Go to Shop Offering →
               </button>
             </div>
+          {:else}
+            <p class="hint">Create a shop offering from this source offering</p>
+
+            <ValidationWrapper errors={errors.copyForShop ? { copyForShop: errors.copyForShop } : {}}>
+              <button
+                type="button"
+                class="secondary-button"
+                onclick={handleCopyForShop}
+                disabled={$offeringLoadingState}
+              >
+                📋 Copy for Shop
+              </button>
+            </ValidationWrapper>
           {/if}
         </div>
       {/if}

@@ -283,7 +283,7 @@ export async function load({ url, params: urlParamsFromLoadEvent, depends, fetch
         } else if (paramName === "offeringId") {
           apiPromise = getOfferingApi(client)
             .loadOffering(entityId)
-            .then((o) => o?.product_def_title);
+            .then((o) => o?.product_def?.title);
         }
 
         if (apiPromise) {

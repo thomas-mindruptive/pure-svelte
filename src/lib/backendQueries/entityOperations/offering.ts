@@ -106,7 +106,32 @@ export async function loadNestedOfferingsWithJoinsAndLinks(
             FROM dbo.wholesaler_offering_links AS l
             WHERE l.offering_id = wio.offering_id
             FOR JSON PATH
-        ) AS links
+        ) AS links,
+        -- Shop offering (subquery to avoid duplicates and JOIN conflicts)
+        -- JSON_QUERY prevents outer FOR JSON PATH from escaping the inner JSON as a string
+        JSON_QUERY((
+            SELECT TOP 1
+                shop.offering_id,
+                shop.wholesaler_id,
+                shop.category_id,
+                shop.product_def_id,
+                shop.sub_seller,
+                shop.material_id,
+                shop.form_id,
+                shop.title,
+                shop.size,
+                shop.dimensions,
+                shop.price,
+                shop.weight_grams,
+                shop.currency,
+                shop.comment,
+                shop.created_at,
+                shop.is_assortment
+            FROM dbo.shop_offering_sources sos_sub
+            INNER JOIN dbo.wholesaler_item_offerings shop ON sos_sub.shop_offering_id = shop.offering_id
+            WHERE sos_sub.source_offering_id = wio.offering_id
+            FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
+        )) AS shop_offering
     FROM dbo.wholesaler_item_offerings AS wio
     LEFT JOIN dbo.product_definitions pd ON wio.product_def_id = pd.product_def_id
     LEFT JOIN dbo.product_categories pc ON wio.category_id = pc.category_id
@@ -115,7 +140,7 @@ export async function loadNestedOfferingsWithJoinsAndLinks(
     ${whereClause}
     ${orderByClause}
     ${limitClause}
-    FOR JSON PATH, INCLUDE_NULL_VALUES
+    FOR JSON PATH
   `;
 
   console.log('========================================');

@@ -460,9 +460,12 @@ export const Wio_PDef_Cat_Supp_Nested_Schema = copyMetaFrom(Wio_Schema, tempWioN
 /**
  * NESTED SCHEMA with links - for client-side display only.
  * Links are populated via separate query and added to the data.
+ * shop_offering: For source offerings (wholesaler_id != 99), includes the linked shop offering if one exists.
+ * WITHOUT INCLUDE_NULL_VALUES in query, LEFT JOIN without match omits the nested object entirely.
  */
 const tempWioNestedWithLinks = Wio_PDef_Cat_Supp_Nested_Schema.extend({
   links: z.array(WholesalerOfferingLinkSchema).nullable().optional(),
+  shop_offering: Wio_Schema.nullable().optional(),
 }).describe("WholesalerItemOffering_ProductDef_Category_Supplier_Nested_WithLinksSchema");
 export const Wio_PDef_Cat_Supp_Nested_WithLinks_Schema = copyMetaFrom(Wio_Schema, tempWioNestedWithLinks);
 

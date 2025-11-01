@@ -22,7 +22,7 @@
   import "$lib/components/styles/form.css";
   import "$lib/components/styles/grid.css";
   import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
-  import type { WholesalerItemOffering, Wio_PDef_Cat_Supp } from "$lib/domain/domainTypes";
+  import type { WholesalerItemOffering, Wio_PDef_Cat_Supp_Nested_WithLinks } from "$lib/domain/domainTypes";
   import { assertDefined } from "$lib/utils/assertions";
   import { log } from "$lib/utils/logger";
 
@@ -85,12 +85,13 @@
         });
       } else {
         // ⚠️⚠️⚠️ NOTE: This initialisation is key. Otherwise form validation and submit fails!
+        // Create mode: NESTED structure with empty nested objects
         finalInitialData = {
           category_id: data.categoryId,
           product_def_id: data.productDefId,
           wholesaler_id: data.supplierId,
           ...data.offering
-        } as Wio_PDef_Cat_Supp;
+        } as Wio_PDef_Cat_Supp_Nested_WithLinks;
       }
     }
 
@@ -125,7 +126,7 @@
   const isCreateMode = $derived(initialLoadedData.isCreateMode);
   const isSuppliersRoute = $derived(initialLoadedData.isSuppliersRoute);
   const isCategoriesRoute = $derived(initialLoadedData.isCategoriesRoute);
-  let formShell: InstanceType<typeof FormShell<Wio_PDef_Cat_Supp>>;
+  let formShell: InstanceType<typeof FormShell<Wio_PDef_Cat_Supp_Nested_WithLinks>>;
 
   // ===== API =====
 
@@ -164,11 +165,11 @@
    * @param data The current form data.
    * @returns A ValidateResult object containing any errors for custom rules.
    */
-  function validateOfferingForSubmit(raw: Record<string, any>): ValidateResult<Wio_PDef_Cat_Supp> {
+  function validateOfferingForSubmit(raw: Record<string, any>): ValidateResult<Wio_PDef_Cat_Supp_Nested_WithLinks> {
     log.debug(`Validating offering form data`, raw);
     assertDefined(raw, "validateOfferingForSubmit");
-    const data = raw as Wio_PDef_Cat_Supp;
-    const errors: Errors<Wio_PDef_Cat_Supp> = {};
+    const data = raw as Wio_PDef_Cat_Supp_Nested_WithLinks;
+    const errors: Errors<Wio_PDef_Cat_Supp_Nested_WithLinks> = {};
 
     // Sample for a complex business rule involving multiple fields ---
     // Example: Prices in Japanese Yen (JPY) cannot have decimals.
@@ -290,7 +291,7 @@
 <!--
   -- Render material combo using Combobox2 component
   -->
-{#snippet materialCombo2(fieldProps: FieldsSnippetProps<WholesalerItemOffering>)}
+{#snippet materialCombo2(fieldProps: FieldsSnippetProps<Wio_PDef_Cat_Supp_Nested_WithLinks>)}
   <FormComboBox2
     {fieldProps}
     items={materials}
@@ -308,7 +309,7 @@
 <!--
   -- Render form combo using Combobox2 component
   -->
-{#snippet formCombo2(fieldProps: FieldsSnippetProps<WholesalerItemOffering>)}
+{#snippet formCombo2(fieldProps: FieldsSnippetProps<Wio_PDef_Cat_Supp_Nested_WithLinks>)}
   <FormComboBox2
     {fieldProps}
     items={forms}
@@ -326,7 +327,7 @@
 <!--
   -- Render constructionType combo 
   -->
-{#snippet constructionTypeCombo(fieldProps: FieldsSnippetProps<WholesalerItemOffering>)}
+{#snippet constructionTypeCombo(fieldProps: FieldsSnippetProps<Wio_PDef_Cat_Supp_Nested_WithLinks>)}
   <FormComboBox2
     {fieldProps}
     items={constructionTypes}
@@ -344,7 +345,7 @@
 <!--
   -- Render surfaceFinish combo
   -->
-{#snippet surfaceFinishCombo(fieldProps: FieldsSnippetProps<WholesalerItemOffering>)}
+{#snippet surfaceFinishCombo(fieldProps: FieldsSnippetProps<Wio_PDef_Cat_Supp_Nested_WithLinks>)}
   <FormComboBox2
     {fieldProps}
     items={surfaceFinishes}
@@ -362,7 +363,7 @@
 <!--
   -- Render product definition combo
   -->
-{#snippet productDefinitionCombo(fieldProps: FieldsSnippetProps<WholesalerItemOffering>)}
+{#snippet productDefinitionCombo(fieldProps: FieldsSnippetProps<Wio_PDef_Cat_Supp_Nested_WithLinks>)}
   <FormComboBox2
     {fieldProps}
     items={availableProducts ?? []}
@@ -380,7 +381,7 @@
 <!--
   -- Render supplier/wholesaler combo
   -->
-{#snippet supplierCombo(fieldProps: FieldsSnippetProps<WholesalerItemOffering>)}
+{#snippet supplierCombo(fieldProps: FieldsSnippetProps<Wio_PDef_Cat_Supp_Nested_WithLinks>)}
   <FormComboBox2
     {fieldProps}
     items={availableSuppliers ?? []}
@@ -405,7 +406,7 @@
     bind:this={formShell}
     autoValidate="change"
     entity="Offering"
-    initial={initialValidatedOfferingData as Wio_PDef_Cat_Supp}
+    initial={initialValidatedOfferingData as Wio_PDef_Cat_Supp_Nested_WithLinks}
     validate={validateOfferingForSubmit}
     submitCbk={submitOffering}
     {disabled}
@@ -419,7 +420,7 @@
       <div class="form-header">
         <div>
           {#if data.offering_id}
-            <h3>{data.product_def_title || "Unnamed Product"} ➜ {data.title || "Unnamed Product"}</h3>
+            <h3>{data.product_def?.title || "Unnamed Product"} ➜ {data.title || "Unnamed Product"}</h3>
           {:else}
             <h3>New Product Offering</h3>
           {/if}
@@ -435,7 +436,7 @@
 
     <!--- FIELDS --------------------------------------------------------------------------------->
     {#snippet fields(fieldProps)}
-      {@const { getS } = fieldProps}
+      {@const { getS, get } = fieldProps}
       <div class="form-body">
         <div class="form-row-grid">
           <!-- title ----------------------------------------------------------------------------->
@@ -466,13 +467,13 @@
                 {@render productDefinitionCombo(fieldProps)}
               {:else}
                 <p>
-                  {getS("product_def_title") ?? "product_def_title missing"}
+                  {get(["product_def", "title"]) ?? "product_def_title missing"}
                 </p>
               {/if}
             {:else}
               <!--- Not create mode => Render static text for product def --->
               <p>
-                {getS("product_def_title") ?? "product_def_title missing"}
+                {get(["product_def", "title"]) ?? "product_def_title missing"}
               </p>
               <p class="field-hint">The product cannot be changed for an existing offering.</p>
             {/if}
@@ -491,7 +492,7 @@
             {:else}
               <!--- Not create mode => Render static text for supplier --->
               <p>
-                {getS("wholesaler_name") ?? "supplier_name missing"}
+                {get(["wholesaler", "name"]) ?? "supplier_name missing"}
               </p>
               <p class="field-hint">The supplier cannot be changed for an existing offering.</p>
             {/if}

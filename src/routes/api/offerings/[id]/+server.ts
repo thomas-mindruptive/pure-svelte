@@ -9,21 +9,21 @@ import type { ApiErrorResponse, ApiSuccessResponse, DeleteConflictResponse, Dele
 import { db } from "$lib/backendQueries/db";
 import { buildUnexpectedError, validateAndUpdateEntity, validateIdUrlParam } from "$lib/backendQueries/genericEntityOperations";
 import {
-  Wio_PDef_Cat_Supp_WithLinks_Schema,
+  Wio_PDef_Cat_Supp_Nested_WithLinks_Schema,
   Wio_Schema,
   type WholesalerItemOffering,
-  type Wio_PDef_Cat_Supp_WithLinks
+  type Wio_PDef_Cat_Supp_Nested_WithLinks
 } from "$lib/domain/domainTypes";
 import { validateEntityBySchema } from "$lib/domain/domainTypes.utils";
 import { log } from "$lib/utils/logger";
-import { json, type RequestHandler } from "@sveltejs/kit";
+import { error, json, type RequestHandler } from "@sveltejs/kit";
 import { v4 as uuidv4 } from "uuid";
 
 // Type alias for offering with links
 import type { DeleteOfferingSuccessResponse } from "$lib/api/app/appSpecificTypes";
 import { deleteOffering } from "$lib/backendQueries/cascadingDeleteOperations";
 import { checkOfferingDependencies } from "$lib/backendQueries/dependencyChecks";
-import { loadFlatOfferingWithJoinsAndLinksForId } from "$lib/backendQueries/entityOperations/offering";
+import { loadNestedOfferingWithJoinsAndLinksForId } from "$lib/backendQueries/entityOperations/offering";
 import { rollbackTransaction } from "$lib/backendQueries/transactionWrapper";
 import { validateOfferingConstraints } from "$lib/backendQueries/validations/valOffering";
 
@@ -50,20 +50,18 @@ export const GET: RequestHandler = async ({ params }) => {
     log.info(`[${operationId}] Transaction started for offering retrieval.`);
 
     try {
-      const flatOfferingWithLinks = await loadFlatOfferingWithJoinsAndLinksForId(transaction, id);
-      // Convert to json and back to ensure that validation works 100% same as on client.
-      const parsedOffering = JSON.parse(JSON.stringify(flatOfferingWithLinks));
+      const jsonString = await loadNestedOfferingWithJoinsAndLinksForId(transaction, id);
+      const offeringsArray = JSON.parse(jsonString);
 
-      // const offeringsArray = JSON.parse(jsonString);
-      // if (!offeringsArray || offeringsArray.length === 0) {
-      //   await rollbackTransaction(transaction);
-      //   throw error(404, `Offering with ID ${id} not found.`);
-      // }
+      if (!offeringsArray || offeringsArray.length === 0) {
+        await rollbackTransaction(transaction);
+        throw error(404, `Offering with ID ${id} not found.`);
+      }
 
-      //const offeringWithJoinsAndLinks = offeringsArray[0];
+      const nestedOfferingWithLinks = offeringsArray[0];
 
       // TODO: all GET <path>/id endpoints should validate retrieved record.
-      const validation = validateEntityBySchema(Wio_PDef_Cat_Supp_WithLinks_Schema, parsedOffering);
+      const validation = validateEntityBySchema(Wio_PDef_Cat_Supp_Nested_WithLinks_Schema, nestedOfferingWithLinks);
       const debugError = false; // ONLY FOR DEBUG!
       if (!validation.isValid || debugError) {
         await rollbackTransaction(transaction);
@@ -79,21 +77,21 @@ export const GET: RequestHandler = async ({ params }) => {
         return json(errRes, { status: 500 });
       }
 
-      const offering = validation.sanitized as Wio_PDef_Cat_Supp_WithLinks;
+      const offering = validation.sanitized as Wio_PDef_Cat_Supp_Nested_WithLinks;
 
       // Commit transaction
       await transaction.commit();
       log.info(`[${operationId}] Transaction committed successfully.`);
 
       // The response now correctly wraps the data in an 'offering' property.
-      const response: ApiSuccessResponse<{ offering: Wio_PDef_Cat_Supp_WithLinks }> = {
+      const response: ApiSuccessResponse<{ offering: Wio_PDef_Cat_Supp_Nested_WithLinks }> = {
         success: true,
         message: "Offering retrieved successfully.",
         data: { offering },
         meta: { timestamp: new Date().toISOString() },
       };
 
-      log.info(`[${operationId}] FN_SUCCESS: Returning detailed offering data with links.`);
+      log.info(`[${operationId}] FN_SUCCESS: Returning detailed offering data with links and shop_offering.`);
       return json(response);
     } catch (err) {
       await rollbackTransaction(transaction);

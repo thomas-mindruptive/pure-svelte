@@ -14,7 +14,6 @@ import type {
   WholesalerOfferingAttribute,
   WholesalerOfferingAttribute_Attribute,
   WholesalerOfferingLink,
-  Wio_PDef_Cat_Supp_WithLinks,
   Wio_PDef_Cat_Supp_Nested_WithLinks
 } from "$lib/domain/domainTypes";
 import { log } from "$lib/utils/logger";
@@ -49,14 +48,15 @@ export function getOfferingApi(client: ApiClient) {
 
     /**
      * Loads a single offering with all its details by ID.
+     * Now returns NESTED structure with product_def, category, wholesaler, links, and shop_offering.
      */
-    async loadOffering(offeringId: number): Promise<Wio_PDef_Cat_Supp_WithLinks> {
+    async loadOffering(offeringId: number): Promise<Wio_PDef_Cat_Supp_Nested_WithLinks> {
       log.info(`API, Loading offering: ${offeringId}`);
       const operationId = `loadOffering-${offeringId}`;
       offeringLoadingManager.start(operationId);
       try {
         const responseData = await client.apiFetch<{
-          offering: Wio_PDef_Cat_Supp_WithLinks;
+          offering: Wio_PDef_Cat_Supp_Nested_WithLinks;
         }>(`/api/offerings/${offeringId}`, { method: "GET" }, { context: operationId });
         return responseData.offering;
       } catch (err) {

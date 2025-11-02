@@ -85,6 +85,31 @@ export const POST: RequestHandler = async ({ params, request }) => {
       return json(errRes, { status: 409 });
     }
 
+    // 3.5. Auto-assign category to wholesaler 99 if not already assigned
+    const categoryCheckRequest = transaction.request();
+    categoryCheckRequest.input("wholesaler_id", 99);
+    categoryCheckRequest.input("category_id", sourceOffering.category_id);
+
+    const categoryCheckResult = await categoryCheckRequest.query(`
+      SELECT wholesaler_id, category_id
+      FROM dbo.wholesaler_categories
+      WHERE wholesaler_id = @wholesaler_id AND category_id = @category_id
+    `);
+
+    // If not assigned, create the assignment
+    if (categoryCheckResult.recordset.length === 0) {
+      const assignCategoryRequest = transaction.request();
+      assignCategoryRequest.input("wholesaler_id", 99);
+      assignCategoryRequest.input("category_id", sourceOffering.category_id);
+
+      await assignCategoryRequest.query(`
+        INSERT INTO dbo.wholesaler_categories (wholesaler_id, category_id)
+        VALUES (@wholesaler_id, @category_id)
+      `);
+
+      log.info(`[${operationId}] Auto-assigned category ${sourceOffering.category_id} to wholesaler 99`);
+    }
+
     // 4. Create shop offering data (copy from source, set wholesaler_id = 99)
     const shopOfferingData: z.infer<typeof WholesalerItemOfferingForCreateSchema> = {
       wholesaler_id: 99, // Shop user

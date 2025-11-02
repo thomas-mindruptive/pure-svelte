@@ -19,6 +19,7 @@ import type {
 import { log } from "$lib/utils/logger";
 
 import type {
+  ApiResponse,
   AssignmentRequest,
   AssignmentSuccessData,
   AssignmentUpdateRequest,
@@ -664,6 +665,62 @@ export function getOfferingApi(client: ApiClient) {
         log.error(`[${operationId}] Failed.`, {
           sourceOfferingId,
           error: getErrorMessage(err),
+        });
+        throw err;
+      } finally {
+        offeringLoadingManager.finish(operationId);
+      }
+    },
+
+    /**
+     * Links a source offering to a shop offering.
+     * Creates an entry in shop_offering_sources table with priority = 0.
+     *
+     * @param shopOfferingId The shop offering ID (wholesaler_id = 99)
+     * @param sourceOfferingId The source offering ID to link
+     * @returns ApiResponse (success or error, e.g., 409 if already linked)
+     */
+    async addSourceOfferingLink(
+      shopOfferingId: number,
+      sourceOfferingId: number
+    ): Promise<ApiResponse<{
+      link: {
+        shop_offering_id: number;
+        source_offering_id: number;
+        priority: number;
+        created_at: string;
+        updated_at: string;
+      }
+    }>> {
+      const operationId = `addSourceOfferingLink-${shopOfferingId}-${sourceOfferingId}`;
+      offeringLoadingManager.start(operationId);
+
+      log.info(`[${operationId}] Starting link request`, {
+        shopOfferingId,
+        sourceOfferingId,
+        url: `/api/offerings/${shopOfferingId}/sources/${sourceOfferingId}`,
+      });
+
+      try {
+        return await client.apiFetchUnion<ApiResponse<{
+          link: {
+            shop_offering_id: number;
+            source_offering_id: number;
+            priority: number;
+            created_at: string;
+            updated_at: string;
+          }
+        }>>(
+          `/api/offerings/${shopOfferingId}/sources/${sourceOfferingId}`,
+          { method: "POST" },
+          { context: operationId }
+        );
+      } catch (err) {
+        log.error(`[${operationId}] Failed to link source offering`, {
+          shopOfferingId,
+          sourceOfferingId,
+          error: err,
+          errorMessage: getErrorMessage(err),
         });
         throw err;
       } finally {

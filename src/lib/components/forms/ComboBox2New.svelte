@@ -9,7 +9,7 @@
 
   // === PROPS ====================================================================================
 
-  // ./ComboBox.types.ts  
+  // ./ComboBox.types.ts
 
   // === PROPS DESTRUCTURE ========================================================================
 
@@ -163,7 +163,9 @@
   class="combobox-container"
   bind:this={containerEl}
 >
-  <label for="combobox-input">{label}</label>
+  {#if label}
+    <label for="combobox-input">{label}</label>
+  {/if}
   <div class="combobox-input-wrapper">
     <input
       type="text"

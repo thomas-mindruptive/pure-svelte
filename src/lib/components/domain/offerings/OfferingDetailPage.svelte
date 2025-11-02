@@ -57,6 +57,7 @@
   import { stringsToNumbers } from "$lib/utils/typeConversions";
   import ComboBox2New from "$lib/components/forms/ComboBox2New.svelte";
   import { getProductDefinitionApi } from "$lib/api/client/productDefinition";
+    import type { WhereCondition } from "$lib/backendQueries/queryGrammar";
 
   // === TYPES ====================================================================================
 
@@ -103,6 +104,15 @@
   // If this a s shop offering, user can assign source offerings id they are not yet in "sourceOfferings".
   let potentialSourceOfferings = $state<Wio_PDef_Cat_Supp_Nested_WithLinks[]>([]);
   let selectedSourceOfferingForLinking = $state<Wio_PDef_Cat_Supp_Nested_WithLinks | null>(null);
+  let linkingSourceOffering = $state(false);
+
+  // Filter out already assigned source offerings.
+  // TODO: Add param zo create anti-join in backend.
+  const availableSourceOfferings = $derived(
+    potentialSourceOfferings.filter(potential =>
+      !sourceOfferings.some(assigned => assigned.offering_id === potential.offering_id)
+    )
+  );
 
   // === API =====================================================================================
 
@@ -142,7 +152,8 @@
           }
 
           // If we are a shop offering (supplier 99), load potential offerings to assign as source offerings.
-          potentialSourceOfferings = await productDefinitionApi.loadNestedOfferingsWithLinksForProductDefinition(offering.product_def_id);
+          const where: WhereCondition<WholesalerItemOffering> = {whereCondOp: "!=", key:"wio.offering_id", val: offering.offering_id};
+          potentialSourceOfferings = await productDefinitionApi.loadNestedOfferingsWithLinksForProductDefinition(offering.product_def_id, where);
           const potentialSourceOfferingsVal = safeParseFirstN(Wio_PDef_Cat_Supp_Nested_WithLinks_Schema, potentialSourceOfferings, 3);
           if (!potentialSourceOfferingsVal.success) {
             errors.potentialSourceOfferings = zodToValidationErrorTree(potentialSourceOfferingsVal.error);
@@ -563,14 +574,40 @@
   /**
    * Link a source offering to this offering.
    */
-  function handleLinkSourceOffering() {
-    assertDefined(offering, "offering");
-    assertDefined(selectedSourceOfferingForLinking, "selectedSourceOfferingForLinking");
-    if (99 !== offering.wholesaler_id) {
-      throw new Error(`Can link source offering only if this is a shop offering`);
+  async function handleLinkSourceOffering() {
+    if (linkingSourceOffering) return;
+    linkingSourceOffering = true;
+    try {
+      assertDefined(offering, "offering");
+      assertDefined(selectedSourceOfferingForLinking, "selectedSourceOfferingForLinking");
+      if (99 !== offering.wholesaler_id) {
+        throw new Error(`Can link source offering only if this is a shop offering`);
+      }
+
+      log.debug(`Linking source offering to shop offering`, {
+        shopOfferingId: offering.offering_id,
+        sourceOfferingId: selectedSourceOfferingForLinking.offering_id
+      });
+
+      const result = await offeringApi.addSourceOfferingLink(
+        offering.offering_id,
+        selectedSourceOfferingForLinking.offering_id
+      );
+
+      if (result.success) {
+        addNotification(`Source offering linked successfully`, "success");
+        selectedSourceOfferingForLinking = null; // Reset selection
+        await reloadSourceOfferings();
+      } else {
+        addNotification(`Failed to link source offering: ${result.message}`, "error");
+      }
+    } catch (err) {
+      const message = getErrorMessage(err);
+      addNotification(`Failed to link source offering: ${message}`, "error");
+      log.error("Failed to link source offering", { error: err });
+    } finally {
+      linkingSourceOffering = false;
     }
-    log.debug(`Linking source offering to offering: `, selectedSourceOfferingForLinking);
-    reloadSourceOfferings();
   }
 </script>
 
@@ -685,21 +722,31 @@
     {:else if offering.wholesaler_id !== 99}
       <p class="info-message">This is not a shop offering. Source offerings are only available for shop offerings (wholesaler_id = 99).</p>
     {:else}
-      <h2>Source Offerings</h2>
-      <ComboBox2New
-        items={potentialSourceOfferings}
-        labelPath={["title"]}
-        label="Source offerings"
-        showDropdownButton={true}
-        valuePath={["offering_id"]}
-        bind:value={selectedSourceOfferingForLinking}
-      />
-      <button
-        class="pc-grid__createbtn"
-        onclick={handleLinkSourceOffering}
-      >
-        Create Offering
-      </button>
+      <div class="source-offering-assignment">
+        <form class="assignment-controls">
+          <strong>Assing offering:</strong>
+          <ComboBox2New
+            items={availableSourceOfferings}
+            labelPath={["title"]}
+            label = {null}
+            showDropdownButton={true}
+            valuePath={["offering_id"]}
+            bind:value={selectedSourceOfferingForLinking}
+          />
+          <button
+            class="pc-grid__createbtn"
+            onclick={handleLinkSourceOffering}
+          >
+            Link source offering
+          </button>
+          {#if linkingSourceOffering}
+            <span
+              class="pc-grid__spinner"
+              aria-hidden="true"
+            ></span>
+          {/if}
+        </form>
+      </div>
       <p>These are the source offerings linked to this shop offering, ordered by priority.</p>
 
       <OfferingGrid
@@ -954,5 +1001,31 @@
   .row-action-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+
+  /* 
+   * --- Source offering assignment ---------------------------------------------------------------
+   */
+  .source-offering-assignment {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 1.5rem;
+    background: var(--color-background);
+    border: 1px solid var(--color-border, #e2e8f0);
+    border-radius: 8px;
+  }
+
+  .assignment-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-grow: 1; /* Allow the form to take up remaining space */
+  }
+
+  .assignment-controls :global(.combobox-container) {
+    width: auto;
+    min-width: 350px;
+    flex: 0 1 auto;
   }
 </style>

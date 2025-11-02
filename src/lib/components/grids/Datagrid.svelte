@@ -828,7 +828,8 @@
                     disabled={!(safeGetId(row) != null && isRowDeletable(row)) ||
                       !deleteStrategy ||
                       typeof deleteStrategy.execute !== "function"}
-                    onclick={() => {
+                    onclick={(e) => {
+                      e.stopPropagation();
                       const id = safeGetId(row);
                       if (id != null) deleteOne(row);
                     }}

@@ -96,6 +96,33 @@ export class ApiClient {
 	 * A specialized fetch wrapper for operations that can return a union of success
 	 * and expected, structured error types (e.g., DeleteApiResponse).
 	 * This function returns the entire response object for type guarding, instead of throwing on handled errors like 409.
+	 *
+	 * @template TUnion - The union type of possible responses (success | error)
+	 *   This is typically `ApiResponse<TSuccessData>` or `DeleteApiResponse<TDeletedResource, TDependency>`
+	 *
+	 * @example
+	 * // For a DELETE operation that can return 409 conflicts:
+	 * const result = await apiFetchUnion<DeleteApiResponse<{ id: number }, string[]>>(
+	 *   '/api/resource/123',
+	 *   { method: 'DELETE' }
+	 * );
+	 * if (result.success) {
+	 *   console.log('Deleted:', result.data.deleted_resource);
+	 * } else {
+	 *   console.log('Error:', result.message);
+	 * }
+	 *
+	 * @example
+	 * // For a POST operation that can return 409 ALREADY_EXISTS:
+	 * const result = await apiFetchUnion<ApiResponse<{ link: LinkData }>>(
+	 *   '/api/links',
+	 *   { method: 'POST' }
+	 * );
+	 * if (result.success) {
+	 *   console.log('Created:', result.data.link);
+	 * } else {
+	 *   console.log('Conflict:', result.message);
+	 * }
 	 */
 	async apiFetchUnion<TUnion>(
 		url: string,

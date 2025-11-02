@@ -10,7 +10,7 @@
   import "$lib/components/styles/grid-section.css";
   import "$lib/components/styles/detail-page-layout.css";
   import "$lib/components/styles/form-elements.css";
-  import OfferingDetailWrapper from "$lib/components/domain/offerings/OfferingDetailWrapper.svelte";
+  import OfferingDetailWrapper from "$lib/components/domain/offerings/legacy/OfferingDetailWrapper.svelte";
 
   import { ApiClient } from "$lib/api/client/ApiClient";
   import type { ID, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";

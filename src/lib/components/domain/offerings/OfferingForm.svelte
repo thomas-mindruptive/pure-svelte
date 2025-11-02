@@ -608,15 +608,6 @@
 
         <!-- SHOPIFY FIELDS (only for Shop Offerings with wholesaler_id = 99) -------------------->
         {#if getS("wholesaler_id") === 99}
-          <div class="form-row-grid" style="margin-top: 2rem; padding-top: 1.5rem; border-top: 2px solid var(--color-border);">
-            <div class="span-4" style="margin-bottom: 1rem;">
-              <h4 style="margin: 0; color: var(--color-primary);">Shopify Integration</h4>
-              <p class="field-hint" style="margin-top: 0.5rem;">
-                These fields are used for syncing with Shopify. System fields are read-only.
-              </p>
-            </div>
-          </div>
-
           <div class="form-row-grid">
             <!-- shopify_sku ----------------------------------------------------------------------->
             <Field

@@ -734,6 +734,7 @@
             bind:value={selectedSourceOfferingForLinking}
           />
           <button
+            type="button"
             class="pc-grid__createbtn"
             onclick={handleLinkSourceOffering}
           >
@@ -747,7 +748,6 @@
           {/if}
         </form>
       </div>
-      <p>These are the source offerings linked to this shop offering, ordered by priority.</p>
 
       <OfferingGrid
         rows={sourceOfferings}
@@ -1010,10 +1010,10 @@
     display: flex;
     align-items: center;
     gap: 1rem;
-    padding: 0.75rem 1.5rem;
+    margin-bottom: 1rem;
     background: var(--color-background);
-    border: 1px solid var(--color-border, #e2e8f0);
-    border-radius: 8px;
+    /* border: 1px solid var(--color-border, #e2e8f0);
+    border-radius: 8px; */
   }
 
   .assignment-controls {

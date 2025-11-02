@@ -253,7 +253,6 @@
     try {
       return pathUtils.get(formState.data, path);
     } catch (e) {
-      formState.errors.get = ["get failed"];
       log.error("get failed", {
         component: "FormShell",
         entity,
@@ -271,7 +270,6 @@
     try {
       return pathUtils.get(formState.data, key);
     } catch (e) {
-      formState.errors.getS = ["getS failed"];
       log.error("get failed", {
         component: "FormShell",
         entity,

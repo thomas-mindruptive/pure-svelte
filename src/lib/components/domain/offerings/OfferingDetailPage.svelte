@@ -280,7 +280,12 @@
       await goto(newUrl, { invalidateAll: true });
     } else {
       // Reload offering after update
-      offering = await offeringApi.loadOffering(data.offeringId);
+      isLoading = true;
+      try {
+        offering = await offeringApi.loadOffering(data.offeringId);
+      } finally {
+        isLoading = false;
+      }
     }
   }
 

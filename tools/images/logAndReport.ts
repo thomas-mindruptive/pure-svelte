@@ -86,8 +86,8 @@ export function printRunSummary(processedOfferings: OfferingWithGenPlanAndImage[
   const scoreWidth = 7;       // Match score column
   const imagesWidth = 6;
   const willGenWidth = 8;
-  const promptWidth = 70;
-  const filePathWidth = 90;
+  const promptWidth = 200;
+  const filePathWidth = 120;
   const imageUrlWidth = 30;
 
   // Print table header
@@ -113,7 +113,7 @@ export function printRunSummary(processedOfferings: OfferingWithGenPlanAndImage[
   // Print table rows
   for (const item of processedOfferings) {
     const id = item.offering.offering_id.toString().padEnd(idWidth);
-    const title = (item.offering.title + "- " + item.offering.product_def.title || "Untitled").substring(0, titleWidth).padEnd(titleWidth);
+    const title = (item.offering.title + " - " + item.offering.product_def.title || "Untitled").substring(0, titleWidth).padEnd(titleWidth);
 
     const productTypeFormatted = item.product_type?.name.substring(0, productTypeWith).padEnd(productTypeWith); 
 

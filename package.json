@@ -18,8 +18,9 @@
 		"scaffold:page": "npm run tools:build && node tools/dist/tools/scaffold-page.js",
 		"parse-ddl": "npm run tools:build && node tools/dist/tools/parse-ddl.js",
 		"/// --- IMAGES ---": "",
-		"generate-images": "node tools/dist/tools/images/generateMissingImages.js",
-		"build-generate-images": "npm run tools:build && node tools/dist/tools/images/generateMissingImages.js",
+		"img:gen": "cls && node tools/dist/tools/images/generateMissingImages.js",
+		"img:buildAndGen": "cls && npm run tools:build && node tools/dist/tools/images/generateMissingImages.js",
+		"img:genProd": "npm run img:gen -- --no-dry-run",
 		"// --- TESTS ---": "",
 		"test": "vitest",
 		"test:run": "vitest run"

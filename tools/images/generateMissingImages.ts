@@ -267,8 +267,8 @@ async function main() {
   }
 
   // Verify API key
-  if (!process.env.FAL_KEY && !config.generation.dry_run) {
-    log.error("❌ FAL_KEY not found in .env file");
+  if (!process.env.FAL_AI_API_KEY && !config.generation.dry_run) {
+    log.error("❌ FAL_AI_API_KEY not found in .env file");
     log.info("Please add your FAL API key to the .env file");
     closeLogFile();
     process.exit(1);

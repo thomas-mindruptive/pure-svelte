@@ -23,7 +23,16 @@ import type { OfferingWithGenerationPlan, OfferingWithGenPlanAndImage } from "./
 
 export function buildPrompt(item: OfferingWithGenerationPlan, config: ImageGenerationConfig["prompt"]) {
   assertDefined(item, "item");
-  return _buildPrompt(item.offering, null, item.material, item.form, item.surface_finish, item.construction_type, item.product_type, config);
+  return _buildPrompt(
+    item.offering,
+    null,
+    item.material,
+    item.form,
+    item.surface_finish,
+    item.construction_type,
+    item.product_type,
+    config,
+  );
 }
 
 /**
@@ -68,7 +77,73 @@ function _buildPrompt(
 
   // 5. Size (if available)
   if (offering?.size) {
-    parts.push(offering.size.toLowerCase());
+    switch (offering.size) {
+      case "XS":
+        parts.push(`'size extra small'`);
+        break;
+      case "S":
+        parts.push(`'size small'`);
+        break;
+      case "M":
+        parts.push(`'size medium'`);
+        break;
+      case "L":
+        parts.push(`'size extra large'`);
+        break;
+      case "XL":
+        parts.push(`'size extra large'`);
+        break;
+      case "XXL":
+        parts.push(`'size extra-extra large'`);
+        break;
+      case "XS-S":
+        parts.push(`'size small'`);
+        break;
+      case "XS-M":
+        parts.push(`'size medium'`);
+        break;
+      case "XS-L":
+        parts.push(`'size large'`);
+        break;
+      case "XS-XL":
+        parts.push(`'size large'`);
+        break;
+      case "XS-XXL":
+        parts.push(`'size large'`);
+        break;
+      case "S-M":
+        parts.push(`'size medium'`);
+        break;
+      case "S-L":
+        parts.push(`'size large'`);
+        break;
+      case "S-XL":
+        parts.push(`'size large'`);
+        break;
+      case "S-XXL":
+        parts.push(`'size large'`);
+        break;
+      case "M-L":
+        parts.push(`'size large'`);
+        break;
+      case "M-XL":
+        parts.push(`'size large'`);
+        break;
+      case "M-XXL":
+        parts.push(`'size large'`);
+        break;
+      case "L-XL":
+        parts.push(`'size extra large'`);
+        break;
+      case "L-XXL":
+        parts.push(`'size extra large'`);
+        break;
+      case "XL-XXL":
+        parts.push(`'size extra large'`);
+        break;
+      default:
+        throw new Error(`Invalid size in offering: ${offering.offering_id}, ${offering.title}`);
+    }
   }
 
   // 6. Surface finish
@@ -114,4 +189,3 @@ function _buildPrompt(
   // Join all parts with commas
   return parts.join(", ");
 }
-

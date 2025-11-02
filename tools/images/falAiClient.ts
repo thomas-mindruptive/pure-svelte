@@ -8,6 +8,7 @@
 
 import * as fal from "@fal-ai/serverless-client";
 import type { ImageGenerationConfig } from "./generateMissingImages.config.js";
+import { log } from "$lib/utils/logger.js";
 
 /**
  * Initialize fal.ai client with API key
@@ -60,16 +61,17 @@ export async function generateImage(
           console.log(`  │  Status: Processing...`);
         }
       },
-    }) as { data: { images: Array<{ url: string }> } };
+    }) as { images: Array<{ url: string; width: number; height: number; content_type: string }>; timings?: any; seed?: number; has_nsfw_concepts?: boolean[]; prompt?: string };
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
 
     // fal.ai returns result with images array
-    if (!result.data || !result.data.images || result.data.images.length === 0) {
+    if (!result.images || result.images.length === 0) {
+      log.error(`fal.ai returned no images`, result);
       throw new Error("fal.ai returned no images");
     }
 
-    const imageUrl = result.data.images[0].url;
+    const imageUrl = result.images[0].url;
     console.log(`  ├─ Image generated in ${elapsed}s`);
 
     return imageUrl;

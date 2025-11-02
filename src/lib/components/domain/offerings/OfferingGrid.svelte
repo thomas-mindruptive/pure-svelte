@@ -26,6 +26,7 @@
   export type OfferingGridProps = {
     rows: Wio_PDef_Cat_Supp_Nested_WithLinks[];
     loading?: boolean;
+    selection?: "none" | "single" | "multiple";
     deleteStrategy: DeleteStrategy<Wio_PDef_Cat_Supp_Nested_WithLinks>;
     rowActionStrategy?: RowActionStrategy<Wio_PDef_Cat_Supp_Nested_WithLinks>;
     // Callback when sort state changes - parent loads data
@@ -40,6 +41,7 @@
     // Core data
     rows,
     loading = false,
+    selection = "multiple",
 
     // Strategies (Dependency Injection pattern)
     deleteStrategy,
@@ -134,6 +136,7 @@
   {columns}
   {getId}
   {loading}
+  {selection}
   gridId="offerings"
   entity="offering"
   {deleteStrategy}

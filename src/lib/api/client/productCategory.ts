@@ -11,7 +11,7 @@ import type { QueryPayload } from "$lib/backendQueries/queryGrammar";
 import { ProductCategorySchema, type ProductCategory } from "$lib/domain/domainTypes";
 import { genTypedQualifiedColumns } from "$lib/domain/domainTypes.utils";
 import { log } from "$lib/utils/logger";
-import type { ApiClient } from "./ApiClient";
+import type { ApiClient } from "./apiClient";
 import { createJsonBody, getErrorMessage } from "./common";
 import { LoadingState } from "./loadingState";
 

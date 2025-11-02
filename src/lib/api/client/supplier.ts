@@ -42,7 +42,7 @@ import type {
 import type { DeleteSupplierApiResponse, RemoveCategoryApiResponse } from "$lib/api/app/appSpecificTypes";
 import { transformToNestedObjects } from "$lib/backendQueries/recordsetTransformer";
 import { genTypedQualifiedColumns, zodToValidationErrorTree } from "$lib/domain/domainTypes.utils";
-import type { ApiClient } from "./ApiClient";
+import type { ApiClient } from "./apiClient";
 import { createJsonAndWrapInPayload, createJsonBody, getErrorMessage } from "./common";
 import { LoadingState } from "./loadingState";
 

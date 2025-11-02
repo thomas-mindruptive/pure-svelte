@@ -19,7 +19,7 @@ import type {
   ProductType,
 } from "../../src/lib/domain/domainTypes.js";
 import type { ImageGenerationConfig } from "./generateMissingImages.config.js";
-import type { OfferingWithGenerationPlan } from "./generateMissingImages.js";
+import type { OfferingWithGenerationPlan, OfferingWithGenPlanAndImage } from "./generateMissingImages.js";
 
 export function buildPrompt(item: OfferingWithGenerationPlan, config: ImageGenerationConfig["prompt"]) {
   assertDefined(item, "item");
@@ -115,51 +115,3 @@ function _buildPrompt(
   return parts.join(", ");
 }
 
-/**
- * Generates a filename for the generated image
- *
- * Format: {material}_{form}_{size}_{timestamp}.png
- * Example: rose_quartz_sphere_5cm_1704123456.png
- */
-export function generateImageFilename(offering: WholesalerItemOffering, material: Material | null, form: Form | null): string {
-  const parts: string[] = [];
-
-  // Material (sanitized)
-  if (material) {
-    parts.push(sanitizeForFilename(material.name));
-  } else {
-    parts.push("unknown_material");
-  }
-
-  // Form (sanitized)
-  if (form) {
-    parts.push(sanitizeForFilename(form.name));
-  } else {
-    parts.push("unknown_form");
-  }
-
-  // Size (if available, sanitized)
-  if (offering.size) {
-    parts.push(sanitizeForFilename(offering.size));
-  }
-
-  // Timestamp for uniqueness
-  const timestamp = Date.now();
-  parts.push(timestamp.toString());
-
-  return parts.join("_") + ".png";
-}
-
-/**
- * Sanitizes a string for use in filenames
- * - Lowercase
- * - Replace spaces with underscores
- * - Remove special characters
- */
-function sanitizeForFilename(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/\s+/g, "_")
-    .replace(/[^a-z0-9_]/g, "")
-    .substring(0, 50); // Limit length
-}

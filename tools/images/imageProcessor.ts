@@ -6,10 +6,9 @@
  * Downloads generated images from URLs and saves them to disk
  */
 
+import { existsSync } from "fs";
 import * as fs from "fs/promises";
 import * as path from "path";
-import { existsSync } from "fs";
-import type { ImageGenerationConfig } from "./generateMissingImages.config.js";
 
 /**
  * Downloads an image from a URL and saves it to the configured directory
@@ -22,15 +21,15 @@ import type { ImageGenerationConfig } from "./generateMissingImages.config.js";
 export async function downloadAndSaveImage(
   imageUrl: string,
   filename: string,
-  config: ImageGenerationConfig['generation']
+  dir: string
 ): Promise<string> {
   console.log(`  ├─ Downloading image...`);
 
   try {
     // Ensure directory exists
-    if (!existsSync(config.image_directory)) {
-      console.log(`  │  Creating directory: ${config.image_directory}`);
-      await fs.mkdir(config.image_directory, { recursive: true });
+    if (!existsSync(dir)) {
+      console.log(`  │  Creating directory: ${dir}`);
+      await fs.mkdir(dir, { recursive: true });
     }
 
     // Download image
@@ -44,7 +43,7 @@ export async function downloadAndSaveImage(
     const buffer = Buffer.from(arrayBuffer);
 
     // Build absolute filepath
-    const filepath = path.join(config.image_directory, filename);
+    const filepath = path.join(dir, filename);
 
     // Save to disk
     await fs.writeFile(filepath, buffer);

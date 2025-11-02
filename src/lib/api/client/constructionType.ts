@@ -10,7 +10,7 @@ import type { QueryRequest, QueryResponseData } from "$lib/api/api.types";
 import type { QueryPayload } from "$lib/backendQueries/queryGrammar";
 import type { ConstructionType } from "$lib/domain/domainTypes";
 import { log } from "$lib/utils/logger";
-import type { ApiClient } from "./ApiClient";
+import type { ApiClient } from "./apiClient";
 import { createJsonBody, getErrorMessage } from "./common";
 import { LoadingState } from "./loadingState";
 

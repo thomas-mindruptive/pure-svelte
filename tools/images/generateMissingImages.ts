@@ -27,7 +27,8 @@ import { estimateCost, generateImage, initializeFalAi } from "./falAiClient";
 import { loadConfig } from "./generateMissingImages.config";
 import { downloadAndSaveImage, verifyImageDirectory } from "./imageProcessor";
 import { closeLogFile, initLogFile, printRunSummary } from "./logAndReport";
-import { buildPrompt, generateImageFilename } from "./promptBuilder";
+import { buildPrompt } from "./promptBuilder";
+import { genAbsImgDirName, generateImageFilename } from "./fileUtils";
 
 
 // Load environment variables
@@ -402,10 +403,11 @@ async function main() {
         itemWithGenPlanAndImage.imageUrl = imageUrl;
 
         // Download and save image
-        const filename = generateImageFilename(item.offering, item.material, item.form);
-        let filepath = "DRY - " + path.join(config.generation.image_directory, filename);
+        const filename = generateImageFilename(item);
+        const absImgBaseDir = genAbsImgDirName(config.generation.image_directory, item);
+        let filepath = "DRY - " + path.join(absImgBaseDir, filename);
         if (!config.generation.dry_run) {
-          filepath = await downloadAndSaveImage(imageUrl, filename, config.generation);
+          filepath = await downloadAndSaveImage(imageUrl, filename, absImgBaseDir);
         }
         log.info(`  ├─ Saved: ${filepath}`);
         itemWithGenPlanAndImage.filePath = filepath;

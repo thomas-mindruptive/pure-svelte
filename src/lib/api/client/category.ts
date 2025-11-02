@@ -15,7 +15,7 @@ import {
   type Wholesaler,
   type Wio_PDef_Cat_Supp_Nested,
 } from "$lib/domain/domainTypes";
-import type { ApiClient } from "./ApiClient";
+import type { ApiClient } from "./apiClient";
 import { createJsonBody, createJsonAndWrapInPayload, getErrorMessage, createJsonAndWrapInPayloadPartial } from "./common";
 import type { PredefinedQueryRequest, QueryResponseData } from "$lib/api/api.types";
 import type { DeleteCategoryApiResponse } from "$lib/api/app/appSpecificTypes"; // CORRECTED IMPORT PATH

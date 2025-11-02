@@ -9,7 +9,7 @@
 import type { QueryResponseData } from "$lib/api/api.types";
 import type { Form } from "$lib/domain/domainTypes";
 import { log } from "$lib/utils/logger";
-import type { ApiClient } from "./ApiClient";
+import type { ApiClient } from "./apiClient";
 import { getErrorMessage } from "./common";
 import { LoadingState } from "./loadingState";
 

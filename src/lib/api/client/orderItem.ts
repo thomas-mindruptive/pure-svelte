@@ -17,7 +17,7 @@ import { log } from "$lib/utils/logger";
 
 import type { DeleteApiResponse, PredefinedQueryRequest, QueryResponseData } from "$lib/api/api.types";
 import { transformToNestedObjects } from "$lib/backendQueries/recordsetTransformer";
-import type { ApiClient } from "./ApiClient";
+import type { ApiClient } from "./apiClient";
 import { createJsonBody, getErrorMessage } from "./common";
 import { LoadingState } from "./loadingState";
 

@@ -17,7 +17,7 @@ import {
   type Wio_PDef_Cat_Supp_Nested_WithLinks,
 } from "$lib/domain/domainTypes";
 import { log } from "$lib/utils/logger";
-import type { ApiClient } from "./ApiClient";
+import type { ApiClient } from "./apiClient";
 import { createJsonBody, getErrorMessage } from "./common";
 import { LoadingState } from "./loadingState";
 

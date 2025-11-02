@@ -32,7 +32,7 @@ import type {
 } from "$lib/api/api.types";
 import { assertDefined } from "$lib/utils/assertions";
 import type { DeleteOfferingApiResponse } from "../app/appSpecificTypes";
-import type { ApiClient } from "./ApiClient";
+import type { ApiClient } from "./apiClient";
 import { createJsonAndWrapInPayload, createJsonBody, getErrorMessage } from "./common";
 import { LoadingState } from "./loadingState";
 const offeringLoadingManager = new LoadingState();

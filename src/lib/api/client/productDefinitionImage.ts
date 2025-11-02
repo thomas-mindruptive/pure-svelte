@@ -11,7 +11,7 @@ import { log } from "$lib/utils/logger";
 import type { QueryPayload } from "$lib/backendQueries/queryGrammar";
 import type { ProductDefinitionImage_Image } from "$lib/domain/domainTypes";
 
-import type { ApiClient } from "./ApiClient";
+import type { ApiClient } from "./apiClient";
 import { createJsonBody, createJsonAndWrapInPayloadPartial, getErrorMessage } from "./common";
 import type { QueryResponseData, DeleteApiResponse, DeleteRequest } from "$lib/api/api.types";
 import { LoadingState } from "./loadingState";

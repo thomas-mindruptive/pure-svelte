@@ -543,8 +543,9 @@ export function getOfferingApi(client: ApiClient) {
 
     /**
      * Loads product definitions for a specific category that a given supplier has NOT yet created an offering for.
-     * This is achieved via a client-constructed anti-join query sent to the generic /api/query endpoint.
-     *
+     * This is achieved via a client-constructed anti-join (antijoin) query sent to the generic /api/query endpoint.
+     * NOT USEd currently, because offerings can flexibly design their own "material" etc. fields.
+     * 
      * @param categoryId The ID of the category to check within.
      * @param supplierId The ID of the supplier for whom to check for existing offerings.
      * @returns A promise that resolves to an array of available ProductDefinition objects.

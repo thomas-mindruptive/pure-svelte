@@ -8,12 +8,13 @@
   export type CategoryGridProps = {
     rows: ProductCategory[];
     loading?: boolean;
+    selection?: "none" | "single" | "multiple";
     deleteStrategy: DeleteStrategy<ProductCategory>;
     rowActionStrategy?: RowActionStrategy<ProductCategory>;
     onSort?: SortFunc<ProductCategory> | undefined;
   };
 
-  const { rows = [], loading = false, deleteStrategy, rowActionStrategy, onSort }: CategoryGridProps = $props();
+  const { rows = [], loading = false, selection = "multiple", deleteStrategy, rowActionStrategy, onSort }: CategoryGridProps = $props();
 
   // === COLUMNS ====================================================================================
 
@@ -34,6 +35,7 @@
   {columns}
   {getId}
   {loading}
+  {selection}
   gridId="categories"
   entity="category"
   {deleteStrategy}

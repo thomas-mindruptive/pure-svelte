@@ -14,13 +14,14 @@
   export type SupplierCategoriesGridProps = {
     rows: WholesalerCategory_Category_Nested[];
     loading?: boolean;
+    selection?: "none" | "single" | "multiple";
     showOfferingCount?: boolean;
     deleteStrategy: DeleteStrategy<WholesalerCategory_Category_Nested>;
     rowActionStrategy?: RowActionStrategy<WholesalerCategory_Category_Nested>;
     onSort?: SortFunc<WholesalerCategory_Category_Nested> | undefined;
   };
 
-  const { rows, loading = false, deleteStrategy, rowActionStrategy, onSort }: SupplierCategoriesGridProps = $props();
+  const { rows, loading = false, selection = "multiple", deleteStrategy, rowActionStrategy, onSort }: SupplierCategoriesGridProps = $props();
 
   // === COLUMNS ==================================================================================
 
@@ -39,6 +40,7 @@
   {columns}
   {getId}
   {loading}
+  {selection}
   gridId="categories"
   entity="category"
   {deleteStrategy}

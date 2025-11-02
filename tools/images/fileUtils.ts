@@ -87,12 +87,20 @@ export function genAbsImgDirName(baseDir: string, item: OfferingWithGenerationPl
 
 /**
  * Sanitizes a string for use in filenames
+ * - Replace German umlauts (ä→ae, ö→oe, ü→ue, ß→ss)
  * - Lowercase
  * - Replace spaces with underscores
  * - Remove special characters
  */
 function sanitizeForFilename(text: string): string {
   return text
+    .replace(/ä/g, "ae")
+    .replace(/ö/g, "oe")
+    .replace(/ü/g, "ue")
+    .replace(/Ä/g, "Ae")
+    .replace(/Ö/g, "Oe")
+    .replace(/Ü/g, "Ue")
+    .replace(/ß/g, "ss")
     .toLowerCase()
     .replace(/\s+/g, "_")
     .replace(/[^a-z0-9_]/g, "")

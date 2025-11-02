@@ -11,12 +11,13 @@
   export type SupplierGridProps = {
     rows: Wholesaler[];
     loading?: boolean;
+    selection?: "none" | "single" | "multiple";
     deleteStrategy: DeleteStrategy<Wholesaler>;
     rowActionStrategy?: RowActionStrategy<Wholesaler>;
     onSort?: SortFunc<Wholesaler> | undefined;
   };
 
-  const { rows, loading = false, deleteStrategy, rowActionStrategy, onSort }: SupplierGridProps = $props();
+  const { rows, loading = false, selection = "multiple", deleteStrategy, rowActionStrategy, onSort }: SupplierGridProps = $props();
 
   // === COLUMNS ==================================================================================
 
@@ -43,6 +44,7 @@
   {columns}
   {getId}
   {loading}
+  {selection}
   gridId="wholesalers"
   entity="wholesaler"
   {deleteStrategy}

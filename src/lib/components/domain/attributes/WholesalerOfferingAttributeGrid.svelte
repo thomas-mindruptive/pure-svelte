@@ -15,6 +15,7 @@
   export type AttributeGridProps = {
     rows: WholesalerOfferingAttribute_Attribute[];
     loading?: boolean;
+    selection?: "none" | "single" | "multiple";
     deleteStrategy: DeleteStrategy<WholesalerOfferingAttribute_Attribute>;
     rowActionStrategy?: RowActionStrategy<WholesalerOfferingAttribute_Attribute>;
   };
@@ -22,6 +23,7 @@
   const {
     rows = [] as WholesalerOfferingAttribute_Attribute[],
     loading = false,
+    selection = "multiple",
     deleteStrategy,
     rowActionStrategy,
   }: AttributeGridProps = $props();
@@ -67,6 +69,7 @@
   {columns}
   {getId}
   {loading}
+  {selection}
   gridId="attributes"
   entity="attribute"
   {deleteStrategy}

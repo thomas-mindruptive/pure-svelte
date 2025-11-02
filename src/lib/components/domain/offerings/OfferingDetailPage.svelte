@@ -55,6 +55,8 @@
   import { safeParseFirstN, zodToValidationErrorTree } from "$lib/domain/domainTypes.utils";
   import { cascadeDelete } from "$lib/api/client/cascadeDelete";
   import { stringsToNumbers } from "$lib/utils/typeConversions";
+  import ComboBox2New from "$lib/components/forms/ComboBox2New.svelte";
+  import { getProductDefinitionApi } from "$lib/api/client/productDefinition";
 
   // === TYPES ====================================================================================
 
@@ -90,13 +92,17 @@
   let sourceOfferings = $state<Wio_PDef_Cat_Supp_Nested_WithLinks[]>([]);
   let copiedShopOfferingId = $state<number | null>(null);
 
-  // Form combobox data
+  // Lookups to material, form, etc.
   let availableProducts = $state<ProductDefinition[]>([]);
   let availableSuppliers = $state<Wholesaler[]>([]);
   let materials = $state<Material[]>([]);
   let forms = $state<Form[]>([]);
   let constructionTypes = $state<ConstructionType[]>([]);
   let surfaceFinishes = $state<SurfaceFinish[]>([]);
+
+  // If this a s shop offering, user can assign source offerings id they are not yet in "sourceOfferings".
+  let potentialSourceOfferings = $state<Wio_PDef_Cat_Supp_Nested_WithLinks[]>([]);
+  let selectedSourceOfferingForLinking = $state<Wio_PDef_Cat_Supp_Nested_WithLinks | null>(null);
 
   // === API =====================================================================================
 
@@ -110,6 +116,7 @@
   const formApi = getFormApi(client);
   const constructionTypeApi = getConstructionTypeApi(client);
   const surfaceFinishApi = getSurfaceFinishApi(client);
+  const productDefinitionApi = getProductDefinitionApi(client);
 
   // === LOAD =====================================================================================
 
@@ -133,9 +140,15 @@
           if (!offeringVal.success) {
             errors.offering = zodToValidationErrorTree(offeringVal.error);
           }
+
+          // If we are a shop offering (supplier 99), load potential offerings to assign as source offerings.
+          potentialSourceOfferings = await productDefinitionApi.loadNestedOfferingsWithLinksForProductDefinition(offering.product_def_id);
+          const potentialSourceOfferingsVal = safeParseFirstN(Wio_PDef_Cat_Supp_Nested_WithLinks_Schema, potentialSourceOfferings, 3);
+          if (!potentialSourceOfferingsVal.success) {
+            errors.potentialSourceOfferings = zodToValidationErrorTree(potentialSourceOfferingsVal.error);
+          }
         }
 
-        // Load form combobox data (always needed)
         materials = await materialApi.loadMaterials();
         if (aborted) return;
         const materialsVal = safeParseFirstN(MaterialSchema, materials, 3);
@@ -518,7 +531,7 @@
         softDepInfo: "This will also delete all assigned attributes and links.",
         hardDepInfo: "",
       },
-      true // allowForceCascade
+      true, // allowForceCascade
     );
 
     if (dataChanged) {
@@ -533,15 +546,32 @@
   function handleOfferingSelect(selectedOffering: Wio_PDef_Cat_Supp_Nested_WithLinks) {
     // Navigate to offering detail page
     if (data.isSuppliersRoute) {
-      goto(`/suppliers/${selectedOffering.wholesaler.wholesaler_id}/categories/${selectedOffering.category.category_id}/offerings/${selectedOffering.offering_id}`);
+      goto(
+        `/suppliers/${selectedOffering.wholesaler.wholesaler_id}/categories/${selectedOffering.category.category_id}/offerings/${selectedOffering.offering_id}`,
+      );
     } else {
-      goto(`/categories/${selectedOffering.category.category_id}/productdefinitions/${selectedOffering.product_def.product_def_id}/offerings/${selectedOffering.offering_id}`);
+      goto(
+        `/categories/${selectedOffering.category.category_id}/productdefinitions/${selectedOffering.product_def.product_def_id}/offerings/${selectedOffering.offering_id}`,
+      );
     }
   }
 
   const offeringsRowActionStrategy: RowActionStrategy<Wio_PDef_Cat_Supp_Nested_WithLinks> = {
     click: handleOfferingSelect,
   };
+
+  /**
+   * Link a source offering to this offering.
+   */
+  function handleLinkSourceOffering() {
+    assertDefined(offering, "offering");
+    assertDefined(selectedSourceOfferingForLinking, "selectedSourceOfferingForLinking");
+    if (99 !== offering.wholesaler_id) {
+      throw new Error(`Can link source offering only if this is a shop offering`);
+    }
+    log.debug(`Linking source offering to offering: `, selectedSourceOfferingForLinking);
+    reloadSourceOfferings();
+  }
 </script>
 
 <!------------------------------------------------------------------------------------------------
@@ -556,8 +586,15 @@
       {#if !offering}
         <p class="field-hint">You must save the new offering first before you can assign attributes.</p>
       {/if}
-      <form class="assignment-form" onsubmit={handleAttributeAssign}>
-        <select bind:value={newAttributeId} required disabled={isAssigningAttribute || !offering}>
+      <form
+        class="assignment-form"
+        onsubmit={handleAttributeAssign}
+      >
+        <select
+          bind:value={newAttributeId}
+          required
+          disabled={isAssigningAttribute || !offering}
+        >
           <option value={null}>Select attribute...</option>
           {#each availableAttributes as attr}
             <option value={attr.attribute_id}>{attr.name}</option>
@@ -600,7 +637,10 @@
       {#if !offering}
         <p class="field-hint">You must save the new offering first before you can add links.</p>
       {/if}
-      <form class="assignment-form" onsubmit={handleLinkAssign}>
+      <form
+        class="assignment-form"
+        onsubmit={handleLinkAssign}
+      >
         <input
           type="url"
           placeholder="https://example.com/product"
@@ -614,7 +654,11 @@
           bind:value={newNotes}
           disabled={isAssigningLink || !offering}
         />
-        <button type="submit" class="primary-button" disabled={isAssigningLink || !newUrl || !offering}>
+        <button
+          type="submit"
+          class="primary-button"
+          disabled={isAssigningLink || !newUrl || !offering}
+        >
           {isAssigningLink ? "Adding..." : "Add Link"}
         </button>
       </form>
@@ -624,7 +668,11 @@
     {#if !offering}
       <p class="field-hint">You must save the new offering first before you can see links.</p>
     {:else}
-      <LinkGrid rows={links} loading={$offeringLoadingState} deleteStrategy={linksDeleteStrategy} />
+      <LinkGrid
+        rows={links}
+        loading={$offeringLoadingState}
+        deleteStrategy={linksDeleteStrategy}
+      />
     {/if}
   </div>
 {/snippet}
@@ -635,11 +683,23 @@
     {#if !offering}
       <p class="field-hint">You must save the offering first before you can see source offerings.</p>
     {:else if offering.wholesaler_id !== 99}
-      <p class="info-message">
-        This is not a shop offering. Source offerings are only available for shop offerings (wholesaler_id = 99).
-      </p>
+      <p class="info-message">This is not a shop offering. Source offerings are only available for shop offerings (wholesaler_id = 99).</p>
     {:else}
       <h2>Source Offerings</h2>
+      <ComboBox2New
+        items={potentialSourceOfferings}
+        labelPath={["title"]}
+        label="Source offerings"
+        showDropdownButton={true}
+        valuePath={["offering_id"]}
+        bind:value={selectedSourceOfferingForLinking}
+      />
+      <button
+        class="pc-grid__createbtn"
+        onclick={handleLinkSourceOffering}
+      >
+        Create Offering
+      </button>
       <p>These are the source offerings linked to this shop offering, ordered by priority.</p>
 
       <OfferingGrid
@@ -648,7 +708,7 @@
         deleteStrategy={sourceOfferingsDeleteStrategy}
         rowActionStrategy={offeringsRowActionStrategy}
       >
-        {#snippet toolbar({ selectedIds, deleteSelected }: { selectedIds: Set<ID>, deleteSelected: () => Promise<void> | void })}
+        {#snippet toolbar({ selectedIds, deleteSelected }: { selectedIds: Set<ID>; deleteSelected: () => Promise<void> | void })}
           <button
             class="pc-grid__btn pc-grid__btn--secondary"
             disabled={selectedIds.size === 0 || $offeringLoadingState}
@@ -676,7 +736,15 @@
           </button>
         {/snippet}
 
-        {#snippet rowActions({ row, id, isDeleting }: { row: Wio_PDef_Cat_Supp_Nested_WithLinks, id: ID | null, isDeleting: (id: ID) => boolean })}
+        {#snippet rowActions({
+          row,
+          id,
+          isDeleting,
+        }: {
+          row: Wio_PDef_Cat_Supp_Nested_WithLinks;
+          id: ID | null;
+          isDeleting: (id: ID) => boolean;
+        })}
           <!-- DELETE (Standard) -->
           <button
             type="button"
@@ -692,7 +760,10 @@
             title="Delete this source offering"
           >
             {#if id !== null && isDeleting(id)}
-              <span class="pc-grid__spinner" aria-hidden="true"></span>
+              <span
+                class="pc-grid__spinner"
+                aria-hidden="true"
+              ></span>
             {/if}
             Delete
           </button>
@@ -765,7 +836,8 @@
             <p class="hint">Linked shop offering</p>
             <div class="success-action">
               <p class="success-message">
-                ✓ Shop offering: <strong>{shopOfferingTitle}</strong> (ID: {shopOfferingId})
+                ✓ Shop offering: <strong>{shopOfferingTitle}</strong>
+                (ID: {shopOfferingId})
               </p>
               <button
                 type="button"

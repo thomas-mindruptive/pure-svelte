@@ -1,8 +1,7 @@
 <!-- SupplierListPage.svelte -->
 <script lang="ts">
-
   import "$lib/components/styles/list-page-layout.css";
-    import ComboBox2 from "../forms/ComboBox2.svelte";
+  import ComboBox2 from "../forms/ComboBox2New.svelte";
 
   // === TEST combo ===============================================================================
 
@@ -32,12 +31,13 @@
 <div class="list-page-content-wrapper">
   <ComboBox2
     items={users}
+    labelPath={["lastName"]}
     bind:value={selectedUser}
     valuePath={["id"]}
-    getLabel={(user) => `${user.firstName} ${user.lastName}`}
     placeholder="Benutzer suchen..."
     label="Benutzer auswählen"
   />
+  <!-- We could override the label by: getLabel={(user) => `${user.firstName} ${user.lastName}`} -->
   <div class="result">
     {#if selectedUser}
       <p>Ausgewähltes Benutzer-Objekt:</p>

@@ -15,6 +15,9 @@
 
   // === PROPS ====================================================================================
 
+  /**
+   * Our props "inherit" from ComboBoxPros.
+   */
   type FormComboBox2Props = Omit<ComboboxProps<TOption, TLabelPath, TValuePath>, "value" | "onChange"> & {
     // The field manipulation props from FormShell
     fieldProps: FieldsSnippetProps<TEntity>;

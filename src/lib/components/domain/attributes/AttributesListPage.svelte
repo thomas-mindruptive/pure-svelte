@@ -4,7 +4,7 @@
   import type { Attribute } from "$lib/domain/domainTypes";
   import { goto } from "$app/navigation";
   import { log } from "$lib/utils/logger";
-  import { ApiClient } from "$lib/api/client/ApiClient";
+  import { ApiClient } from "$lib/api/client/apiClient";
   import type { ID, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
   import { page } from "$app/state";
   import { cascadeDelete } from "$lib/api/client/cascadeDelete";

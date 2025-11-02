@@ -3,7 +3,7 @@
 import { log } from '$lib/utils/logger';
 import { error, type LoadEvent } from '@sveltejs/kit';
 import { getSupplierApi } from '$lib/api/client/supplier';
-import { ApiClient } from '$lib/api/client/ApiClient';
+import { ApiClient } from '$lib/api/client/apiClient';
 import type { SupplierCategoryDetailPage_LoadDataAsync } from './supplierCategoryDetailPage.types';
 import { getCategoryApi } from '$lib/api/client/category';
 

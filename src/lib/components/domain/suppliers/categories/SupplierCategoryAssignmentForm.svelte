@@ -10,7 +10,7 @@
   import { WholesalerCategorySchema, type WholesalerCategory } from "$lib/domain/domainTypes";
   import "$lib/components/styles/form.css";
   import "$lib/components/styles/grid.css";
-  import { ApiClient } from "$lib/api/client/ApiClient";
+  import { ApiClient } from "$lib/api/client/apiClient";
   import { getSupplierApi } from "$lib/api/client/supplier";
   import type {
     SubmittedCallback,

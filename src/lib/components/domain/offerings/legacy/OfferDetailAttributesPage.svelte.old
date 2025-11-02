@@ -12,7 +12,7 @@
   import "$lib/components/styles/form-elements.css";
   import OfferingDetailWrapper from "$lib/components/domain/offerings/legacy/OfferingDetailWrapper.svelte";
 
-  import { ApiClient } from "$lib/api/client/ApiClient";
+  import { ApiClient } from "$lib/api/client/apiClient";
   import type { ID, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
   import {
     OfferingDetailAttributes_LoadDataSchema,

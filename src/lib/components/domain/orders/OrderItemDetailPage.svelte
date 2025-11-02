@@ -6,7 +6,7 @@
   // Component Imports
   import "$lib/components/styles/detail-page-layout.css";
   // API & Type Imports
-  import { ApiClient } from "$lib/api/client/ApiClient";
+  import { ApiClient } from "$lib/api/client/apiClient";
   import {
     OrderItem_ProdDef_Category_Schema,
     OrderSchema,

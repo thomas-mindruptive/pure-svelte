@@ -2,7 +2,7 @@
 
 <script lang="ts">
   import { goto } from "$app/navigation";
-  import { ApiClient } from "$lib/api/client/ApiClient";
+  import { ApiClient } from "$lib/api/client/apiClient";
   import { getOfferingApi, offeringLoadingState } from "$lib/api/client/offering";
   import { getProductDefinitionImageApi, productDefinitionImageLoadingState } from "$lib/api/client/productDefinitionImage";
   import type { ColumnDef, DeleteStrategy, ID, RowActionStrategy } from "$lib/components/grids/Datagrid.types";

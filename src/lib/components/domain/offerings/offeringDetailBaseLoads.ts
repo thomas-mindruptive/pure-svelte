@@ -4,7 +4,7 @@
  * Load the base data for offering detail pages.
  */
 
-import { ApiClient } from "$lib/api/client/ApiClient";
+import { ApiClient } from "$lib/api/client/apiClient";
 import { getCategoryApi } from "$lib/api/client/category";
 import { getFormApi } from "$lib/api/client/form";
 import { getMaterialApi } from "$lib/api/client/material";

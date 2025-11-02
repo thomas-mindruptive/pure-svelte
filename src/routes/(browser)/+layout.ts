@@ -2,7 +2,7 @@
 
 import { log } from "$lib/utils/logger";
 import { error, type LoadEvent } from "@sveltejs/kit";
-import { ApiClient } from "$lib/api/client/ApiClient";
+import { ApiClient } from "$lib/api/client/apiClient";
 import { getSupplierApi } from "$lib/api/client/supplier";
 import { getOfferingApi } from "$lib/api/client/offering";
 import { buildBreadcrumb } from "$lib/components/sidebarAndNav/buildBreadcrumb";

@@ -1,7 +1,7 @@
 <!-- File: src/lib/components/domain/productDefinitions/ProductDefinitionForm.svelte -->
 
 <script lang="ts">
-  import { ApiClient } from "$lib/api/client/ApiClient";
+  import { ApiClient } from "$lib/api/client/apiClient";
   import { getProductDefinitionApi } from "$lib/api/client/productDefinition";
   import type {
     CancelledCallback,

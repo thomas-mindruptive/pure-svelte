@@ -1,7 +1,7 @@
 import { log } from '$lib/utils/logger';
 import { type LoadEvent } from '@sveltejs/kit';
 
-import { ApiClient } from '$lib/api/client/ApiClient';
+import { ApiClient } from '$lib/api/client/apiClient';
 import { getAttributeApi } from '$lib/api/client/attribute';
 
 /**

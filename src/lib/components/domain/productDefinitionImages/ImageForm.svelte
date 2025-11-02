@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ApiClient } from "$lib/api/client/ApiClient";
+  import { ApiClient } from "$lib/api/client/apiClient";
   import { getProductDefinitionImageApi } from "$lib/api/client/productDefinitionImage";
   import Field from "$lib/components/forms/Field.svelte";
   import StaticFieldValue from "$lib/components/forms/StaticFieldValue.svelte";

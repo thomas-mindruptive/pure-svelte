@@ -9,7 +9,7 @@
   import "$lib/components/styles/list-page-layout.css";
   // --- API & Strategy Imports ---
   // The ApiClient is the foundation for making SSR-safe fetch requests.
-  import { ApiClient } from "$lib/api/client/ApiClient";
+  import { ApiClient } from "$lib/api/client/apiClient";
   // Types for the strategy pattern used by the generic DataGrid component.
   import { page } from "$app/state";
   import type { SortDescriptor } from "$lib/backendQueries/queryGrammar";

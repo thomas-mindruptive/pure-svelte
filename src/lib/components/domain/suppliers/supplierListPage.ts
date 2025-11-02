@@ -4,7 +4,7 @@ import { log } from '$lib/utils/logger';
 import { type LoadEvent } from '@sveltejs/kit';
 
 // Import the new dependencies
-import { ApiClient } from '$lib/api/client/ApiClient';
+import { ApiClient } from '$lib/api/client/apiClient';
 import { getSupplierApi } from '$lib/api/client/supplier';
 import type { SupplierListPageProps } from './SupplierListPage.svelte';
 

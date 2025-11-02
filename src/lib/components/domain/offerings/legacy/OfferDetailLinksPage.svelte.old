@@ -4,7 +4,7 @@
   import LinkGrid from "$lib/components/links/LinkGrid.svelte";
   import { getOfferingApi, offeringLoadingState } from "$lib/api/client/offering";
   import { type WholesalerOfferingLink } from "$lib/domain/domainTypes";
-  import { ApiClient } from "$lib/api/client/ApiClient";
+  import { ApiClient } from "$lib/api/client/apiClient";
   import "$lib/components/styles/assignment-section.css";
   import "$lib/components/styles/grid-section.css";
   import "$lib/components/styles/detail-page-layout.css";

@@ -5,12 +5,12 @@
  * @description Defines the data structures based on the efficient, join-based loading strategy.
  */
 
-import { z } from 'zod';
 import {
 	WholesalerCategory_Category_Schema,
-	Wio_PDef_Cat_Supp_Nested_Schema
+	Wio_PDef_Cat_Supp_Nested_WithLinks_Schema
 } from '$lib/domain/domainTypes';
 import type { PromisifyComplex } from '$lib/utils/typeUtils';
+import { z } from 'zod';
 
 
 /**
@@ -29,7 +29,7 @@ export const SupplierCategoryDetailPage_LoadDataSchema = z.object({
 	/**
 	 * The list of offerings for this specific supplier and category.
 	 */
-	offerings: z.array(Wio_PDef_Cat_Supp_Nested_Schema)
+	offerings: z.array(Wio_PDef_Cat_Supp_Nested_WithLinks_Schema)
 });
 
 // --- TypeScript Type Exports ---

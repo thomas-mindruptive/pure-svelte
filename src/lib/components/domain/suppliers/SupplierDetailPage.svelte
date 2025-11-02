@@ -11,7 +11,7 @@
   import "$lib/components/styles/detail-page-layout.css";
   import "$lib/components/styles/grid-section.css";
   // API & Type Imports
-  import { ApiClient } from "$lib/api/client/ApiClient";
+  import { ApiClient } from "$lib/api/client/apiClient";
   import { categoryLoadingState } from "$lib/api/client/category";
   import { getSupplierApi, supplierLoadingState } from "$lib/api/client/supplier";
   import type { ColumnDef, DeleteStrategy, ID, RowActionStrategy } from "$lib/components/grids/Datagrid.types";

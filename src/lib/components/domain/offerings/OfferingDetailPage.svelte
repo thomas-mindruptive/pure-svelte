@@ -17,7 +17,7 @@
   import "$lib/components/styles/form-elements.css";
 
   // API & Type Imports
-  import { ApiClient } from "$lib/api/client/ApiClient";
+  import { ApiClient } from "$lib/api/client/apiClient";
   import { getOfferingApi, offeringLoadingState } from "$lib/api/client/offering";
   import { getCategoryApi } from "$lib/api/client/category";
   import { getMaterialApi } from "$lib/api/client/material";

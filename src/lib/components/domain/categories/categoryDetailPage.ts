@@ -1,6 +1,6 @@
 import { log } from "$lib/utils/logger";
 import { error, type LoadEvent } from "@sveltejs/kit";
-import { ApiClient } from "$lib/api/client/ApiClient";
+import { ApiClient } from "$lib/api/client/apiClient";
 import type { CategoryDetailPage_LoadDataAsync } from "./categoryDetailPage.types";
 import { getCategoryApi } from "$lib/api/client/category";
 import { getProductTypeApi } from "$lib/api/client/productType";

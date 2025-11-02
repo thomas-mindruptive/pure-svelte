@@ -2,7 +2,7 @@
 
 <script lang="ts">
   import { goto } from "$app/navigation";
-  import { ApiClient } from "$lib/api/client/ApiClient";
+  import { ApiClient } from "$lib/api/client/apiClient";
   import { getProductDefinitionImageApi, productDefinitionImageLoadingState } from "$lib/api/client/productDefinitionImage";
   import { getMaterialApi } from "$lib/api/client/material";
   import { getFormApi } from "$lib/api/client/form";

@@ -3,7 +3,7 @@
    * SupplierForm Component (Svelte 5 + Runes)
    */
 
-  import { ApiClient } from "$lib/api/client/ApiClient";
+  import { ApiClient } from "$lib/api/client/apiClient";
   import { getSupplierApi } from "$lib/api/client/supplier";
   import type {
     CancelledCallback,

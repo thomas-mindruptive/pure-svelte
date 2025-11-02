@@ -8,7 +8,7 @@
   import "$lib/components/styles/list-page-layout.css";
 
   // --- API & Strategy Imports ---
-  import { ApiClient } from "$lib/api/client/ApiClient";
+  import { ApiClient } from "$lib/api/client/apiClient";
   import type { ID, DeleteStrategy, RowActionStrategy, ColumnDef } from "$lib/components/grids/Datagrid.types";
   import type { SortDescriptor } from "$lib/backendQueries/queryGrammar";
 

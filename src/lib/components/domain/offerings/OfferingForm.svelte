@@ -5,7 +5,7 @@
    */
 
   // ===== IMPORTS =====
-  import { ApiClient } from "$lib/api/client/ApiClient";
+  import { ApiClient } from "$lib/api/client/apiClient";
   import { getOfferingApi } from "$lib/api/client/offering";
   import { type OfferingDetail_LoadData, OfferingDetail_LoadDataSchema } from "$lib/components/domain/offerings/offeringDetail.types";
   import Field from "$lib/components/forms/Field.svelte";

@@ -25,8 +25,6 @@ import { transformToNestedObjects } from "$lib/backendQueries/recordsetTransform
 const categoryLoadingManager = new LoadingState();
 export const categoryLoadingState = categoryLoadingManager.isLoadingStore;
 
-export type OfferingWithDetails = Wio_PDef_Cat_Supp_Nested;
-
 /**
  * Factory function to create a category-specific API client.
  * @param client An instance of ApiClient with the correct fetch context.
@@ -250,7 +248,7 @@ export function getCategoryApi(client: ApiClient) {
     /**
      * Loads all offerings for a specific supplier and category.
      */
-    async loadOfferingsForSupplierCategory(supplierId: number, categoryId: number): Promise<OfferingWithDetails[]> {
+    async loadOfferingsForSupplierCategory(supplierId: number, categoryId: number): Promise<Wio_PDef_Cat_Supp_Nested[]> {
       const operationId = `loadOfferingsForSupplierCategory-${supplierId}-${categoryId}`;
       categoryLoadingManager.start(operationId);
       try {

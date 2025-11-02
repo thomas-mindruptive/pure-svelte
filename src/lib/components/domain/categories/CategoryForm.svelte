@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ApiClient } from "$lib/api/client/ApiClient";
+  import { ApiClient } from "$lib/api/client/apiClient";
   import { getCategoryApi } from "$lib/api/client/category";
   import Field from "$lib/components/forms/Field.svelte";
   import FormComboBox2 from "$lib/components/forms/FormComboBox2.svelte";

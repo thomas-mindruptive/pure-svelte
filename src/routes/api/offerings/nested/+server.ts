@@ -8,7 +8,7 @@
 import type { ApiErrorResponse, ApiSuccessResponse, QueryResponseData } from "$lib/api/api.types";
 import { db } from "$lib/backendQueries/db";
 import { buildUnexpectedError } from "$lib/backendQueries/genericEntityOperations";
-import { loadNestedOfferingsWithJoinsAndLinks } from "$lib/backendQueries/entityOperations/offering";
+import { loadNestedOfferingsOptimized } from "$lib/backendQueries/entityOperations/offering";
 import { rollbackTransaction } from "$lib/backendQueries/transactionWrapper";
 import {
   Wio_PDef_Cat_Supp_Nested_WithLinks_Schema,
@@ -44,20 +44,26 @@ export const POST: RequestHandler = async ({ request }) => {
     });
 
     // Start transaction
+    const tBegin = Date.now();
     await transaction.begin();
+    console.log(`[PERF] [${operationId}] Transaction.begin() took: ${Date.now() - tBegin}ms`);
     log.info(`[${operationId}] Transaction started for nested offerings query.`);
 
     try {
-      const jsonString = await loadNestedOfferingsWithJoinsAndLinks(
+      const t0 = Date.now();
+      const jsonString = await loadNestedOfferingsOptimized(
         transaction,
         payload.where,
         payload.orderBy,
         payload.limit,
         payload.offset,
       );
+      console.log(`[PERF] [${operationId}] SQL query took: ${Date.now() - t0}ms`);
 
       // Parse JSON string to array (SQL Server returns null for empty results)
+      const t1 = Date.now();
       const offeringsArray = jsonString ? JSON.parse(jsonString) : [];
+      console.log(`[PERF] [${operationId}] JSON.parse took: ${Date.now() - t1}ms`);
       log.debug(`[${operationId}] Parsed ${offeringsArray.length} offerings from JSON.`);
 
       // Log first offering for debugging
@@ -72,6 +78,7 @@ export const POST: RequestHandler = async ({ request }) => {
       }
 
       // Validate each offering
+      const t2 = Date.now();
       const validatedOfferings: Wio_PDef_Cat_Supp_Nested_WithLinks[] = [];
       const validationErrors: Array<{ index: number; errors: any }> = [];
 
@@ -85,6 +92,7 @@ export const POST: RequestHandler = async ({ request }) => {
           validatedOfferings.push(validation.sanitized as Wio_PDef_Cat_Supp_Nested_WithLinks);
         }
       }
+      console.log(`[PERF] [${operationId}] Validation took: ${Date.now() - t2}ms`);
 
       if (validationErrors.length > 0) {
         await rollbackTransaction(transaction);
@@ -101,7 +109,9 @@ export const POST: RequestHandler = async ({ request }) => {
       }
 
       // Commit transaction
+      const tCommit = Date.now();
       await transaction.commit();
+      console.log(`[PERF] [${operationId}] Transaction.commit() took: ${Date.now() - tCommit}ms`);
       log.info(`[${operationId}] Transaction committed successfully.`);
 
       const responseData: QueryResponseData<Wio_PDef_Cat_Supp_Nested_WithLinks> = {

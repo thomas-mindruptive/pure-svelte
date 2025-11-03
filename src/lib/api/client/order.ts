@@ -108,7 +108,7 @@ export function getOrderApi(client: ApiClient) {
       if (orderBy) {
         queryPartial.orderBy = orderBy;
       }
-      const res = api.loadOrderWholesalers(queryPartial);
+      const res = await api.loadOrderWholesalers(queryPartial);
       // NOTE: loadOrders validates to schema.
       return res;
     },

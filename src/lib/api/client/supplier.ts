@@ -121,7 +121,7 @@ export function getSupplierApi(client: ApiClient) {
       if (orderBy) {
         queryPartial.orderBy = orderBy;
       }
-      const res = api.loadSuppliers(queryPartial);
+      const res = await api.loadSuppliers(queryPartial);
       return res;
     },
 

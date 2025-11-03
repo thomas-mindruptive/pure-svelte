@@ -20,6 +20,7 @@ import { log } from "$lib/utils/logger";
 import type { ApiClient } from "./apiClient";
 import { createJsonBody, getErrorMessage } from "./common";
 import { LoadingState } from "./loadingState";
+import { getOfferingApi } from "./offering";
 
 // Create a dedicated loading state manager for this entity.
 const productDefinitionLoadingManager = new LoadingState();
@@ -230,6 +231,8 @@ export function getProductDefinitionApi(client: ApiClient) {
       const operationId = `loadNestedOfferingsWithLinksForProductDefinition-${productDefId}`;
       productDefinitionLoadingManager.start(operationId);
       try {
+        const offeringApi = getOfferingApi(client);
+
         let finalWhere: WhereConditionGroup<WholesalerItemOffering> | WhereCondition<WholesalerItemOffering> = {
           whereCondOp: "AND",
           conditions: [{ key: "wio.product_def_id", whereCondOp: "=", val: productDefId }], // Qualified for JOIN query
@@ -238,21 +241,24 @@ export function getProductDefinitionApi(client: ApiClient) {
           finalWhere = { whereCondOp: "AND", conditions: [aWhere, finalWhere] };
         }
 
-        const payload: QueryPayload<WholesalerItemOffering> = {
-          // ⚠️ "select" not used by nested endpoint - uses wio.* in SQL
-          select: [], 
-          where: finalWhere,
-          ...(aOrderBy && { orderBy: aOrderBy }),
-          ...(aLimit && { limit: aLimit }),
-          ...(aOffset && { offset: aOffset }),
-        };
+        const offerings = await offeringApi.loadNestedOfferingsWithLinks(finalWhere, aOrderBy, aLimit, aOffset);
+        return offerings;
 
-        const responseData = await client.apiFetch<QueryResponseData<Wio_PDef_Cat_Supp_Nested_WithLinks>>(
-          "/api/offerings/nested",
-          { method: "POST", body: createJsonBody(payload) },
-          { context: operationId },
-        );
-        return responseData.results as Wio_PDef_Cat_Supp_Nested_WithLinks[];
+        // const payload: QueryPayload<WholesalerItemOffering> = {
+        //   // ⚠️ "select" not used by nested endpoint - uses wio.* in SQL
+        //   select: [], 
+        //   where: finalWhere,
+        //   ...(aOrderBy && { orderBy: aOrderBy }),
+        //   ...(aLimit && { limit: aLimit }),
+        //   ...(aOffset && { offset: aOffset }),
+        // };
+
+        // const responseData = await client.apiFetch<QueryResponseData<Wio_PDef_Cat_Supp_Nested_WithLinks>>(
+        //   "/api/offerings/nested",
+        //   { method: "POST", body: createJsonBody(payload) },
+        //   { context: operationId },
+        // );
+        // return responseData.results as Wio_PDef_Cat_Supp_Nested_WithLinks[];
       } catch (err) {
         log.error(`[${operationId}] Failed.`, { productDefId, error: getErrorMessage(err) });
         throw err;

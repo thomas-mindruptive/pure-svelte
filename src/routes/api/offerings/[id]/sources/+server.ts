@@ -1,5 +1,5 @@
 import { db } from "$lib/backendQueries/db";
-import { loadNestedOfferingsWithJoinsAndLinks } from "$lib/backendQueries/entityOperations/offering";
+import { loadNestedOfferingsOptimized } from "$lib/backendQueries/entityOperations/offering";
 import { json, error } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
 import { log } from "$lib/utils/logger";
@@ -33,26 +33,27 @@ export const GET: RequestHandler = async ({ params }) => {
     await transaction.begin();
     transactionStarted = true;
 
-    log.debug(`[${operationId}] Loading source offerings with nested joins`);
-    // Use loadNestedOfferingsWithJoinsAndLinks with custom JOIN
+    log.debug(`[${operationId}] Loading source offerings with optimized query`);
+    // Use loadNestedOfferingsOptimized with custom JOIN
     // to get source offerings ordered by priority
-    const jsonString = await loadNestedOfferingsWithJoinsAndLinks(
+    // Note: Using sos_filter alias to avoid conflict with standard sos JOIN
+    const jsonString = await loadNestedOfferingsOptimized(
       transaction,
       {
-        key: "sos.shop_offering_id" as any, // Custom field from additional JOIN
+        key: "sos_filter.shop_offering_id" as any, // Custom field from additional JOIN
         whereCondOp: "=",
         val: shopOfferingId,
       },
       [
-        { key: "sos.priority" as any, direction: "asc" }, // Custom field from additional JOIN
+        { key: "sos_filter.priority" as any, direction: "asc" }, // Custom field from additional JOIN
         { key: "wio.offering_id" as any, direction: "asc" },
       ],
-      undefined,
-      undefined,
-      // Custom JOIN to link via shop_offering_sources
+      undefined, // limit
+      undefined, // offset
+      // Custom JOIN to link via shop_offering_sources with unique alias
       `
-      INNER JOIN dbo.shop_offering_sources sos
-        ON wio.offering_id = sos.source_offering_id
+      INNER JOIN dbo.shop_offering_sources sos_filter
+        ON wio.offering_id = sos_filter.source_offering_id
       `
     );
 

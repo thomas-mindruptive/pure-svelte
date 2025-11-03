@@ -2,16 +2,42 @@ import type { WholesalerItemOffering } from "$lib/domain/domainTypes";
 import type { Transaction } from "mssql";
 import { buildWhereClause, type BuildContext } from "../queryBuilder";
 import type { WhereCondition, WhereConditionGroup, SortDescriptor } from "../queryGrammar";
-import { error } from "@sveltejs/kit";
 import { assertDefined } from "$lib/utils/assertions";
+import { error } from "@sveltejs/kit";
 
-export async function loadNestedOfferingsWithJoinsAndLinks(
+/**
+ * Loads a single nested offering by ID using the optimized approach.
+ * Returns JSON string with the offering (as an array with 1 element).
+ */
+export async function loadNestedOfferingWithJoinsAndLinksForId(transaction: Transaction, id: number): Promise<string> {
+  assertDefined(transaction, "transaction");
+  assertDefined(id, "id");
+  const whereCondition: WhereCondition<WholesalerItemOffering> = {
+    key: "wio.offering_id",
+    whereCondOp: "=",
+    val: id
+  };
+  return await loadNestedOfferingsOptimized(transaction, whereCondition);
+}
+
+/**
+ * OPTIMIZED VERSION: Loads nested offerings using Table Variable approach
+ *
+ * Performance improvements:
+ * - No correlated subqueries (Links and Shop Offerings loaded separately)
+ * - Single batch with 3 statements (1 roundtrip to DB)
+ * - Scalable for large result sets (100s or 1000s of offerings)
+ * - Table Variable ensures ORDER BY and LIMIT work correctly
+ *
+ * Returns: JSON string with merged data (offerings with nested links)
+ */
+export async function loadNestedOfferingsOptimized(
   transaction: Transaction,
   aWhere?: WhereConditionGroup<WholesalerItemOffering> | WhereCondition<WholesalerItemOffering>,
   aOrderBy?: SortDescriptor<WholesalerItemOffering>[],
   aLimit?: number,
   aOffset?: number,
-  aAdditionalJoins?: string,
+  customJoinClause?: string,
 ): Promise<string> {
   assertDefined(transaction, "transaction");
 
@@ -22,7 +48,9 @@ export async function loadNestedOfferingsWithJoinsAndLinks(
 
   let whereClause = "";
   if (aWhere) {
-    whereClause = `WHERE ${buildWhereClause(aWhere, ctx, true)}`; // hasJoins = true (we use JOINs)
+    whereClause = buildWhereClause(aWhere, ctx, true);
+  } else {
+    whereClause = "1=1"; // Fallback for no WHERE clause
   }
 
   // Build ORDER BY clause
@@ -30,143 +58,174 @@ export async function loadNestedOfferingsWithJoinsAndLinks(
   if (aOrderBy && aOrderBy.length > 0) {
     orderByClause = `ORDER BY ${aOrderBy.map((s) => `${String(s.key)} ${s.direction}`).join(", ")}`;
   } else if (aLimit || aOffset) {
-    // SQL Server requires ORDER BY for OFFSET/FETCH
     orderByClause = "ORDER BY wio.offering_id ASC";
   }
 
-  // Build LIMIT/OFFSET clause (SQL Server syntax)
+  // Build LIMIT/OFFSET clause
   let limitClause = "";
   if (aLimit && aLimit > 0) {
     limitClause = `OFFSET ${aOffset || 0} ROWS FETCH NEXT ${aLimit} ROWS ONLY`;
   } else if (aOffset && aOffset > 0) {
-    // Only OFFSET without LIMIT - fetch all remaining rows
     limitClause = `OFFSET ${aOffset} ROWS`;
   }
 
   const request = transaction.request();
 
-  // Dynamische Parameter binden
+  // Bind parameters
   for (const [key, value] of Object.entries(ctx.parameters)) {
     request.input(key, value);
   }
 
-  // Using JOINs instead of subqueries for better performance.
-  // JSON PATH automatically nests based on dotted aliases (e.g. 'product_def.title').
-  const sqlQuery = `
-    SELECT
-        -- Main offering columns
-        wio.offering_id,
-        wio.wholesaler_id,
-        wio.category_id,
-        wio.product_def_id,
-        wio.sub_seller,
-        wio.material_id,
-        wio.form_id,
-        wio.title,
-        wio.size,
-        wio.dimensions,
-        wio.price,
-        wio.weight_grams,
-        wio.currency,
-        wio.comment,
-        wio.created_at,
-        wio.is_assortment,
-        -- Product definition (nested via dotted alias)
-        pd.product_def_id AS 'product_def.product_def_id',
-        pd.category_id AS 'product_def.category_id',
-        pd.title AS 'product_def.title',
-        pd.description AS 'product_def.description',
-        pd.material_id AS 'product_def.material_id',
-        pd.form_id AS 'product_def.form_id',
-        pd.construction_type_id AS 'product_def.construction_type_id',
-        pd.surface_finish_id AS 'product_def.surface_finish_id',
-        pd.for_liquids AS 'product_def.for_liquids',
-        pd.created_at AS 'product_def.created_at',
-        -- Category (nested via dotted alias)
-        pc.category_id AS 'category.category_id',
-        pc.product_type_id AS 'category.product_type_id',
-        pc.name AS 'category.name',
-        pc.description AS 'category.description',
-        -- Wholesaler (nested via dotted alias)
-        w.wholesaler_id AS 'wholesaler.wholesaler_id',
-        w.name AS 'wholesaler.name',
-        w.country AS 'wholesaler.country',
-        w.region AS 'wholesaler.region',
-        w.b2b_notes AS 'wholesaler.b2b_notes',
-        w.status AS 'wholesaler.status',
-        w.dropship AS 'wholesaler.dropship',
-        w.website AS 'wholesaler.website',
-        w.email AS 'wholesaler.email',
-        w.price_range AS 'wholesaler.price_range',
-        w.relevance AS 'wholesaler.relevance',
-        w.created_at AS 'wholesaler.created_at',
-        -- Links (still subquery due to 1:N relationship)
-        (
-            SELECT l.link_id, l.offering_id, l.url, l.notes, l.created_at
-            FROM dbo.wholesaler_offering_links AS l
-            WHERE l.offering_id = wio.offering_id
-            FOR JSON PATH
-        ) AS links,
-        -- Shop offering (subquery to avoid duplicates and JOIN conflicts)
-        -- JSON_QUERY prevents outer FOR JSON PATH from escaping the inner JSON as a string
-        JSON_QUERY((
-            SELECT TOP 1
-                shop.offering_id,
-                shop.wholesaler_id,
-                shop.category_id,
-                shop.product_def_id,
-                shop.sub_seller,
-                shop.material_id,
-                shop.form_id,
-                shop.title,
-                shop.size,
-                shop.dimensions,
-                shop.price,
-                shop.weight_grams,
-                shop.currency,
-                shop.comment,
-                shop.created_at,
-                shop.is_assortment
-            FROM dbo.shop_offering_sources sos_sub
-            INNER JOIN dbo.wholesaler_item_offerings shop ON sos_sub.shop_offering_id = shop.offering_id
-            WHERE sos_sub.source_offering_id = wio.offering_id
-            FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
-        )) AS shop_offering
+  const sqlBatch = `
+    -- Table Variable for filtered Offering IDs
+    DECLARE @offering_ids TABLE (offering_id INT PRIMARY KEY);
+
+    -- STEP 1: Collect IDs (with WHERE, ORDER BY, LIMIT applied)
+    INSERT INTO @offering_ids (offering_id)
+    SELECT wio.offering_id
     FROM dbo.wholesaler_item_offerings AS wio
-    LEFT JOIN dbo.product_definitions pd ON wio.product_def_id = pd.product_def_id
-    LEFT JOIN dbo.product_categories pc ON wio.category_id = pc.category_id
-    LEFT JOIN dbo.wholesalers w ON wio.wholesaler_id = w.wholesaler_id
-    ${aAdditionalJoins || ''}
-    ${whereClause}
+    ${customJoinClause || ""}
+    WHERE ${whereClause}
     ${orderByClause}
-    ${limitClause}
-    FOR JSON PATH
+    ${limitClause};
+
+    -- STEP 2: Query for offerings and nested data (returns single JSON string)
+    SELECT (
+        SELECT
+            wio.offering_id,
+            wio.wholesaler_id,
+            wio.category_id,
+            wio.product_def_id,
+            wio.sub_seller,
+            wio.material_id,
+            wio.form_id,
+            wio.title,
+            wio.size,
+            wio.dimensions,
+            wio.price,
+            wio.weight_grams,
+            wio.currency,
+            wio.comment,
+            wio.created_at,
+            wio.is_assortment,
+            -- Product definition (nested via dotted alias)
+            pd.product_def_id AS 'product_def.product_def_id',
+            pd.category_id AS 'product_def.category_id',
+            pd.title AS 'product_def.title',
+            pd.description AS 'product_def.description',
+            pd.material_id AS 'product_def.material_id',
+            pd.form_id AS 'product_def.form_id',
+            pd.construction_type_id AS 'product_def.construction_type_id',
+            pd.surface_finish_id AS 'product_def.surface_finish_id',
+            pd.for_liquids AS 'product_def.for_liquids',
+            pd.created_at AS 'product_def.created_at',
+            -- Category (nested via dotted alias)
+            pc.category_id AS 'category.category_id',
+            pc.product_type_id AS 'category.product_type_id',
+            pc.name AS 'category.name',
+            pc.description AS 'category.description',
+            -- Wholesaler (nested via dotted alias)
+            w.wholesaler_id AS 'wholesaler.wholesaler_id',
+            w.name AS 'wholesaler.name',
+            w.country AS 'wholesaler.country',
+            w.region AS 'wholesaler.region',
+            w.b2b_notes AS 'wholesaler.b2b_notes',
+            w.status AS 'wholesaler.status',
+            w.dropship AS 'wholesaler.dropship',
+            w.website AS 'wholesaler.website',
+            w.email AS 'wholesaler.email',
+            w.price_range AS 'wholesaler.price_range',
+            w.relevance AS 'wholesaler.relevance',
+            w.created_at AS 'wholesaler.created_at',
+            -- Shop offering (nested via dotted alias) - 1:1 via shop_offering_sources
+            shop.offering_id AS 'shop_offering.offering_id',
+            shop.wholesaler_id AS 'shop_offering.wholesaler_id',
+            shop.category_id AS 'shop_offering.category_id',
+            shop.product_def_id AS 'shop_offering.product_def_id',
+            shop.sub_seller AS 'shop_offering.sub_seller',
+            shop.material_id AS 'shop_offering.material_id',
+            shop.form_id AS 'shop_offering.form_id',
+            shop.title AS 'shop_offering.title',
+            shop.size AS 'shop_offering.size',
+            shop.dimensions AS 'shop_offering.dimensions',
+            shop.price AS 'shop_offering.price',
+            shop.weight_grams AS 'shop_offering.weight_grams',
+            shop.currency AS 'shop_offering.currency',
+            shop.comment AS 'shop_offering.comment',
+            shop.created_at AS 'shop_offering.created_at',
+            shop.is_assortment AS 'shop_offering.is_assortment'
+        FROM @offering_ids ids
+        INNER JOIN dbo.wholesaler_item_offerings wio ON ids.offering_id = wio.offering_id
+        ${customJoinClause || ""}
+        LEFT JOIN dbo.product_definitions pd ON wio.product_def_id = pd.product_def_id
+        LEFT JOIN dbo.product_categories pc ON wio.category_id = pc.category_id
+        LEFT JOIN dbo.wholesalers w ON wio.wholesaler_id = w.wholesaler_id
+        LEFT JOIN dbo.shop_offering_sources sos ON wio.offering_id = sos.source_offering_id
+        LEFT JOIN dbo.wholesaler_item_offerings shop ON sos.shop_offering_id = shop.offering_id
+        ${orderByClause}
+        FOR JSON PATH
+    ) AS offerings_json;
+
+    -- STEP 3: Query for links (returns single JSON string)
+    SELECT (
+        SELECT
+            l.offering_id,
+            l.link_id,
+            l.url,
+            l.notes,
+            l.created_at
+        FROM dbo.wholesaler_offering_links l
+        INNER JOIN @offering_ids ids ON l.offering_id = ids.offering_id
+        FOR JSON PATH
+    ) AS links_json;
   `;
 
   console.log('========================================');
-  console.log('COMPLETE SQL QUERY:');
-  console.log(sqlQuery);
+  console.log('OPTIMIZED SQL BATCH (Table Variable):');
+  console.log(sqlBatch);
   console.log('PARAMETERS:', ctx.parameters);
   console.log('========================================');
 
-  const result = await request.query(sqlQuery);
+  const t0 = Date.now();
+  const result = await request.query(sqlBatch);
+  console.log(`[OPTIMIZED] Batch query took: ${Date.now() - t0}ms`);
 
-  if (!result.recordset?.length) {
-    throw error(404, "No offerings found for the given criteria.");
+  // Cast recordsets to array for type safety
+  const recordsets = Array.isArray(result.recordsets) ? result.recordsets : [];
+
+  // Check if first result set is empty
+  if (recordsets.length === 0 || !recordsets[0] || recordsets[0].length === 0) {
+    return "[]";
   }
 
-  // FOR JSON PATH returns JSON in the first column of the first row
-  const firstRow = result.recordset[0];
-  const jsonString = firstRow[Object.keys(firstRow)[0]];
-  return jsonString;
-}
+  // FOR JSON PATH returns a single row with a JSON string column
+  const offeringsJson = recordsets[0][0]?.offerings_json;
+  const linksJson = recordsets[1]?.[0]?.links_json;
 
-export async function loadNestedOfferingWithJoinsAndLinksForId(transaction: Transaction, id: number) {
-  assertDefined(transaction, "transaction");
-  assertDefined(id, "id");
-  const whereCondition: WhereCondition<WholesalerItemOffering> = { key: "wio.offering_id" as any, whereCondOp: "=", val: id };
-  const jsonString = await loadNestedOfferingsWithJoinsAndLinks(transaction, whereCondition);
-  return jsonString;
+  // Parse the JSON strings
+  const offerings = offeringsJson ? JSON.parse(offeringsJson) : [];
+  const links = linksJson ? JSON.parse(linksJson) : [];
+
+  // --- Merge Process ---
+
+  // 1. Create a map for fast access to links
+  const linksByOfferingId = new Map<number, any[]>();
+  links.forEach((link: any) => {
+    if (!linksByOfferingId.has(link.offering_id)) {
+      linksByOfferingId.set(link.offering_id, []);
+    }
+    linksByOfferingId.get(link.offering_id)!.push(link);
+  });
+
+  // 2. Add links to offerings
+  offerings.forEach((offering: any) => {
+    // shop_offering is already correctly nested (or null)
+    // Add links from the map
+    offering.links = linksByOfferingId.get(offering.offering_id) || [];
+  });
+
+  // Convert back to JSON string (to match existing API contract)
+  return JSON.stringify(offerings);
 }
 
 export async function loadFlatOfferingsWithJoinsAndLinks(

@@ -6,7 +6,7 @@
  * This module follows the Factory Pattern to ensure SSR safety.
  */
 
-import { ComparisonOperator, JoinType, LogicalOperator, type QueryPayload } from "$lib/backendQueries/queryGrammar";
+import { ComparisonOperator, JoinType, LogicalOperator, type QueryPayload, type SortDescriptor, type WhereCondition, type WhereConditionGroup } from "$lib/backendQueries/queryGrammar";
 import type {
   Attribute,
   ProductDefinition,
@@ -14,7 +14,7 @@ import type {
   WholesalerOfferingAttribute,
   WholesalerOfferingAttribute_Attribute,
   WholesalerOfferingLink,
-  Wio_PDef_Cat_Supp_Nested_WithLinks
+  Wio_PDef_Cat_Supp_Nested_WithLinks,
 } from "$lib/domain/domainTypes";
 import { log } from "$lib/utils/logger";
 
@@ -60,6 +60,47 @@ export function getOfferingApi(client: ApiClient) {
           offering: Wio_PDef_Cat_Supp_Nested_WithLinks;
         }>(`/api/offerings/${offeringId}`, { method: "GET" }, { context: operationId });
         return responseData.offering;
+      } catch (err) {
+        log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
+        throw err;
+      } finally {
+        offeringLoadingManager.finish(operationId);
+      }
+    },
+
+    /**
+     * Loads all offerings with links.
+     * Uses the nested offerings endpoint with full JSON structure including links.
+     * @param aWhere Optional additional WHERE conditions.
+     * @param aOrderBy Optional sort descriptors.
+     * @param aLimit Optional limit for pagination.
+     * @param aOffset Optional offset for pagination.
+     * @returns A promise that resolves to an array of nested offerings with links.
+     */
+    async loadNestedOfferingsWithLinks(
+      aWhere?: WhereConditionGroup<WholesalerItemOffering> | WhereCondition<WholesalerItemOffering> | null,
+      aOrderBy?: SortDescriptor<WholesalerItemOffering>[] | null,
+      aLimit?: number | null,
+      aOffset?: number | null,
+    ): Promise<Wio_PDef_Cat_Supp_Nested_WithLinks[]> {
+      const operationId = `loadNestedOfferingsWithLinks`;
+      offeringLoadingManager.start(operationId);
+      try {
+          const payload: QueryPayload<WholesalerItemOffering> = {
+          // ⚠️ "select" not used by nested endpoint - uses wio.* in SQL
+          select: [],
+          ...(aWhere && {where: aWhere}),
+          ...(aOrderBy && { orderBy: aOrderBy }),
+          ...(aLimit && { limit: aLimit }),
+          ...(aOffset && { offset: aOffset }),
+        };
+
+        const responseData = await client.apiFetch<QueryResponseData<Wio_PDef_Cat_Supp_Nested_WithLinks>>(
+          "/api/offerings/nested",
+          { method: "POST", body: createJsonBody(payload) },
+          { context: operationId },
+        );
+        return responseData.results as Wio_PDef_Cat_Supp_Nested_WithLinks[];
       } catch (err) {
         log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
         throw err;
@@ -546,7 +587,7 @@ export function getOfferingApi(client: ApiClient) {
      * Loads product definitions for a specific category that a given supplier has NOT yet created an offering for.
      * This is achieved via a client-constructed anti-join (antijoin) query sent to the generic /api/query endpoint.
      * NOT USEd currently, because offerings can flexibly design their own "material" etc. fields.
-     * 
+     *
      * @param categoryId The ID of the category to check within.
      * @param supplierId The ID of the supplier for whom to check for existing offerings.
      * @returns A promise that resolves to an array of available ProductDefinition objects.
@@ -622,7 +663,7 @@ export function getOfferingApi(client: ApiClient) {
         const responseData = await client.apiFetch<QueryResponseData<Wio_PDef_Cat_Supp_Nested_WithLinks>>(
           `/api/offerings/${shopOfferingId}/sources`,
           { method: "GET" },
-          { context: operationId }
+          { context: operationId },
         );
 
         log.info(`[${operationId}] Successfully loaded source offerings`, {
@@ -656,7 +697,7 @@ export function getOfferingApi(client: ApiClient) {
         const data = await client.apiFetch<{ shop_offering_id: number }>(
           `/api/offerings/${sourceOfferingId}/copy-for-shop`,
           { method: "POST" },
-          { context: operationId }
+          { context: operationId },
         );
 
         log.info(`[${operationId}] Created shop offering ${data.shop_offering_id} from source ${sourceOfferingId}.`);
@@ -682,16 +723,18 @@ export function getOfferingApi(client: ApiClient) {
      */
     async addSourceOfferingLink(
       shopOfferingId: number,
-      sourceOfferingId: number
-    ): Promise<ApiResponse<{
-      link: {
-        shop_offering_id: number;
-        source_offering_id: number;
-        priority: number;
-        created_at: string;
-        updated_at: string;
-      }
-    }>> {
+      sourceOfferingId: number,
+    ): Promise<
+      ApiResponse<{
+        link: {
+          shop_offering_id: number;
+          source_offering_id: number;
+          priority: number;
+          created_at: string;
+          updated_at: string;
+        };
+      }>
+    > {
       const operationId = `addSourceOfferingLink-${shopOfferingId}-${sourceOfferingId}`;
       offeringLoadingManager.start(operationId);
 
@@ -702,19 +745,17 @@ export function getOfferingApi(client: ApiClient) {
       });
 
       try {
-        return await client.apiFetchUnion<ApiResponse<{
-          link: {
-            shop_offering_id: number;
-            source_offering_id: number;
-            priority: number;
-            created_at: string;
-            updated_at: string;
-          }
-        }>>(
-          `/api/offerings/${shopOfferingId}/sources/${sourceOfferingId}`,
-          { method: "POST" },
-          { context: operationId }
-        );
+        return await client.apiFetchUnion<
+          ApiResponse<{
+            link: {
+              shop_offering_id: number;
+              source_offering_id: number;
+              priority: number;
+              created_at: string;
+              updated_at: string;
+            };
+          }>
+        >(`/api/offerings/${shopOfferingId}/sources/${sourceOfferingId}`, { method: "POST" }, { context: operationId });
       } catch (err) {
         log.error(`[${operationId}] Failed to link source offering`, {
           shopOfferingId,
@@ -737,10 +778,7 @@ export function getOfferingApi(client: ApiClient) {
      * @param sourceOfferingId The source offering ID to unlink
      * @returns DeleteApiResponse with success status
      */
-    async removeSourceOfferingLink(
-      shopOfferingId: number,
-      sourceOfferingId: number
-    ): Promise<DeleteApiResponse<any, any>> {
+    async removeSourceOfferingLink(shopOfferingId: number, sourceOfferingId: number): Promise<DeleteApiResponse<any, any>> {
       const operationId = `removeSourceOfferingLink-${shopOfferingId}-${sourceOfferingId}`;
       offeringLoadingManager.start(operationId);
 
@@ -754,7 +792,7 @@ export function getOfferingApi(client: ApiClient) {
         return await client.apiFetchUnion<DeleteApiResponse<any, any>>(
           `/api/offerings/${shopOfferingId}/sources/${sourceOfferingId}`,
           { method: "DELETE" },
-          { context: operationId }
+          { context: operationId },
         );
       } catch (err) {
         log.error(`[${operationId}] Failed to remove source offering link`, {

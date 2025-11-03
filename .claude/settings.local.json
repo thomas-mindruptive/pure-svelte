@@ -24,7 +24,10 @@
       "WebFetch(domain:stackoverflow.com)",
       "Bash(for file in \"src/lib/components/domain/attributes/WholesalerOfferingAttributeGrid.svelte\" \"src/lib/components/domain/suppliers/SupplierGrid.svelte\" \"src/lib/components/domain/attributes/AttributesGrid.svelte\" \"src/lib/components/domain/categories/CategoryGrid.svelte\" \"src/lib/components/domain/categories/CategoryProductDefsGrid.svelte\" \"src/lib/components/domain/suppliers/SupplierCategoriesGrid.svelte\")",
       "Bash(do echo \"=== $file ===\")",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(cat:*)",
+      "Bash(mv:*)",
+      "Bash(node test-db-check.cjs:*)"
     ],
     "deny": [],
     "ask": []

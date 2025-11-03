@@ -185,7 +185,7 @@ function determineActiveNode(url: URL, activeTree: RuntimeHierarchyTree): Runtim
  * @returns A data object containing the hierarchies, breadcrumb items, active node, and URL params for the layout.
  */
 export async function load({ url, params: urlParamsFromLoadEvent, depends, fetch: loadEventFetch }: LoadEvent) {
-  log.info(`Load function triggered for URL: ${url.pathname}`);
+  log.infoHeader(`Load function triggered for URL: ${url.pathname}`);
   depends(`url:${url.href}`);
 
   // ⚠️ Due to SSR, state leak between requests and/or multiple user is a problem => Reset.

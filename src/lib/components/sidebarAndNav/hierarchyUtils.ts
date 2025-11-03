@@ -13,6 +13,7 @@ import {
 } from "./HierarchySidebar.types";
 import { NavigationError } from "./navigationError";
 import type { ValidationErrorTree } from "../validation/validation.types";
+import { parseUrlPathSegments } from "$lib/utils/url";
 
 // === TYPE ALIASES FOR STRICT TYPING ============================================================
 
@@ -366,7 +367,7 @@ export function reconcilePaths(
  * @throws {Error} If the path is empty, does not match the tree's root, or is structurally invalid.
  */
 export function findNodesAndParamValuesForPath(tree: RuntimeHierarchyTree, primitivePath: (string | number)[]): RuntimeHierarchyTreeNode[] {
-  log.debug(`Finding nodes for primitive path:`, {
+  log.debug(`Finding nodes for primitive path: ${primitivePath.toString()}`, {
     treeName: tree.name,
     path: primitivePath,
   });
@@ -385,12 +386,15 @@ export function findNodesAndParamValuesForPath(tree: RuntimeHierarchyTree, primi
     throw new NavigationError(message, "ERR_ROOT_MISMATCH");
   }
 
-  // --- Step 2: Traverse the Path ---
+  // --- Step 2: Traverse the url path segments.
+  //     For each segment find the node (= nextNode) that matches the current segement.  ---
   const nodesOnPath: RuntimeHierarchyTreeNode[] = [rootNode];
   let currentNode = rootNode;
 
+  log.detdebug(`<pathTrav> Traversing path ${primitivePath.toString()}`);
   for (let i = 1; i < primitivePath.length; i++) {
     const segment = primitivePath[i];
+    log.detdebug(`<pathTrav> segment = ${segment}`);
     let nextNode: RuntimeHierarchyTreeNode | undefined = undefined;
     const children = currentNode.children ?? [];
 
@@ -398,14 +402,31 @@ export function findNodesAndParamValuesForPath(tree: RuntimeHierarchyTree, primi
       // Special case "new": The next child must be an object just like segment were a number.
       if (segment.toLowerCase() === "new") {
         nextNode = children.find((child) => child.item.type === "object");
+        log.detdebug(`<pathTrav> segement is "new", nextnode = ${nextNode?.item.key}`);
         if (nextNode) {
           nextNode.item.urlParamValue = "new";
         }
       } else {
-        nextNode = children.find((child) => child.item.key === segment);
+        nextNode = children.find((child) => {
+          if (!child.item.href) {
+            const message = `Validation failed: Child '${child.item.key}' must have a href.`;
+            log.error(message);
+            throw new NavigationError(message, "ERR_CHILD_NEEDS_HREF");
+          }
+          // The last segment of the item's href must match the segment.
+          const nodeHrefSegments = parseUrlPathSegments(child.item.href);
+          if (nodeHrefSegments.length === 0) {
+            log.warn(`href for child '${child.item.key}' has no segments: ${child.item.href}`);
+            return false;
+          }
+          return nodeHrefSegments[nodeHrefSegments.length - 1] === segment;
+          // OLD: return child.item.key === segment; This is wrong because the key can be "micky mouse".
+        });
+        log.detdebug(`<pathTrav> segement is string, nextnode = ${nextNode?.item.key}`);
       }
     } else if (typeof segment === "number") {
       nextNode = children.find((child) => child.item.type === "object");
+      log.detdebug(`<pathTrav> segement is number, nextnode = ${nextNode?.item.key}`);
       if (nextNode) {
         nextNode.item.urlParamValue = Number(segment);
         if (isNaN(nextNode.item.urlParamValue)) {

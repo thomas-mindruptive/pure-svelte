@@ -112,23 +112,11 @@ export const POST: RequestHandler = async ({ params, request }) => {
 
     // 4. Create shop offering data (copy from source, set wholesaler_id = 99)
     const shopOfferingData: z.infer<typeof WholesalerItemOfferingForCreateSchema> = {
-      wholesaler_id: 99, // Shop user
-      category_id: sourceOffering.category_id,
-      product_def_id: sourceOffering.product_def_id,
-      sub_seller: sourceOffering.sub_seller,
-      material_id: sourceOffering.material_id,
-      form_id: sourceOffering.form_id,
-      surface_finish_id: sourceOffering.surface_finish_id,
-      construction_type_id: sourceOffering.construction_type_id,
-      color_variant: sourceOffering.color_variant,
-      title: sourceOffering.title,
-      size: sourceOffering.size,
-      dimensions: sourceOffering.dimensions,
-      weight_grams: sourceOffering.weight_grams,
-      price: sourceOffering.price,
-      currency: sourceOffering.currency,
-      comment: sourceOffering.comment ? `Copied from offering ${sourceOfferingId}: ${sourceOffering.comment}` : `Copied from offering ${sourceOfferingId}`,
-      is_assortment: sourceOffering.is_assortment,
+      ...sourceOffering,
+      wholesaler_id: 99, // Shop user - Override
+      comment: sourceOffering.comment
+        ? `Copied from offering ${sourceOfferingId}: ${sourceOffering.comment}`
+        : `Copied from offering ${sourceOfferingId}`,
     };
 
     // 5. Validate and insert shop offering
@@ -190,9 +178,9 @@ export const POST: RequestHandler = async ({ params, request }) => {
         success: true,
         message: "Shop offering created successfully",
         data: { shop_offering_id: shopOfferingId },
-        meta: { timestamp: new Date().toISOString() }
+        meta: { timestamp: new Date().toISOString() },
       },
-      { status: 201 }
+      { status: 201 },
     );
   } catch (err: unknown) {
     await rollbackTransaction(transaction);

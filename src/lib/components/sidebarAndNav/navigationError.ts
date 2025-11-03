@@ -6,7 +6,8 @@ export type NavigationErrorCode =
 	| 'ERR_ROOT_MISMATCH'
 	| 'ERR_INVALID_STRING_SEGMENT'
 	| 'ERR_ID_NOT_ALLOWED'
-	| 'ERR_SEGMENT_MUST_BE_NUMBER';
+	| 'ERR_SEGMENT_MUST_BE_NUMBER'
+	| 'ERR_CHILD_NEEDS_HREF'
 
 /**
  * Custom error class for navigation-specific issues.

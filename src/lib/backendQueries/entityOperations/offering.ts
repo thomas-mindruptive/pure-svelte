@@ -4,6 +4,7 @@ import { buildWhereClause, type BuildContext } from "../queryBuilder";
 import type { WhereCondition, WhereConditionGroup, SortDescriptor } from "../queryGrammar";
 import { assertDefined } from "$lib/utils/assertions";
 import { error } from "@sveltejs/kit";
+import { log } from "$lib/utils/logger";
 
 /**
  * Loads a single nested offering by ID using the optimized approach.
@@ -40,6 +41,7 @@ export async function loadNestedOfferingsOptimized(
   customJoinClause?: string,
 ): Promise<string> {
   assertDefined(transaction, "transaction");
+  log.debug(`loadNestedOfferingsOptimized`, {aWhere, aOrderBy, aLimit, aOffset, customJoinClause});
 
   const ctx: BuildContext = {
     parameters: {},
@@ -180,15 +182,15 @@ export async function loadNestedOfferingsOptimized(
     ) AS links_json;
   `;
 
-  console.log('========================================');
-  console.log('OPTIMIZED SQL BATCH (Table Variable):');
-  console.log(sqlBatch);
-  console.log('PARAMETERS:', ctx.parameters);
-  console.log('========================================');
+  log.debug('========================================');
+  log.debug('OPTIMIZED SQL BATCH (Table Variable):');
+  log.debug(sqlBatch);
+  log.debug('PARAMETERS:', ctx.parameters);
+  log.debug('========================================');
 
   const t0 = Date.now();
   const result = await request.query(sqlBatch);
-  console.log(`[OPTIMIZED] Batch query took: ${Date.now() - t0}ms`);
+  log.debug(`[OPTIMIZED] Batch query took: ${Date.now() - t0}ms`);
 
   // Cast recordsets to array for type safety
   const recordsets = Array.isArray(result.recordsets) ? result.recordsets : [];
@@ -205,6 +207,8 @@ export async function loadNestedOfferingsOptimized(
   // Parse the JSON strings
   const offerings = offeringsJson ? JSON.parse(offeringsJson) : [];
   const links = linksJson ? JSON.parse(linksJson) : [];
+
+  log.debug(`Found ${offerings.length} offerings and ${links.length} links.`)
 
   // --- Merge Process ---
 

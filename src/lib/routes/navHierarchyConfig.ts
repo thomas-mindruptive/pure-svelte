@@ -164,7 +164,7 @@ export const productCategoriesHierarchyConfig: HierarchyTree = {
                             }),
                             // Images List - Visible images list for offering.
                             createHierarchyNode({
-                              item: { key: "offering-images", type: "list", href:"/categories/[categoryId]/productdefinitions/[productDefId]/offerings/[offeringId]/images", label: "Images" },
+                              item: { key: "offeringimages", type: "list", href:"/categories/[categoryId]/productdefinitions/[productDefId]/offerings/[offeringId]/images", label: "Images" },
                               children: [
                                 // Image Object - Hidden, represents the selected image. Has urlParamName.
                                 createHierarchyNode({

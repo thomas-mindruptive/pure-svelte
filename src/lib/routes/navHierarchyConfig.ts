@@ -54,11 +54,11 @@ export const supplierHierarchyConfig: HierarchyTree = {
                             }),
                             // Images List - Visible images list for offering.
                             createHierarchyNode({
-                              item: { key: "images", type: "list", href:"/suppliers/[supplierId]/categories/[categoryId]/offerings/[offeringId]/images", label: "Images" },
+                              item: { key: "offeringimages", type: "list", href:"/suppliers/[supplierId]/categories/[categoryId]/offerings/[offeringId]/images", label: "Images" },
                               children: [
                                 // Image Object - Hidden, represents the selected image. Has urlParamName.
                                 createHierarchyNode({
-                                  item: { key: "image", type: "object", href: "/suppliers/[supplierId]/categories/[categoryId]/offerings/[offeringId]/images/[imageId]", label: "Image", display: false, urlParamName: "imageId" },
+                                  item: { key: "offeringimage", type: "object", href: "/suppliers/[supplierId]/categories/[categoryId]/offerings/[offeringId]/images/[imageId]", label: "Image", display: false, urlParamName: "imageId" },
                                   children: []
                                 }),
                               ]
@@ -136,11 +136,11 @@ export const productCategoriesHierarchyConfig: HierarchyTree = {
                   children: [
                     // Images List - Visible images list for product definition.
                     createHierarchyNode({
-                      item: { key: "images", type: "list", href: "/categories/[categoryId]/productdefinitions/[productDefId]/images", label: "Images" },
+                      item: { key: "productimages", type: "list", href: "/categories/[categoryId]/productdefinitions/[productDefId]/images", label: "Images" },
                       children: [
                         // Image Object - Hidden, represents the selected image. Has urlParamName.
                         createHierarchyNode({
-                          item: { key: "image", type: "object", href: "/categories/[categoryId]/productdefinitions/[productDefId]/images/[imageId]", label: "Image", display: false, urlParamName: "imageId" },
+                          item: { key: "productimage", type: "object", href: "/categories/[categoryId]/productdefinitions/[productDefId]/images/[imageId]", label: "Image", display: false, urlParamName: "imageId" },
                           children: []
                         }),
                       ]
@@ -164,11 +164,11 @@ export const productCategoriesHierarchyConfig: HierarchyTree = {
                             }),
                             // Images List - Visible images list for offering.
                             createHierarchyNode({
-                              item: { key: "images", type: "list", href:"/categories/[categoryId]/productdefinitions/[productDefId]/offerings/[offeringId]/images", label: "Images" },
+                              item: { key: "offering-images", type: "list", href:"/categories/[categoryId]/productdefinitions/[productDefId]/offerings/[offeringId]/images", label: "Images" },
                               children: [
                                 // Image Object - Hidden, represents the selected image. Has urlParamName.
                                 createHierarchyNode({
-                                  item: { key: "image", type: "object", href: "/categories/[categoryId]/productdefinitions/[productDefId]/offerings/[offeringId]/images/[imageId]", label: "Image", display: false, urlParamName: "imageId" },
+                                  item: { key: "offering-image", type: "object", href: "/categories/[categoryId]/productdefinitions/[productDefId]/offerings/[offeringId]/images/[imageId]", label: "Image", display: false, urlParamName: "imageId" },
                                   children: []
                                 }),
                               ]

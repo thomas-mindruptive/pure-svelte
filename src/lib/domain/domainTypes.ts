@@ -654,33 +654,34 @@ export const ImageSizeRangeEnum = z.enum([
   'XS', 'S', 'M', 'L', 'XL', 'S-M', 'M-L', 'L-XL'
 ]);
 
+// ===== IMAGE SUBCLASS BASE SCHEMA =====
+// Common fields for all image subclasses (ProductDefinitionImage, OfferingImage)
+// OOP Inheritance Pattern: All image subclasses extend Image via image_id (PK+FK)
+
+const ImageSubclassBaseSchema = z.object({
+  image_id: z.number().int().positive(), // PK + FK: OOP inheritance pattern
+
+  // Variant Matching Fields (for findBestMatchingImage)
+  material_id: z.number().int().positive().nullable().optional(),
+  form_id: z.number().int().positive().nullable().optional(),
+  surface_finish_id: z.number().int().positive().nullable().optional(),
+  construction_type_id: z.number().int().positive().nullable().optional(),
+
+  // Image Metadata
+  size_range: z.string().max(50).nullable().optional(), // Flexible size range like "XS-L", "S-XL", etc.
+  quality_grade: z.string().max(10).nullable().optional(),
+  color_variant: z.string().max(50).nullable().optional(),
+  image_type: z.string().max(50).nullable().optional(),
+  sort_order: z.number().int().nonnegative().default(0),
+  is_primary: z.boolean().default(false),
+  created_at: z.string().optional(),
+});
+
 // ===== PRODUCT DEFINITION IMAGE (dbo.product_definition_images) =====
-// OOP Inheritance Pattern: ProductDefinitionImage extends Image
-// - image_id is PRIMARY KEY (same as the inherited Image)
-// - Adds product context and variant dimensions
-// - Includes variant matching fields for offering image matching
 
-const ProductDefinitionImageSchemaBase = z
-  .object({
-    image_id: z.number().int().positive(), // PK + FK: OOP inheritance pattern
-    product_def_id: z.number().int().positive(),
-
-    // Variant Matching Fields (for findBestMatchingImage)
-    material_id: z.number().int().positive().nullable().optional(),
-    form_id: z.number().int().positive().nullable().optional(),
-    surface_finish_id: z.number().int().positive().nullable().optional(),
-    construction_type_id: z.number().int().positive().nullable().optional(),
-
-    // Image Metadata
-    size_range: z.string().max(50).nullable().optional(), // Flexible size range like "XS-L", "S-XL", etc.
-    quality_grade: z.string().max(10).nullable().optional(),
-    color_variant: z.string().max(50).nullable().optional(),
-    image_type: z.string().max(50).nullable().optional(),
-    sort_order: z.number().int().nonnegative().default(0),
-    is_primary: z.boolean().default(false),
-    created_at: z.string().optional(),
-  })
-  .describe("ProductDefinitionImageSchema");
+const ProductDefinitionImageSchemaBase = ImageSubclassBaseSchema.extend({
+  product_def_id: z.number().int().positive(),
+}).describe("ProductDefinitionImageSchema");
 
 export const ProductDefinitionImage_Schema = createSchemaWithMeta(ProductDefinitionImageSchemaBase, {
   alias: "pdi",
@@ -712,30 +713,10 @@ const tempProductDefinitionImageNested = ProductDefinitionImage_Schema.extend({
 export const ProductDefinitionImage_Image_ProductDef_Schema = copyMetaFrom(ProductDefinitionImage_Schema, tempProductDefinitionImageNested);
 
 // ===== OFFERING IMAGE =====
-// Extends Image with offering context and variant dimensions
-// Same pattern as ProductDefinitionImage but for offerings
 
-const OfferingImageSchemaBase = z
-  .object({
-    image_id: z.number().int().positive(), // PK + FK: OOP inheritance pattern
-    offering_id: z.number().int().positive(),
-
-    // Variant Matching Fields (optional - offerings already have these)
-    material_id: z.number().int().positive().nullable().optional(),
-    form_id: z.number().int().positive().nullable().optional(),
-    surface_finish_id: z.number().int().positive().nullable().optional(),
-    construction_type_id: z.number().int().positive().nullable().optional(),
-
-    // Image Metadata
-    size_range: z.string().max(50).nullable().optional(),
-    quality_grade: z.string().max(10).nullable().optional(),
-    color_variant: z.string().max(50).nullable().optional(),
-    image_type: z.string().max(50).nullable().optional(),
-    sort_order: z.number().int().nonnegative().default(0),
-    is_primary: z.boolean().default(false),
-    created_at: z.string().optional(),
-  })
-  .describe("OfferingImageSchema");
+const OfferingImageSchemaBase = ImageSubclassBaseSchema.extend({
+  offering_id: z.number().int().positive(),
+}).describe("OfferingImageSchema");
 
 export const OfferingImage_Schema = createSchemaWithMeta(OfferingImageSchemaBase, {
   alias: "oi",
@@ -830,6 +811,7 @@ export const AllBrandedSchemas = {
   ConstructionTypeSchema,
   ImageSchema,
   ProductDefinitionImageSchema: ProductDefinitionImage_Schema,
+  OfferingImageSchema: OfferingImage_Schema,
 } as const;
 
 // ===== HELPER EXPORT =====

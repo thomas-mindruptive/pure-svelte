@@ -27,7 +27,9 @@
       "Bash(done)",
       "Bash(cat:*)",
       "Bash(mv:*)",
-      "Bash(node test-db-check.cjs:*)"
+      "Bash(node test-db-check.cjs:*)",
+      "Bash(npm run check:types:*)",
+      "Bash(npm run)"
     ],
     "deny": [],
     "ask": []

@@ -711,6 +711,61 @@ const tempProductDefinitionImageNested = ProductDefinitionImage_Schema.extend({
 });
 export const ProductDefinitionImage_Image_ProductDef_Schema = copyMetaFrom(ProductDefinitionImage_Schema, tempProductDefinitionImageNested);
 
+// ===== OFFERING IMAGE =====
+// Extends Image with offering context and variant dimensions
+// Same pattern as ProductDefinitionImage but for offerings
+
+const OfferingImageSchemaBase = z
+  .object({
+    image_id: z.number().int().positive(), // PK + FK: OOP inheritance pattern
+    offering_id: z.number().int().positive(),
+
+    // Variant Matching Fields (optional - offerings already have these)
+    material_id: z.number().int().positive().nullable().optional(),
+    form_id: z.number().int().positive().nullable().optional(),
+    surface_finish_id: z.number().int().positive().nullable().optional(),
+    construction_type_id: z.number().int().positive().nullable().optional(),
+
+    // Image Metadata
+    size_range: z.string().max(50).nullable().optional(),
+    quality_grade: z.string().max(10).nullable().optional(),
+    color_variant: z.string().max(50).nullable().optional(),
+    image_type: z.string().max(50).nullable().optional(),
+    sort_order: z.number().int().nonnegative().default(0),
+    is_primary: z.boolean().default(false),
+    created_at: z.string().optional(),
+  })
+  .describe("OfferingImageSchema");
+
+export const OfferingImage_Schema = createSchemaWithMeta(OfferingImageSchemaBase, {
+  alias: "oi",
+  tableName: "offering_images",
+  dbSchema: "dbo",
+} as const);
+
+/**
+ * Schema for creating a new OfferingImage.
+ * Omits server-generated fields (created_at).
+ * NOTE: image_id is required and comes from the parent Image insert.
+ */
+const tempOfferingImageForCreate = OfferingImage_Schema.omit({
+  created_at: true,
+}).describe("OfferingImageForCreateSchema");
+export const OfferingImageForCreateSchema = copyMetaFrom(OfferingImage_Schema, tempOfferingImageForCreate);
+
+// ===== OFFERING IMAGE with JOINS =====
+
+const tempOfferingImageWithImage = OfferingImage_Schema.extend({
+  image: ImageSchema,
+});
+export const OfferingImage_Image_Schema = copyMetaFrom(OfferingImage_Schema, tempOfferingImageWithImage);
+
+const tempOfferingImageNested = OfferingImage_Schema.extend({
+  image: ImageSchema,
+  offering: Wio_Schema,
+});
+export const OfferingImage_Image_Offering_Schema = copyMetaFrom(OfferingImage_Schema, tempOfferingImageNested);
+
 // ===== SCHEMAS => TYPES  =====
 
 export type Wholesaler = z.infer<typeof WholesalerSchema>;
@@ -751,6 +806,9 @@ export type Image = z.infer<typeof ImageSchema>;
 export type ProductDefinitionImage = z.infer<typeof ProductDefinitionImage_Schema>;
 export type ProductDefinitionImage_Image = z.infer<typeof ProductDefinitionImage_Image_Schema>;
 export type ProductDefinitionImage_Image_ProductDef = z.infer<typeof ProductDefinitionImage_Image_ProductDef_Schema>;
+export type OfferingImage = z.infer<typeof OfferingImage_Schema>;
+export type OfferingImage_Image = z.infer<typeof OfferingImage_Image_Schema>;
+export type OfferingImage_Image_Offering = z.infer<typeof OfferingImage_Image_Offering_Schema>;
 
 // ===== ALL BRANDED SCHEMAS (= with meta info)  =====
 

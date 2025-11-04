@@ -7,20 +7,29 @@ declare global {
   // We allow it to be undefined initially.
   var _dbConnectionPool: Promise<ConnectionPool> | undefined;
 }
-
+/**
+ * ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️
+ * SQLEXPRESS configured with fixed port 1433
+ * TCP/IP enabled in SQL Server Config Manager
+ * ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️
+ */
 const dbConfig = {
   user: 'sa',
   password: 'ichBinAdmin@123',
-  server: 'localhost',
+  server: 'localhost',  // Port 1433 is default
   database: 'pureenergyworks',
   options: {
-    trustServerCertificate: true
+    trustServerCertificate: true,
+    encrypt: false,  // Für lokale Entwicklung
+    enableArithAbort: true
   },
   pool: {
     max: 20,
-    min: 0,
+    min: 5,
     idleTimeoutMillis: 15000
-  }
+  },
+  connectionTimeout: 15000,
+  requestTimeout: 15000
 };
 
 /**

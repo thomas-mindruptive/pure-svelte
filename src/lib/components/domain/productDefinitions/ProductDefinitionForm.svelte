@@ -239,18 +239,23 @@
   -- Render category combo
   -->
 {#snippet categoryCombo(fieldProps: FieldsSnippetProps<ProductDefinition>)}
-  <FormComboBox2
-    {fieldProps}
-    items={categories}
-    path={["category_id"]}
-    labelPath={["name"]}
-    valuePath={["category_id"]}
-    placeholder="Search categories..."
-    label="Product Category"
-    onChange={(value, category) => {
-      log.debug("Category selected via Combobox:", { value, category_name: category?.name });
-    }}
-  />
+  <div>
+    <FormComboBox2
+      {fieldProps}
+      items={categories}
+      path={["category_id"]}
+      labelPath={["name"]}
+      valuePath={["category_id"]}
+      placeholder="Search categories..."
+      label="Product Category"
+      onChange={(value, category) => {
+        log.debug("Category selected via Combobox:", { value, category_name: category?.name });
+      }}
+    />
+    {#if !isCreateMode}
+      <span class="field-hint">⚠️ Changing this will automatically update all offerings to the new category (CASCADE update)</span>
+    {/if}
+  </div>
 {/snippet}
 
 <!-- TEMPLATE ------------------------------------------------------------------------------------>

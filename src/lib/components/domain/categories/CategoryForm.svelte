@@ -4,24 +4,19 @@
   import Field from "$lib/components/forms/Field.svelte";
   import FormComboBox2 from "$lib/components/forms/FormComboBox2.svelte";
   import type {
-      CancelledCallback,
-      ChangedCallback,
-      Errors,
-      SubmitErrorCallback,
-      SubmittedCallback,
-      ValidateResult,
+    CancelledCallback,
+    ChangedCallback,
+    Errors,
+    SubmitErrorCallback,
+    SubmittedCallback,
+    ValidateResult,
   } from "$lib/components/forms/forms.types";
   import FormShell, { type FieldsSnippetProps } from "$lib/components/forms/FormShell.svelte";
   import "$lib/components/styles/form.css";
   import "$lib/components/styles/grid.css";
   import type { ValidationErrorTree } from "$lib/components/validation/validation.types";
   import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
-  import {
-      ProductCategorySchema,
-      ProductTypeSchema,
-      type ProductCategory,
-      type ProductType
-  } from "$lib/domain/domainTypes";
+  import { ProductCategorySchema, ProductTypeSchema, type ProductCategory, type ProductType } from "$lib/domain/domainTypes";
   import { safeParseFirstN, zodToValidationErrorTree } from "$lib/domain/domainTypes.utils";
   import { assertDefined } from "$lib/utils/assertions";
   import { log } from "$lib/utils/logger";
@@ -159,6 +154,7 @@
     valuePath={["product_type_id"]}
     placeholder="Search product types..."
     label="Product type"
+    required
     onChange={(value, product_type) => {
       log.debug("Material selected via Combobox2:", { value, material_name: product_type?.name });
     }}
@@ -226,6 +222,7 @@
             class="span-2"
           />
 
+          <!-- Product type ---------------------------------------------------------------------->
           {@render productTypesCombo(fieldProps)}
         </div>
       </div>

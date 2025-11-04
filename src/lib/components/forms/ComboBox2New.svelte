@@ -21,6 +21,7 @@
     valuePath,
     placeholder = "Search...",
     label = "Selection",
+    required, 
     onChange,
     filterFn,
     minSearchLength = 2,
@@ -175,6 +176,7 @@
       {placeholder}
       bind:value={searchTerm}
       onfocus={handleFocus}
+      {required}
       oninput={() => {
         showAllMode = false;
         open();

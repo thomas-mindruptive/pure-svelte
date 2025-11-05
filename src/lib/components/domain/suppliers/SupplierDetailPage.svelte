@@ -9,6 +9,7 @@
   import SupplierCategoriesGrid from "$lib/components/domain/suppliers/SupplierCategoriesGrid.svelte";
   */
   import SupplierForm from "$lib/components/domain/suppliers/SupplierForm.svelte";
+  import CategoryGrid from "$lib/components/domain/categories/CategoryGrid.svelte"; // <refact01> Use CategoryGrid component
   import "$lib/components/styles/assignment-section.css";
   import "$lib/components/styles/detail-page-layout.css";
   import "$lib/components/styles/grid-section.css";
@@ -291,11 +292,11 @@
   }
 
   /**
-   * Navigates to the category detail page.
-   * <refact01> CHANGED: Navigate to /categories/ID instead of /suppliers/ID/categories/ID
+   * Navigates to the offerings page for this supplier and category.
+   * <refact01> CHANGED: Navigate to /suppliers/N/categories/M (stays in supplier context)
    */
   function handleCategorySelect(category: ProductCategory) {
-    goto(`/categories/${category.category_id}`);
+    goto(buildChildUrl(page.url.pathname, "categories", category.category_id));
   }
 
   const categoriesRowActionStrategy: RowActionStrategy<ProductCategory> = {
@@ -387,23 +388,14 @@
       <p>Categories will be available after supplier has been saved.</p>
     {:else}
       <h2>Product Categories</h2>
-      <p>Browse all product categories. Click a category to view product definitions.</p>
-      <!-- <refact01> CHANGED: Simple list of ALL categories (no assignments, no delete) -->
-      <Datagrid
+      <p>Browse all product categories. Click a category to view offerings for this supplier.</p>
+      <!-- <refact01> CHANGED: Use CategoryGrid component (supports sorting) -->
+      <CategoryGrid
         rows={categories}
-        columns={[
-          { key: 'category_id', header: 'ID', width: '80px' },
-          { key: 'name', header: 'Name', width: '200px' },
-          { key: 'description', header: 'Description', width: 'auto' }
-        ]}
-        getId={(row) => row.category_id}
         loading={$categoryLoadingState}
-        gridId="categories"
-        entity="category"
         deleteStrategy={categoriesDeleteStrategy}
         rowActionStrategy={categoriesRowActionStrategy}
         onSort={handleCategoriesSort}
-        maxBodyHeight="550px"
       />
     {/if}
   </div>

@@ -66,12 +66,18 @@
       resolvedData = null;
 
       try {
-        const [assignmentDetails, offerings] = await Promise.all([data.assignmentDetails, data.offerings]);
+        // <refact01> CHANGED: No more assignmentDetails - await category and offerings
+        const [category, offerings] = await Promise.all([data.category, data.offerings]);
 
         if (aborted) return;
 
-        // Assemble the data object for Zod validation.
-        const dataToValidate = { assignmentDetails, offerings };
+        // <refact01> CHANGED: Assemble with supplierId, categoryId from data (not promises)
+        const dataToValidate = {
+          supplierId: data.supplierId,
+          categoryId: data.categoryId,
+          category,
+          offerings
+        };
         const validationResult = SupplierCategoryDetailPage_LoadDataSchema.safeParse(dataToValidate);
 
         if (!validationResult.success) {
@@ -106,10 +112,11 @@
   // ========================================================================
 
   async function reloadOfferings() {
-    assertDefined(resolvedData, "reloadOfferings needs resolvedData", ["assignmentDetails"]);
-    const { wholesaler_id, category_id } = resolvedData.assignmentDetails;
-    log.info(`Re-fetching offerings for supplier ${wholesaler_id}, category ${category_id}`);
-    const updatedOfferings = await categoryApi.loadOfferingsForSupplierCategory(wholesaler_id, category_id);
+    // <refact01> CHANGED: Use supplierId and categoryId directly from resolvedData
+    assertDefined(resolvedData, "reloadOfferings needs resolvedData");
+    const { supplierId, categoryId } = resolvedData;
+    log.info(`Re-fetching offerings for supplier ${supplierId}, category ${categoryId}`);
+    const updatedOfferings = await categoryApi.loadOfferingsForSupplierCategory(supplierId, categoryId);
     resolvedData.offerings = updatedOfferings;
     log.info("Local state for offerings updated.");
   }
@@ -174,23 +181,15 @@
       <p>Please wait while we fetch the details for this category.</p>
     </div>
   </div>
-{:else if !resolvedData.assignmentDetails}
-  <div class="component-error-boundary">
-    <h3>Category Assignment Not Found</h3>
-    <p>The selected category does not seem to be assigned to this supplier.</p>
-  </div>
 {:else}
+  <!-- <refact01> REMOVED: No more assignmentDetails check - category always exists -->
   <div class="detail-page-layout">
     <div class="detail-header-section">
-      <h1>Offerings in "{resolvedData.assignmentDetails.category_name}"</h1>
-      <p>{resolvedData.assignmentDetails.category_name || "No name available for this category."}</p>
+      <!-- <refact01> CHANGED: Use category.name and category.description directly -->
+      <h1>Offerings in "{resolvedData.category.name}"</h1>
+      <p>{resolvedData.category.description || "No description available for this category."}</p>
 
-      {#if resolvedData.assignmentDetails.comment}
-        <p class="comment">
-          <strong>Supplier Notes:</strong>
-          {resolvedData.assignmentDetails.comment}
-        </p>
-      {/if}
+      <!-- <refact01> REMOVED: No more assignmentDetails.comment -->
     </div>
 
     <div class="grid-section">
@@ -223,13 +222,7 @@
     color: var(--color-muted);
     max-width: 80ch;
   }
-  .comment {
-    font-style: italic;
-    margin-top: 0.75rem;
-    border-left: 3px solid var(--color-primary);
-    padding-left: 1rem;
-    background-color: color-mix(in srgb, var(--color-primary) 5%, transparent);
-  }
+  /* <refact01> REMOVED: .comment style - no more assignmentDetails.comment */
   .grid-section {
     background: var(--color-background);
     border-radius: 8px;

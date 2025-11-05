@@ -22,7 +22,7 @@ export type ComboboxProps<T extends Record<string, any>, TLabelPath extends NonE
     // Label text for the combobox
     label?: string | null;
 
-    required: boolean;
+    required?: boolean | undefined;
 
     // Callback when selection changes
     onChange?: (value: T | null) => void;

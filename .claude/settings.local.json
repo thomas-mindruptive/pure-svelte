@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(powershell -Command \"Get-Service -Name ''SQLBrowser'' | Select-Object Name, Status, DisplayName\")",
-      "Bash(powershell -Command:*)"
+      "Bash(powershell -Command:*)",
+      "Bash(nul)",
+      "Bash(ls:*)"
     ],
     "deny": [],
     "ask": []

@@ -156,6 +156,7 @@ const ProductDefinitionSchemaBase = z
     construction_type_id: z.number().int().positive().nullable().optional(),
     surface_finish_id: z.number().int().positive().nullable().optional(),
     for_liquids: z.boolean().optional().nullable(),
+    packaging: z.string().max(100).nullable().optional(),
     created_at: z.string().optional(),
   })
   .describe("ProductDefinitionSchema");
@@ -387,6 +388,7 @@ const Wio_BaseSchema = z
     title: z.string().max(255).nullable().optional(),
     size: z.string().max(50).nullable().optional(),
     dimensions: z.string().max(100).nullable().optional(),
+    packaging: z.string().max(100).nullable().optional(),
     price: z.number().multipleOf(0.01).nullable().optional(), // precision [18,2]
     weight_grams: z.number().positive().nullable().optional(),
     currency: z.string().length(3).nullable().optional(),

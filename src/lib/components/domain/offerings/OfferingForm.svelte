@@ -579,6 +579,15 @@
             class="span-1"
           />
 
+          <!-- packaging ------------------------------------------------------------------------->
+          <Field
+            {fieldProps}
+            path={["packaging"]}
+            label="Packaging"
+            placeholder="e.g., Box, Bag, Tube"
+            class="span-1"
+          />
+
           <!-- weight_grams ------------------------------------------------------------------------>
           <Field
             {fieldProps}

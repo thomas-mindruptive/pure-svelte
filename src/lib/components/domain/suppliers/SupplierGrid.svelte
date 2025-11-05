@@ -50,7 +50,7 @@
   {deleteStrategy}
   {rowActionStrategy}
   {onSort}
-  maxBodyHeight="550px"
+  maxBodyHeight="750px"
 />
 
 <!--

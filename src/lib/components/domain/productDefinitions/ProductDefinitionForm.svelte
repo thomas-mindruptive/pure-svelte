@@ -307,6 +307,14 @@
             type="checkbox"
             class="span-1"
           />
+
+          <Field
+            {fieldProps}
+            path={["packaging"]}
+            label="Packaging"
+            placeholder="e.g., Box, Bag, Tube"
+            class="span-1"
+          />
         </div>
         <!--END ROW -->
 

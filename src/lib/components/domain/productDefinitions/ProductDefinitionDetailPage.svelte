@@ -14,7 +14,7 @@
     type Form,
     type Material,
     type ProductDefinition,
-    type Wio_PDef_Cat_Supp_Nested,
+    type WholesalerItemOffering,
     type Wio_PDef_Cat_Supp_Nested_WithLinks,
     type Wio_PDef_Cat_Supp,
     type ConstructionType,
@@ -215,7 +215,7 @@
     assertDefined(productDefId, "productDefId");
 
     log.info(`Re-fetching offerings for productDefId: ${productDefId}`);
-    const updatedOfferings = await productDefinitionApi.loadOfferingsForProductDefinition(productDefId);
+    const updatedOfferings = await productDefinitionApi.loadNestedOfferingsWithLinksForProductDefinition(productDefId);
     offerings = updatedOfferings;
     log.info("Local state for offerings updated.");
   }
@@ -260,9 +260,14 @@
     }
   }
 
-  async function handleOfferingsSort(sortState: SortDescriptor<Wio_PDef_Cat_Supp_Nested>[] | null) {
+  async function handleOfferingsSort(sortState: SortDescriptor<Wio_PDef_Cat_Supp_Nested_WithLinks>[] | null) {
     try {
-      offerings = await productDefinitionApi.loadOfferingsForProductDefinition(productDefId, null, sortState);
+      // Type assertion is safe here because SortDescriptor only uses keys that exist in both types
+      offerings = await productDefinitionApi.loadNestedOfferingsWithLinksForProductDefinition(
+        productDefId,
+        null,
+        sortState as SortDescriptor<WholesalerItemOffering>[] | null
+      );
     } catch (e: unknown) {
       addNotification(`Error during sorting API: ${getErrorMessage(e)}`);
     }

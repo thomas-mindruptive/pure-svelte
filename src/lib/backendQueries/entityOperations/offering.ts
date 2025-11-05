@@ -87,6 +87,9 @@ export async function loadNestedOfferingsOptimized(
     SELECT wio.offering_id
     FROM dbo.wholesaler_item_offerings AS wio
     ${customJoinClause || ""}
+    LEFT JOIN dbo.product_definitions pd ON wio.product_def_id = pd.product_def_id
+    LEFT JOIN dbo.product_categories pc ON wio.category_id = pc.category_id
+    LEFT JOIN dbo.wholesalers w ON wio.wholesaler_id = w.wholesaler_id
     WHERE ${whereClause}
     ${orderByClause}
     ${limitClause};

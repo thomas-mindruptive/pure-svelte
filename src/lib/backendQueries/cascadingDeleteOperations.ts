@@ -9,7 +9,9 @@ import type {
   DeletedOfferingData,
   DeletedProductDefinitonData,
   DeletedSupplierData,
+  /* <refact01> DEPRECATED: wholesaler_categories removed
   DeletedSupplierCategoryData,
+  */
 } from "$lib/api/app/appSpecificTypes";
 
 /**
@@ -258,7 +260,7 @@ export async function deleteSupplier(
           @deletedLinks        INT = 0,
           @deletedAttributes   INT = 0,
           @deletedOfferings    INT = 0,
-          @deletedWhCat        INT = 0,
+          -- <refact01> @deletedWhCat        INT = 0,
           @deletedSupplier     INT = 0;
 
         -- 1) Delete order_items (indirect via offerings) - must come first as leaf nodes
@@ -291,11 +293,13 @@ export async function deleteSupplier(
         WHERE O.wholesaler_id = @${supplierIdParam};
         SET @deletedOfferings = @@ROWCOUNT;
 
+        /* <refact01> DEPRECATED: wholesaler_categories removed
         -- 6) Delete wholesaler-category assignments
         DELETE C
         FROM dbo.wholesaler_categories AS C
         WHERE C.wholesaler_id = @${supplierIdParam};
         SET @deletedWhCat = @@ROWCOUNT;
+        */
 
         -- 7) Finally, delete the supplier
         DELETE W
@@ -310,7 +314,7 @@ export async function deleteSupplier(
           @deletedLinks      AS deletedLinks,
           @deletedAttributes AS deletedAttributes,
           @deletedOfferings  AS deletedOfferings,
-          @deletedWhCat      AS deletedWholesalerCategories,
+          -- <refact01> @deletedWhCat      AS deletedWholesalerCategories,
           @deletedSupplier   AS deletedSuppliers;
       `;
 
@@ -318,7 +322,7 @@ export async function deleteSupplier(
 
       if (res?.recordset?.[0]) {
         stats = res.recordset[0];
-        stats.total = stats.deletedOrderItems + stats.deletedOrders + stats.deletedLinks + stats.deletedAttributes + stats.deletedOfferings + stats.deletedWholesalerCategories;
+        stats.total = stats.deletedOrderItems + stats.deletedOrders + stats.deletedLinks + stats.deletedAttributes + stats.deletedOfferings; // <refact01> removed: + stats.deletedWholesalerCategories
       } else {
         stats = {
           total: 0,
@@ -327,7 +331,7 @@ export async function deleteSupplier(
           deletedLinks: 0,
           deletedAttributes: 0,
           deletedOfferings: 0,
-          deletedWholesalerCategories: 0,
+          // <refact01> deletedWholesalerCategories: 0,
           deletedSuppliers: 0,
         };
       }
@@ -418,7 +422,7 @@ export async function deleteProductCategory(
           @deletedAttributes           INT = 0,
           @deletedOfferings            INT = 0,
           @deletedProductDefinitions   INT = 0,
-          @deletedWholesalerCategories INT = 0,
+          -- <refact01> @deletedWholesalerCategories INT = 0,
           @deletedProductCategories    INT = 0;
 
         -- 1) Delete indirect dependencies: links for offerings in this category
@@ -445,11 +449,13 @@ export async function deleteProductCategory(
         WHERE P.category_id = @${categoryIdParam};
         SET @deletedProductDefinitions = @@ROWCOUNT;
 
+        /* <refact01> DEPRECATED: wholesaler_categories removed
         -- 5) Delete direct dependencies: wholesaler-category assignments for this category
         DELETE C
         FROM dbo.wholesaler_categories AS C
         WHERE C.category_id = @${categoryIdParam};
         SET @deletedWholesalerCategories = @@ROWCOUNT;
+        */
 
         -- 6) Finally, delete the product category itself
         DELETE PC
@@ -463,7 +469,7 @@ export async function deleteProductCategory(
           @deletedAttributes           AS deletedAttributes,
           @deletedOfferings            AS deletedOfferings,
           @deletedProductDefinitions   AS deletedProductDefinitions,
-          @deletedWholesalerCategories AS deletedWholesalerCategories,
+          -- <refact01> @deletedWholesalerCategories AS deletedWholesalerCategories,
           @deletedProductCategories    AS deletedProductCategories;
       `;
 
@@ -476,8 +482,7 @@ export async function deleteProductCategory(
           (stats.deletedLinks ?? 0) +
           (stats.deletedAttributes ?? 0) +
           (stats.deletedOfferings ?? 0) +
-          (stats.deletedProductDefinitions ?? 0) +
-          (stats.deletedWholesalerCategories ?? 0);
+          (stats.deletedProductDefinitions ?? 0); // <refact01> removed: + (stats.deletedWholesalerCategories ?? 0)
       } else {
         stats = {
           total: 0,
@@ -485,7 +490,7 @@ export async function deleteProductCategory(
           deletedAttributes: 0,
           deletedOfferings: 0,
           deletedProductDefinitions: 0,
-          deletedWholesalerCategories: 0,
+          // <refact01> deletedWholesalerCategories: 0,
           deletedProductCategories: 0,
         };
       }
@@ -937,15 +942,14 @@ export async function deleteOrderItem(
   }
 }
 
-/**
- * Deletes a Supplier-Category Assignment, with an option to cascade and delete all dependent offerings.
- * @param wholesalerId The ID of the supplier.
- * @param categoryId The ID of the category.
- * @param cascade If true, performs a cascade delete of all dependent offerings and their children.
- * @param transaction The active MSSQL transaction object.
- * @returns A promise that resolves with the data of the deleted assignment and deletion stats.
- * @throws An error if the assignment with the given IDs is not found.
- */
+/* <refact01> DEPRECATED: wholesaler_categories removed - no more assignments to delete
+// Deletes a Supplier-Category Assignment, with an option to cascade and delete all dependent offerings.
+// @param wholesalerId The ID of the supplier.
+// @param categoryId The ID of the category.
+// @param cascade If true, performs a cascade delete of all dependent offerings and their children.
+// @param transaction The active MSSQL transaction object.
+// @returns A promise that resolves with the data of the deleted assignment and deletion stats.
+// @throws An error if the assignment with the given IDs is not found.
 export async function deleteSupplierCategoryAssignment(
   wholesalerId: number,
   categoryId: number,
@@ -1103,3 +1107,4 @@ export async function deleteSupplierCategoryAssignment(
     throw err;
   }
 }
+*/

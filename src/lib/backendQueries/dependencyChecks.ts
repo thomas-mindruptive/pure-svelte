@@ -5,14 +5,13 @@ import { TransWrapper } from "$lib/backendQueries/transactionWrapper";
 import { log } from "$lib/utils/logger";
 import type { Transaction } from "mssql";
 
-/**
- * Checks for offering dependencies within a specific supplier-category ASSIGNMENT.
- * This is used before deleting a wholesaler_categories record to see if it would orphan any offerings.
- * @param wholesalerId The ID of the supplier.
- * @param categoryId The ID of the category.
- * @param transaction The active database transaction object.
- * @returns Object with hard dependencies (order items) and soft dependencies (offerings, links, attributes).
- */
+/* <refact01> DEPRECATED: wholesaler_categories removed - no more assignments to check
+// Checks for offering dependencies within a specific supplier-category ASSIGNMENT.
+// This is used before deleting a wholesaler_categories record to see if it would orphan any offerings.
+// @param wholesalerId The ID of the supplier.
+// @param categoryId The ID of the category.
+// @param transaction The active database transaction object.
+// @returns Object with hard dependencies (order items) and soft dependencies (offerings, links, attributes).
 export async function checkSupplierCategoryDependencies(
   wholesalerId: number,
   categoryId: number,
@@ -75,6 +74,7 @@ export async function checkSupplierCategoryDependencies(
   log.info("(dependencyChecks) Found assignment dependencies", { hard: hardDependencies, soft: softDependencies });
   return { hard: hardDependencies, soft: softDependencies };
 }
+*/
 
 /**
  * Checks all master data dependencies for a Wholesaler.
@@ -119,6 +119,7 @@ export async function checkWholesalerDependencies(
 
     // SOFT Dependencies - these can be cascade deleted with cascade=true
 
+    /* <refact01> DEPRECATED: wholesaler_categories removed
     const categoriesCheck = await transWrapper.request().input("wholesalerId", wholesalerId).query`
       SELECT COUNT(*) as count
       FROM dbo.wholesaler_categories
@@ -127,6 +128,7 @@ export async function checkWholesalerDependencies(
     if (categoriesCheck.recordset[0].count > 0) {
       softDependencies.push(`${categoriesCheck.recordset[0].count} assigned categories`);
     }
+    */
 
     const offeringsCheck = await transWrapper.request().input("wholesalerId", wholesalerId).query`
       SELECT COUNT(*) as count
@@ -200,23 +202,25 @@ export async function checkProductCategoryMasterDependencies(
 
     // 2. Hard Dependency: Product Definitions (dbo.product_definitions)
     const definitionsCheck = await transWrapper.request().input("categoryId", categoryId).query`
-            SELECT COUNT(*) as count 
-            FROM dbo.product_definitions 
+            SELECT COUNT(*) as count
+            FROM dbo.product_definitions
             WHERE category_id = @categoryId
         `;
     if (definitionsCheck.recordset[0].count > 0) {
       hardDependencies.push(`${definitionsCheck.recordset[0].count} product definitions`);
     }
 
+    /* <refact01> DEPRECATED: wholesaler_categories removed
     // 3. Soft Dependency: Supplier Assignments (dbo.wholesaler_categories)
     const assignmentsCheck = await transWrapper.request().input("categoryId", categoryId).query`
-            SELECT COUNT(*) as count 
-            FROM dbo.wholesaler_categories 
+            SELECT COUNT(*) as count
+            FROM dbo.wholesaler_categories
             WHERE category_id = @categoryId
         `;
     if (assignmentsCheck.recordset[0].count > 0) {
       softDependencies.push(`${assignmentsCheck.recordset[0].count} supplier assignments`);
     }
+    */
 
     transWrapper.commit();
   } catch {

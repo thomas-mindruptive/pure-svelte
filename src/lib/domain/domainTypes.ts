@@ -177,6 +177,7 @@ const tempProductDefinitionForCreate = ProductDefinitionSchema.omit({
 }).describe("ProductDefinitionForCreateSchema");
 export const ProductDefinitionForCreateSchema = copyMetaFrom(ProductDefinitionSchema, tempProductDefinitionForCreate);
 
+/* <refact01> DEPRECATED: wholesaler_categories table removed - suppliers can create offerings for ANY category
 // ===== WHOLESALER CATEGORY (dbo.wholesaler_categories) =====
 
 const WholesalerCategorySchemaBase = z
@@ -195,10 +196,8 @@ export const WholesalerCategorySchema = createSchemaWithMeta(WholesalerCategoryS
   dbSchema: "dbo",
 } as const);
 
-/**
- * Schema for creating a new WholesalerCategory assignment.
- * Client provides foreign keys and data, but not the timestamp.
- */
+// Schema for creating a new WholesalerCategory assignment.
+// Client provides foreign keys and data, but not the timestamp.
 const tempWholesalerCategoryForCreate = WholesalerCategorySchema.omit({
   created_at: true,
 }).describe("WholesalerCategoryForCreateSchema");
@@ -222,6 +221,7 @@ export const WholesalerCategory_Category_Nested_Schema = copyMetaFrom(Wholesaler
 export const WholesalerCategoryWithCountSchema = WholesalerCategory_Category_Schema.extend({
   offering_count: z.number().int().nonnegative().optional(),
 }).describe("WholesalerCategoryWithCountSchema");
+*/
 
 // ===== MATERIAL (dbo.materials) =====
 
@@ -757,10 +757,12 @@ export type Attribute = z.infer<typeof AttributeSchema>;
 export type ProductDefinition = z.infer<typeof ProductDefinitionSchema>;
 export type ProdDef_mat_form_surf_constr_Nested = z.infer<typeof ProdDef_mat_form_surf_constr_Nested_Schema>;
 
+/* <refact01> DEPRECATED: wholesaler_categories removed
 export type WholesalerCategory = z.infer<typeof WholesalerCategorySchema>;
 export type WholesalerCategory_Category = z.infer<typeof WholesalerCategory_Category_Schema>;
 export type WholesalerCategoryWithCount = z.infer<typeof WholesalerCategoryWithCountSchema>;
 export type WholesalerCategory_Category_Nested = z.infer<typeof WholesalerCategory_Category_Nested_Schema>;
+*/
 
 export type WholesalerItemOffering = z.infer<typeof Wio_Schema>;
 export type Wio_PDef = z.infer<typeof Wio_PDef_Schema>;
@@ -802,7 +804,7 @@ export const AllBrandedSchemas = {
   WholesalerItemOfferingSchema: Wio_Schema,
   AttributeSchema,
   WholesalerOfferingLinkSchema,
-  WholesalerCategorySchema,
+  // <refact01> WholesalerCategorySchema,
   WholesalerOfferingAttributeSchema,
   OrderSchema,
   OrderItemSchema,

@@ -1,11 +1,13 @@
 // src/routes/api/supplier-categories/+server.ts
 
-/**
+/* <refact01> DEPRECATED: wholesaler_categories removed - suppliers can create offerings for ANY category
+ * This API endpoint is no longer used. All supplier-category assignment logic has been removed.
+ * Suppliers do not need to be "assigned" to categories anymore.
+ *
  * @file Supplier-Category Assignment API - FINAL ARCHITECTURE
  * @description Handles the n:m relationship with proper, explicit type usage for all
  * success and error responses, returning structured JSON for handled errors
  * instead of throwing.
- */
 
 import { json, error, type RequestHandler } from "@sveltejs/kit";
 import { db } from "$lib/backendQueries/db";
@@ -27,10 +29,8 @@ import type {
 import type { DeletedSupplierCategoryData } from "$lib/api/app/appSpecificTypes";
 import { rollbackTransaction } from "$lib/backendQueries/transactionWrapper";
 
-/**
- * POST /api/supplier-categories
- * @description Assigns a category to a supplier.
- */
+// POST /api/supplier-categories
+// @description Assigns a category to a supplier.
 export const POST: RequestHandler = async ({ request }) => {
   log.infoHeader("POST /api/supplier-categories");
   const operationId = uuidv4();
@@ -135,10 +135,8 @@ export const POST: RequestHandler = async ({ request }) => {
   }
 };
 
-/**
- * PUT /api/supplier-categories
- * @description Updates an existing category assignment (comment, link).
- */
+// PUT /api/supplier-categories
+// @description Updates an existing category assignment (comment, link).
 export const PUT: RequestHandler = async ({ request }) => {
   log.infoHeader("PUT /api/supplier-categories");
   const operationId = uuidv4();
@@ -246,10 +244,8 @@ export const PUT: RequestHandler = async ({ request }) => {
   }
 };
 
-/**
- * DELETE /api/supplier-categories
- * @description Removes a category assignment.
- */
+// DELETE /api/supplier-categories
+// @description Removes a category assignment.
 export const DELETE: RequestHandler = async ({ request }) => {
   log.infoHeader("DELETE /api/supplier-categories");
   const operationId = uuidv4();
@@ -338,3 +334,4 @@ export const DELETE: RequestHandler = async ({ request }) => {
     throw error(status, message);
   }
 };
+*/

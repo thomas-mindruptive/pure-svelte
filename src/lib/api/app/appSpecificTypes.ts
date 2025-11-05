@@ -8,7 +8,9 @@
 
 import type {
   Wholesaler,
+  /* <refact01> DEPRECATED: wholesaler_categories removed
   WholesalerCategory_Category,
+  */
   ProductCategory,
   WholesalerItemOffering,
   ProductDefinition,
@@ -35,24 +37,26 @@ export type DeleteSupplierConflictResponse = DeleteConflictResponse<SupplierDepe
 /** The complete, explicit response union for the `deleteSupplier` operation. */
 export type DeleteSupplierApiResponse = DeleteSupplierSuccessResponse | DeleteSupplierConflictResponse | ApiErrorResponse;
 
+/* <refact01> DEPRECATED: wholesaler_categories removed
 // =================================================================
 // OPERATION: removeCategoryFromSupplier
 // =================================================================
 
-/** The shape of the `deleted_resource` payload on successful category assignment removal. */
+/** The shape of the `deleted_resource` payload on successful category assignment removal. *-/
 export type DeletedSupplierCategoryData = Pick<WholesalerCategory_Category, "wholesaler_id" | "category_id" | "category_name">;
 
-/** The exact success response for removing a category assignment. */
+/** The exact success response for removing a category assignment. *-/
 export type RemoveCategorySuccessResponse = DeleteSuccessResponse<DeletedSupplierCategoryData>;
 
-/** The dependency structure for a category assignment removal conflict. */
+/** The dependency structure for a category assignment removal conflict. *-/
 //type SupplierCategoryDependencies = { offering_count: number };
 
-/** The exact conflict response for removing a category assignment. */
+/** The exact conflict response for removing a category assignment. *-/
 export type RemoveCategoryConflictResponse = DeleteConflictResponse<{ hard: string[]; soft: string[] }>;
 
-/** The complete, explicit response union for the `removeCategoryFromSupplier` operation. */
+/** The complete, explicit response union for the `removeCategoryFromSupplier` operation. *-/
 export type RemoveCategoryApiResponse = RemoveCategorySuccessResponse | RemoveCategoryConflictResponse | ApiErrorResponse;
+*/
 
 // =================================================================
 // OPERATION: deleteCategory

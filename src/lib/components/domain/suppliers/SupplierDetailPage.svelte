@@ -4,15 +4,17 @@
   import { addNotification } from "$lib/stores/notifications";
   import { log } from "$lib/utils/logger";
   // Component Imports
+  /* <refact01> DEPRECATED: wholesaler_categories removed - no more category assignments
   import CategoryAssignment from "$lib/components/domain/suppliers/CategoryAssignment.svelte";
   import SupplierCategoriesGrid from "$lib/components/domain/suppliers/SupplierCategoriesGrid.svelte";
+  */
   import SupplierForm from "$lib/components/domain/suppliers/SupplierForm.svelte";
   import "$lib/components/styles/assignment-section.css";
   import "$lib/components/styles/detail-page-layout.css";
   import "$lib/components/styles/grid-section.css";
   // API & Type Imports
   import { ApiClient } from "$lib/api/client/apiClient";
-  import { categoryLoadingState } from "$lib/api/client/category";
+  import { categoryLoadingState, getCategoryApi } from "$lib/api/client/category";
   import { getSupplierApi, supplierLoadingState } from "$lib/api/client/supplier";
   import type { ColumnDef, DeleteStrategy, ID, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
   import type { SortDescriptor } from "$lib/backendQueries/queryGrammar";
@@ -23,13 +25,15 @@
     type ProductCategory,
     ProductCategorySchema,
     type Wholesaler,
+    /* <refact01> DEPRECATED: wholesaler_categories removed
     type WholesalerCategory,
     type WholesalerCategory_Category_Nested,
+    */
     WholesalerSchema,
   } from "$lib/domain/domainTypes";
   // Schemas
   import { page } from "$app/state";
-  import { cascadeDelete, cascadeDeleteAssignments, type CompositeID } from "$lib/api/client/cascadeDelete";
+  import { cascadeDelete /* <refact01>, cascadeDeleteAssignments, type CompositeID */ } from "$lib/api/client/cascadeDelete";
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
   import type { ValidationErrorTree } from "$lib/components/validation/validation.types";
   import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
@@ -62,8 +66,11 @@
   // === STATE ====================================================================================
 
   let supplier = $state<Wholesaler | null>(null);
+  /* <refact01> CHANGED: Show ALL categories instead of assigned ones
   let assignedCategories = $state<WholesalerCategory_Category_Nested[]>([]);
   let availableCategories = $state<ProductCategory[]>([]);
+  */
+  let categories = $state<ProductCategory[]>([]); // <refact01> All categories, no assignments
   let orders = $state<Order_Wholesaler[]>([]);
 
   //let resolvedData = $state<SupplierDetailPage_LoadData | null>(null);
@@ -79,6 +86,7 @@
   }
   const client = new ApiClient(data.loadEventFetch);
   const supplierApi = getSupplierApi(client);
+  const categoryApi = getCategoryApi(client); // <refact01> Added for category master-data delete
   const orderApi = getOrderApi(client);
 
   // === LOAD =====================================================================================
@@ -104,19 +112,13 @@
 
         // === Categories path=================================================
         if ("categories" === data.activeChildPath) {
-          assignedCategories = await supplierApi.loadCategoriesForSupplier(data.supplierId);
+          // <refact01> CHANGED: Load ALL categories (no more assignments)
+          categories = await supplierApi.loadCategoriesForSupplier(data.supplierId);
           if (aborted) return;
-          availableCategories = await supplierApi.loadAvailableCategoriesForSupplier(data.supplierId);
-          if (aborted) return;
-          const assignedCategoriesVal = safeParseFirstN(ProductCategorySchema, assignedCategories, 3);
-          const availableCategoriesVal = safeParseFirstN(ProductCategorySchema, availableCategories, 3);
-          if (assignedCategoriesVal.error) {
-            errors.assignedCategories = zodToValidationErrorTree(assignedCategoriesVal.error);
-            log.error("Assigned categories validation failed", errors.assignedCategories);
-          }
-          if (availableCategoriesVal.error) {
-            errors.availableCategories = zodToValidationErrorTree(availableCategoriesVal.error);
-            log.error("Available categories validation failed", errors.availableCategories);
+          const categoriesVal = safeParseFirstN(ProductCategorySchema, categories, 3);
+          if (categoriesVal.error) {
+            errors.categories = zodToValidationErrorTree(categoriesVal.error);
+            log.error("Categories validation failed", errors.categories);
           }
 
           // === Orders path=================================================
@@ -203,9 +205,8 @@
 
   // ===== HELPERS ================================================================================
 
-  /**
-   * Reload categories and set them into the state.
-   */
+  /* <refact01> DEPRECATED: No more category assignments - categories are just read-only
+  // Reload categories and set them into the state.
   async function reloadCategories() {
     assertDefined(supplier, "reloadCategories: Supplier must be loaded/available");
 
@@ -220,12 +221,12 @@
     availableCategories = updatedAvailable;
     log.info("Local state updated. UI will refresh seamlessly.");
   }
+  */
 
   // ===== BUSINESS LOGIC =========================================================================
 
-  /**
-   * Handles the assignment of a new category.
-   */
+  /* <refact01> DEPRECATED: wholesaler_categories removed - no more assignments
+  // Handles the assignment of a new category.
   async function assignCategory(category: ProductCategory, comment?: string, link?: string) {
     assertDefined(category, "category");
 
@@ -257,31 +258,25 @@
       addNotification("Failed to assign category.", "error");
     }
   }
+  */
 
   // === CATEGORIES GRID FUNCTIONS ================================================================
 
+  /**
+   * Deletes categories (master data delete, not assignment).
+   * <refact01> CHANGED: Now deletes category master data with cascade delete checks.
+   */
   async function handleCategoryDelete(ids: ID[]): Promise<void> {
-    log.info(`Deleting categories`, { ids });
+    log.info(`Deleting categories (master data)`, { ids });
     assertDefined(ids, "ids");
     let dataChanged = false;
 
-    if (data.isCreateMode) {
-      log.error("Cannot delete category in create mode.");
-      addNotification("Cannot delete category in create mode.", "error");
-      return;
-    }
-
-    assertDefined(supplier, "supplier");
     const idsAsNumber = stringsToNumbers(ids);
-    const compositeIds: CompositeID[] = idsAsNumber.map((id) => ({
-      parent1Id: supplier!.wholesaler_id,
-      parent2Id: id,
-    }));
-    dataChanged = await cascadeDeleteAssignments(
-      compositeIds,
-      supplierApi.removeCategoryFromSupplier,
+    dataChanged = await cascadeDelete(
+      idsAsNumber,
+      categoryApi.deleteCategory,
       {
-        domainObjectName: "Category",
+        domainObjectName: "Product Category",
         hardDepInfo: "Category has hard dependencies. Delete?",
         softDepInfo: "Category has soft dependencies. Delete?",
       },
@@ -289,30 +284,35 @@
     );
 
     if (dataChanged) {
-      // Reload and change state.
-      reloadCategories();
+      // Reload categories after delete
+      assertDefined(supplier, "supplier must be defined");
+      categories = await supplierApi.loadCategoriesForSupplier(supplier.wholesaler_id);
     }
   }
 
   /**
-   * Navigates to the next hierarchy level (offerings for a category).
+   * Navigates to the category detail page.
+   * <refact01> CHANGED: Navigate to /categories/ID instead of /suppliers/ID/categories/ID
    */
-  function handleCategorySelect(category: WholesalerCategory_Category_Nested) {
-    goto(buildChildUrl(page.url.pathname, "categories", category.category_id));
+  function handleCategorySelect(category: ProductCategory) {
+    goto(`/categories/${category.category_id}`);
   }
 
-  // Strategy objects for the CategoryGrid component.
-  const categoriesDeleteStrategy: DeleteStrategy<WholesalerCategory_Category_Nested> = {
-    execute: handleCategoryDelete,
-  };
-
-  const categoriesRowActionStrategy: RowActionStrategy<WholesalerCategory_Category_Nested> = {
+  const categoriesRowActionStrategy: RowActionStrategy<ProductCategory> = {
     click: handleCategorySelect,
   };
 
-  async function handleCategoriesSort(sortState: SortDescriptor<WholesalerCategory_Category_Nested>[] | null) {
-    assertDefined(supplier, "supplier");
-    assignedCategories = await supplierApi.loadCategoriesForSupplier(supplier.wholesaler_id, null, sortState);
+  // <refact01> CHANGED: Delete now performs master-data delete (not assignment delete)
+  const categoriesDeleteStrategy: DeleteStrategy<ProductCategory> = {
+    execute: handleCategoryDelete,
+  };
+
+  /**
+   * Handles category grid sorting.
+   * <refact01> CHANGED: Now uses categoryApi.loadCategories directly with orderBy
+   */
+  async function handleCategoriesSort(sortState: SortDescriptor<ProductCategory>[] | null) {
+    categories = await categoryApi.loadCategoriesWithWhereAndOrder(null, sortState);
   }
 
   // === ORDERS GRID ==============================================================================
@@ -348,8 +348,8 @@
     );
 
     if (dataChanged) {
-      // Reload and change state.
-      reloadCategories();
+      // <refact01> TODO: Implement reloadOrders() if needed
+      log.info("Order deleted, reload would happen here");
     }
   }
 
@@ -384,16 +384,26 @@
 {#snippet categoryGridSection()}
   <div class="grid-section">
     {#if data.isCreateMode}
-      <p>Assigned categories will be available after supplier has been saved.</p>
+      <p>Categories will be available after supplier has been saved.</p>
     {:else}
-      <h2>Assigned Categories</h2>
-      <p>Products this supplier can offer are organized by these categories. Click a category to manage its product offerings.</p>
-      <SupplierCategoriesGrid
-        rows={assignedCategories}
+      <h2>Product Categories</h2>
+      <p>Browse all product categories. Click a category to view product definitions.</p>
+      <!-- <refact01> CHANGED: Simple list of ALL categories (no assignments, no delete) -->
+      <Datagrid
+        rows={categories}
+        columns={[
+          { key: 'category_id', header: 'ID', width: '80px' },
+          { key: 'name', header: 'Name', width: '200px' },
+          { key: 'description', header: 'Description', width: 'auto' }
+        ]}
+        getId={(row) => row.category_id}
         loading={$categoryLoadingState}
+        gridId="categories"
+        entity="category"
         deleteStrategy={categoriesDeleteStrategy}
         rowActionStrategy={categoriesRowActionStrategy}
         onSort={handleCategoriesSort}
+        maxBodyHeight="550px"
       />
     {/if}
   </div>
@@ -449,7 +459,7 @@
         />
       </div>
 
-      <!-- Section 2: Assign new categories -->
+      <!-- <refact01> DEPRECATED: Section 2 (Assign new categories) removed - no more assignments
       <div class="assignment-section">
         {#if supplier}
           <CategoryAssignment
@@ -463,8 +473,9 @@
           <p>Category assignment selection will be available after supplier has been saved.</p>
         {/if}
       </div>
+      -->
 
-      <!-- Section 3: Grid of assigned categories -->
+      <!-- Section 3: Grid of categories (read-only) -->
       {#if "categories" === data.activeChildPath}
         {@render categoryGridSection()}
       {:else if "orders" === data.activeChildPath}

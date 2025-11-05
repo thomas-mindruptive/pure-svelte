@@ -22,6 +22,7 @@ export interface QueryConfig {
 
 export const queryConfig: QueryConfig = {
   predefinedQueryies: {
+    /* <refact01> DEPRECATED: wholesaler_categories removed
     supplier_categories: {
       from: { table: "dbo.wholesalers", alias: "w" },
       joins: [
@@ -59,6 +60,7 @@ export const queryConfig: QueryConfig = {
         },
       ],
     },
+    */
     category_offerings_proddef: {
       from: { table: "dbo.product_categories", alias: "pc" },
       joins: [
@@ -114,6 +116,7 @@ export const queryConfig: QueryConfig = {
         },
       ],
     },
+    /* <refact01> DEPRECATED: wholesaler_categories removed
     wholesaler_category_offerings: {
       from: { table: "dbo.wholesaler_categories", alias: "wc" },
       joins: [
@@ -128,6 +131,7 @@ export const queryConfig: QueryConfig = {
         },
       ],
     },
+    */
     wholesaler_item_offering_product_def: {
       from: { table: "dbo.wholesaler_item_offerings", alias: "wio" },
       joins: [

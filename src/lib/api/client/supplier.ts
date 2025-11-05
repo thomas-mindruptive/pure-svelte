@@ -9,7 +9,9 @@
 
 import {
   ComparisonOperator,
+  /* <refact01> DEPRECATED: wholesaler_categories removed
   LogicalOperator,
+  */
   type QueryPayload,
   type SortDescriptor,
   type WhereCondition,
@@ -22,29 +24,38 @@ import {
   type Order_Wholesaler,
   type ProductCategory,
   type Wholesaler,
+  /* <refact01> DEPRECATED: wholesaler_categories removed
   type WholesalerCategory,
   type WholesalerCategory_Category,
   type WholesalerCategoryWithCount,
+  */
   type Wio_PDef_Cat_Supp_Nested,
+  /* <refact01> DEPRECATED: wholesaler_categories removed
   WholesalerCategory_Category_Nested_Schema,
   type WholesalerCategory_Category_Nested,
+  */
 } from "$lib/domain/domainTypes";
 import { log } from "$lib/utils/logger";
 
 import type {
   ApiValidationError,
+  /* <refact01> DEPRECATED: wholesaler_categories removed
   AssignmentRequest,
   AssignmentSuccessData,
+  */
   PredefinedQueryRequest,
   QueryResponseData,
+  /* <refact01> DEPRECATED: wholesaler_categories removed
   RemoveAssignmentRequest,
+  */
 } from "$lib/api/api.types";
-import type { DeleteSupplierApiResponse, RemoveCategoryApiResponse } from "$lib/api/app/appSpecificTypes";
+import type { DeleteSupplierApiResponse /* <refact01> , RemoveCategoryApiResponse */ } from "$lib/api/app/appSpecificTypes";
 import { transformToNestedObjects } from "$lib/backendQueries/recordsetTransformer";
 import { genTypedQualifiedColumns, zodToValidationErrorTree } from "$lib/domain/domainTypes.utils";
 import type { ApiClient } from "./apiClient";
 import { createJsonAndWrapInPayload, createJsonBody, getErrorMessage } from "./common";
 import { LoadingState } from "./loadingState";
+import { getCategoryApi } from "./category"; // <refact01> For mini wrapper methods
 
 // Loading state managers remain global as they are a client-side concern.
 const supplierLoadingManager = new LoadingState();
@@ -214,64 +225,27 @@ export function getSupplierApi(client: ApiClient) {
     // ===== CATEGORY ASSIGNMENT CRUD =====
 
     /**
-     * Loads categories assigned to a supplier.
+     * Loads categories for a supplier.
+     * <refact01> CHANGED: Mini wrapper to categoryApi.loadCategories() - returns ALL categories.
+     * supplierId parameter kept for backward compatibility but is unused.
      */
     async loadCategoriesForSupplier(
       supplierId: number,
-      where?: WhereConditionGroup<WholesalerCategory_Category_Nested> | null,
-      orderBy?: SortDescriptor<WholesalerCategory_Category_Nested>[] | null,
-    ): Promise<WholesalerCategory_Category_Nested[]> {
-      const operationId = `loadCategoriesForSupplier-${supplierId}`;
-      supplierLoadingOperations.start(operationId);
-      try {
-        const supplierFilterWhere = {
-          key: "w.wholesaler_id" as const,
-          whereCondOp: ComparisonOperator.EQUALS,
-          val: supplierId,
-        };
-
-        let completeWhereGroup:
-          | WhereCondition<WholesalerCategory_Category_Nested>
-          | WhereConditionGroup<WholesalerCategory_Category_Nested>;
-        if (where) {
-          completeWhereGroup = {
-            whereCondOp: "AND",
-            conditions: [supplierFilterWhere, where],
-          };
-        } else {
-          completeWhereGroup = supplierFilterWhere;
-        }
-
-        const completeOrderBy: SortDescriptor<WholesalerCategory_Category_Nested>[] =
-          orderBy && orderBy.length > 0 ? orderBy : [{ key: "pc.name", direction: "asc" }];
-
-        const cols = genTypedQualifiedColumns(WholesalerCategory_Category_Nested_Schema, true);
-        const request: PredefinedQueryRequest<WholesalerCategory_Category_Nested> = {
-          namedQuery: "supplier_categories",
-          payload: {
-            select: cols, //["w.wholesaler_id", "wc.category_id", "pc.name AS category_name", "wc.comment", "wc.link"],
-            where: completeWhereGroup,
-            orderBy: completeOrderBy,
-          },
-        };
-        const responseData = await client.apiFetch<QueryResponseData<WholesalerCategoryWithCount>>(
-          "/api/query",
-          { method: "POST", body: createJsonBody(request) },
-          { context: operationId },
-        );
-        const nestedRes = transformToNestedObjects(responseData.results, WholesalerCategory_Category_Nested_Schema);
-        return nestedRes;
-      } catch (err) {
-        log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
-        throw err;
-      } finally {
-        supplierLoadingOperations.finish(operationId);
-      }
+      where?: WhereConditionGroup<ProductCategory> | null,
+      orderBy?: SortDescriptor<ProductCategory>[] | null,
+    ): Promise<ProductCategory[]> {
+      // <refact01> Delegate to categoryApi.loadCategories with where/orderBy support
+      const categoryApi = getCategoryApi(client);
+      const queryPartial: Partial<QueryPayload<ProductCategory>> = {};
+      if (where) queryPartial.where = where;
+      if (orderBy) queryPartial.orderBy = orderBy;
+      return categoryApi.loadCategories(queryPartial);
     },
 
+    /* <refact01> DEPRECATED: wholesaler_categories removed
     /**
      * Loads exactly one supplier <-> categories assignment.
-     */
+     *-/
     async loadCategoryAssignmentForSupplier(supplierId: number, categoryId: number): Promise<WholesalerCategory_Category | null> {
       const operationId = `loadCategoriesForSupplier-${supplierId}`;
       supplierLoadingOperations.start(operationId);
@@ -309,10 +283,10 @@ export function getSupplierApi(client: ApiClient) {
         supplierLoadingOperations.finish(operationId);
       }
     },
+    */
 
-    /**
-     * Loads all available categories from master data.
-     */
+    /* <refact01> DEPRECATED: Removed - use categoryApi.loadCategories() directly
+    // Loads all available categories from master data.
     async loadAvailableCategories(): Promise<ProductCategory[]> {
       const operationId = "loadAvailableCategories";
       supplierLoadingOperations.start(operationId);
@@ -334,36 +308,23 @@ export function getSupplierApi(client: ApiClient) {
         supplierLoadingOperations.finish(operationId);
       }
     },
+    */
 
-    /**
-     * Gets available categories that are not yet assigned to a specific supplier.
-     */
+    /* <refact01> DEPRECATED: Removed - use categoryApi.loadCategories() directly
+    // Gets available categories for a supplier.
+    // CHANGED: Mini wrapper to categoryApi.loadCategories() - returns ALL categories.
+    // supplierId parameter kept for backward compatibility but is unused.
     async loadAvailableCategoriesForSupplier(supplierId: number): Promise<ProductCategory[]> {
-      const operationId = `loadAvailableCategoriesForSupplier-${supplierId}`;
-      supplierLoadingOperations.start(operationId);
-      try {
-        // TODO: Change to antijoin.
-        const [allCategories, assignedCategories] = await Promise.all([
-          api.loadAvailableCategories(),
-          api.loadCategoriesForSupplier(supplierId),
-        ]);
-
-        const assignedIds = new Set(assignedCategories.map((c) => c.category_id));
-        const availableCategories = allCategories.filter((cat) => !assignedIds.has(cat.category_id));
-
-        log.info(`[${operationId}] Found ${availableCategories.length} available categories for supplier ${supplierId}`);
-        return availableCategories;
-      } catch (err) {
-        log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
-        throw err;
-      } finally {
-        supplierLoadingOperations.finish(operationId);
-      }
+      // Simply delegate to categoryApi - all categories are available
+      const categoryApi = getCategoryApi(client);
+      return categoryApi.loadCategories();
     },
+    */
 
+    /* <refact01> DEPRECATED: wholesaler_categories removed
     /**
      * Assigns a category to a supplier.
-     */
+     *-/
     async assignCategoryToSupplier(
       supplierId: number,
       category: Omit<WholesalerCategory, "wholesaler_id">,
@@ -389,10 +350,12 @@ export function getSupplierApi(client: ApiClient) {
         supplierLoadingOperations.finish(operationId);
       }
     },
+    */
 
+    /* <refact01> DEPRECATED: wholesaler_categories removed
     /**
      * Updates an existing category assignment for a supplier.
-     */
+     *-/
     async updateSupplierCategoryAssignment(
       supplierId: number,
       categoryId: number,
@@ -419,10 +382,12 @@ export function getSupplierApi(client: ApiClient) {
         supplierLoadingOperations.finish(operationId);
       }
     },
+    */
 
+    /* <refact01> DEPRECATED: wholesaler_categories removed
     /**
      * Removes a category assignment from a supplier.
-     */
+     *-/
     async removeCategoryFromSupplier(
       supplierId: number,
       categoryId: number,
@@ -447,6 +412,7 @@ export function getSupplierApi(client: ApiClient) {
         supplierLoadingOperations.finish(operationId);
       }
     },
+    */
 
     // ===== OFFERINGS =====
 

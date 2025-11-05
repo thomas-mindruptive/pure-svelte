@@ -4,7 +4,8 @@
       "Bash(powershell -Command \"Get-Service -Name ''SQLBrowser'' | Select-Object Name, Status, DisplayName\")",
       "Bash(powershell -Command:*)",
       "Bash(nul)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(npm run check:*)"
     ],
     "deny": [],
     "ask": []

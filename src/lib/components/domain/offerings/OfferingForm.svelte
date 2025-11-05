@@ -461,22 +461,8 @@
 
           <!-- "product defs" combo -------------------------------------------------------------->
           <div class="control-group span-2">
-            <!--- Create mode and suppliers route => render "productdefs" combo --->
-            {#if isCreateMode}
-              {#if isSuppliersRoute}
-                {@render productDefinitionCombo(fieldProps)}
-              {:else}
-                <p>
-                  {get(["product_def", "title"]) ?? "product_def_title missing"}
-                </p>
-              {/if}
-            {:else}
-              <!--- Not create mode => Render static text for product def --->
-              <p>
-                {get(["product_def", "title"]) ?? "product_def_title missing"}
-              </p>
-              <p class="field-hint">The product cannot be changed for an existing offering.</p>
-            {/if}
+            <!-- <refact01> CHANGED: Product def combo ALWAYS editable (no wholesaler_categories constraint) -->
+            {@render productDefinitionCombo(fieldProps)}
           </div>
         </div>
         <!-- end row ----------------------------------------------------------------------------->

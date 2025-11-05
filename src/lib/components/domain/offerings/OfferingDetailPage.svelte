@@ -197,23 +197,21 @@
           errors.surfaceFinishes = zodToValidationErrorTree(surfaceFinishesVal.error);
         }
 
-        // Load route-specific combobox data
-        if (data.isSuppliersRoute) {
-          // Load products for category (supplier is fixed)
-          availableProducts = await categoryApi.loadProductDefsForCategory(data.categoryId);
-          if (aborted) return;
-          const productsVal = safeParseFirstN(ProductDefinitionSchema, availableProducts, 3);
-          if (!productsVal.success) {
-            errors.availableProducts = zodToValidationErrorTree(productsVal.error);
-          }
-        } else if (data.isCategoriesRoute) {
-          // Load suppliers for category (product is fixed)
-          availableSuppliers = await categoryApi.loadSuppliersForCategory(data.categoryId);
-          if (aborted) return;
-          const suppliersVal = safeParseFirstN(WholesalerSchema, availableSuppliers, 3);
-          if (!suppliersVal.success) {
-            errors.availableSuppliers = zodToValidationErrorTree(suppliersVal.error);
-          }
+        // <refact01> CHANGED: Load products AND suppliers on BOTH routes (no more constraints)
+        // Load products for category
+        availableProducts = await categoryApi.loadProductDefsForCategory(data.categoryId);
+        if (aborted) return;
+        const productsVal = safeParseFirstN(ProductDefinitionSchema, availableProducts, 3);
+        if (!productsVal.success) {
+          errors.availableProducts = zodToValidationErrorTree(productsVal.error);
+        }
+
+        // Load suppliers for category
+        availableSuppliers = await categoryApi.loadSuppliersForCategory(data.categoryId);
+        if (aborted) return;
+        const suppliersVal = safeParseFirstN(WholesalerSchema, availableSuppliers, 3);
+        if (!suppliersVal.success) {
+          errors.availableSuppliers = zodToValidationErrorTree(suppliersVal.error);
         }
 
         // Load data based on activeChildPath (only in edit mode)

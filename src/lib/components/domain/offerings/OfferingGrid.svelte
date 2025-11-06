@@ -59,56 +59,72 @@
       header: "Offering",
       accessor: (offering) => offering.title,
       sortable: true,
+      width: "15rem",
     },
     {
       key: "pd.title",
       header: "Product",
       sortable: true,
+      width: "15rem",
       accessor: (offering) => offering.product_def.title || "Unnamed Product",
     },
     {
       key: "w.name",
       header: "Supplier",
       sortable: true,
+      width: "12rem",
       accessor: (offering) => offering.wholesaler.name || "Unnamed Supplier",
     },
-        {
+    {
       key: "wio.sub_seller",
       header: "Subseller",
       sortable: true,
+      width: "10rem",
       accessor: (offering) => offering.sub_seller || "—",
     },
     {
       key: "wio.price",
       header: "Price",
       sortable: true,
+      width: "8rem",
       accessor: (offering) => {
         if (offering.price == null) return "—";
         return `${offering.currency || "USD"} ${offering.price.toFixed(2)}`;
       },
     },
     {
-      key: "size",
-      header: "Size/Dim/Weight",
-      sortable: false,
-      accessor: (offering) => {
-        const size = offering.size || "NA";
-        const dimensions = offering.dimensions || "NA";
-        const weight = offering.weight_grams ? offering.weight_grams.toString() : "NA";
-        const cellTitle = `${size} / ${dimensions} / ${weight}`;
-        return cellTitle;
-      },
+      key: "wio.size",
+      header: "Size",
+      sortable: true,
+      width: "7rem",
+      accessor: (offering) => offering.size || "—",
+    },
+    {
+      key: "wio.dimensions",
+      header: "Dimensions",
+      sortable: true,
+      width: "8rem",
+      accessor: (offering) => offering.dimensions || "—",
+    },
+    {
+      key: "wio.weight_range",
+      header: "Weight",
+      sortable: true,
+      width: "8rem",
+      accessor: (offering) => offering.weight_range || (offering.weight_grams ? `${offering.weight_grams}g` : "—"),
     },
     {
       key: "comment",
       header: "Notes",
       sortable: false,
+      width: "12rem",
       accessor: (offering) => offering.comment?.substring(0, 20) || "—",
     },
     {
       key: "links",
       header: "Links",
       sortable: false,
+      width: "12rem",
       accessor: (offering) => {
         let displayUrl = "";
         if (offering.links?.[0]) {

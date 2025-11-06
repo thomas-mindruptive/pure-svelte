@@ -11,9 +11,11 @@
  * Result type for parsing operations
  */
 export type ParseResult<T> = {
-  valid: boolean;
+  valid: true;
   data?: T;
-  error?: string;
+} | {
+  valid: false;
+  error: string;
 };
 
 /**
@@ -24,6 +26,16 @@ export type WeightRange = {
   max: number;
   unit: 'g' | 'kg';
 };
+
+/**
+ * Parsed dimension data structure.
+ * Can contain either a range (min/max) or a list of dimensions (values).
+ */
+export interface ParsedDimensionData {
+  unit: string;
+  range?: { min: number; max: number };
+  values?: number[];
+}
 
 /**
  * Parses and validates weight range strings.
@@ -65,7 +77,7 @@ export function parseWeightRange(input: string | null | undefined): ParseResult<
     const valInGrams = val * unitMultiplier;
 
     if (valInGrams <= 0) {
-      return { valid: false, error: 'Weight must be greater than 0' };
+      return { valid: false, error: `Weight must be greater than 0: "${input}"` };
     }
     return {
       valid: true,
@@ -84,10 +96,10 @@ export function parseWeightRange(input: string | null | undefined): ParseResult<
     const max = maxVal * unitMultiplier;
 
     if (min <= 0 || max <= 0) {
-      return { valid: false, error: 'Weight values must be greater than 0' };
+      return { valid: false, error: `Weight values must be greater than 0: "${input}"` };
     }
     if (min > max) {
-      return { valid: false, error: 'Minimum weight must be less than or equal to maximum weight' };
+      return { valid: false, error: `Minimum weight must be less than or equal to maximum weight: "${input}"` };
     }
 
     return {
@@ -105,7 +117,7 @@ export function parseWeightRange(input: string | null | undefined): ParseResult<
     const valInGrams = val * unitMultiplier;
 
     if (valInGrams <= 0) {
-      return { valid: false, error: 'Weight must be greater than 0' };
+      return { valid: false, error: `Weight must be greater than 0: "${input}"` };
     }
     return {
       valid: true,
@@ -115,7 +127,7 @@ export function parseWeightRange(input: string | null | undefined): ParseResult<
 
   return {
     valid: false,
-    error: 'Invalid weight format. Use: "250g", "50-80g", "ca. 100g", or "0.25kg"'
+    error: `Invalid weight format: "${input}". Use: "250g", "50-80g", "ca. 100g", or "0.25kg"`
   };
 }
 
@@ -123,82 +135,92 @@ export function parseWeightRange(input: string | null | undefined): ParseResult<
  * Parses and validates dimension strings.
  *
  * Supported formats (unit REQUIRED, only mm/cm/m allowed):
- * - Single value: "3cm", "10mm", "1.5m", "1,5cm", "3 cm"
- * - Range: "1-3cm", "5-10mm", "1,5 - 3 cm"
+ * - Single value: "3cm", "10mm", "1.5m", "1,5cm"
+ * - Range: "1-3cm", "5-10mm", "1,5 – 3 cm" (supports -, –, and —)
+ * - Multi-dimensional: "10x5cm", "10 x 5 x 3 mm"
  * - Accepts comma or dot as decimal separator
  * - Allows optional whitespace around values and units
  *
- * @param input - The dimension string to parse (e.g., "1-3cm" or "1,5 - 3 cm")
- * @returns ParseResult with min/max dimensions
+ * @param input - The dimension string to parse (e.g., "1-3cm", "10 x 5 cm")
+ * @returns ParseResult with structured dimension data
  *
  * @example
- * parseDimensions("3cm")       // { valid: true, data: { min: 3, max: 3, unit: 'cm' } }
- * parseDimensions("1-3cm")     // { valid: true, data: { min: 1, max: 3, unit: 'cm' } }
- * parseDimensions("1,5 - 3 cm") // { valid: true, data: { min: 1.5, max: 3, unit: 'cm' } }
- * parseDimensions("10mm")      // { valid: true, data: { min: 10, max: 10, unit: 'mm' } }
+ * parseDimensions("3cm")       // { valid: true, data: { values: [3], unit: 'cm' } }
+ * parseDimensions("1-3cm")     // { valid: true, data: { range: { min: 1, max: 3 }, unit: 'cm' } }
+ * parseDimensions("10 x 5 cm") // { valid: true, data: { values: [10, 5], unit: 'cm' } }
  * parseDimensions("3")         // { valid: false, error: "..." } - unit required
- * parseDimensions("2-3")       // { valid: false, error: "..." } - unit required
  * parseDimensions("3inch")     // { valid: false, error: "..." } - invalid unit
  */
-export function parseDimensions(input: string | null | undefined): ParseResult<{ min: number; max: number; unit: string }> {
-  // Null/undefined is valid for optional fields
-  if (!input) {
+export function parseDimensions(input: string | null | undefined): ParseResult<ParsedDimensionData> {
+  // Null/undefined or empty strings are valid for optional fields
+  if (!input || input.trim() === '') {
     return { valid: true };
   }
 
   const trimmed = input.trim().toLowerCase();
 
-  if (trimmed === '') {
-    return { valid: true };
-  }
+  // Pattern 1: Multi-dimensional - "10x5cm", "10 x 5 x 3 mm"
+  const multiDimMatch = trimmed.match(/^((?:\d+(?:[.,]\d+)?\s*x\s*)+\d+(?:[.,]\d+)?)\s*(cm|mm|m)$/);
+  if (multiDimMatch) {
+    const unit = multiDimMatch[2];
+    // Extract all numbers separated by 'x'
+    const values = multiDimMatch[1]
+      .split('x')
+      .map(s => parseFloat(s.trim().replace(',', '.')));
 
-  // Pattern 1: Single value - "3cm", "10mm", "1.5m", "1,5cm" (unit REQUIRED: mm, cm, m)
-  // Accept both comma and dot as decimal separator, optional whitespace
-  const singleMatch = trimmed.match(/^(\d+(?:[.,]\d+)?)\s*(?:(cm)|(mm)|(m))$/);
-  if (singleMatch) {
-    // Normalize comma to dot for parseFloat
-    const valStr = singleMatch[1].replace(',', '.');
-    const val = parseFloat(valStr);
-    // Extract unit from the matching group (2=cm, 3=mm, 4=m)
-    const unit = singleMatch[2] || singleMatch[3] || singleMatch[4];
-
-    if (val <= 0) {
-      return { valid: false, error: 'Dimension must be greater than 0' };
+    // Check that all values are valid positive numbers
+    if (values.some(v => isNaN(v) || v <= 0)) {
+      return { valid: false, error: `All dimension values must be valid numbers greater than 0: "${input}"` };
     }
+
     return {
       valid: true,
-      data: { min: val, max: val, unit }
+      data: { values, unit }
     };
   }
 
-  // Pattern 2: Range - "1-3cm", "5-10mm", "4-5m", "1,5 - 3 cm" (unit REQUIRED: mm, cm, m)
-  // Accept both comma and dot as decimal separator, optional whitespace
-  const rangeMatch = trimmed.match(/^(\d+(?:[.,]\d+)?)\s*-\s*(\d+(?:[.,]\d+)?)\s*(?:(cm)|(mm)|(m))$/);
-
+  // Pattern 2: Range - "1-3cm", "1,5 – 5 mm" (supports -, –, and —)
+  const rangeMatch = trimmed.match(/^(\d+(?:[.,]\d+)?)\s*[-–—]\s*(\d+(?:[.,]\d+)?)\s*(cm|mm|m)$/);
   if (rangeMatch) {
-    // Normalize comma to dot for parseFloat
     const minStr = rangeMatch[1].replace(',', '.');
     const maxStr = rangeMatch[2].replace(',', '.');
     const min = parseFloat(minStr);
     const max = parseFloat(maxStr);
-    // Extract unit from the matching group (3=cm, 4=mm, 5=m)
-    const unit = rangeMatch[3] || rangeMatch[4] || rangeMatch[5];
+    const unit = rangeMatch[3];
 
     if (min <= 0 || max <= 0) {
-      return { valid: false, error: 'Dimension values must be greater than 0' };
+      return { valid: false, error: `Dimension values must be greater than 0: "${input}"` };
     }
     if (min > max) {
-      return { valid: false, error: 'Minimum dimension must be less than or equal to maximum dimension' };
+      return { valid: false, error: `Minimum dimension must be less than or equal to maximum dimension: "${input}"` };
     }
 
     return {
       valid: true,
-      data: { min, max, unit }
+      data: { range: { min, max }, unit }
     };
   }
 
+  // Pattern 3: Single value - "3cm", "1.5m"
+  const singleMatch = trimmed.match(/^(\d+(?:[.,]\d+)?)\s*(cm|mm|m)$/);
+  if (singleMatch) {
+    const valStr = singleMatch[1].replace(',', '.');
+    const val = parseFloat(valStr);
+    const unit = singleMatch[2];
+
+    if (val <= 0) {
+      return { valid: false, error: `Dimension must be greater than 0: "${input}"` };
+    }
+    return {
+      valid: true,
+      // Single value stored as array with one element
+      data: { values: [val], unit }
+    };
+  }
+
+  // If no pattern matches, return comprehensive error
   return {
     valid: false,
-    error: 'Invalid dimension format. Use: "3cm", "10mm", "1.5m", or "1-3cm" (unit required: mm, cm, m)'
+    error: `Invalid dimension format: "${input}". Use: "10cm", "5-10mm", or "10 x 5 x 3 m" (unit required: mm, cm, m)`
   };
 }

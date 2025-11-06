@@ -113,6 +113,7 @@ export async function loadNestedOfferingsOptimized(
             wio.comment,
             wio.created_at,
             wio.is_assortment,
+            wio.override_material,
             -- Product definition (nested via dotted alias)
             pd.product_def_id AS 'product_def.product_def_id',
             pd.category_id AS 'product_def.category_id',
@@ -158,7 +159,8 @@ export async function loadNestedOfferingsOptimized(
             shop.currency AS 'shop_offering.currency',
             shop.comment AS 'shop_offering.comment',
             shop.created_at AS 'shop_offering.created_at',
-            shop.is_assortment AS 'shop_offering.is_assortment'
+            shop.is_assortment AS 'shop_offering.is_assortment',
+            shop.override_material AS 'shop_offering.override_material'
         FROM @offering_ids ids
         INNER JOIN dbo.wholesaler_item_offerings wio ON ids.offering_id = wio.offering_id
         ${customJoinClause || ""}
@@ -298,6 +300,7 @@ export async function loadFlatOfferingsWithJoinsAndLinks(
         wio.comment,
         wio.created_at,
         wio.is_assortment,
+        wio.override_material,
         pd.title AS product_def_title,
         pd.description AS product_def_description,
         pc.name AS category_name,
@@ -426,6 +429,7 @@ export async function loadOfferingsForImageAnalysis(
         wio.comment,
         wio.created_at,
         wio.is_assortment,
+        wio.override_material,
 
         -- Product definition (nested)
         pd.product_def_id AS 'product_def.product_def_id',

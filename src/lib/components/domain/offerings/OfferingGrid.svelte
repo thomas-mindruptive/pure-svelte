@@ -55,16 +55,16 @@
 
   const columns: ColumnDef<typeof Wio_PDef_Cat_Supp_Nested_WithLinks_Schema>[] = [
     {
-      key: "pd.title",
-      header: "Product",
-      sortable: true,
-      accessor: (offering) => offering.product_def.title || "Unnamed Product",
-    },
-    {
       key: "wio.title",
       header: "Offering",
       accessor: (offering) => offering.title,
       sortable: true,
+    },
+    {
+      key: "pd.title",
+      header: "Product",
+      sortable: true,
+      accessor: (offering) => offering.product_def.title || "Unnamed Product",
     },
     {
       key: "w.name",

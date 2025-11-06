@@ -138,6 +138,7 @@
 .pc-grid__tbody tr {
   position: relative;
   vertical-align: top;
+  cursor: pointer;
 }
 
 .pc-grid__tbody tr::after {

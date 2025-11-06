@@ -502,6 +502,15 @@
             {@render materialCombo2(fieldProps)}
           </div>
 
+          <!-- override_material checkbox --------------------------------------------------------->
+          <Field
+            {fieldProps}
+            path={["override_material"]}
+            label="overr."
+            type="checkbox"
+            class="span-1"
+          />
+
           <!-- form ------------------------------------------------------------------------------>
           <div class="control-group span-1">
             {@render formCombo2(fieldProps)}

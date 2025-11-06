@@ -9,12 +9,16 @@ import { log } from "$lib/utils/logger";
 import type { ApiErrorResponse } from "$lib/api/api.types";
 import { buildUnexpectedError } from "$lib/backendQueries/genericEntityOperations";
 import { rollbackTransaction } from "$lib/backendQueries/transactionWrapper";
+import { insertRecordWithTransaction } from "$lib/backendQueries/genericEntityOperations";
 
 /**
  * POST /api/offerings/[id]/copy-for-shop
  *
  * Creates a shop offering (wholesaler_id = 99) by copying a source offering.
  * Links the new shop offering to the source via shop_offering_sources table.
+ *
+ * <refact01> CHANGED: Removed deprecated wholesaler_categories auto-assignment
+ * Suppliers can now create offerings for ANY category without assignment.
  *
  * Returns: { shop_offering_id: number }
  */
@@ -85,6 +89,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
       return json(errRes, { status: 409 });
     }
 
+    /* <refact01> REMOVED: wholesaler_categories auto-assignment - no longer needed
     // 3.5. Auto-assign category to wholesaler 99 if not already assigned
     const categoryCheckRequest = transaction.request();
     categoryCheckRequest.input("wholesaler_id", 99);
@@ -109,6 +114,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
 
       log.info(`[${operationId}] Auto-assigned category ${sourceOffering.category_id} to wholesaler 99`);
     }
+    */
 
     // 4. Create shop offering data (copy from source, set wholesaler_id = 99)
     const shopOfferingData: z.infer<typeof WholesalerItemOfferingForCreateSchema> = {
@@ -119,43 +125,17 @@ export const POST: RequestHandler = async ({ params, request }) => {
         : `Copied from offering ${sourceOfferingId}`,
     };
 
-    // 5. Validate and insert shop offering
+    // 5. Validate and insert shop offering using generic method
     const validated = WholesalerItemOfferingForCreateSchema.parse(shopOfferingData);
 
-    const insertRequest = transaction.request();
-    insertRequest.input("wholesaler_id", validated.wholesaler_id);
-    insertRequest.input("category_id", validated.category_id);
-    insertRequest.input("product_def_id", validated.product_def_id);
-    insertRequest.input("sub_seller", validated.sub_seller);
-    insertRequest.input("material_id", validated.material_id);
-    insertRequest.input("form_id", validated.form_id);
-    insertRequest.input("surface_finish_id", validated.surface_finish_id);
-    insertRequest.input("construction_type_id", validated.construction_type_id);
-    insertRequest.input("color_variant", validated.color_variant);
-    insertRequest.input("title", validated.title);
-    insertRequest.input("size", validated.size);
-    insertRequest.input("dimensions", validated.dimensions);
-    insertRequest.input("weight_grams", validated.weight_grams);
-    insertRequest.input("price", validated.price);
-    insertRequest.input("currency", validated.currency);
-    insertRequest.input("comment", validated.comment);
-    insertRequest.input("is_assortment", validated.is_assortment);
+    // Use generic insertRecordWithTransaction - automatically includes override_material
+    const insertedRecord = await insertRecordWithTransaction(
+      WholesalerItemOfferingForCreateSchema,
+      validated,
+      transaction
+    );
 
-    const insertResult = await insertRequest.query(`
-      INSERT INTO dbo.wholesaler_item_offerings (
-        wholesaler_id, category_id, product_def_id, sub_seller,
-        material_id, form_id, surface_finish_id, construction_type_id, color_variant,
-        title, size, dimensions, weight_grams, price, currency, comment, is_assortment
-      )
-      OUTPUT INSERTED.offering_id
-      VALUES (
-        @wholesaler_id, @category_id, @product_def_id, @sub_seller,
-        @material_id, @form_id, @surface_finish_id, @construction_type_id, @color_variant,
-        @title, @size, @dimensions, @weight_grams, @price, @currency, @comment, @is_assortment
-      )
-    `);
-
-    const shopOfferingId = insertResult.recordset[0].offering_id;
+    const shopOfferingId = insertedRecord.offering_id as number;
 
     // 6. Link shop offering to source via shop_offering_sources
     const linkRequest = transaction.request();

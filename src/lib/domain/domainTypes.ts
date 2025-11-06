@@ -394,6 +394,7 @@ const Wio_BaseSchema = z
     currency: z.string().length(3).nullable().optional(),
     comment: z.string().max(4000).nullable().optional(),
     is_assortment: z.boolean().nullable().optional(),
+    override_material: z.boolean().default(false), // Allow material override from ProductDef
     // Shopify integration fields (for shop offerings with wholesaler_id = 99)
     shopify_product_id: z.number().int().positive().nullable().optional(),
     shopify_variant_id: z.number().int().positive().nullable().optional(),

@@ -4,6 +4,8 @@
  * Enforces business rules for offerings, particularly the constraint that
  * offerings cannot override material/form/surface/construction fields if they
  * are already set in the parent Product Definition.
+ *
+ * UNLESS override_material flag is set to TRUE (for material_id only).
  */
 
 import type { WholesalerItemOffering } from "$lib/domain/domainTypes";
@@ -20,16 +22,17 @@ import type { z } from "zod";
  * the offering MUST either:
  * - Leave the field as NULL (inherits from Product Definition)
  * - Set the SAME value as Product Definition (redundant but allowed)
+ * - Set override_material=TRUE to allow material_id override (material_id only)
  *
  * **NOT allowed:**
- * - Setting a DIFFERENT value (would create conflict)
+ * - Setting a DIFFERENT value (would create conflict) - unless override flag is set
  *
  * @param offering - The offering data being created/updated (partial for updates)
  * @param transaction - Database transaction for loading Product Definition
  * @returns ValidationResultFor indicating success or field-specific errors
  *
  * @example
- * // Product Definition: material_id=5 (Rose Quartz), form_id=2 (Sphere)
+ * // Product Definition: material_id=5 (Halbedelstein), form_id=2 (Sphere)
  *
  * // ✅ Valid: Offering inherits from Product Definition
  * { product_def_id: 10, material_id: null, form_id: null }
@@ -37,8 +40,11 @@ import type { z } from "zod";
  * // ✅ Valid: Offering explicitly sets same value
  * { product_def_id: 10, material_id: 5, form_id: 2 }
  *
- * // ❌ Invalid: Offering tries to override material
- * { product_def_id: 10, material_id: 7, form_id: null }
+ * // ✅ Valid: Offering overrides material with flag set
+ * { product_def_id: 10, material_id: 7, override_material: true }
+ *
+ * // ❌ Invalid: Offering tries to override material without flag
+ * { product_def_id: 10, material_id: 7, override_material: false }
  * // Error: "Cannot override material_id. Product Definition has material_id=5"
  */
 export async function validateOfferingConstraints(
@@ -97,15 +103,29 @@ export async function validateOfferingConstraints(
 			const offeringValue = offering[field];
 
 			// Rule: If Product Definition has value AND offering has DIFFERENT value → ERROR
+			// UNLESS override_material flag is set (for material_id only)
 			if (prodDefValue !== null && prodDefValue !== undefined) {
 				if (offeringValue !== null && offeringValue !== undefined && offeringValue !== prodDefValue) {
-					errors[field] = [`Cannot override ${field}. Product Definition already has ${field}=${prodDefValue}.`];
-					log.warn(`Offering constraint violation`, {
-						field,
-						product_def_id: offering.product_def_id,
-						product_def_value: prodDefValue,
-						offering_value: offeringValue
-					});
+					// Check if override is allowed for this specific field
+					const overrideAllowed = field === 'material_id' && offering.override_material === true;
+
+					if (!overrideAllowed) {
+						errors[field] = [`Cannot override ${field}. Product Definition already has ${field}=${prodDefValue}.`];
+						log.warn(`Offering constraint violation`, {
+							field,
+							product_def_id: offering.product_def_id,
+							product_def_value: prodDefValue,
+							offering_value: offeringValue
+						});
+					} else {
+						log.info(`Override allowed for ${field}`, {
+							field,
+							product_def_id: offering.product_def_id,
+							product_def_value: prodDefValue,
+							offering_value: offeringValue,
+							override_flag: offering.override_material
+						});
+					}
 				}
 			}
 		}

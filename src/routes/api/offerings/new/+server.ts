@@ -18,11 +18,14 @@ import { v4 as uuidv4 } from "uuid";
  * @description Creates a new offering.
  * Foreign key constraints in the database ensure referential integrity:
  * - wholesaler_id, category_id, product_def_id must exist
- * - wholesaler_categories assignment is enforced by FK
+ *
+ * <refact01> CHANGED: wholesaler_categories assignment NO LONGER required
+ * Suppliers can now create offerings for ANY category.
  *
  * Business rule validation:
  * - Offerings cannot override material/form/surface/construction fields
  *   if they are already set in the parent Product Definition
+ * - UNLESS override_material=true (for material_id only)
  */
 export const POST: RequestHandler = async ({ request }) => {
   const operationId = uuidv4();

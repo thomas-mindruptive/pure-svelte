@@ -54,6 +54,12 @@ export function generateImageFilename(item: OfferingWithGenerationPlan): string 
   return parts.join("_") + ".png";
 }
 
+/**
+ * Generate the absolute directory name.
+ * @param baseDir 
+ * @param item 
+ * @returns 
+ */
 export function genAbsImgDirName(baseDir: string, item: OfferingWithGenerationPlan) {
   assertDefined(baseDir, "baseDir");
   assertDefined(item, "item");

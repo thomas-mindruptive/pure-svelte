@@ -1,10 +1,13 @@
 import type { WholesalerItemOffering, Wio_PDef_Cat_Supp_Nested_WithLinks } from "$lib/domain/domainTypes";
+import { WholesalerItemOfferingForCreateSchema } from "$lib/domain/domainTypes";
 import type { Transaction } from "mssql";
 import { buildWhereClause, type BuildContext } from "../queryBuilder";
 import type { WhereCondition, WhereConditionGroup, SortDescriptor } from "../queryGrammar";
 import { assertDefined } from "$lib/utils/assertions";
 import { error } from "@sveltejs/kit";
 import { log } from "$lib/utils/logger";
+import { insertRecordWithTransaction } from "../genericEntityOperations";
+import type { z } from "zod";
 
 /**
  * Loads a single nested offering by ID using the optimized approach.
@@ -239,6 +242,63 @@ export async function loadNestedOfferingsOptimized(
 
   // Return array of objects directly (no stringify needed)
   return offerings;
+}
+
+/**
+ * Generic function to copy an offering.
+ *
+ * @param transaction - Database transaction
+ * @param sourceOfferingId - ID of the offering to copy
+ * @param modifications - Optional modifications to apply to the copied offering (e.g., change wholesaler_id, comment, etc.)
+ * @returns The new offering ID
+ *
+ * @example
+ * // Copy offering and change wholesaler to shop (99)
+ * const newId = await copyOffering(transaction, 123, {
+ *   wholesaler_id: 99,
+ *   comment: "Copied from offering 123"
+ * });
+ */
+export async function copyOffering(
+  transaction: Transaction,
+  sourceOfferingId: number,
+  modifications?: Partial<WholesalerItemOffering>
+): Promise<number> {
+  assertDefined(transaction, "transaction");
+  assertDefined(sourceOfferingId, "sourceOfferingId");
+
+  log.debug(`copyOffering: Copying offering ${sourceOfferingId}`, { modifications });
+
+  // 1. Load source offering
+  const sourceOfferings = await loadNestedOfferingWithJoinsAndLinksForId(transaction, sourceOfferingId);
+
+  if (!sourceOfferings || sourceOfferings.length === 0) {
+    throw error(404, `Source offering ${sourceOfferingId} not found`);
+  }
+
+  const sourceOffering = sourceOfferings[0];
+
+  // 2. Copy offering data and apply modifications
+  const copiedOfferingData: z.infer<typeof WholesalerItemOfferingForCreateSchema> = {
+    ...sourceOffering,
+    ...modifications, // Apply any modifications (e.g., wholesaler_id, comment)
+  };
+
+  // 3. Validate using schema for create (removes offering_id, created_at, etc.)
+  const validated = WholesalerItemOfferingForCreateSchema.parse(copiedOfferingData);
+
+  // 4. Insert new offering
+  const insertedRecord = await insertRecordWithTransaction(
+    WholesalerItemOfferingForCreateSchema,
+    validated,
+    transaction
+  );
+
+  const newOfferingId = insertedRecord.offering_id as number;
+
+  log.info(`copyOffering: Created new offering ${newOfferingId} from source ${sourceOfferingId}`);
+
+  return newOfferingId;
 }
 
 export async function loadFlatOfferingsWithJoinsAndLinks(

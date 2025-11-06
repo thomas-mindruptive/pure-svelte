@@ -1,7 +1,5 @@
 import { db } from "$lib/backendQueries/db";
-import { loadNestedOfferingWithJoinsAndLinksForId } from "$lib/backendQueries/entityOperations/offering";
-import { WholesalerItemOfferingForCreateSchema } from "$lib/domain/domainTypes";
-import type { z } from "zod";
+import { loadNestedOfferingWithJoinsAndLinksForId, copyOffering } from "$lib/backendQueries/entityOperations/offering";
 import { json, error } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
 import { v4 as uuidv4 } from "uuid";
@@ -9,7 +7,6 @@ import { log } from "$lib/utils/logger";
 import type { ApiErrorResponse } from "$lib/api/api.types";
 import { buildUnexpectedError } from "$lib/backendQueries/genericEntityOperations";
 import { rollbackTransaction } from "$lib/backendQueries/transactionWrapper";
-import { insertRecordWithTransaction } from "$lib/backendQueries/genericEntityOperations";
 
 /**
  * POST /api/offerings/[id]/copy-for-shop
@@ -115,28 +112,15 @@ export const POST: RequestHandler = async ({ params, request }) => {
     }
     */
 
-    // 4. Create shop offering data (copy from source, set wholesaler_id = 99)
-    const shopOfferingData: z.infer<typeof WholesalerItemOfferingForCreateSchema> = {
-      ...sourceOffering,
+    // 4. Use generic copyOffering() to create shop offering
+    const shopOfferingId = await copyOffering(transaction, sourceOfferingId, {
       wholesaler_id: 99, // Shop user - Override
       comment: sourceOffering.comment
         ? `Copied from offering ${sourceOfferingId}: ${sourceOffering.comment}`
         : `Copied from offering ${sourceOfferingId}`,
-    };
+    });
 
-    // 5. Validate and insert shop offering using generic method
-    const validated = WholesalerItemOfferingForCreateSchema.parse(shopOfferingData);
-
-    // Use generic insertRecordWithTransaction - automatically includes override_material
-    const insertedRecord = await insertRecordWithTransaction(
-      WholesalerItemOfferingForCreateSchema,
-      validated,
-      transaction
-    );
-
-    const shopOfferingId = insertedRecord.offering_id as number;
-
-    // 6. Link shop offering to source via shop_offering_sources
+    // 5. Link shop offering to source via shop_offering_sources
     const linkRequest = transaction.request();
     linkRequest.input("shop_offering_id", shopOfferingId);
     linkRequest.input("source_offering_id", sourceOfferingId);

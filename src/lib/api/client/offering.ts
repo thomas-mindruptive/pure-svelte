@@ -182,6 +182,37 @@ export function getOfferingApi(client: ApiClient) {
       }
     },
 
+    /**
+     * Copies an offering and returns the new offering ID.
+     */
+    async copyOffering(offeringId: number): Promise<number> {
+      assertDefined(offeringId, "offeringId");
+      const operationId = `copyOffering-${offeringId}`;
+      offeringLoadingManager.start(operationId);
+      try {
+        log.info(`[${operationId}] Copying offering ${offeringId}`);
+        const url = `/api/offerings/${offeringId}/copy`;
+
+        const responseData = await client.apiFetch<{ new_offering_id: number }>(
+          url,
+          { method: "POST" },
+          { context: operationId }
+        );
+
+        log.info(`[${operationId}] Offering copied successfully`, {
+          sourceId: offeringId,
+          newId: responseData.new_offering_id,
+        });
+
+        return responseData.new_offering_id;
+      } catch (err) {
+        log.error(`[${operationId}] Failed to copy offering`, { error: getErrorMessage(err) });
+        throw err;
+      } finally {
+        offeringLoadingManager.finish(operationId);
+      }
+    },
+
     // ===== ATTRIBUTE MANAGEMENT =====
 
     /**

@@ -26,6 +26,7 @@
   import { zodToValidationErrors } from "$lib/domain/domainTypes.utils";
   import { assertDefined } from "$lib/utils/assertions";
   import { log } from "$lib/utils/logger";
+  import { addNotification } from "$lib/stores/notifications";
 
   // ===== INTERNAL TYPES =====
 
@@ -128,6 +129,10 @@
   const isSuppliersRoute = $derived(initialLoadedData.isSuppliersRoute);
   const isCategoriesRoute = $derived(initialLoadedData.isCategoriesRoute);
   let formShell: InstanceType<typeof FormShell<Wio_PDef_Cat_Supp_Nested_WithLinks>>;
+
+  // Copy operation state
+  let copiedOfferingId = $state<number | null>(null);
+  let isCopying = $state(false);
 
   // ===== API =====
 
@@ -258,6 +263,58 @@
       dirty: p.dirty,
     });
     onChanged?.(p);
+  }
+
+  /**
+   * Handles copying the current offering
+   */
+  async function handleCopy() {
+    const offeringId = initialLoadedData.offering?.offering_id;
+
+    if (!offeringId) {
+      log.error("(OfferingForm) Cannot copy: No offering ID");
+      addNotification("Cannot copy: No offering ID available", "error");
+      return;
+    }
+
+    isCopying = true;
+    copiedOfferingId = null;
+
+    try {
+      log.info("(OfferingForm) Copying offering", { offeringId });
+
+      // Use API client instead of direct fetch
+      const newOfferingId = await offeringApi.copyOffering(offeringId);
+      copiedOfferingId = newOfferingId;
+
+      log.info("(OfferingForm) Offering copied successfully", {
+        sourceId: offeringId,
+        newId: copiedOfferingId,
+      });
+
+      addNotification(`Offering successfully copied! New ID: ${copiedOfferingId}`, "success");
+    } catch (error) {
+      log.error("(OfferingForm) Failed to copy offering", { error });
+      copiedOfferingId = null;
+      addNotification(`Failed to copy offering: ${error}`, "error", 5000);
+    } finally {
+      isCopying = false;
+    }
+  }
+
+  /**
+   * Navigates to the copied offering
+   */
+  function handleGoto() {
+    if (!copiedOfferingId) {
+      log.error("(OfferingForm) Cannot navigate: No copied offering ID");
+      return;
+    }
+
+    // Navigate to the copied offering detail page
+    // Keep the same route context (suppliers or categories)
+    const basePath = initialLoadedData.urlPathName.replace(/\/offerings\/.*$/, '');
+    window.location.href = `${basePath}/offerings/${copiedOfferingId}`;
   }
 </script>
 
@@ -670,6 +727,7 @@
       {assertDefined(submitAction, "OfferingForm, actions snippet, submitAction")}
       {assertDefined(cancel, "OfferingForm, actions snippet, cancel")}
       <div class="form-actions">
+        <!-- Cancel and Save buttons -->
         <button
           class="secondary-button"
           type="button"
@@ -692,6 +750,38 @@
           {/if}
           Save Offering
         </button>
+
+        <!-- Spacer -->
+        <div style="flex: 1;"></div>
+
+        <!-- Copy and Goto buttons (only in edit mode) -->
+        {#if !isCreateMode && initialLoadedData.offering?.offering_id}
+          <button
+            class="secondary-button"
+            type="button"
+            onclick={handleCopy}
+            disabled={submitting || isCopying}
+            aria-busy={isCopying}
+          >
+            {#if isCopying}
+              <span
+                class="pc-grid__spinner"
+                aria-hidden="true"
+              ></span>
+            {/if}
+            Copy
+          </button>
+
+          {#if copiedOfferingId}
+            <button
+              class="primary-button"
+              type="button"
+              onclick={handleGoto}
+            >
+              Goto Copy
+            </button>
+          {/if}
+        {/if}
       </div>
     {/snippet}
   </FormShell>

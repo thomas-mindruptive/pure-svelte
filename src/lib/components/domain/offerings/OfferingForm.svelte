@@ -365,6 +365,7 @@
     valuePath={["wholesaler_id"]}
     placeholder="Search suppliers..."
     label="Supplier"
+    required
     onChange={(value, supplier) => {
       log.debug("Supplier selected via Combobox:", { value, supplier_name: supplier?.name });
     }}

@@ -6,7 +6,9 @@
       "Bash(nul)",
       "Bash(ls:*)",
       "Bash(npm run check:*)",
-      "Bash(dir /b *.sql:*)"
+      "Bash(dir /b *.sql:*)",
+      "Bash(git log:*)",
+      "Bash(dir \"C:\\dev\\pure\\pureenergy-schema\" /b)"
     ],
     "deny": [],
     "ask": []

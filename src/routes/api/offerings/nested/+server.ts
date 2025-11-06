@@ -51,7 +51,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
     try {
       const t0 = Date.now();
-      const jsonString = await loadNestedOfferingsOptimized(
+      const offeringsArray = await loadNestedOfferingsOptimized(
         transaction,
         payload.where,
         payload.orderBy,
@@ -59,12 +59,7 @@ export const POST: RequestHandler = async ({ request }) => {
         payload.offset,
       );
       console.log(`[PERF] [${operationId}] SQL query took: ${Date.now() - t0}ms`);
-
-      // Parse JSON string to array (SQL Server returns null for empty results)
-      const t1 = Date.now();
-      const offeringsArray = jsonString ? JSON.parse(jsonString) : [];
-      console.log(`[PERF] [${operationId}] JSON.parse took: ${Date.now() - t1}ms`);
-      log.debug(`[${operationId}] Parsed ${offeringsArray.length} offerings from JSON.`);
+      log.debug(`[${operationId}] Loaded ${offeringsArray.length} offerings directly as objects.`);
 
       // Log first offering for debugging
       if (offeringsArray.length > 0) {

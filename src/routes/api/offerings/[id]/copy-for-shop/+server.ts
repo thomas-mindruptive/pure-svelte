@@ -40,8 +40,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
     await transaction.begin();
 
     // 1. Load source offering
-    const sourceJsonString = await loadNestedOfferingWithJoinsAndLinksForId(transaction, sourceOfferingId);
-    const sourceOfferings = JSON.parse(sourceJsonString);
+    const sourceOfferings = await loadNestedOfferingWithJoinsAndLinksForId(transaction, sourceOfferingId);
 
     if (!sourceOfferings || sourceOfferings.length === 0) {
       throw error(404, `Source offering ${sourceOfferingId} not found`);

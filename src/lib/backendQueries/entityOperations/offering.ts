@@ -1,4 +1,4 @@
-import type { WholesalerItemOffering } from "$lib/domain/domainTypes";
+import type { WholesalerItemOffering, Wio_PDef_Cat_Supp_Nested_WithLinks } from "$lib/domain/domainTypes";
 import type { Transaction } from "mssql";
 import { buildWhereClause, type BuildContext } from "../queryBuilder";
 import type { WhereCondition, WhereConditionGroup, SortDescriptor } from "../queryGrammar";
@@ -8,9 +8,9 @@ import { log } from "$lib/utils/logger";
 
 /**
  * Loads a single nested offering by ID using the optimized approach.
- * Returns JSON string with the offering (as an array with 1 element).
+ * Returns an array with a single offering object.
  */
-export async function loadNestedOfferingWithJoinsAndLinksForId(transaction: Transaction, id: number): Promise<string> {
+export async function loadNestedOfferingWithJoinsAndLinksForId(transaction: Transaction, id: number): Promise<Wio_PDef_Cat_Supp_Nested_WithLinks[]> {
   assertDefined(transaction, "transaction");
   assertDefined(id, "id");
   const whereCondition: WhereCondition<WholesalerItemOffering> = {
@@ -30,7 +30,7 @@ export async function loadNestedOfferingWithJoinsAndLinksForId(transaction: Tran
  * - Scalable for large result sets (100s or 1000s of offerings)
  * - Table Variable ensures ORDER BY and LIMIT work correctly
  *
- * Returns: JSON string with merged data (offerings with nested links)
+ * Returns: Array of offerings with nested links (objects, not JSON string)
  */
 export async function loadNestedOfferingsOptimized(
   transaction: Transaction,
@@ -39,7 +39,7 @@ export async function loadNestedOfferingsOptimized(
   aLimit?: number,
   aOffset?: number,
   customJoinClause?: string,
-): Promise<string> {
+): Promise<Wio_PDef_Cat_Supp_Nested_WithLinks[]> {
   assertDefined(transaction, "transaction");
   log.debug(`loadNestedOfferingsOptimized`, {aWhere, aOrderBy, aLimit, aOffset, customJoinClause});
 
@@ -206,7 +206,7 @@ export async function loadNestedOfferingsOptimized(
 
   // Check if first result set is empty
   if (recordsets.length === 0 || !recordsets[0] || recordsets[0].length === 0) {
-    return "[]";
+    return [];
   }
 
   // FOR JSON PATH returns a single row with a JSON string column
@@ -237,8 +237,8 @@ export async function loadNestedOfferingsOptimized(
     offering.links = linksByOfferingId.get(offering.offering_id) || [];
   });
 
-  // Convert back to JSON string (to match existing API contract)
-  return JSON.stringify(offerings);
+  // Return array of objects directly (no stringify needed)
+  return offerings;
 }
 
 export async function loadFlatOfferingsWithJoinsAndLinks(

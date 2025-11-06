@@ -50,8 +50,7 @@ export const GET: RequestHandler = async ({ params }) => {
     log.info(`[${operationId}] Transaction started for offering retrieval.`);
 
     try {
-      const jsonString = await loadNestedOfferingWithJoinsAndLinksForId(transaction, id);
-      const offeringsArray = JSON.parse(jsonString);
+      const offeringsArray = await loadNestedOfferingWithJoinsAndLinksForId(transaction, id);
 
       if (!offeringsArray || offeringsArray.length === 0) {
         await rollbackTransaction(transaction);

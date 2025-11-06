@@ -37,7 +37,7 @@ export const GET: RequestHandler = async ({ params }) => {
     // Use loadNestedOfferingsOptimized with custom JOIN
     // to get source offerings ordered by priority
     // Note: Using sos_filter alias to avoid conflict with standard sos JOIN
-    const jsonString = await loadNestedOfferingsOptimized(
+    const offeringsArray = await loadNestedOfferingsOptimized(
       transaction,
       {
         key: "sos_filter.shop_offering_id" as any, // Custom field from additional JOIN
@@ -61,9 +61,7 @@ export const GET: RequestHandler = async ({ params }) => {
     await transaction.commit();
     transactionStarted = false;
 
-    // Parse JSON string to array (SQL Server returns null for empty results)
-    const offeringsArray = jsonString ? JSON.parse(jsonString) : [];
-    log.debug(`[${operationId}] Parsed ${offeringsArray.length} offerings from JSON.`);
+    log.debug(`[${operationId}] Loaded ${offeringsArray.length} source offerings directly as objects.`);
 
     const responseData: QueryResponseData<Wio_PDef_Cat_Supp_Nested_WithLinks> = {
       results: offeringsArray as any,

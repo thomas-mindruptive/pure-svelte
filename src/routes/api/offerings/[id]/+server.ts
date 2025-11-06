@@ -5,16 +5,14 @@
  * @description Provides GET operation for a single, detailed offering record.
  */
 
-import type { ApiErrorResponse, ApiSuccessResponse, DeleteConflictResponse, DeleteRequest } from "$lib/api/api.types";
+import type { ApiSuccessResponse, DeleteConflictResponse, DeleteRequest } from "$lib/api/api.types";
 import { db } from "$lib/backendQueries/db";
 import { buildUnexpectedError, validateAndUpdateEntity, validateIdUrlParam } from "$lib/backendQueries/genericEntityOperations";
 import {
-  Wio_PDef_Cat_Supp_Nested_WithLinks_Schema,
   Wio_Schema,
   type WholesalerItemOffering,
   type Wio_PDef_Cat_Supp_Nested_WithLinks
 } from "$lib/domain/domainTypes";
-import { validateEntityBySchema } from "$lib/domain/domainTypes.utils";
 import { log } from "$lib/utils/logger";
 import { error, json, type RequestHandler } from "@sveltejs/kit";
 import { v4 as uuidv4 } from "uuid";
@@ -58,25 +56,26 @@ export const GET: RequestHandler = async ({ params }) => {
       }
 
       const nestedOfferingWithLinks = offeringsArray[0];
+      const offering = nestedOfferingWithLinks;
 
-      // TODO: all GET <path>/id endpoints should validate retrieved record.
-      const validation = validateEntityBySchema(Wio_PDef_Cat_Supp_Nested_WithLinks_Schema, nestedOfferingWithLinks);
-      const debugError = false; // ONLY FOR DEBUG!
-      if (!validation.isValid || debugError) {
-        await rollbackTransaction(transaction);
-        const errRes: ApiErrorResponse = {
-          success: false,
-          message: "Data validation failed for retrieved offering record.",
-          status_code: 500,
-          error_code: "INTERNAL_SERVER_ERROR",
-          errors: validation.errors,
-          meta: { timestamp: new Date().toISOString() },
-        };
-        log.error(`[${operationId}] FN_FAILURE: Database record validation failed.`, { errors: validation.errors });
-        return json(errRes, { status: 500 });
-      }
+      // // TODO: all GET <path>/id endpoints should validate retrieved record.
+      // const validation = validateEntityBySchema(Wio_PDef_Cat_Supp_Nested_WithLinks_Schema, nestedOfferingWithLinks);
+      // const debugError = false; // ONLY FOR DEBUG!
+      // if (!validation.isValid || debugError) {
+      //   await rollbackTransaction(transaction);
+      //   const errRes: ApiErrorResponse = {
+      //     success: false,
+      //     message: "Data validation failed for retrieved offering record.",
+      //     status_code: 500,
+      //     error_code: "INTERNAL_SERVER_ERROR",
+      //     errors: validation.errors,
+      //     meta: { timestamp: new Date().toISOString() },
+      //   };
+      //   log.error(`[${operationId}] FN_FAILURE: Database record validation failed.`, { errors: validation.errors });
+      //   return json(errRes, { status: 500 });
+      // }
 
-      const offering = validation.sanitized as Wio_PDef_Cat_Supp_Nested_WithLinks;
+      // const offering = validation.sanitized as Wio_PDef_Cat_Supp_Nested_WithLinks;
 
       // Commit transaction
       await transaction.commit();

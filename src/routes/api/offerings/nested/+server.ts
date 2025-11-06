@@ -5,21 +5,19 @@
  * @description Provides POST operation for flexible querying of nested offerings with joins and links.
  */
 
-import type { ApiErrorResponse, ApiSuccessResponse, QueryResponseData } from "$lib/api/api.types";
+import type { ApiSuccessResponse, QueryResponseData } from "$lib/api/api.types";
 import { db } from "$lib/backendQueries/db";
-import { buildUnexpectedError } from "$lib/backendQueries/genericEntityOperations";
 import { loadNestedOfferingsOptimized } from "$lib/backendQueries/entityOperations/offering";
+import { buildUnexpectedError } from "$lib/backendQueries/genericEntityOperations";
+import type { QueryPayload } from "$lib/backendQueries/queryGrammar";
 import { rollbackTransaction } from "$lib/backendQueries/transactionWrapper";
 import {
-  Wio_PDef_Cat_Supp_Nested_WithLinks_Schema,
   type WholesalerItemOffering,
-  type Wio_PDef_Cat_Supp_Nested_WithLinks,
+  type Wio_PDef_Cat_Supp_Nested_WithLinks
 } from "$lib/domain/domainTypes";
-import { validateEntityBySchema } from "$lib/domain/domainTypes.utils";
 import { log } from "$lib/utils/logger";
 import { json, type RequestHandler } from "@sveltejs/kit";
 import { v4 as uuidv4 } from "uuid";
-import type { QueryPayload } from "$lib/backendQueries/queryGrammar";
 
 /**
  * POST /api/offerings/nested
@@ -72,36 +70,37 @@ export const POST: RequestHandler = async ({ request }) => {
         });
       }
 
+      const validatedOfferings = offeringsArray;
       // Validate each offering
-      const t2 = Date.now();
-      const validatedOfferings: Wio_PDef_Cat_Supp_Nested_WithLinks[] = [];
-      const validationErrors: Array<{ index: number; errors: any }> = [];
+      // const t2 = Date.now();
+      // const validatedOfferings: Wio_PDef_Cat_Supp_Nested_WithLinks[] = [];
+      // const validationErrors: Array<{ index: number; errors: any }> = [];
 
-      for (let i = 0; i < offeringsArray.length; i++) {
-        const offering = offeringsArray[i];
-        const validation = validateEntityBySchema(Wio_PDef_Cat_Supp_Nested_WithLinks_Schema, offering);
+      // for (let i = 0; i < offeringsArray.length; i++) {
+      //   const offering = offeringsArray[i];
+      //   const validation = validateEntityBySchema(Wio_PDef_Cat_Supp_Nested_WithLinks_Schema, offering);
 
-        if (!validation.isValid) {
-          validationErrors.push({ index: i, errors: validation.errors });
-        } else {
-          validatedOfferings.push(validation.sanitized as Wio_PDef_Cat_Supp_Nested_WithLinks);
-        }
-      }
-      console.log(`[PERF] [${operationId}] Validation took: ${Date.now() - t2}ms`);
+      //   if (!validation.isValid) {
+      //     validationErrors.push({ index: i, errors: validation.errors });
+      //   } else {
+      //     validatedOfferings.push(validation.sanitized as Wio_PDef_Cat_Supp_Nested_WithLinks);
+      //   }
+      // }
+      // console.log(`[PERF] [${operationId}] Validation took: ${Date.now() - t2}ms`);
 
-      if (validationErrors.length > 0) {
-        await rollbackTransaction(transaction);
-        const errRes: ApiErrorResponse = {
-          success: false,
-          message: "Data validation failed for one or more offering records.",
-          status_code: 500,
-          error_code: "INTERNAL_SERVER_ERROR",
-          errors: validationErrors as any,
-          meta: { timestamp: new Date().toISOString() },
-        };
-        log.error(`[${operationId}] FN_FAILURE: Database record validation failed.`, { validationErrors });
-        return json(errRes, { status: 500 });
-      }
+      // if (validationErrors.length > 0) {
+      //   await rollbackTransaction(transaction);
+      //   const errRes: ApiErrorResponse = {
+      //     success: false,
+      //     message: "Data validation failed for one or more offering records.",
+      //     status_code: 500,
+      //     error_code: "INTERNAL_SERVER_ERROR",
+      //     errors: validationErrors as any,
+      //     meta: { timestamp: new Date().toISOString() },
+      //   };
+      //   log.error(`[${operationId}] FN_FAILURE: Database record validation failed.`, { validationErrors });
+      //   return json(errRes, { status: 500 });
+      // }
 
       // Commit transaction
       const tCommit = Date.now();

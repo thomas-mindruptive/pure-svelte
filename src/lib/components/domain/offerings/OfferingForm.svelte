@@ -67,10 +67,13 @@
       return {
         errors: result.error.issues,
         isValid: false,
-        materials: [],
-        forms: [],
-        constructionTypes: [],
-        surfaceFinishes: [],
+        initialValidatedOfferingData: initialLoadedData.offering ?? null,
+        availableProducts: initialLoadedData.availableProducts ?? [],
+        availableSuppliers: initialLoadedData.availableSuppliers ?? [],
+        materials: initialLoadedData.materials ?? [],
+        forms: initialLoadedData.forms ?? [],
+        constructionTypes: initialLoadedData.constructionTypes ?? [],
+        surfaceFinishes: initialLoadedData.surfaceFinishes ?? [],
       };
     }
 

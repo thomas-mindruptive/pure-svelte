@@ -117,9 +117,7 @@
   // Filter out already assigned source offerings.
   // TODO: Add param zo create anti-join in backend.
   const availableSourceOfferings = $derived(
-    potentialSourceOfferings.filter(potential =>
-      !sourceOfferings.some(assigned => assigned.offering_id === potential.offering_id)
-    )
+    potentialSourceOfferings.filter((potential) => !sourceOfferings.some((assigned) => assigned.offering_id === potential.offering_id)),
   );
 
   // === API =====================================================================================
@@ -161,8 +159,11 @@
           }
 
           // If we are a shop offering (supplier 99), load potential offerings to assign as source offerings.
-          const where: WhereCondition<WholesalerItemOffering> = {whereCondOp: "!=", key:"wio.offering_id", val: offering.offering_id};
-          potentialSourceOfferings = await productDefinitionApi.loadNestedOfferingsWithLinksForProductDefinition(offering.product_def_id, where);
+          const where: WhereCondition<WholesalerItemOffering> = { whereCondOp: "!=", key: "wio.offering_id", val: offering.offering_id };
+          potentialSourceOfferings = await productDefinitionApi.loadNestedOfferingsWithLinksForProductDefinition(
+            offering.product_def_id,
+            where,
+          );
           const potentialSourceOfferingsVal = safeParseFirstN(Wio_PDef_Cat_Supp_Nested_WithLinks_Schema, potentialSourceOfferings, 3);
           if (!potentialSourceOfferingsVal.success) {
             errors.potentialSourceOfferings = zodToValidationErrorTree(potentialSourceOfferingsVal.error);
@@ -605,13 +606,10 @@
 
       log.debug(`Linking source offering to shop offering`, {
         shopOfferingId: offering.offering_id,
-        sourceOfferingId: selectedSourceOfferingForLinking.offering_id
+        sourceOfferingId: selectedSourceOfferingForLinking.offering_id,
       });
 
-      const result = await offeringApi.addSourceOfferingLink(
-        offering.offering_id,
-        selectedSourceOfferingForLinking.offering_id
-      );
+      const result = await offeringApi.addSourceOfferingLink(offering.offering_id, selectedSourceOfferingForLinking.offering_id);
 
       if (result.success) {
         addNotification(`Source offering linked successfully`, "success");
@@ -712,7 +710,7 @@
     { key: "oi.quality_grade", header: "Quality", accessor: (img) => img.quality_grade || "—", sortable: true },
     { key: "oi.color_variant", header: "Color", accessor: (img) => img.color_variant || "—", sortable: true },
     { key: "oi.sort_order", header: "Sort", accessor: (img) => img.sort_order, sortable: true },
-    { key: "oi.is_primary", header: "Primary", accessor: (img) => img.is_primary ? "Yes" : "No", sortable: true },
+    { key: "oi.is_primary", header: "Primary", accessor: (img) => (img.is_primary ? "Yes" : "No"), sortable: true },
   ];
 
   const getImageRowId = (image: OfferingImage_Image) => image.image_id;
@@ -835,7 +833,7 @@
           <ComboBox2New
             items={availableSourceOfferings}
             labelPath={["title"]}
-            label = {null}
+            label={null}
             showDropdownButton={true}
             valuePath={["offering_id"]}
             bind:value={selectedSourceOfferingForLinking}
@@ -980,7 +978,7 @@
   <div class="detail-page-layout">
     <!-- Section 1: Offering details form -->
     <div class="form-section">
-      <ValidationWrapper {errors}>
+      <ValidationWrapper {errors} renderChildrenInCaseOfErrors={true}>
         <OfferingForm
           initialLoadedData={{
             offering,
@@ -1032,16 +1030,14 @@
           {:else}
             <p class="hint">Create a shop offering from this source offering</p>
 
-            <ValidationWrapper errors={errors.copyForShop ? { copyForShop: errors.copyForShop } : {}}>
-              <button
-                type="button"
-                class="secondary-button"
-                onclick={handleCopyForShop}
-                disabled={$offeringLoadingState}
-              >
-                📋 Copy for Shop
-              </button>
-            </ValidationWrapper>
+            <button
+              type="button"
+              class="secondary-button"
+              onclick={handleCopyForShop}
+              disabled={$offeringLoadingState}
+            >
+              📋 Copy for Shop
+            </button>
           {/if}
         </div>
       {/if}

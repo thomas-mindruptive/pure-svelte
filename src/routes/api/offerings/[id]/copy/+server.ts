@@ -1,5 +1,5 @@
 import { db } from "$lib/backendQueries/db";
-import { copyOffering } from "$lib/backendQueries/entityOperations/offering";
+import { copyOffering, copyLinksForOffering } from "$lib/backendQueries/entityOperations/offering";
 import { json, error } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
 import { v4 as uuidv4 } from "uuid";
@@ -48,10 +48,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
       log.debug(`[${operationId}] No request body or invalid JSON, using empty modifications`);
     }
 
-    // Add default comment if not provided
-    if (!modifications.comment) {
-      modifications.comment = `Copied from offering ${sourceOfferingId}`;
-    }
+    // Note: Comment extension is handled automatically by copyOffering()
 
     log.info(`[${operationId}] Starting transaction for copying offering ${sourceOfferingId}`);
     await transaction.begin();
@@ -59,6 +56,11 @@ export const POST: RequestHandler = async ({ params, request }) => {
     try {
       log.debug(`[${operationId}] Calling copyOffering()`, { sourceOfferingId, modifications });
       const newOfferingId = await copyOffering(transaction, sourceOfferingId, modifications);
+
+      // Copy links from source to new offering
+      log.debug(`[${operationId}] Copying links from source offering`);
+      const linkCount = await copyLinksForOffering(transaction, sourceOfferingId, newOfferingId);
+      log.debug(`[${operationId}] Copied ${linkCount} links`);
 
       log.debug(`[${operationId}] Committing transaction`);
       await transaction.commit();

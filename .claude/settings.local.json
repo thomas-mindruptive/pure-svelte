@@ -5,7 +5,8 @@
       "Bash(powershell -Command:*)",
       "Bash(nul)",
       "Bash(ls:*)",
-      "Bash(npm run check:*)"
+      "Bash(npm run check:*)",
+      "Bash(dir /b *.sql:*)"
     ],
     "deny": [],
     "ask": []

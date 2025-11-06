@@ -284,6 +284,14 @@ export async function copyOffering(
     ...modifications, // Apply any modifications (e.g., wholesaler_id, comment)
   };
 
+  // 2.1. Extend comment (if not explicitly overridden in modifications)
+  if (!modifications?.comment) {
+    const originalComment = sourceOffering.comment || '';
+    copiedOfferingData.comment = originalComment
+      ? `${originalComment}\n\nCopied from offering ${sourceOfferingId}`
+      : `Copied from offering ${sourceOfferingId}`;
+  }
+
   // 3. Validate using schema for create (removes offering_id, created_at, etc.)
   const validated = WholesalerItemOfferingForCreateSchema.parse(copiedOfferingData);
 
@@ -299,6 +307,46 @@ export async function copyOffering(
   log.info(`copyOffering: Created new offering ${newOfferingId} from source ${sourceOfferingId}`);
 
   return newOfferingId;
+}
+
+/**
+ * Copies all links from a source offering to a target offering.
+ *
+ * @param transaction - Active database transaction
+ * @param sourceOfferingId - ID of offering to copy links FROM
+ * @param targetOfferingId - ID of offering to copy links TO
+ * @returns Number of links copied
+ *
+ * @example
+ * const linkCount = await copyLinksForOffering(transaction, 123, 456);
+ * log.info(`Copied ${linkCount} links from offering 123 to 456`);
+ */
+export async function copyLinksForOffering(
+  transaction: Transaction,
+  sourceOfferingId: number,
+  targetOfferingId: number
+): Promise<number> {
+  assertDefined(transaction, "transaction");
+  assertDefined(sourceOfferingId, "sourceOfferingId");
+  assertDefined(targetOfferingId, "targetOfferingId");
+
+  log.debug(`copyLinksForOffering: Copying links from ${sourceOfferingId} to ${targetOfferingId}`);
+
+  const request = transaction.request();
+  request.input('sourceId', sourceOfferingId);
+  request.input('targetId', targetOfferingId);
+
+  const result = await request.query(`
+    INSERT INTO dbo.wholesaler_offering_links (offering_id, url, notes)
+    SELECT @targetId, url, notes
+    FROM dbo.wholesaler_offering_links
+    WHERE offering_id = @sourceId
+  `);
+
+  const linkCount = result.rowsAffected[0] || 0;
+  log.info(`copyLinksForOffering: Copied ${linkCount} links from ${sourceOfferingId} to ${targetOfferingId}`);
+
+  return linkCount;
 }
 
 export async function loadFlatOfferingsWithJoinsAndLinks(

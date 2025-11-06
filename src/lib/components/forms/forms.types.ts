@@ -1,5 +1,7 @@
-export type Errors<T> = Partial<Record<keyof T, string[]>>;
-export type ValidateResult<T> = { valid: boolean; errors?: Errors<T> };
+import type { ValidationErrors } from "../validation/validation.types";
+
+export type Errors<T> = Partial<ValidationErrors<T>>;
+export type ValidateResult<T> = { valid: boolean; errors?: Errors<T> | undefined };
 
 export type FormData<T> = T;
 

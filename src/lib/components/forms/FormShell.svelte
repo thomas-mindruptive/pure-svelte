@@ -331,7 +331,7 @@
 
     // --- Step 1: Execute the parent's custom validation logic ---
     // This provides the business rule violations.
-    let customResult: ValidateResult<T> = { valid: true, errors: {} };
+    let customResult: ValidateResult<T> = { valid: true, errors: undefined };
     if (validate) {
       try {
         customResult = await validate(formState.data);

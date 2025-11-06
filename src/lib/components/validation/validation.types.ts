@@ -6,7 +6,7 @@ export type ZodLikeValidationError = {
 };
 
 /** Flat validation errors structure (from z.flattenError) */
-export type ValidationErrors = Record<string, string[]>;
+export type ValidationErrors<T = any> = Record<keyof T, string[]>;
 
 /** Tree validation errors structure (converted from z.treeifyError) */
 export type ValidationErrorTree = {

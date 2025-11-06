@@ -327,7 +327,7 @@ export type ValidationResultFor<S extends z.ZodTypeAny> =
     }
   | {
       isValid: false;
-      errors: ValidationErrors;
+      errors: ValidationErrors<z.output<S>>;
       sanitized: undefined;
     };
 
@@ -363,7 +363,7 @@ export function toValidationResult<S extends z.ZodTypeAny>(zodParseResult: z.Zod
 /**
  * Converts a Zod error into a field-indexed error record optimized for forms and APIs.
  */
-export function zodToValidationErrors(error: z.ZodError): ValidationErrors {
+export function zodToValidationErrors(error: z.ZodError): ValidationErrors<any> {
   const { fieldErrors, formErrors } = z.flattenError(error);
 
   const errors: Record<string, string[]> = {};

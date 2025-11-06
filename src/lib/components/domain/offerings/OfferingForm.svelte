@@ -7,22 +7,23 @@
   // ===== IMPORTS =====
   import { ApiClient } from "$lib/api/client/apiClient";
   import { getOfferingApi } from "$lib/api/client/offering";
-  import { type OfferingDetail_LoadData, OfferingDetail_LoadDataSchema } from "$lib/components/domain/offerings/offeringDetail.types";
+  import { OfferingDetail_LoadDataSchema, type OfferingDetail_LoadData } from "$lib/components/domain/offerings/offeringDetail.types";
   import Field from "$lib/components/forms/Field.svelte";
   import FormComboBox2 from "$lib/components/forms/FormComboBox2.svelte";
   import type {
-    CancelledCallback,
-    ChangedCallback,
-    Errors,
-    SubmitErrorCallback,
-    SubmittedCallback,
-    ValidateResult,
+      CancelledCallback,
+      ChangedCallback,
+      SubmitErrorCallback,
+      SubmittedCallback,
+      ValidateResult
   } from "$lib/components/forms/forms.types";
   import FormShell, { type FieldsSnippetProps } from "$lib/components/forms/FormShell.svelte";
   import "$lib/components/styles/form.css";
   import "$lib/components/styles/grid.css";
+  import type { ValidationErrors } from "$lib/components/validation/validation.types";
   import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
-  import type { WholesalerItemOffering, Wio_PDef_Cat_Supp_Nested_WithLinks } from "$lib/domain/domainTypes";
+  import { Wio_PDef_Cat_Supp_Nested_WithLinks_Schema, type WholesalerItemOffering, type Wio_PDef_Cat_Supp_Nested_WithLinks } from "$lib/domain/domainTypes";
+  import { zodToValidationErrors } from "$lib/domain/domainTypes.utils";
   import { assertDefined } from "$lib/utils/assertions";
   import { log } from "$lib/utils/logger";
 
@@ -160,35 +161,18 @@
     log.debug(`Validating offering form data`, raw);
     assertDefined(raw, "validateOfferingForSubmit");
     const data = raw as Wio_PDef_Cat_Supp_Nested_WithLinks;
-    const errors: Errors<Wio_PDef_Cat_Supp_Nested_WithLinks> = {};
+    //const errors: Errors<Wio_PDef_Cat_Supp_Nested_WithLinks> = {};
 
-    // Sample for a complex business rule involving multiple fields ---
-    // Example: Prices in Japanese Yen (JPY) cannot have decimals.
-    const isJpy = data.currency?.toUpperCase() === "JPY";
-    const hasDecimals = data.price != null && data.price % 1 !== 0;
-    if (isJpy && hasDecimals) {
-      // Return an error for the 'price' field. FormShell will handle applying it.
-      errors.price = ["Prices in JPY cannot have decimals."];
-      log.debug("(OfferingForm) Custom validation failed: JPY price has decimals.");
+    const offeringVal = Wio_PDef_Cat_Supp_Nested_WithLinks_Schema.safeParse(data);
+
+    let errors: ValidationErrors<Wio_PDef_Cat_Supp_Nested_WithLinks> | undefined = undefined;
+    if (offeringVal.error) {
+      log.error(`Validation of offering failed: `, offeringVal.error);
+      errors = zodToValidationErrors(offeringVal.error);
     }
 
-    // Validate the base ids. They mus be there even if there are no visible fields.
-    if (!data.wholesaler_id) {
-      errors.wholesaler_id = ["OfferingForm.validateOfferingForSubmit: A supplier must be selected."];
-    }
-    if (!data.product_def_id) {
-      errors.product_def_id = ["OfferingForm.validateOfferingForSubmit: A product must be selected."];
-    }
-    if (!data.category_id) {
-      errors.category_id = ["OfferingForm.validateOfferingForSubmit: A category must be defined."];
-    }
-    if (data.price != null) {
-      if (isNaN(Number(data.price)) || Number(data.price) < 0) {
-        errors.price = ["Price must be a valid, non-negative number."];
-      }
-    }
     return {
-      valid: Object.keys(errors).length === 0,
+      valid: offeringVal.success,
       errors,
     };
   }

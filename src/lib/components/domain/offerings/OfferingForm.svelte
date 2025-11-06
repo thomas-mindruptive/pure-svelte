@@ -473,8 +473,8 @@
           <Field
             {fieldProps}
             path={["override_material"]}
-            label="overr."
-            type="checkbox"
+            label="override Material"
+            type="checkbox"   
             class="span-1"
           />
 
@@ -537,7 +537,7 @@
             {fieldProps}
             path={["dimensions"]}
             label="Dimensions"
-            placeholder="e.g., 10x20x5 cm"
+            placeholder="Unit required: 3cm, 1-3cm, 10mm"
             class="span-1"
           />
 
@@ -567,7 +567,7 @@
             path={["weight_range"]}
             label="Weight Range"
             type="text"
-            placeholder="e.g., 50-80g, ca. 100g"
+            placeholder="Unit required: 250g, 50-80g, ca. 100g"
             class="span-1"
           />
         </div>

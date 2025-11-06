@@ -1,7 +1,7 @@
 // File: src/lib/domain/domainTypes.ts
 
 import { log } from "$lib/utils/logger";
-import { parseWeightRange } from "$lib/utils/parseUtils";
+import { parseWeightRange, parseDimensions } from "$lib/utils/parseUtils";
 import { z } from "zod";
 
 // ===== SCHEMA META HELPER =====
@@ -388,7 +388,16 @@ const Wio_BaseSchema = z
     color_variant: z.string().max(100).nullable().optional(), // For image matching
     title: z.string().max(255).nullable().optional(),
     size: z.string().max(50).nullable().optional(),
-    dimensions: z.string().max(100).nullable().optional(),
+    dimensions: z.string().max(100).nullable().optional()
+      .superRefine((val, ctx) => {
+        const result = parseDimensions(val);
+        if (!result.valid) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: result.error || "Invalid dimension format"
+          });
+        }
+      }),
     packaging: z.string().max(100).nullable().optional(),
     price: z.number().multipleOf(0.01).nullable().optional(), // precision [18,2]
     weight_grams: z.number().positive().nullable().optional(),

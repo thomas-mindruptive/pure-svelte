@@ -28,10 +28,10 @@ export type WeightRange = {
 /**
  * Parses and validates weight range strings.
  *
- * Supported formats:
- * - Single value: "250g", "250", "0.25kg"
- * - Range: "50-80g", "50-80", "0.05-0.08kg"
- * - Approximate: "ca. 100g", "ca 100"
+ * Supported formats (unit REQUIRED):
+ * - Single value: "250g", "0.25kg"
+ * - Range: "50-80g", "0.05-0.08kg"
+ * - Approximate: "ca. 100g", "ca 100g"
  *
  * @param input - The weight string to parse (e.g., "50-80g")
  * @returns ParseResult with min/max weights in grams
@@ -41,7 +41,8 @@ export type WeightRange = {
  * parseWeightRange("50-80g")      // { valid: true, data: { min: 50, max: 80, unit: 'g' } }
  * parseWeightRange("ca. 100g")    // { valid: true, data: { min: 100, max: 100, unit: 'g' } }
  * parseWeightRange("0.25kg")      // { valid: true, data: { min: 250, max: 250, unit: 'kg' } }
- * parseWeightRange("invalid")     // { valid: false, error: "Invalid format..." }
+ * parseWeightRange("250")         // { valid: false, error: "Invalid format..." } - unit required
+ * parseWeightRange("2-3")         // { valid: false, error: "Invalid format..." } - unit required
  */
 export function parseWeightRange(input: string | null | undefined): ParseResult<WeightRange> {
   // Null/undefined is valid for optional fields
@@ -55,28 +56,32 @@ export function parseWeightRange(input: string | null | undefined): ParseResult<
     return { valid: true };
   }
 
-  // Detect unit (default: grams)
-  const unit: 'g' | 'kg' = trimmed.includes('kg') ? 'kg' : 'g';
-  const unitMultiplier = unit === 'kg' ? 1000 : 1; // Convert kg to grams
-
-  // Pattern 1: Single value - "250g", "250", "0.25kg"
-  const singleMatch = trimmed.match(/^(\d+(?:\.\d+)?)\s*(g|kg)?$/);
+  // Pattern 1: Single value - "250g", "0.25kg" (unit REQUIRED)
+  const singleMatch = trimmed.match(/^(\d+(?:\.\d+)?)\s*(g|kg)$/);
   if (singleMatch) {
-    const val = parseFloat(singleMatch[1]) * unitMultiplier;
-    if (val <= 0) {
+    const val = parseFloat(singleMatch[1]);
+    const unit = singleMatch[2] as 'g' | 'kg';
+    const unitMultiplier = unit === 'kg' ? 1000 : 1;
+    const valInGrams = val * unitMultiplier;
+
+    if (valInGrams <= 0) {
       return { valid: false, error: 'Weight must be greater than 0' };
     }
     return {
       valid: true,
-      data: { min: val, max: val, unit }
+      data: { min: valInGrams, max: valInGrams, unit }
     };
   }
 
-  // Pattern 2: Range - "50-80g", "50-80", "0.05-0.08kg"
-  const rangeMatch = trimmed.match(/^(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)\s*(g|kg)?$/);
+  // Pattern 2: Range - "50-80g", "0.05-0.08kg" (unit REQUIRED)
+  const rangeMatch = trimmed.match(/^(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)\s*(g|kg)$/);
   if (rangeMatch) {
-    const min = parseFloat(rangeMatch[1]) * unitMultiplier;
-    const max = parseFloat(rangeMatch[2]) * unitMultiplier;
+    const minVal = parseFloat(rangeMatch[1]);
+    const maxVal = parseFloat(rangeMatch[2]);
+    const unit = rangeMatch[3] as 'g' | 'kg';
+    const unitMultiplier = unit === 'kg' ? 1000 : 1;
+    const min = minVal * unitMultiplier;
+    const max = maxVal * unitMultiplier;
 
     if (min <= 0 || max <= 0) {
       return { valid: false, error: 'Weight values must be greater than 0' };
@@ -91,16 +96,20 @@ export function parseWeightRange(input: string | null | undefined): ParseResult<
     };
   }
 
-  // Pattern 3: Approximate - "ca. 100g", "ca 100", "ca. 0.1kg"
-  const approxMatch = trimmed.match(/^ca\.?\s*(\d+(?:\.\d+)?)\s*(g|kg)?$/);
+  // Pattern 3: Approximate - "ca. 100g", "ca 100g", "ca. 0.1kg" (unit REQUIRED)
+  const approxMatch = trimmed.match(/^ca\.?\s*(\d+(?:\.\d+)?)\s*(g|kg)$/);
   if (approxMatch) {
-    const val = parseFloat(approxMatch[1]) * unitMultiplier;
-    if (val <= 0) {
+    const val = parseFloat(approxMatch[1]);
+    const unit = approxMatch[2] as 'g' | 'kg';
+    const unitMultiplier = unit === 'kg' ? 1000 : 1;
+    const valInGrams = val * unitMultiplier;
+
+    if (valInGrams <= 0) {
       return { valid: false, error: 'Weight must be greater than 0' };
     }
     return {
       valid: true,
-      data: { min: val, max: val, unit }
+      data: { min: valInGrams, max: valInGrams, unit }
     };
   }
 
@@ -113,17 +122,23 @@ export function parseWeightRange(input: string | null | undefined): ParseResult<
 /**
  * Parses and validates dimension strings.
  *
- * Supported formats:
- * - Single value: "3cm", "3"
- * - Range: "1-3cm", "1-3"
+ * Supported formats (unit REQUIRED, only mm/cm/m allowed):
+ * - Single value: "3cm", "10mm", "1.5m", "1,5cm", "3 cm"
+ * - Range: "1-3cm", "5-10mm", "1,5 - 3 cm"
+ * - Accepts comma or dot as decimal separator
+ * - Allows optional whitespace around values and units
  *
- * @param input - The dimension string to parse (e.g., "1-3cm")
+ * @param input - The dimension string to parse (e.g., "1-3cm" or "1,5 - 3 cm")
  * @returns ParseResult with min/max dimensions
  *
  * @example
- * parseDimensions("3cm")     // { valid: true, data: { min: 3, max: 3, unit: 'cm' } }
- * parseDimensions("1-3cm")   // { valid: true, data: { min: 1, max: 3, unit: 'cm' } }
- * parseDimensions("invalid") // { valid: false, error: "..." }
+ * parseDimensions("3cm")       // { valid: true, data: { min: 3, max: 3, unit: 'cm' } }
+ * parseDimensions("1-3cm")     // { valid: true, data: { min: 1, max: 3, unit: 'cm' } }
+ * parseDimensions("1,5 - 3 cm") // { valid: true, data: { min: 1.5, max: 3, unit: 'cm' } }
+ * parseDimensions("10mm")      // { valid: true, data: { min: 10, max: 10, unit: 'mm' } }
+ * parseDimensions("3")         // { valid: false, error: "..." } - unit required
+ * parseDimensions("2-3")       // { valid: false, error: "..." } - unit required
+ * parseDimensions("3inch")     // { valid: false, error: "..." } - invalid unit
  */
 export function parseDimensions(input: string | null | undefined): ParseResult<{ min: number; max: number; unit: string }> {
   // Null/undefined is valid for optional fields
@@ -137,14 +152,16 @@ export function parseDimensions(input: string | null | undefined): ParseResult<{
     return { valid: true };
   }
 
-  // Extract unit (cm, mm, m, inch, etc.)
-  const unitMatch = trimmed.match(/([a-z]+)$/);
-  const unit = unitMatch ? unitMatch[1] : '';
-
-  // Pattern 1: Single value - "3cm", "3"
-  const singleMatch = trimmed.match(/^(\d+(?:\.\d+)?)\s*([a-z]*)$/);
+  // Pattern 1: Single value - "3cm", "10mm", "1.5m", "1,5cm" (unit REQUIRED: mm, cm, m)
+  // Accept both comma and dot as decimal separator, optional whitespace
+  const singleMatch = trimmed.match(/^(\d+(?:[.,]\d+)?)\s*(?:(cm)|(mm)|(m))$/);
   if (singleMatch) {
-    const val = parseFloat(singleMatch[1]);
+    // Normalize comma to dot for parseFloat
+    const valStr = singleMatch[1].replace(',', '.');
+    const val = parseFloat(valStr);
+    // Extract unit from the matching group (2=cm, 3=mm, 4=m)
+    const unit = singleMatch[2] || singleMatch[3] || singleMatch[4];
+
     if (val <= 0) {
       return { valid: false, error: 'Dimension must be greater than 0' };
     }
@@ -154,11 +171,18 @@ export function parseDimensions(input: string | null | undefined): ParseResult<{
     };
   }
 
-  // Pattern 2: Range - "1-3cm", "1-3"
-  const rangeMatch = trimmed.match(/^(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)\s*([a-z]*)$/);
+  // Pattern 2: Range - "1-3cm", "5-10mm", "4-5m", "1,5 - 3 cm" (unit REQUIRED: mm, cm, m)
+  // Accept both comma and dot as decimal separator, optional whitespace
+  const rangeMatch = trimmed.match(/^(\d+(?:[.,]\d+)?)\s*-\s*(\d+(?:[.,]\d+)?)\s*(?:(cm)|(mm)|(m))$/);
+
   if (rangeMatch) {
-    const min = parseFloat(rangeMatch[1]);
-    const max = parseFloat(rangeMatch[2]);
+    // Normalize comma to dot for parseFloat
+    const minStr = rangeMatch[1].replace(',', '.');
+    const maxStr = rangeMatch[2].replace(',', '.');
+    const min = parseFloat(minStr);
+    const max = parseFloat(maxStr);
+    // Extract unit from the matching group (3=cm, 4=mm, 5=m)
+    const unit = rangeMatch[3] || rangeMatch[4] || rangeMatch[5];
 
     if (min <= 0 || max <= 0) {
       return { valid: false, error: 'Dimension values must be greater than 0' };
@@ -175,6 +199,6 @@ export function parseDimensions(input: string | null | undefined): ParseResult<{
 
   return {
     valid: false,
-    error: 'Invalid dimension format. Use: "3cm" or "1-3cm"'
+    error: 'Invalid dimension format. Use: "3cm", "10mm", "1.5m", or "1-3cm" (unit required: mm, cm, m)'
   };
 }

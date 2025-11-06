@@ -144,15 +144,6 @@
           formShell.set(["product_def_id"], firstProduct.product_def_id);
         }
       }
-
-      // We are on route "/categories/1/productdefinitions/5/offerings/..."
-      if (isCategoriesRoute) {
-        const firstSupplier = availableSuppliers?.[0];
-        if (firstSupplier && formShell) {
-          log.debug(`(OfferingForm) Initializing wholesaler_id to first available supplier: ${firstSupplier.wholesaler_id}`);
-          formShell.set(["wholesaler_id"], firstSupplier.wholesaler_id);
-        }
-      }
     }
   });
 
@@ -436,7 +427,7 @@
 
     <!--- FIELDS --------------------------------------------------------------------------------->
     {#snippet fields(fieldProps)}
-      {@const { getS, get } = fieldProps}
+      {@const { getS } = fieldProps}
       <div class="form-body">
         <div class="form-row-grid">
           <!-- title ----------------------------------------------------------------------------->
@@ -470,17 +461,9 @@
         <div class="form-row-grid">
           <!-- "suppliers" combo ----------------------------------------------------------------->
           <div class="control-group span-2">
-            <!--- Create mode and categories route => render "suppliers" combo --->
-            {#if isCreateMode}
-              {#if isCategoriesRoute}
-                {@render supplierCombo(fieldProps)}
-              {/if}
-            {:else}
-              <!--- Not create mode => Render static text for supplier --->
-              <p>
-                {get(["wholesaler", "name"]) ?? "supplier_name missing"}
-              </p>
-              <p class="field-hint">The supplier cannot be changed for an existing offering.</p>
+            <!--- <refact01> CHANGED: Supplier can now be changed (wholesaler_categories constraint removed) --->
+            {#if isCategoriesRoute}
+              {@render supplierCombo(fieldProps)}
             {/if}
           </div>
 
@@ -587,10 +570,20 @@
           <Field
             {fieldProps}
             path={["weight_grams"]}
-            label="Weight"
+            label="Weight (g)"
             type="number"
             step="0.01"
             placeholder="e.g., 250"
+            class="span-1"
+          />
+
+          <!-- weight_range ------------------------------------------------------------------------>
+          <Field
+            {fieldProps}
+            path={["weight_range"]}
+            label="Weight Range"
+            type="text"
+            placeholder="e.g., 50-80g, ca. 100g"
             class="span-1"
           />
         </div>

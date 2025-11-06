@@ -1,6 +1,7 @@
 // File: src/lib/domain/domainTypes.ts
 
 import { log } from "$lib/utils/logger";
+import { parseWeightRange } from "$lib/utils/parseUtils";
 import { z } from "zod";
 
 // ===== SCHEMA META HELPER =====
@@ -391,6 +392,16 @@ const Wio_BaseSchema = z
     packaging: z.string().max(100).nullable().optional(),
     price: z.number().multipleOf(0.01).nullable().optional(), // precision [18,2]
     weight_grams: z.number().positive().nullable().optional(),
+    weight_range: z.string().max(50).nullable().optional()
+      .superRefine((val, ctx) => {
+        const result = parseWeightRange(val);
+        if (!result.valid) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: result.error || "Invalid weight format"
+          });
+        }
+      }),
     currency: z.string().length(3).nullable().optional(),
     comment: z.string().max(4000).nullable().optional(),
     is_assortment: z.boolean().nullable().optional(),

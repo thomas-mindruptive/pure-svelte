@@ -381,6 +381,7 @@ const Wio_BaseSchema = z
     category_id: z.number().int().positive(),
     product_def_id: z.number().int().positive(),
     sub_seller: z.string().max(255).nullable().optional(),
+    wholesaler_article_number: z.string().max(100).nullable().optional(),
     material_id: z.number().int().positive().nullable().optional(),
     form_id: z.number().int().positive().nullable().optional(),
     construction_type_id: z.number().int().positive().nullable().optional(),

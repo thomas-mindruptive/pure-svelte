@@ -451,14 +451,24 @@
             {/if}
           </div>
 
-          <!-- title ----------------------------------------------------------------------------->
+          <!-- subseller ---------------------------------------------------------------------->
           <Field
             {fieldProps}
             path={["sub_seller"]}
             label="Subseller"
             type="text"
             placeholder="Subseller"
-            class="span-2"
+            class="span-1"
+          />
+
+          <!-- supplier article number --------------------------------------------------------->
+          <Field
+            {fieldProps}
+            path={["wholesaler_article_number"]}
+            label="Supplier Article Nr."
+            type="text"
+            placeholder="Supplier Article Number"
+            class="span-1"
           />
         </div>
         <!-- end row ----------------------------------------------------------------------------->

@@ -5,6 +5,8 @@ scaffolding-generated
 tools/dist
 
 log
+#Claude code
+nul
 
 # Prevent TypeScript compilation artifacts in src/
 /src/**/*.js

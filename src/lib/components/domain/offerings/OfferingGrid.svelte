@@ -3,9 +3,9 @@
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
   import type { ColumnDef, DeleteStrategy, RowActionStrategy, SortFunc, ID } from "$lib/components/grids/Datagrid.types";
   import type {
-      WholesalerOfferingLink,
-      Wio_PDef_Cat_Supp_Nested_WithLinks,
-      Wio_PDef_Cat_Supp_Nested_WithLinks_Schema,
+    WholesalerOfferingLink,
+    Wio_PDef_Cat_Supp_Nested_WithLinks,
+    Wio_PDef_Cat_Supp_Nested_WithLinks_Schema,
   } from "$lib/domain/domainTypes";
   import type { Snippet } from "svelte";
 
@@ -83,6 +83,13 @@
       accessor: (offering) => offering.sub_seller || "—",
     },
     {
+      key: "wio.material_id",
+      header: "Material",
+      sortable: true,
+      width: "5rem",
+      accessor: (offering) => offering.material_id || "—",
+    },
+    {
       key: "wio.price",
       header: "Price",
       sortable: true,
@@ -133,12 +140,12 @@
         } else {
           displayUrl = "-";
         }
-        return displayUrl; 
+        return displayUrl;
       },
       isLink: true,
       onClick(row, col) {
         const linkArray = row[col.key as keyof typeof row] as WholesalerOfferingLink[];
-        const url = linkArray[0].url; 
+        const url = linkArray[0].url;
         if (url) window.open(url, "_blank");
       },
     },

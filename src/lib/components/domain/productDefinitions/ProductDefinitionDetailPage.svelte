@@ -112,6 +112,28 @@
       try {
         if (isCreateMode) {
           log.debug(`Create Mode`);
+
+          // Load dropdown data for form
+          constructionTypes = await constructionTypeApi.loadConstructionTypes();
+          if (aborted) return;
+          const constructionTypesVal = safeParseFirstN(ConstructionTypeSchema, constructionTypes, 3);
+          if (!constructionTypesVal.success) {
+            errors.constructionTypes = zodToValidationErrorTree(constructionTypesVal.error);
+          }
+
+          surfaceFinishes = await surfaceFinishApi.loadSurfaceFinishes();
+          const surfaceFinishesVal = safeParseFirstN(SurfaceFinishSchema, surfaceFinishes, 3);
+          if (aborted) return;
+          if (!surfaceFinishesVal.success) {
+            errors.surfaceFinishes = zodToValidationErrorTree(surfaceFinishesVal.error);
+          }
+
+          categories = await productCategoryApi.loadProductCategories();
+          const categoriesVal = safeParseFirstN(ProductCategorySchema, categories, 3);
+          if (aborted) return;
+          if (!categoriesVal.success) {
+            errors.categories = zodToValidationErrorTree(categoriesVal.error);
+          }
         } else {
           if (isNaN(productDefId) || productDefId < 0) {
             throw error(400, "ProductDefintionDetailPage::$effect: Invalid Product Definition ID. Must be a positive number.");

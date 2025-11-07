@@ -9,7 +9,12 @@
       "Bash(dir /b *.sql:*)",
       "Bash(git log:*)",
       "Bash(dir \"C:\\dev\\pure\\pureenergy-schema\" /b)",
-      "Bash(npm run test:*)"
+      "Bash(npm run test:*)",
+      "WebSearch",
+      "WebFetch(domain:minimalistdjango.com)",
+      "WebFetch(domain:codesignal.com)",
+      "WebFetch(domain:stackoverflow.com)",
+      "WebFetch(domain:github.com)"
     ],
     "deny": [],
     "ask": []

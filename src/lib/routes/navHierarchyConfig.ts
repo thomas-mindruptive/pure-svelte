@@ -257,6 +257,23 @@ export const testHierarchyConfig: HierarchyTree = {
     }),
 };
 
+/**
+ * Navigation hierarchy for Reports section.
+ */
+// prettier-ignore
+export const reportsHierarchyConfig: HierarchyTree = {
+  name: "reports",
+  rootItem:
+    createHierarchyNode({
+      item: { key: "reports", type: "list", href: "/reports", label: "Reports" },
+      children: [
+        createHierarchyNode({
+          item: { key: "offerings", type: "list", href: "/reports/offerings", label: "Offerings" },
+        })
+      ],
+    }),
+};
+
 // ================================================================================================
 // MAIN EXPORT FUNCTIONS
 // ================================================================================================
@@ -266,7 +283,7 @@ export const testHierarchyConfig: HierarchyTree = {
  * This is the main entry point for getting hierarchy definitions.
  */
 export function getAppHierarchies(): Hierarchy {
-  return [supplierHierarchyConfig, productCategoriesHierarchyConfig, attributesHierarchyConfig, ordersHierarchyConfig, testHierarchyConfig];
+  return [supplierHierarchyConfig, productCategoriesHierarchyConfig, attributesHierarchyConfig, ordersHierarchyConfig, testHierarchyConfig, reportsHierarchyConfig];
 }
 
 /**

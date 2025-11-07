@@ -1,4 +1,4 @@
-import type { WhereConditionGroup, SortDescriptor } from "$lib/backendQueries/queryGrammar";
+import type { WhereConditionGroup, WhereCondition, SortDescriptor, ComparisonOperator } from "$lib/backendQueries/queryGrammar";
 import type { QualifiedColumnsFromBrandedSchemaWithJoins } from "$lib/domain/domainTypes.utils";
 import type z from "zod";
 
@@ -15,6 +15,11 @@ export type ColumnDef<S extends z.ZodObject<any>> =
       class?: string;
       isLink?: boolean;
       onClick?: ((row: z.infer<S>, col: ColumnDef<any>) => unknown) | null | undefined;
+      // Filter-related fields (DataGrid2)
+      filterable?: boolean;
+      filterType?: 'text' | 'number' | 'boolean' | 'select';
+      filterOperator?: ComparisonOperator;
+      filterOptions?: { label: string; value: unknown }[];
     }
   // Case 2: A special, non-sortable column for computed values.
   | {
@@ -85,3 +90,9 @@ export type ApiLoadFuncWithId<T> = (id: number, where: WhereConditionGroup<T> | 
  * Sort callback for the DataGrid.
  */
 export type SortFunc<T> = (sortState: SortDescriptor<T>[] | null) => void | Promise<void>;
+
+/**
+ * Filter callback for DataGrid2.
+ * Receives WhereCondition or WhereConditionGroup based on active filters.
+ */
+export type FilterFunc<T> = (where: WhereCondition<T> | WhereConditionGroup<T> | null) => void | Promise<void>;

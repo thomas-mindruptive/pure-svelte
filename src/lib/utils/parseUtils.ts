@@ -332,8 +332,13 @@ export function parseDimensions(input: string | null | undefined): ParseResult<P
 
   // Convert single aspect to ParsedDimensionData format
   const { unit, range, values, multiDimRange } = result.data!;
+  const data: ParsedDimensionData = { unit };
+  if (range !== undefined) data.range = range;
+  if (values !== undefined) data.values = values;
+  if (multiDimRange !== undefined) data.multiDimRange = multiDimRange;
+
   return {
     valid: true,
-    data: { unit, range, values, multiDimRange }
+    data
   };
 }

@@ -528,6 +528,7 @@
             path={["wholesaler_article_number"]}
             label="Supplier Article Nr."
             type="text"
+            required
             placeholder="Supplier Article Number"
             class="span-1"
           />

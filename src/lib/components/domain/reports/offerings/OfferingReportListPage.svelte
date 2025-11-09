@@ -31,18 +31,18 @@
     WhereCondition,
     WhereConditionGroup
   } from "$lib/backendQueries/queryGrammar";
-  import type { Wio_PDef_Cat_Supp_Nested_WithLinks } from "$lib/domain/domainTypes";
+  import type { OfferingReportView } from "$lib/domain/domainTypes";
   import { log } from "$lib/utils/logger";
 
   type Props = {
     data: {
-      offerings: Promise<Wio_PDef_Cat_Supp_Nested_WithLinks[]>;
+      offerings: Promise<OfferingReportView[]>;
       loadEventFetch: typeof fetch;
     };
   };
 
   let { data }: Props = $props();
-  let resolvedOfferings = $state<Wio_PDef_Cat_Supp_Nested_WithLinks[]>([]);
+  let resolvedOfferings = $state<OfferingReportView[]>([]);
   let isLoading = $state(true);
   let currentWhere = $state<WhereCondition<any> | WhereConditionGroup<any> | null>(null);
   let currentSort = $state<SortDescriptor<any>[] | null>(null);
@@ -97,7 +97,7 @@
     isLoading = true;
     try {
       log.info(`[OfferingReportListPage] Calling API with where:`, where, `sort:`, currentSort);
-      resolvedOfferings = await offeringApi.loadNestedOfferingsWithLinks(where, currentSort);
+      resolvedOfferings = await offeringApi.loadOfferingsForReport(where, currentSort);
       log.info(`[OfferingReportListPage] Received ${resolvedOfferings.length} offerings`);
       log.debug(`[OfferingReportListPage] First 3 offerings:`, resolvedOfferings.slice(0, 3));
     } finally {
@@ -121,7 +121,7 @@
     isLoading = true;
     try {
       log.info(`[OfferingReportListPage] Calling API with where:`, currentWhere, `sort:`, sort);
-      resolvedOfferings = await offeringApi.loadNestedOfferingsWithLinks(currentWhere, sort);
+      resolvedOfferings = await offeringApi.loadOfferingsForReport(currentWhere, sort);
       log.info(`[OfferingReportListPage] Received ${resolvedOfferings.length} offerings`);
     } finally {
       isLoading = false;

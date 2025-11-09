@@ -839,6 +839,41 @@ export function getOfferingApi(client: ApiClient) {
       }
     },
 
+    /**
+     * Loads offerings for report using the view_offerings_pt_pc_pd view.
+     * Provides complete breadth of data (product type, category, lookups).
+     */
+    async loadOfferingsForReport(
+      aWhere?: WhereConditionGroup<any> | WhereCondition<any> | null,
+      aOrderBy?: SortDescriptor<any>[] | null,
+      aLimit?: number | null,
+      aOffset?: number | null,
+    ): Promise<any[]> {
+      const operationId = `loadOfferingsForReport`;
+      offeringLoadingManager.start(operationId);
+      try {
+        const payload: QueryPayload<any> = {
+          select: [],
+          ...(aWhere && { where: aWhere }),
+          ...(aOrderBy && { orderBy: aOrderBy }),
+          ...(aLimit && { limit: aLimit }),
+          ...(aOffset && { offset: aOffset }),
+        };
+
+        const responseData = await client.apiFetch<QueryResponseData<any>>(
+          "/api/offerings/report",
+          { method: "POST", body: createJsonBody(payload) },
+          { context: operationId },
+        );
+        return responseData.results;
+      } catch (err) {
+        log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
+        throw err;
+      } finally {
+        offeringLoadingManager.finish(operationId);
+      }
+    },
+
     // ===== UTILITY FUNCTIONS =====
   };
 

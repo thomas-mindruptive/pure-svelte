@@ -771,6 +771,57 @@ const tempOfferingImageNested = OfferingImage_Schema.extend({
 });
 export const OfferingImage_Image_Offering_Schema = copyMetaFrom(OfferingImage_Schema, tempOfferingImageNested);
 
+// ===== OFFERING REPORT VIEW (dbo.view_offerings_pt_pc_pd) =====
+
+const OfferingReportViewSchemaBase = z.object({
+  // Wholesaler
+  wsId: z.number().int().positive(),
+  wsName: z.string().max(200),
+
+  // Product Type
+  ptName: z.string().max(200),
+
+  // Product Category
+  pcId: z.number().int().positive(),
+  catName: z.string().max(200),
+  catDescription: z.string().max(500).nullable().optional(),
+
+  // Product Definition
+  pdefId: z.number().int().positive(),
+  pdefTitle: z.string().max(500),
+  pdefFormId: z.number().int().positive().nullable().optional(),
+  pdefFormName: z.string().max(200).nullable().optional(),
+  pdefMatId: z.number().int().positive().nullable().optional(),
+  pdefMatName: z.string().max(200).nullable().optional(),
+  pdConstrTypeId: z.number().int().positive().nullable().optional(),
+  pdConstrTypeName: z.string().max(200).nullable().optional(),
+  pdSurfFinId: z.number().int().positive().nullable().optional(),
+  pdSurfFinName: z.string().max(200).nullable().optional(),
+
+  // Offering
+  wioId: z.number().int().positive(),
+  wioTitle: z.string().max(500),
+  wioPrice: z.number().nullable().optional(),
+  wioSize: z.string().max(200).nullable().optional(),
+  wioFormId: z.number().int().positive().nullable().optional(),
+  wioFormName: z.string().max(200).nullable().optional(),
+  wioMatId: z.number().int().positive().nullable().optional(),
+  wioMaterialName: z.string().max(200).nullable().optional(),
+  wioConstrTypeId: z.number().int().positive().nullable().optional(),
+  wioConstrTypeName: z.string().max(200).nullable().optional(),
+  wioSurfFinId: z.number().int().positive().nullable().optional(),
+  wioSurfFinishName: z.string().max(200).nullable().optional(),
+  wioDimensions: z.string().max(200).nullable().optional(),
+  wioComment: z.string().max(4000).nullable().optional(),
+  wioWeightGrams: z.number().nullable().optional(),
+}).describe("OfferingReportViewSchema");
+
+export const OfferingReportViewSchema = createSchemaWithMeta(OfferingReportViewSchemaBase, {
+  alias: "v",
+  tableName: "view_offerings_pt_pc_pd",
+  dbSchema: "dbo",
+} as const);
+
 // ===== SCHEMAS => TYPES  =====
 
 export type Wholesaler = z.infer<typeof WholesalerSchema>;
@@ -816,6 +867,8 @@ export type ProductDefinitionImage_Image_ProductDef = z.infer<typeof ProductDefi
 export type OfferingImage = z.infer<typeof OfferingImage_Schema>;
 export type OfferingImage_Image = z.infer<typeof OfferingImage_Image_Schema>;
 export type OfferingImage_Image_Offering = z.infer<typeof OfferingImage_Image_Offering_Schema>;
+
+export type OfferingReportView = z.infer<typeof OfferingReportViewSchema>;
 
 // ===== ALL BRANDED SCHEMAS (= with meta info)  =====
 

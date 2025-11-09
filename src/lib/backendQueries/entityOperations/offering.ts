@@ -634,3 +634,82 @@ export async function loadOfferingsForImageAnalysis(
 
   return jsonString || "[]";
 }
+
+/**
+ * Loads offerings from the view_offerings_pt_pc_pd view.
+ * This provides the complete "breadth" of offering data including product type, category, and all lookups.
+ *
+ * @param transaction - Active database transaction
+ * @param aWhere - Optional WHERE conditions (use view column names like "wioMaterialName", "pdefMatName")
+ * @param aOrderBy - Optional sort descriptors (use view column names)
+ * @param aLimit - Optional limit for pagination
+ * @param aOffset - Optional offset for pagination
+ * @returns Array of flat offering report rows
+ */
+export async function loadOfferingsFromView(
+  transaction: Transaction,
+  aWhere?: WhereConditionGroup<any> | WhereCondition<any>,
+  aOrderBy?: SortDescriptor<any>[],
+  aLimit?: number,
+  aOffset?: number,
+): Promise<any[]> {
+  assertDefined(transaction, "transaction");
+  log.debug(`loadOfferingsFromView`, { aWhere, aOrderBy, aLimit, aOffset });
+
+  const ctx: BuildContext = {
+    parameters: {},
+    paramIndex: 0,
+  };
+
+  let whereClause = "";
+  if (aWhere) {
+    whereClause = `WHERE ${buildWhereClause(aWhere, ctx, false)}`; // hasJoins = false (view, not table joins)
+  }
+
+  // Build ORDER BY clause
+  let orderByClause = "";
+  if (aOrderBy && aOrderBy.length > 0) {
+    orderByClause = `ORDER BY ${aOrderBy.map((s) => `${String(s.key)} ${s.direction}`).join(", ")}`;
+  } else if (aLimit || aOffset) {
+    orderByClause = "ORDER BY wioId ASC"; // Default order for pagination
+  }
+
+  // Build LIMIT/OFFSET clause
+  let limitClause = "";
+  if (aLimit && aLimit > 0) {
+    limitClause = `OFFSET ${aOffset || 0} ROWS FETCH NEXT ${aLimit} ROWS ONLY`;
+  } else if (aOffset && aOffset > 0) {
+    limitClause = `OFFSET ${aOffset} ROWS`;
+  }
+
+  const request = transaction.request();
+
+  // Bind parameters
+  for (const [key, value] of Object.entries(ctx.parameters)) {
+    request.input(key, value);
+  }
+
+  const sql = `
+    SELECT *
+    FROM dbo.view_offerings_pt_pc_pd
+    ${whereClause}
+    ${orderByClause}
+    ${limitClause}
+  `;
+
+  log.debug('========================================');
+  log.debug('VIEW QUERY SQL:');
+  log.debug(sql);
+  log.debug('PARAMETERS:', ctx.parameters);
+  log.debug('========================================');
+
+  const t0 = Date.now();
+  const result = await request.query(sql);
+  log.debug(`[VIEW] Query took: ${Date.now() - t0}ms`);
+
+  if (!result.recordset?.length) {
+    return [];
+  }
+
+  return result.recordset;
+}

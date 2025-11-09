@@ -713,3 +713,136 @@ export async function loadOfferingsFromView(
 
   return result.recordset;
 }
+
+/**
+ * Loads offerings from the view_offerings_pt_pc_pd view WITH LINKS.
+ * Similar to loadNestedOfferingsOptimized, but uses the view as base.
+ *
+ * @param transaction - Active database transaction
+ * @param aWhere - Optional WHERE conditions (use view column names)
+ * @param aOrderBy - Optional sort descriptors (use view column names)
+ * @param aLimit - Optional limit for pagination
+ * @param aOffset - Optional offset for pagination
+ * @returns Array of flat offering report rows with links array added
+ */
+export async function loadOfferingsFromViewWithLinks(
+  transaction: Transaction,
+  aWhere?: WhereConditionGroup<any> | WhereCondition<any>,
+  aOrderBy?: SortDescriptor<any>[],
+  aLimit?: number,
+  aOffset?: number,
+): Promise<any[]> {
+  assertDefined(transaction, "transaction");
+  log.debug(`loadOfferingsFromViewWithLinks`, { aWhere, aOrderBy, aLimit, aOffset });
+
+  const ctx: BuildContext = {
+    parameters: {},
+    paramIndex: 0,
+  };
+
+  let whereClause = "";
+  if (aWhere) {
+    whereClause = `WHERE ${buildWhereClause(aWhere, ctx, false)}`;
+  }
+
+  // Build ORDER BY clause
+  let orderByClause = "";
+  if (aOrderBy && aOrderBy.length > 0) {
+    orderByClause = `ORDER BY ${aOrderBy.map((s) => `${String(s.key)} ${s.direction}`).join(", ")}`;
+  } else if (aLimit || aOffset) {
+    orderByClause = "ORDER BY wioId ASC";
+  }
+
+  // Build LIMIT/OFFSET clause
+  let limitClause = "";
+  if (aLimit && aLimit > 0) {
+    limitClause = `OFFSET ${aOffset || 0} ROWS FETCH NEXT ${aLimit} ROWS ONLY`;
+  } else if (aOffset && aOffset > 0) {
+    limitClause = `OFFSET ${aOffset} ROWS`;
+  }
+
+  const request = transaction.request();
+
+  // Bind parameters
+  for (const [key, value] of Object.entries(ctx.parameters)) {
+    request.input(key, value);
+  }
+
+  // Batch query: View + Links (similar pattern to loadNestedOfferingsOptimized)
+  const sqlBatch = `
+    -- Table Variable for filtered Offering IDs
+    DECLARE @offering_ids TABLE (offering_id INT PRIMARY KEY);
+
+    -- STEP 1: Collect IDs from view (with WHERE, ORDER BY, LIMIT applied)
+    INSERT INTO @offering_ids (offering_id)
+    SELECT wioId
+    FROM dbo.view_offerings_pt_pc_pd
+    ${whereClause}
+    ${orderByClause}
+    ${limitClause};
+
+    -- STEP 2: Query view data for these IDs (maintains sort order)
+    SELECT *
+    FROM dbo.view_offerings_pt_pc_pd v
+    INNER JOIN @offering_ids ids ON v.wioId = ids.offering_id
+    ${orderByClause};
+
+    -- STEP 3: Query for links (returns single JSON string)
+    SELECT (
+        SELECT
+            l.offering_id,
+            l.link_id,
+            l.url,
+            l.notes,
+            l.created_at
+        FROM dbo.wholesaler_offering_links l
+        INNER JOIN @offering_ids ids ON l.offering_id = ids.offering_id
+        FOR JSON PATH
+    ) AS links_json;
+  `;
+
+  log.debug('========================================');
+  log.debug('VIEW WITH LINKS SQL BATCH:');
+  log.debug(sqlBatch);
+  log.debug('PARAMETERS:', ctx.parameters);
+  log.debug('========================================');
+
+  const t0 = Date.now();
+  const result = await request.query(sqlBatch);
+  log.debug(`[VIEW WITH LINKS] Batch query took: ${Date.now() - t0}ms`);
+
+  // Cast recordsets to array for type safety
+  const recordsets = Array.isArray(result.recordsets) ? result.recordsets : [];
+
+  // Check if first result set is empty
+  if (recordsets.length === 0 || !recordsets[0] || recordsets[0].length === 0) {
+    return [];
+  }
+
+  // Offerings from view (recordset 0)
+  const offerings = recordsets[0];
+
+  // Links JSON (recordset 1)
+  const linksJson = recordsets[1]?.[0]?.links_json;
+  const links = linksJson ? JSON.parse(linksJson) : [];
+
+  log.debug(`Found ${offerings.length} offerings and ${links.length} links.`);
+
+  // --- Merge Process ---
+
+  // 1. Create a map for fast access to links
+  const linksByOfferingId = new Map<number, any[]>();
+  links.forEach((link: any) => {
+    if (!linksByOfferingId.has(link.offering_id)) {
+      linksByOfferingId.set(link.offering_id, []);
+    }
+    linksByOfferingId.get(link.offering_id)!.push(link);
+  });
+
+  // 2. Add links to offerings (view uses wioId)
+  offerings.forEach((offering: any) => {
+    offering.links = linksByOfferingId.get(offering.wioId) || [];
+  });
+
+  return offerings;
+}

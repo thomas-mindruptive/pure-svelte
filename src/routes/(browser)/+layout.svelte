@@ -116,7 +116,7 @@
 <style>
   .browser-layout {
     display: grid;
-    grid-template-columns: 320px 1fr;
+    grid-template-columns: 320px minmax(0, 1fr);
     height: 100vh;
     width: 100vw;
   }

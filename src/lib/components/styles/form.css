@@ -72,6 +72,10 @@
   flex-direction: column;
 }
 
+.form-group.span-1 {
+  grid-column: span 1;
+}
+
 .form-group.span-2 {
   grid-column: span 2;
 }
@@ -211,10 +215,12 @@
     grid-template-columns: 1fr;
   }
 
+  .form-group.span-1,
   .form-group.span-2,
   .form-group.span-3,
   .form-group.span-4,
   .form-group.span-5,
+  .control-group.span-1,
   .control-group.span-2,
   .control-group.span-3,
   .control-group.span-4,

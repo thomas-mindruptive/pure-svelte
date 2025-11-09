@@ -36,6 +36,7 @@
   // The new form component
   import "$lib/components/styles/detail-page-layout.css";
   import "$lib/components/styles/grid-section.css";
+  import "$lib/components/styles/form-elements.css";
   // Type and Schema Imports
   import { page } from "$app/state";
   import { cascadeDelete } from "$lib/api/client/cascadeDelete";

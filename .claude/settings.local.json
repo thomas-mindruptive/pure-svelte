@@ -15,7 +15,9 @@
       "WebFetch(domain:codesignal.com)",
       "WebFetch(domain:stackoverflow.com)",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:svelte.dev)"
+      "WebFetch(domain:svelte.dev)",
+      "Bash(dir C:devpure /b)",
+      "Bash(dir \"C:\\dev\\pure\" /b)"
     ],
     "deny": [],
     "ask": []

@@ -79,6 +79,30 @@
       filterable: true,
       filterType: "text",
     },
+    {
+      key: "website",
+      header: "Website",
+      accessor: (r) => {
+        if (r.website) {
+          try {
+            return new URL(r.website).hostname;
+          } catch {
+            return r.website.substring(0, 30) + "...";
+          }
+        }
+        return "-";
+      },
+      sortable: true,
+      filterable: true,
+      filterType: "text",
+      width: "180px",
+      isLink: true,
+      onClick: (r) => {
+        if (r.website) {
+          window.open(r.website, "_blank");
+        }
+      },
+    },
   ];
 
   const getId = (r: Wholesaler) => r.wholesaler_id;

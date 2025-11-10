@@ -37,7 +37,7 @@
       accessor: (r) => (r.dropship ? "Yes" : "No"),
       sortable: true,
       filterable: true,
-      filterType: "text",
+      filterType: "boolean",
     },
     {
       key: "email",

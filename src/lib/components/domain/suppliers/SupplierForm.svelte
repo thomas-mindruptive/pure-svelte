@@ -212,11 +212,13 @@
               <option value="NL">Netherlands</option>
               <option value="CH">Switzerland</option>
               <option value="UK">United Kingdom</option>
-              <option value="CZ">Czech Rpublic</option>
-              <option value="SVK">Slowakia</option>
+              <option value="CZ">Czech Republic</option>
+              <option value="SVK">Slovakia</option>
+              <option value="ES">Spain</option>
               <option value="US">United States</option>
-              <option value="BRA">Brasil</option>
+              <option value="BRA">Brazil</option>
               <option value="CN">China</option>
+              <option value="IN">India</option>
               <option value="JP">Japan</option>
             </select>
             {#if errors.country}

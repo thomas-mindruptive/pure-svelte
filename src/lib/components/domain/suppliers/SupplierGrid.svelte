@@ -1,9 +1,9 @@
 <!-- SupplierGrid.svelte -->
 
 <script lang="ts">
-  // Thin wrapper around Datagrid for wholesalers
-  import Datagrid from "$lib/components/grids/Datagrid.svelte";
-  import type { DeleteStrategy, RowActionStrategy, SortFunc, ColumnDef } from "$lib/components/grids/Datagrid.types";
+  // Thin wrapper around Datagrid2 for wholesalers with filtering support
+  import Datagrid2 from "$lib/components/grids/Datagrid2.svelte";
+  import type { DeleteStrategy, RowActionStrategy, SortFunc, FilterFunc, ColumnDef } from "$lib/components/grids/Datagrid.types";
   import type { Wholesaler, WholesalerSchema } from "$lib/domain/domainTypes";
 
   // === PROPS ====================================================================================
@@ -14,32 +14,77 @@
     selection?: "none" | "single" | "multiple";
     deleteStrategy: DeleteStrategy<Wholesaler>;
     rowActionStrategy?: RowActionStrategy<Wholesaler>;
-    onSort?: SortFunc<Wholesaler> | undefined;
+    onSort?: SortFunc<Wholesaler>;
+    onFilter?: FilterFunc<Wholesaler>;
   };
 
-  const { rows, loading = false, selection = "multiple", deleteStrategy, rowActionStrategy, onSort }: SupplierGridProps = $props();
+  const { rows, loading = false, selection = "multiple", deleteStrategy, rowActionStrategy, onSort, onFilter }: SupplierGridProps = $props();
 
   // === COLUMNS ==================================================================================
 
   const columns: ColumnDef<typeof WholesalerSchema>[] = [
-    { key: "name", header: "Name", sortable: true, width:"200px" },
+    {
+      key: "name",
+      header: "Name",
+      sortable: true,
+      filterable: true,
+      filterType: "text",
+      width:"200px"
+    },
     {
       key: "dropship",
       header: "Dropship",
       accessor: (r) => (r.dropship ? "Yes" : "No"),
       sortable: true,
+      filterable: true,
+      filterType: "text",
     },
-    { key: "email", header: "Email", accessor: null, sortable: true },
-    { key: "country", header: "Country", accessor: null, sortable: true },
-    { key: "relevance", header: "Relevance", accessor: null, sortable: true },
-    { key: "price_range", header: "Price Range", accessor: null, sortable: true },
-    { key: "status", header: "Status", accessor: null, sortable: true },
+    {
+      key: "email",
+      header: "Email",
+      accessor: null,
+      sortable: true,
+      filterable: true,
+      filterType: "text",
+    },
+    {
+      key: "country",
+      header: "Country",
+      accessor: null,
+      sortable: true,
+      filterable: true,
+      filterType: "text",
+    },
+    {
+      key: "relevance",
+      header: "Relevance",
+      accessor: null,
+      sortable: true,
+      filterable: true,
+      filterType: "text",
+    },
+    {
+      key: "price_range",
+      header: "Price Range",
+      accessor: null,
+      sortable: true,
+      filterable: true,
+      filterType: "text",
+    },
+    {
+      key: "status",
+      header: "Status",
+      accessor: null,
+      sortable: true,
+      filterable: true,
+      filterType: "text",
+    },
   ];
 
   const getId = (r: Wholesaler) => r.wholesaler_id;
 </script>
 
-<Datagrid
+<Datagrid2
   {rows}
   {columns}
   {getId}
@@ -50,6 +95,7 @@
   {deleteStrategy}
   {rowActionStrategy}
   {onSort}
+  {onFilter}
   maxBodyHeight="750px"
 />
 

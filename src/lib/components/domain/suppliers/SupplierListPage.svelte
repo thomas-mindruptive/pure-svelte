@@ -12,7 +12,11 @@
   import { ApiClient } from "$lib/api/client/apiClient";
   // Types for the strategy pattern used by the generic DataGrid component.
   import { page } from "$app/state";
-  import type { SortDescriptor } from "$lib/backendQueries/queryGrammar";
+  import type {
+    SortDescriptor,
+    WhereCondition,
+    WhereConditionGroup
+  } from "$lib/backendQueries/queryGrammar";
   import type { DeleteStrategy, ID, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
 
   import { cascadeDelete } from "$lib/api/client/cascadeDelete";
@@ -22,6 +26,7 @@
 
   export interface SupplierListPageProps {
     suppliers: Promise<Wholesaler[]>;
+    loadEventFetch: typeof fetch;
   }
 
   // 1. The `data` prop receives the promise streamed from the non-blocking `load` function.
@@ -37,6 +42,8 @@
     status: number;
   } | null>(null);
   const allowForceCascadingDelte = $state(true);
+  let currentWhere = $state<WhereCondition<Wholesaler> | WhereConditionGroup<Wholesaler> | null>(null);
+  let currentSort = $state<SortDescriptor<Wholesaler>[] | null>(null);
 
   // === LOAD =====================================================================================
 
@@ -100,7 +107,7 @@
   // === API ======================================================================================
 
   // 3. These functions handle user interactions within the grid. They remain unchanged.
-  const client = new ApiClient(fetch);
+  const client = new ApiClient(data.loadEventFetch);
   const supplierApi = getSupplierApi(client);
 
   // === EVENTS ===================================================================================
@@ -138,7 +145,29 @@
   }
 
   async function handleSort(sortState: SortDescriptor<Wholesaler>[] | null) {
-    resolvedSuppliers = await supplierApi.loadSuppliersWithWhereAndOrder(null, sortState);
+    log.info(`(SupplierListPage) Sort triggered:`, sortState);
+    currentSort = sortState;
+    isLoading = true;
+    try {
+      log.info(`(SupplierListPage) Calling API with where:`, currentWhere, `sort:`, sortState);
+      resolvedSuppliers = await supplierApi.loadSuppliersWithWhereAndOrder(currentWhere, sortState);
+      log.info(`(SupplierListPage) Received ${resolvedSuppliers.length} suppliers`);
+    } finally {
+      isLoading = false;
+    }
+  }
+
+  async function handleFilter(where: WhereConditionGroup<Wholesaler> | WhereCondition<Wholesaler> | null) {
+    log.info(`(SupplierListPage) Filter triggered:`, where);
+    currentWhere = where;
+    isLoading = true;
+    try {
+      log.info(`(SupplierListPage) Calling API with where:`, where, `sort:`, currentSort);
+      resolvedSuppliers = await supplierApi.loadSuppliersWithWhereAndOrder(where, currentSort);
+      log.info(`(SupplierListPage) Received ${resolvedSuppliers.length} suppliers`);
+    } finally {
+      isLoading = false;
+    }
   }
 
   // ===== GRID STRATEGIES =====
@@ -183,6 +212,7 @@
         {deleteStrategy}
         {rowActionStrategy}
         onSort={handleSort}
+        onFilter={handleFilter}
       />
     </div>
   {/if}

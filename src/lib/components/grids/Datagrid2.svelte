@@ -25,8 +25,8 @@
 
   // DataGrid2 Props - extends DataGrid with filter functionality
   export type DataGrid2Props<T> = DataGridProps<T> & {
-    onFilter?: FilterFunc<T>;
-    filterCombineMode?: 'AND' | 'OR';
+    onFilter?: FilterFunc<T> | undefined;
+    filterCombineMode?: 'AND' | 'OR' | undefined;
   };
 
   const {
@@ -145,15 +145,20 @@
 </script>
 
 <div class="datagrid2-container">
-  <FilterToolbar
-    {columns}
-    {combineMode}
-    {activeFilterCount}
-    {filterResetKey}
-    onFilterChange={handleFilterChange}
-    onCombineModeToggle={handleCombineModeToggle}
-    onClearAllFilters={handleClearAllFilters}
-  />
+  <details class="filter-details" open>
+    <summary class="filter-summary">
+      Filters {activeFilterCount > 0 ? `(${activeFilterCount} active)` : ''}
+    </summary>
+    <FilterToolbar
+      {columns}
+      {combineMode}
+      {activeFilterCount}
+      {filterResetKey}
+      onFilterChange={handleFilterChange}
+      onCombineModeToggle={handleCombineModeToggle}
+      onClearAllFilters={handleClearAllFilters}
+    />
+  </details>
 
   <Datagrid {...datagridProps} {columns} />
 </div>
@@ -163,5 +168,25 @@
     display: flex;
     flex-direction: column;
     height: 100%;
+  }
+
+  .filter-details {
+    border: 1px solid var(--color-border, #ddd);
+    border-radius: 4px;
+    margin-bottom: 1rem;
+    background: var(--color-surface, #fff);
+  }
+
+  .filter-summary {
+    padding: 0.75rem 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+    background: var(--color-surface-alt, #f8f9fa);
+    border-radius: 4px;
+  }
+
+  .filter-summary:hover {
+    background: var(--color-surface-hover, #e9ecef);
   }
 </style>

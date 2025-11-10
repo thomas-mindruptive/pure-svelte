@@ -144,5 +144,6 @@
     padding: 2rem;
     height: 100%;
     background: var(--color-background);
+    max-width: 80vw;
   }
 </style>

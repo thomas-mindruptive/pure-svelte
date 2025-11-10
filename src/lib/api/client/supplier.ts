@@ -122,7 +122,7 @@ export function getSupplierApi(client: ApiClient) {
      * @returns
      */
     async loadSuppliersWithWhereAndOrder(
-      where: WhereConditionGroup<Wholesaler> | null,
+      where: WhereConditionGroup<Wholesaler> | WhereCondition<Wholesaler> | null,
       orderBy: SortDescriptor<Wholesaler>[] | null,
     ): Promise<Wholesaler[]> {
       const queryPartial: Partial<QueryPayload<Wholesaler>> = {};

@@ -297,4 +297,5 @@
   selection="none"
   gridId="offerings-report"
   entity="offering"
+  maxBodyHeight=80vh
 />

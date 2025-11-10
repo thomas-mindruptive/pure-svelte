@@ -29,7 +29,7 @@ export function load({ fetch }: LoadEvent): SupplierListPageProps {
   // 3. Call the API method. The call is now clean and doesn't need `fetch`.
   const suppliers = supplierApi.loadSuppliers();
 
-  // ⚠️ Return the promise. Target component must handle it!
-  return {suppliers};
+  // ⚠️ Return the promise AND fetch for client-side API calls. Target component must handle it!
+  return { suppliers, loadEventFetch: fetch };
 
 }

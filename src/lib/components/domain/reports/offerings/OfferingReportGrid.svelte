@@ -8,6 +8,7 @@
    * Key Features:
    * - Filterable columns for all view fields
    * - Clickable Title column for navigation to offering detail page
+   * - Clickable Links column showing first link (opens in new tab)
    * - Server-side filtering and sorting via QueryGrammar
    *
    * Column Key Structure:
@@ -20,16 +21,16 @@
    */
   import Datagrid2 from "$lib/components/grids/Datagrid2.svelte";
   import type { ColumnDef, FilterFunc, SortFunc } from "$lib/components/grids/Datagrid.types";
-  import type { OfferingReportView } from "$lib/domain/domainTypes";
+  import type { OfferingReportViewWithLinks } from "$lib/domain/domainTypes";
   import { OfferingReportViewSchema } from "$lib/domain/domainTypes";
   import { log } from "$lib/utils/logger";
   import { goto } from "$app/navigation";
 
   type Props = {
-    rows: OfferingReportView[];
+    rows: OfferingReportViewWithLinks[];
     loading: boolean;
-    onFilter: FilterFunc<OfferingReportView>;
-    onSort: SortFunc<OfferingReportView>;
+    onFilter: FilterFunc<OfferingReportViewWithLinks>;
+    onSort: SortFunc<OfferingReportViewWithLinks>;
   };
 
   let { rows, loading, onFilter, onSort }: Props = $props();
@@ -56,7 +57,7 @@
   /**
    * Navigates to the offering detail page when user clicks on Title.
    */
-  function handleOfferingClick(row: OfferingReportView) {
+  function handleOfferingClick(row: OfferingReportViewWithLinks) {
     const categoryId = row.pcId;
     const productDefId = row.pdefId;
     const offeringId = row.wioId;
@@ -247,9 +248,33 @@
       filterType: "text",
       width: "200px"
     },
+    {
+      key: "links" as any,
+      header: "Links",
+      accessor: (row: OfferingReportViewWithLinks) => {
+        if (row.links?.[0]) {
+          try {
+            return new URL(row.links[0].url).hostname;
+          } catch {
+            return row.links[0].url.substring(0, 30) + "...";
+          }
+        }
+        return "-";
+      },
+      sortable: false,
+      filterable: false,
+      filterType: "text",
+      width: "12rem",
+      isLink: true,
+      onClick: (row: OfferingReportViewWithLinks) => {
+        if (row.links?.[0]?.url) {
+          window.open(row.links[0].url, "_blank");
+        }
+      },
+    } as any,
   ];
 
-  function getId(row: OfferingReportView): number {
+  function getId(row: OfferingReportViewWithLinks): number {
     return row.wioId;
   }
 

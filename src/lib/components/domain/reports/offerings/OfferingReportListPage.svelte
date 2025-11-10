@@ -31,18 +31,18 @@
     WhereCondition,
     WhereConditionGroup
   } from "$lib/backendQueries/queryGrammar";
-  import type { OfferingReportView } from "$lib/domain/domainTypes";
+  import type { OfferingReportViewWithLinks } from "$lib/domain/domainTypes";
   import { log } from "$lib/utils/logger";
 
   type Props = {
     data: {
-      offerings: Promise<OfferingReportView[]>;
+      offerings: Promise<OfferingReportViewWithLinks[]>;
       loadEventFetch: typeof fetch;
     };
   };
 
   let { data }: Props = $props();
-  let resolvedOfferings = $state<OfferingReportView[]>([]);
+  let resolvedOfferings = $state<OfferingReportViewWithLinks[]>([]);
   let isLoading = $state(true);
   let currentWhere = $state<WhereCondition<any> | WhereConditionGroup<any> | null>(null);
   let currentSort = $state<SortDescriptor<any>[] | null>(null);
@@ -97,7 +97,7 @@
     isLoading = true;
     try {
       log.info(`[OfferingReportListPage] Calling API with where:`, where, `sort:`, currentSort);
-      resolvedOfferings = await offeringApi.loadOfferingsForReport(where, currentSort);
+      resolvedOfferings = await offeringApi.loadOfferingsForReportWithLinks(where, currentSort);
       log.info(`[OfferingReportListPage] Received ${resolvedOfferings.length} offerings`);
       log.debug(`[OfferingReportListPage] First 3 offerings:`, resolvedOfferings.slice(0, 3));
     } finally {
@@ -121,7 +121,7 @@
     isLoading = true;
     try {
       log.info(`[OfferingReportListPage] Calling API with where:`, currentWhere, `sort:`, sort);
-      resolvedOfferings = await offeringApi.loadOfferingsForReport(currentWhere, sort);
+      resolvedOfferings = await offeringApi.loadOfferingsForReportWithLinks(currentWhere, sort);
       log.info(`[OfferingReportListPage] Received ${resolvedOfferings.length} offerings`);
     } finally {
       isLoading = false;
@@ -129,10 +129,20 @@
   }
 </script>
 
-<h1>Offerings Report</h1>
-<OfferingReportGrid
-  rows={resolvedOfferings}
-  loading={isLoading}
-  onFilter={handleFilter}
-  onSort={handleSort}
-/>
+<div class="page-container">
+  <h1>Offerings Report</h1>
+  <OfferingReportGrid
+    rows={resolvedOfferings}
+    loading={isLoading}
+    onFilter={handleFilter}
+    onSort={handleSort}
+  />
+</div>
+
+<style>
+  .page-container {
+    padding: 2rem;
+    height: 100%;
+    background: var(--color-background);
+  }
+</style>

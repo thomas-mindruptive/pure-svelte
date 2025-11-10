@@ -870,6 +870,14 @@ export type OfferingImage_Image_Offering = z.infer<typeof OfferingImage_Image_Of
 
 export type OfferingReportView = z.infer<typeof OfferingReportViewSchema>;
 
+/**
+ * OfferingReportView WITH Links
+ * Extends OfferingReportView to include links array
+ */
+export type OfferingReportViewWithLinks = OfferingReportView & {
+  links?: WholesalerOfferingLink[];
+};
+
 // ===== ALL BRANDED SCHEMAS (= with meta info)  =====
 
 export const AllBrandedSchemas = {

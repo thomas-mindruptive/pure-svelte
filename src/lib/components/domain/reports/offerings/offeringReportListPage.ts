@@ -7,7 +7,7 @@ export function load({ fetch }: LoadEvent) {
   const offeringApi = getOfferingApi(client);
 
   // Promise ohne await - für Streaming
-  const offerings = offeringApi.loadOfferingsForReport();
+  const offerings = offeringApi.loadOfferingsForReportWithLinks();
 
   return { offerings, loadEventFetch: fetch };
 }

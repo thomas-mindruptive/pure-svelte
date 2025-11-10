@@ -220,6 +220,7 @@
               <option value="CN">China</option>
               <option value="IN">India</option>
               <option value="JP">Japan</option>
+              <option value="ZAF">South Africa</option>
             </select>
             {#if errors.country}
               <div class="error-text">{errors.country[0]}</div>

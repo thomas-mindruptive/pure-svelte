@@ -10,12 +10,12 @@
   flex-direction: column;
   gap: 1.5rem;
   min-width: 0; /* Allow the flex container itself to shrink */
+  max-width: 79vw;
 }
 
 /* All direct children should be able to shrink smaller than their content */
 .detail-page-layout > * {
   min-width: 0;
-  max-width: 100%;
 }
 
 .detail-header-section {

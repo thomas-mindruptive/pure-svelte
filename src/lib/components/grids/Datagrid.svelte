@@ -37,6 +37,7 @@
 
     // Layout
     maxBodyHeight?: string | undefined;
+    maxBodyWidth?: string | undefined;
 
     // Parent defines initial data and loading status.
     loading?: boolean;
@@ -97,6 +98,7 @@
     entity = "item",
 
     maxBodyHeight,
+    maxBodyWidth,
 
     rows = [] as any[],
     columns = [] as ColumnDef<any>[],
@@ -602,7 +604,7 @@
 
 <div
   class="pc-grid pc-grid--comfortable pc-grid--scroll-body"
-  style={maxBodyHeight ? `--pc-grid-body-max-height:${maxBodyHeight};` : ""}
+  style={`${maxBodyHeight ? `--pc-grid-body-max-height:${maxBodyHeight};` : ""}${maxBodyWidth ? `--pc-grid-body-max-width:${maxBodyWidth};` : ""}`}
 >
   <!-- TOOLBAR ----------------------------------------------------------------------------------->
   <div class="pc-grid__toolbar">

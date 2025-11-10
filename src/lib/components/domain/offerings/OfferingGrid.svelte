@@ -35,6 +35,9 @@
     toolbar?: Snippet<[ToolbarSnippetProps]>;
     // Custom row actions snippet
     rowActions?: Snippet<[RowActionsSnippetProps]>;
+    // Max dimensions
+    maxBodyHeight?: string;
+    maxBodyWidth?: string;
   };
 
   const {
@@ -49,6 +52,10 @@
     onSort,
     toolbar,
     rowActions,
+
+    // Max dimensions
+    maxBodyHeight,
+    maxBodyWidth,
   }: OfferingGridProps = $props();
 
   // === COLUMNS  =================================================================================
@@ -167,4 +174,6 @@
   {onSort}
   {toolbar}
   {rowActions}
+  {maxBodyHeight}
+  {maxBodyWidth}
 />

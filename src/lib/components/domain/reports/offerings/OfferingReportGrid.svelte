@@ -31,9 +31,10 @@
     loading: boolean;
     onFilter: FilterFunc<OfferingReportViewWithLinks>;
     onSort: SortFunc<OfferingReportViewWithLinks>;
+    maxBodyHeight?: string;
   };
 
-  let { rows, loading, onFilter, onSort }: Props = $props();
+  let { rows, loading, onFilter, onSort, maxBodyHeight }: Props = $props();
 
   // Log rows when they change
   $effect(() => {
@@ -297,5 +298,5 @@
   selection="none"
   gridId="offerings-report"
   entity="offering"
-  maxBodyHeight=80vh
+  maxBodyHeight={maxBodyHeight ?? "80vh"}
 />

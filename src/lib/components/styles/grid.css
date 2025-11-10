@@ -388,6 +388,7 @@
 
 .pc-grid--scroll-body .pc-grid__scroller {
   max-height: var(--pc-grid-body-max-height, 60vh);
+  max-width: var(--pc-grid-body-max-width, 100%);
   overflow: auto;
 }
 

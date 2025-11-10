@@ -448,6 +448,8 @@
         {deleteStrategy}
         {rowActionStrategy}
         onSort={handleOfferingsSort}
+
+        maxBodyHeight={"50vh"}
       />
     {:else}
       <p>Offerings will be displayed here after the product definition has been saved.</p>

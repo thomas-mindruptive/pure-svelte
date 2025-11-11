@@ -21,7 +21,7 @@
    * 6. New data replaces grid contents
    */
   import { ApiClient } from "$lib/api/client/apiClient";
-  import { getOfferingApi, offeringLoadingState } from "$lib/api/client/offering";
+  import { getOfferingApi } from "$lib/api/client/offering";
   import OfferingReportGrid from "./OfferingReportGrid.svelte";
   import type {
     SortDescriptor,
@@ -40,32 +40,18 @@
 
   let { data }: Props = $props();
   let resolvedOfferings = $state<OfferingReportViewWithLinks[]>([]);
-  let isLoading = $state(false); // Start with false - Datagrid will trigger loading
+  let isLoading = $state(false);  // Page-level loading (for error handling)
 
   const client = new ApiClient(data.loadEventFetch);
   const offeringApi = getOfferingApi(client);
 
   /**
-   * Initial Load Effect
-   * NO EFFECT NEEDED! Datagrid will ALWAYS call handleQueryChange on mount.
-   * Either with saved state or with null/null for initial load.
-   */
-
-  /**
    * Query Change Handler
    *
-   * Called by Datagrid2 when filters or sort changes.
-   * Receives both filter and sort in a single callback to avoid race conditions.
+   * Called by Datagrid when filters or sort changes.
    *
-   * Important: Datagrid2 handles:
-   * - Auto-save to localStorage before calling this
-   * - Auto-restore from localStorage on mount
-   * - Combining filter changes with current sort
-   * - Combining sort changes with current filter
-   *
-   * This handler only needs to:
-   * - Fetch fresh data with the combined query
-   * - Update loading state
+   * Note: Page tracks loading for error handling, Grid tracks its own loading for spinner.
+   * They are independent - no coordination needed.
    */
   async function handleQueryChange(query: {
     filters: WhereCondition<any> | WhereConditionGroup<any> | null,
@@ -86,7 +72,6 @@
   <h1>Offerings Report</h1>
   <OfferingReportGrid
     rows={resolvedOfferings}
-    loading={isLoading || $offeringLoadingState}
     onQueryChange={handleQueryChange}
   />
 </div>

@@ -15,7 +15,7 @@
   import { stringsToNumbers } from "$lib/utils/typeConversions";
   import { cascadeDelete } from "$lib/api/client/cascadeDelete";
   import { page } from "$app/state";
-  import { getOrderApi, orderLoadingState } from "$lib/api/client/order";
+  import { getOrderApi } from "$lib/api/client/order";
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
   import { safeParseFirstN } from "$lib/domain/domainTypes.utils";
   import { convertToHtml, isoDateStringToLocale } from "$lib/utils/formatUtils";
@@ -86,7 +86,7 @@
     // Reset state before loading
     isLoading = true;
     loadingOrValidationError = null;
-    resolvedOrders = []; // Clear old data to prevent stale UI
+    // DON'T clear resolvedOrders = [] - causes Grid to re-render and triggers loop!
 
     try {
       const orders = await orderApi.loadOrderWholesalersWithWhereAndOrder(
@@ -164,7 +164,6 @@
         rows={resolvedOrders}
         {columns}
         {getId}
-        loading={isLoading || $orderLoadingState}
         gridId="orders"
         entity="order"
         {deleteStrategy}

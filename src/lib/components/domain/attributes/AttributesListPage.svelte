@@ -1,6 +1,6 @@
 <script lang="ts">
   import AttributesGrid from "$lib/components/domain/attributes/AttributesGrid.svelte";
-  import { attributeLoadingState, getAttributeApi } from "$lib/api/client/attribute";
+  import { getAttributeApi } from "$lib/api/client/attribute";
   import type { Attribute } from "$lib/domain/domainTypes";
   import { goto } from "$app/navigation";
   import { log } from "$lib/utils/logger";
@@ -74,7 +74,7 @@
     // Reset state before loading
     isLoading = true;
     loadingOrValidationError = null;
-    resolvedAttributes = []; // Clear old data to prevent stale UI
+    // DON'T clear resolvedAttributes = [] - causes Grid to re-render and triggers loop!
 
     try {
       // For now, loadAttributes doesn't support filters/sort, so we just load all
@@ -128,7 +128,6 @@
       </button>
       <AttributesGrid
         rows={resolvedAttributes}
-        loading={isLoading || $attributeLoadingState}
         {deleteStrategy}
         {rowActionStrategy}
         onQueryChange={handleQueryChange}

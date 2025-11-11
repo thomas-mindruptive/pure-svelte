@@ -1,7 +1,7 @@
 <!-- SupplierListPage.svelte -->
 <script lang="ts">
   import { goto } from "$app/navigation";
-  import { getSupplierApi, supplierLoadingState } from "$lib/api/client/supplier";
+  import { getSupplierApi } from "$lib/api/client/supplier";
   import SupplierGrid from "$lib/components/domain/suppliers/SupplierGrid.svelte";
   import type { Wholesaler } from "$lib/domain/domainTypes";
   import { log } from "$lib/utils/logger";
@@ -92,23 +92,20 @@
   }) {
     log.info(`(SupplierListPage) Query change - filters:`, query.filters, `sort:`, query.sort);
 
-    // Reset state before loading
+    // Page tracks loading for error handling (Grid has its own loading state)
     isLoading = true;
     loadingOrValidationError = null;
-    resolvedSuppliers = []; // Clear old data to prevent stale UI
+    // DON'T clear resolvedSuppliers = [] - causes Grid to re-render and triggers loop!
+    // Keep old data visible until new data arrives
 
     try {
       resolvedSuppliers = await supplierApi.loadSuppliersWithWhereAndOrder(query.filters, query.sort);
       log.info(`(SupplierListPage) Received ${resolvedSuppliers.length} suppliers`);
     } catch (rawError: any) {
-      // Robust error handling from the original $effect
       const status = rawError.status ?? 500;
       const message = rawError.body?.message || rawError.message || "An unknown error occurred while loading suppliers.";
 
-      // Set the clean error state for the UI to display
       loadingOrValidationError = { message, status };
-
-      // Log the full error for debugging
       log.error("(SupplierListPage) Error loading suppliers", { rawError });
     } finally {
       isLoading = false;
@@ -153,7 +150,6 @@
       </button>
       <SupplierGrid
         rows={resolvedSuppliers}
-        loading={isLoading || $supplierLoadingState}
         {deleteStrategy}
         {rowActionStrategy}
         onQueryChange={handleQueryChange}

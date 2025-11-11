@@ -43,8 +43,7 @@
     maxBodyHeight?: string | undefined;
     maxBodyWidth?: string | undefined;
 
-    // Parent defines initial data and loading status.
-    loading?: boolean;
+    // Parent defines initial data (Grid manages its own loading state)
     rows: any[];
 
     // Callback when query changes (filters + sort combined) - PREFERRED
@@ -120,8 +119,6 @@
     selection = "multiple" as "none" | "single" | "multiple",
     canDelete = (_row: any) => true,
 
-    loading = false,
-
     onQueryChange,
     onSort,
     filterCombineMode = 'AND',
@@ -180,7 +177,7 @@
 
   // Sorting - initialize with saved state
   let sortState = $state<SortDescriptor<T>[]>(savedState.sort || []);
-  let isSorting = $state(false);
+  let isLoadingData = $state(false);  // Grid owns its data loading state
 
   // Filtering (from Datagrid2) - initialize with saved state
   let activeFilters = new SvelteMap<string, WhereCondition<T>>();
@@ -211,11 +208,32 @@
     // ALWAYS call onQueryChange if it exists
     // This is the ONLY place that triggers data loading
     if (onQueryChange) {
-      // Call with saved state or null/null for initial load
-      onQueryChange({
-        filters: savedState.filters || null,
-        sort: savedState.sort || null
-      });
+      let aborted = false;
+
+      // CRITICAL: Use setTimeout to decouple from onMount lifecycle
+      // Without this, calling onQueryChange changes parent state DURING child mount
+      // → Parent re-renders while child is still mounting → Grid recreates → LOOP!
+      const timeoutId = setTimeout(async () => {
+        if (aborted) return;  // Component unmounted before timeout fired
+
+        isLoadingData = true;
+        try {
+          await onQueryChange({
+            filters: savedState.filters || null,
+            sort: savedState.sort || null
+          });
+        } finally {
+          if (!aborted) {
+            isLoadingData = false;  // Always clear, even on error
+          }
+        }
+      }, 0);  // 0ms = run after current render cycle completes
+
+      // Cleanup: prevent state updates on unmounted component
+      return () => {
+        aborted = true;
+        clearTimeout(timeoutId);
+      };
     }
   });
 
@@ -469,13 +487,18 @@
 
     stateManager.saveFilters(whereGroup);
 
-    await onQueryChange?.({
-      filters: whereGroup,
-      sort: sortState.length > 0 ? sortState : null
-    });
+    isLoadingData = true;
+    try {
+      await onQueryChange?.({
+        filters: whereGroup,
+        sort: sortState.length > 0 ? sortState : null
+      });
+    } finally {
+      isLoadingData = false;
+    }
   }
 
-  function handleCombineModeToggle() {
+  async function handleCombineModeToggle() {
     log.debug(`[Datagrid] Toggling combine mode from ${combineMode} to ${combineMode === 'AND' ? 'OR' : 'AND'}`);
     combineMode = combineMode === 'AND' ? 'OR' : 'AND';
     const whereGroup = buildWhereGroup();
@@ -483,23 +506,33 @@
 
     stateManager.saveFilters(whereGroup);
 
-    onQueryChange?.({
-      filters: whereGroup,
-      sort: sortState.length > 0 ? sortState : null
-    });
+    isLoadingData = true;
+    try {
+      await onQueryChange?.({
+        filters: whereGroup,
+        sort: sortState.length > 0 ? sortState : null
+      });
+    } finally {
+      isLoadingData = false;
+    }
   }
 
-  function handleClearAllFilters() {
+  async function handleClearAllFilters() {
     log.debug(`[Datagrid] Clearing all ${activeFilters.size} filters`);
     activeFilters.clear();
     filterResetKey++;
 
     stateManager.saveFilters(null);
 
-    onQueryChange?.({
-      filters: null,
-      sort: sortState.length > 0 ? sortState : null
-    });
+    isLoadingData = true;
+    try {
+      await onQueryChange?.({
+        filters: null,
+        sort: sortState.length > 0 ? sortState : null
+      });
+    } finally {
+      isLoadingData = false;
+    }
   }
 
   function handleFilterToggle() {
@@ -512,7 +545,7 @@
   async function handleSort(key: AllQualifiedColumns) {
     assertDefined(key, "key");
 
-    isSorting = true;
+    isLoadingData = true;
 
     try {
       let descriptor = sortState.find((descriptor) => descriptor.key === key);
@@ -557,7 +590,7 @@
         log.warn(msg);
       }
     } finally {
-      isSorting = false;
+      isLoadingData = false;
     }
   }
 
@@ -788,7 +821,7 @@
       <!-- DELETE SELECTED ----------------------------------------------------------------------->
       <button
         class="pc-grid__btn"
-        disabled={selectedIds.size === 0 || loading || isSorting || !deleteStrategy || typeof deleteStrategy.execute !== "function"}
+        disabled={selectedIds.size === 0 || isLoadingData || !deleteStrategy || typeof deleteStrategy.execute !== "function"}
         onclick={() => deleteSelected()}
         aria-busy={Array.from(selectedIds).some((id: ID) => isDeleting(id))}
         title={selectedIds.size === 0
@@ -801,7 +834,7 @@
       <!-- CLEAR SORTING ------------------------------------------------------------------------->
       <button
         class="pc-grid__btn"
-        disabled={sortState.length === 0 || loading || isSorting}
+        disabled={sortState.length === 0 || isLoadingData}
         onclick={() => {
           log.debug(`Clearing all sortings: ${JSON.stringify(sortState)}`);
           sortState = [];
@@ -820,7 +853,7 @@
       {/if}
 
       <!-- LOADING SPINNER ----------------------------------------------------------------------->
-      {#if loading || isSorting}
+      {#if isLoadingData}
         <div
           class="loader-wrapper"
           transition:fade={{ duration: 150, delay: 200 }}

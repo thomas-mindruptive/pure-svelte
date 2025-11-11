@@ -8,7 +8,6 @@
 
   export type AttributesGridProps = {
     rows: Attribute[];
-    loading?: boolean;
     selection?: "none" | "single" | "multiple";
     deleteStrategy: DeleteStrategy<Attribute>;
     rowActionStrategy?: RowActionStrategy<Attribute>;
@@ -18,7 +17,7 @@
     }) => Promise<void> | void;
   };
 
-  const { rows = [], loading = false, selection = "multiple", deleteStrategy, rowActionStrategy, onQueryChange }: AttributesGridProps = $props();
+  const { rows = [], selection = "multiple", deleteStrategy, rowActionStrategy, onQueryChange }: AttributesGridProps = $props();
 
   // === COLUMNS ==================================================================================
 
@@ -39,7 +38,6 @@
   {rows}
   {columns}
   {getId}
-  {loading}
   {selection}
   gridId="attributes-master"
   entity="attribute"

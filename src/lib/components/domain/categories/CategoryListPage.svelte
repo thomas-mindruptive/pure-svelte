@@ -8,7 +8,7 @@
   import type { SortDescriptor, WhereCondition, WhereConditionGroup } from "$lib/backendQueries/queryGrammar";
   import { page } from "$app/state";
   import type { ProductCategory } from "$lib/domain/domainTypes";
-  import { categoryLoadingState, getCategoryApi } from "$lib/api/client/category";
+  import { getCategoryApi } from "$lib/api/client/category";
   import { stringsToNumbers } from "$lib/utils/typeConversions";
   import { cascadeDelete } from "$lib/api/client/cascadeDelete";
   import "$lib/components/styles/list-page-layout.css";
@@ -81,7 +81,7 @@
     // Reset state before loading
     isLoading = true;
     loadingOrValidationError = null;
-    resolvedCategories = []; // Clear old data to prevent stale UI
+    // DON'T clear resolvedCategories = [] - causes Grid to re-render and triggers loop!
 
     try {
       // API expects WhereConditionGroup | null, we have WhereCondition | WhereConditionGroup | null
@@ -142,7 +142,6 @@
       </button>
       <CategoryGrid
         rows={resolvedCategories}
-        loading={isLoading || $categoryLoadingState}
         {deleteStrategy}
         {rowActionStrategy}
         onQueryChange={handleQueryChange}

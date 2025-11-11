@@ -29,7 +29,6 @@
 
   type Props = {
     rows: OfferingReportViewWithLinks[];
-    loading: boolean;
     onQueryChange?: (query: {
       filters: WhereCondition<OfferingReportViewWithLinks> | WhereConditionGroup<OfferingReportViewWithLinks> | null,
       sort: SortDescriptor<OfferingReportViewWithLinks>[] | null
@@ -37,7 +36,7 @@
     maxBodyHeight?: string;
   };
 
-  let { rows, loading, onQueryChange, maxBodyHeight }: Props = $props();
+  let { rows, onQueryChange, maxBodyHeight }: Props = $props();
 
   // Log rows when they change
   $effect(() => {
@@ -294,7 +293,6 @@
   {columns}
   {rows}
   {getId}
-  {loading}
   {onQueryChange}
   {deleteStrategy}
   selection="none"

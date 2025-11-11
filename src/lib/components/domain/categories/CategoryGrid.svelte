@@ -8,7 +8,6 @@
 
   export type CategoryGridProps = {
     rows: ProductCategory[];
-    loading?: boolean;
     selection?: "none" | "single" | "multiple";
     deleteStrategy: DeleteStrategy<ProductCategory>;
     rowActionStrategy?: RowActionStrategy<ProductCategory>;
@@ -20,7 +19,7 @@
     }) => Promise<void> | void;
   };
 
-  const { rows = [], loading = false, selection = "multiple", deleteStrategy, rowActionStrategy, onSort, onQueryChange }: CategoryGridProps = $props();
+  const { rows = [], selection = "multiple", deleteStrategy, rowActionStrategy, onSort, onQueryChange }: CategoryGridProps = $props();
 
   // === COLUMNS ====================================================================================
 
@@ -40,7 +39,6 @@
   {rows}
   {columns}
   {getId}
-  {loading}
   {selection}
   gridId="categories"
   entity="category"

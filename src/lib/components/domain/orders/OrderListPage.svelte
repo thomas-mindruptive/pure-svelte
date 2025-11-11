@@ -10,7 +10,7 @@
   // --- API & Strategy Imports ---
   import { ApiClient } from "$lib/api/client/apiClient";
   import type { ID, DeleteStrategy, RowActionStrategy, ColumnDef } from "$lib/components/grids/Datagrid.types";
-  import type { SortDescriptor } from "$lib/backendQueries/queryGrammar";
+  import type { SortDescriptor, WhereCondition, WhereConditionGroup } from "$lib/backendQueries/queryGrammar";
 
   import { stringsToNumbers } from "$lib/utils/typeConversions";
   import { cascadeDelete } from "$lib/api/client/cascadeDelete";
@@ -27,7 +27,7 @@
   // === STATE ====================================================================================
 
   let resolvedOrders = $state<Order_Wholesaler[]>([]);
-  let isLoading = $state(true); // The component always starts in a loading state.
+  let isLoading = $state(false); // Start with false - Datagrid will trigger loading
   let loadingOrValidationError = $state<{
     message: string;
     status: number;
@@ -40,65 +40,8 @@
   const orderApi = getOrderApi(client);
 
   // === LOAD =====================================================================================
-
-  /**
-   * ⚠️ NOTE: with this list page, we change the +page.ts -> load -> page.svelte pattern!
-   * Reason: We use the "streaming API" approach anyway,
-   * i.e. the "load" function only returns promises, not the data itself.
-   * => There is no advantage, quite the opposite:
-   * We would have to maintain an indirection (= +page.ts).
-   */
-  $effect(() => {
-    // For Svelte cleanup funtion!
-    let aborted = false;
-
-    // We define a self-contained async function to handle the promise lifecycle.
-    // This is a robust pattern for managing async operations inside an effect.
-    log.debug(`Before processPromise`);
-    const processPromise = async () => {
-      // a. Reset the state each time a new promise is processed.
-      isLoading = true;
-      loadingOrValidationError = null;
-      resolvedOrders = []; // Clear old data to prevent stale UI
-
-      try {
-        if (!aborted) {
-          resolvedOrders = await orderApi.loadOrderWholesalers();
-          const valResult = safeParseFirstN(Order_Wholesaler_Schema, resolvedOrders, 4);
-          if (!valResult.success) {
-            const msg = `Cannot validate orders: ${convertToHtml(JSON.stringify(valResult.error.issues))}`;
-            loadingOrValidationError = { message: msg, status: 500 };
-            log.error(msg);
-          }
-          log.debug(`Orders promise resolved successfully.`, resolvedOrders);
-        }
-      } catch (rawError: any) {
-        if (!aborted) {
-          const status = rawError.status ?? 500;
-          const message = rawError.body?.message || rawError.message || "An unknown error occurred while loading.";
-
-          // Set the clean error state for the UI to display.
-          loadingOrValidationError = { message, status };
-
-          // Log the full, raw error object for debugging purposes.
-          log.error("Promise rejected while loading.", { rawError });
-        }
-      } finally {
-        // Always set loading to false when the process is complete (success or fail).
-        if (!aborted) {
-          isLoading = false;
-        }
-      }
-    };
-
-    // Execute the promise handling function.
-    processPromise();
-
-    // Cleanup function
-    return () => {
-      aborted = true;
-    };
-  });
+  // Initial load is now controlled by Datagrid component via onQueryChange
+  // No $effect needed - prevents race conditions and duplicate loads
 
   // === EVENTS ===================================================================================
 
@@ -134,8 +77,46 @@
     goto(`${page.url.pathname}/new`);
   }
 
-  async function handleSort(sortState: SortDescriptor<Order_Wholesaler>[] | null) {
-    resolvedOrders = await orderApi.loadOrderWholesalersWithWhereAndOrder(null, sortState);
+  async function handleQueryChange(query: {
+    filters: WhereCondition<Order_Wholesaler> | WhereConditionGroup<Order_Wholesaler> | null,
+    sort: SortDescriptor<Order_Wholesaler>[] | null
+  }) {
+    log.info(`(OrderListPage) Query change - filters:`, query.filters, `sort:`, query.sort);
+
+    // Reset state before loading
+    isLoading = true;
+    loadingOrValidationError = null;
+    resolvedOrders = []; // Clear old data to prevent stale UI
+
+    try {
+      const orders = await orderApi.loadOrderWholesalersWithWhereAndOrder(
+        query.filters as WhereConditionGroup<Order_Wholesaler> | null,
+        query.sort
+      );
+
+      // IMPORTANT: Validate the first 4 orders with safeParseFirstN
+      const valResult = safeParseFirstN(Order_Wholesaler_Schema, orders, 4);
+      if (!valResult.success) {
+        const msg = `Cannot validate orders: ${convertToHtml(JSON.stringify(valResult.error.issues))}`;
+        loadingOrValidationError = { message: msg, status: 500 };
+        log.error(msg);
+      } else {
+        resolvedOrders = orders;
+        log.info(`(OrderListPage) Received ${orders.length} valid orders`);
+      }
+    } catch (rawError: any) {
+      // Robust error handling from the original $effect
+      const status = rawError.status ?? 500;
+      const message = rawError.body?.message || rawError.message || "An unknown error occurred while loading orders.";
+
+      // Set the clean error state for the UI to display
+      loadingOrValidationError = { message, status };
+
+      // Log the full error for debugging
+      log.error("(OrderListPage) Error loading orders", { rawError });
+    } finally {
+      isLoading = false;
+    }
   }
 
   // === DATAGRID DATA ============================================================================
@@ -188,7 +169,7 @@
         entity="order"
         {deleteStrategy}
         {rowActionStrategy}
-        onSort={handleSort}
+        onQueryChange={handleQueryChange}
         maxBodyHeight="550px"
       />
     </div>

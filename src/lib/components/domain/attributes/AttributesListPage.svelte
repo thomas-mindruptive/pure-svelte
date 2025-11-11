@@ -6,6 +6,7 @@
   import { log } from "$lib/utils/logger";
   import { ApiClient } from "$lib/api/client/apiClient";
   import type { ID, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
+  import type { SortDescriptor, WhereCondition, WhereConditionGroup } from "$lib/backendQueries/queryGrammar";
   import { page } from "$app/state";
   import { cascadeDelete } from "$lib/api/client/cascadeDelete";
   import { stringsToNumbers } from "$lib/utils/typeConversions";
@@ -13,53 +14,22 @@
 
   // === PROPS ====================================================================================
 
-  let { data }: { data: { attributes: Promise<Attribute[]> } } = $props();
+  let { data }: { data: { loadEventFetch: typeof fetch } } = $props();
 
   // === STATE ====================================================================================
 
   let resolvedAttributes = $state<Attribute[]>([]);
-  let isLoading = $state(true);
+  let isLoading = $state(false); // Start with false - Datagrid will trigger loading
   let loadingOrValidationError = $state<{ message: string; status: number } | null>(null);
   const allowForceCascadingDelte = $state(true);
 
   // === LOAD =====================================================================================
-
-  $effect(() => {
-    let aborted = false;
-    const processPromise = async () => {
-      isLoading = true;
-      loadingOrValidationError = null;
-      resolvedAttributes = [];
-
-      try {
-        if (!aborted) {
-          resolvedAttributes = await data.attributes;
-          log.debug(`Attributes promise resolved successfully.`);
-        }
-      } catch (rawError: any) {
-        if (!aborted) {
-          const status = rawError.status ?? 500;
-          const message = rawError.body?.message || rawError.message || "An unknown error occurred while loading attributes.";
-          loadingOrValidationError = { message, status };
-          log.error("(AttributeListPage) Promise rejected while loading attributes", { rawError });
-        }
-      } finally {
-        if (!aborted) {
-          isLoading = false;
-        }
-      }
-    };
-
-    processPromise();
-
-    return () => {
-      aborted = true;
-    };
-  });
+  // Initial load is now controlled by Datagrid component via onQueryChange
+  // No $effect needed - prevents race conditions and duplicate loads
 
   // === API & EVENTS =============================================================================
 
-  const client = new ApiClient(fetch);
+  const client = new ApiClient(data.loadEventFetch);
   const attributeApi = getAttributeApi(client);
 
   function handleAttributeSelect(attribute: Attribute): void {
@@ -93,6 +63,37 @@
     log.info(`Going to AttributeDetailPage with "new"`);
     // We assume a future route like `/attributes/new`.
     goto(`${page.url.pathname}/new`);
+  }
+
+  async function handleQueryChange(query: {
+    filters: WhereCondition<Attribute> | WhereConditionGroup<Attribute> | null,
+    sort: SortDescriptor<Attribute>[] | null
+  }) {
+    log.info(`(AttributesListPage) Query change - filters:`, query.filters, `sort:`, query.sort);
+
+    // Reset state before loading
+    isLoading = true;
+    loadingOrValidationError = null;
+    resolvedAttributes = []; // Clear old data to prevent stale UI
+
+    try {
+      // For now, loadAttributes doesn't support filters/sort, so we just load all
+      // In the future, update to loadAttributesWithWhereAndOrder when available
+      resolvedAttributes = await attributeApi.loadAttributes();
+      log.info(`(AttributesListPage) Received ${resolvedAttributes.length} attributes`);
+    } catch (rawError: any) {
+      // Robust error handling from the original $effect
+      const status = rawError.status ?? 500;
+      const message = rawError.body?.message || rawError.message || "An unknown error occurred while loading attributes.";
+
+      // Set the clean error state for the UI to display
+      loadingOrValidationError = { message, status };
+
+      // Log the full error for debugging
+      log.error("(AttributesListPage) Error loading attributes", { rawError });
+    } finally {
+      isLoading = false;
+    }
   }
 
   // === GRID STRATEGIES ==========================================================================
@@ -130,6 +131,7 @@
         loading={isLoading || $attributeLoadingState}
         {deleteStrategy}
         {rowActionStrategy}
+        onQueryChange={handleQueryChange}
       />
     </div>
   {/if}

@@ -20,19 +20,23 @@
   import { log } from "$lib/utils/logger";
   import type { Snippet } from "svelte";
   import { fade } from "svelte/transition";
-  import type { ColumnDef, ConfirmResult, DeleteStrategy, DryRunResult, ID, RowActionStrategy, SortFunc } from "./Datagrid.types";
+  import type { ColumnDef, ConfirmResult, DeleteStrategy, DryRunResult, ID, RowActionStrategy } from "./Datagrid.types";
 
-  import type { SortDescriptor } from "$lib/backendQueries/queryGrammar";
+  import type { SortDescriptor, WhereCondition, WhereConditionGroup } from "$lib/backendQueries/queryGrammar";
   import "$lib/components/styles/loadingIndicator.css";
   import type { AllQualifiedColumns } from "$lib/domain/domainTypes.utils";
   import { addNotification } from "$lib/stores/notifications";
   import { assertDefined } from "$lib/utils/assertions";
+  import FilterToolbar from './FilterToolbar.svelte';
+  import { SvelteMap } from 'svelte/reactivity';
+  import { createGridState } from '$lib/stores/gridState';
+  import { onMount } from 'svelte';
 
   // ===== PROP TYPES =====
 
   export type DataGridProps<T> = {
-    // ID and entity name
-    gridId?: string;
+    // ID and entity name (gridId required for localStorage when using filtering)
+    gridId?: string | undefined;
     entity?: string;
 
     // Layout
@@ -43,8 +47,17 @@
     loading?: boolean;
     rows: any[];
 
-    // Callback when sort state changes - parent loads data
-    onSort?: SortFunc<T> | undefined;
+    // Callback when query changes (filters + sort combined) - PREFERRED
+    onQueryChange?: ((query: {
+      filters: WhereCondition<T> | WhereConditionGroup<T> | null,
+      sort: SortDescriptor<T>[] | null
+    }) => Promise<void> | void) | undefined;
+
+    // Legacy sort callback - DEPRECATED, use onQueryChange instead
+    onSort?: ((sortState: SortDescriptor<T>[] | null) => Promise<void> | void) | undefined;
+
+    // Filter mode (AND/OR)
+    filterCombineMode?: 'AND' | 'OR' | undefined;
 
     // Columns and row ids.
     columns: ColumnDef<any>[];
@@ -109,7 +122,9 @@
 
     loading = false,
 
+    onQueryChange,
     onSort,
+    filterCombineMode = 'AND',
 
     deleteStrategy,
     rowActionStrategy,
@@ -121,16 +136,90 @@
     meta,
   }: DataGridProps<T> = $props();
 
+  // ===== UTILITY FUNCTIONS =====
+
+  /**
+   * Converts WhereConditionGroup back to a Map of filter values for UI restore.
+   * This allows filter inputs to show the saved values after page reload.
+   */
+  function convertWhereToFilterValues(
+    where: WhereConditionGroup<T> | WhereCondition<T> | null
+  ): Map<string, {operator: any, value: any}> | null {
+    if (!where) return null;
+
+    const map = new Map<string, {operator: any, value: any}>();
+
+    // Single condition
+    if ('key' in where) {
+      map.set(String(where.key), { operator: where.whereCondOp, value: where.val });
+      return map;
+    }
+
+    // Group of conditions
+    if ('conditions' in where && where.conditions) {
+      where.conditions.forEach(cond => {
+        if ('key' in cond) {
+          map.set(String(cond.key), { operator: cond.whereCondOp, value: cond.val });
+        }
+      });
+    }
+
+    return map.size > 0 ? map : null;
+  }
+
   // ===== LOCAL STATE =====
 
   const deletingObjectIds = $state<Set<ID>>(new Set());
   const selectedIds = $state<Set<ID>>(new Set());
 
-  // Sorting
-  let sortState = $state<SortDescriptor<T>[]>([]);
+  // localStorage state manager
+  const stateManager = createGridState<T>(gridId);
+
+  // Load saved state ONCE at initialization (not in $effect)
+  const savedState = stateManager.load();
+
+  // Sorting - initialize with saved state
+  let sortState = $state<SortDescriptor<T>[]>(savedState.sort || []);
   let isSorting = $state(false);
 
-  // ===== UTILITY FUNCTIONS =====
+  // Filtering (from Datagrid2) - initialize with saved state
+  let activeFilters = new SvelteMap<string, WhereCondition<T>>();
+  let combineMode = $state<'AND'|'OR'>(filterCombineMode);
+  let filterResetKey = $state(0);
+  let filterExpanded = $state(savedState.ui.filterExpanded ?? true);
+
+  // Initial filter values for UI restore
+  let initialFilterValues = $state<Map<string, {operator: any, value: any}> | null>(
+    savedState.filters ? convertWhereToFilterValues(savedState.filters) : null
+  );
+
+  // Rebuild activeFilters Map from saved state (for backend queries)
+  if (savedState.filters) {
+    if ('key' in savedState.filters) {
+      activeFilters.set(String(savedState.filters.key), savedState.filters as WhereCondition<T>);
+    } else if ('conditions' in savedState.filters && savedState.filters.conditions) {
+      savedState.filters.conditions.forEach(cond => {
+        if ('key' in cond) {
+          activeFilters.set(String(cond.key), cond as WhereCondition<T>);
+        }
+      });
+    }
+  }
+
+  // Restore saved query state OR trigger initial load after component mount
+  onMount(() => {
+    // ALWAYS call onQueryChange if it exists
+    // This is the ONLY place that triggers data loading
+    if (onQueryChange) {
+      // Call with saved state or null/null for initial load
+      onQueryChange({
+        filters: savedState.filters || null,
+        sort: savedState.sort || null
+      });
+    }
+  });
+
+  // ===== MORE UTILITY FUNCTIONS =====
 
   function newBatchId(): string {
     // @ts-ignore
@@ -351,6 +440,73 @@
     }
   }
 
+  // ===== FILTERING LOGIC =====
+
+  const activeFilterCount = $derived(activeFilters.size);
+
+  function buildWhereGroup(): WhereConditionGroup<T> | WhereCondition<T> | null {
+    const conditions = Array.from(activeFilters.values());
+    if (conditions.length === 0) return null;
+    if (conditions.length === 1) return conditions[0];
+
+    return {
+      whereCondOp: combineMode,
+      conditions
+    };
+  }
+
+  async function handleFilterChange(columnKey: string, condition: WhereCondition<T> | null) {
+    log.debug(`[Datagrid] Filter change for key: ${columnKey}`, condition);
+
+    if (condition) {
+      activeFilters.set(columnKey, condition);
+    } else {
+      activeFilters.delete(columnKey);
+    }
+
+    const whereGroup = buildWhereGroup();
+    log.debug(`[Datagrid] Built where group (${activeFilters.size} active filters):`, whereGroup);
+
+    stateManager.saveFilters(whereGroup);
+
+    await onQueryChange?.({
+      filters: whereGroup,
+      sort: sortState.length > 0 ? sortState : null
+    });
+  }
+
+  function handleCombineModeToggle() {
+    log.debug(`[Datagrid] Toggling combine mode from ${combineMode} to ${combineMode === 'AND' ? 'OR' : 'AND'}`);
+    combineMode = combineMode === 'AND' ? 'OR' : 'AND';
+    const whereGroup = buildWhereGroup();
+    log.debug(`[Datagrid] Reapplying filters with new mode:`, whereGroup);
+
+    stateManager.saveFilters(whereGroup);
+
+    onQueryChange?.({
+      filters: whereGroup,
+      sort: sortState.length > 0 ? sortState : null
+    });
+  }
+
+  function handleClearAllFilters() {
+    log.debug(`[Datagrid] Clearing all ${activeFilters.size} filters`);
+    activeFilters.clear();
+    filterResetKey++;
+
+    stateManager.saveFilters(null);
+
+    onQueryChange?.({
+      filters: null,
+      sort: sortState.length > 0 ? sortState : null
+    });
+  }
+
+  function handleFilterToggle() {
+    filterExpanded = !filterExpanded;
+    stateManager.saveUI({ filterExpanded });
+  }
+
   // ===== SORTING LOGIC =====
 
   async function handleSort(key: AllQualifiedColumns) {
@@ -377,24 +533,34 @@
         }
       }
 
-      log.debug(`Sorting - Calling onSort - sortState: ${JSON.stringify(sortState)}`);
+      log.debug(`Sorting - sortState: ${JSON.stringify(sortState)}`);
 
-      if (!onSort) {
-        const msg = `Missing onSort callback for ${JSON.stringify(descriptor)}`;
+      // Save to localStorage (only if gridId and filtering enabled)
+      const sortToSave = sortState.length > 0 ? sortState : null;
+      if (hasFilterableColumns) {
+        stateManager.saveSort(sortToSave);
+      }
+
+      // Prefer onQueryChange, fallback to onSort
+      if (onQueryChange) {
+        await onQueryChange({
+          filters: buildWhereGroup(),
+          sort: sortToSave
+        });
+        addNotification(`Successfully sorted - ${JSON.stringify(sortState)}`, "success");
+      } else if (onSort) {
+        await onSort(sortToSave);
+        addNotification(`Successfully sorted - ${JSON.stringify(sortState)}`, "success");
+      } else {
+        const msg = `Missing onQueryChange or onSort callback for ${JSON.stringify(descriptor)}`;
         addNotification(msg, "info");
         log.warn(msg);
-      } else {
-        if (sortState.length == 0) {
-          await onSort(null);
-        } else {
-          await onSort(sortState);
-        }
-        addNotification(`Successfully sorted - ${JSON.stringify(sortState)}`, "success");
       }
     } finally {
       isSorting = false;
     }
   }
+
 
   // ===== DELETE ORCHESTRATION =====
 
@@ -576,22 +742,18 @@
   // ===== LIFECYCLE =====
 
   $effect(() => {
-    try {
-      const multiselect = selection === "multiple";
-      log.info("Grid mounted (via $effect)", {
-        component: "DataGrid",
-        gridId,
-        entity,
-        selection,
-        multiselect,
-        columns: (columns as ColumnDef<any>[]).map((c: ColumnDef<any>) => c.key),
-      });
+    const multiselect = selection === "multiple";
+    log.info("Grid mounted (via $effect)", {
+      component: "DataGrid",
+      gridId,
+      entity,
+      selection,
+      multiselect,
+      columns: (columns as ColumnDef<any>[]).map((c: ColumnDef<any>) => c.key),
+    });
 
-      if (!deleteStrategy || typeof deleteStrategy.execute !== "function") {
-        log.warn({ component: "DataGrid", gridId, entity }, "deleteStrategy.execute missing; delete actions will be disabled");
-      }
-    } catch (error) {
-      console.error("DataGrid mount log failed", error);
+    if (!deleteStrategy || typeof deleteStrategy.execute !== "function") {
+      log.warn({ component: "DataGrid", gridId, entity }, "deleteStrategy.execute missing; delete actions will be disabled");
     }
 
     return () => {};
@@ -600,6 +762,7 @@
   // ===== COMPUTED =====
 
   const totalColumns = $derived(columns.length + (selection !== "none" ? 1 : 0) + 1);
+  const hasFilterableColumns = $derived(columns.some(col => col.key !== '<computed>' && 'filterable' in col && col.filterable));
 </script>
 
 <div
@@ -667,6 +830,25 @@
       {/if}
     {/if}
   </div>
+
+  <!-- FILTER TOOLBAR (auto-rendered if any column is filterable) --------------------------------->
+  {#if hasFilterableColumns}
+    <details class="filter-details" open={filterExpanded} ontoggle={handleFilterToggle}>
+      <summary class="filter-summary">
+        Filters {activeFilterCount > 0 ? `(${activeFilterCount} active)` : ''}
+      </summary>
+      <FilterToolbar
+        {columns}
+        {combineMode}
+        {activeFilterCount}
+        {filterResetKey}
+        {initialFilterValues}
+        onFilterChange={handleFilterChange}
+        onCombineModeToggle={handleCombineModeToggle}
+        onClearAllFilters={handleClearAllFilters}
+      />
+    </details>
+  {/if}
 
   <!-- TABLE CONTAINER --------------------------------------------------------------------------->
   <div class="pc-grid__scroller">
@@ -867,3 +1049,25 @@
     {@render meta({ selectedIds, deletingObjectIds, deleteSelected })}
   {/if}
 </div>
+
+<style>
+  .filter-details {
+    border: 1px solid var(--color-border, #ddd);
+    border-radius: 4px;
+    margin-bottom: 1rem;
+    background: var(--color-surface, #fff);
+  }
+
+  .filter-summary {
+    padding: 0.75rem 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+    background: var(--color-surface-alt, #f8f9fa);
+    border-radius: 4px;
+  }
+
+  .filter-summary:hover {
+    background: var(--color-surface-hover, #e9ecef);
+  }
+</style>

@@ -19,8 +19,9 @@
    * - Clicking on Title navigates to: /categories/{categoryId}/productdefinitions/{productDefId}/offerings/{offeringId}
    * - Uses proper URL hierarchy for deep linking and breadcrumbs
    */
-  import Datagrid2 from "$lib/components/grids/Datagrid2.svelte";
-  import type { ColumnDef, FilterFunc, SortFunc } from "$lib/components/grids/Datagrid.types";
+  import Datagrid from "$lib/components/grids/Datagrid.svelte";
+  import type { ColumnDef } from "$lib/components/grids/Datagrid.types";
+  import type { WhereCondition, WhereConditionGroup, SortDescriptor } from "$lib/backendQueries/queryGrammar";
   import type { OfferingReportViewWithLinks } from "$lib/domain/domainTypes";
   import { OfferingReportViewSchema } from "$lib/domain/domainTypes";
   import { log } from "$lib/utils/logger";
@@ -29,12 +30,14 @@
   type Props = {
     rows: OfferingReportViewWithLinks[];
     loading: boolean;
-    onFilter: FilterFunc<OfferingReportViewWithLinks>;
-    onSort: SortFunc<OfferingReportViewWithLinks>;
+    onQueryChange?: (query: {
+      filters: WhereCondition<OfferingReportViewWithLinks> | WhereConditionGroup<OfferingReportViewWithLinks> | null,
+      sort: SortDescriptor<OfferingReportViewWithLinks>[] | null
+    }) => Promise<void> | void;
     maxBodyHeight?: string;
   };
 
-  let { rows, loading, onFilter, onSort, maxBodyHeight }: Props = $props();
+  let { rows, loading, onQueryChange, maxBodyHeight }: Props = $props();
 
   // Log rows when they change
   $effect(() => {
@@ -287,13 +290,12 @@
   };
 </script>
 
-<Datagrid2
+<Datagrid
   {columns}
   {rows}
   {getId}
   {loading}
-  {onFilter}
-  {onSort}
+  {onQueryChange}
   {deleteStrategy}
   selection="none"
   gridId="offerings-report"

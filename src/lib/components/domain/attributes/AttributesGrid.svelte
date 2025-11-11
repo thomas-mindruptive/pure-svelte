@@ -1,6 +1,7 @@
 <script lang="ts">
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
   import type { ColumnDef, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
+  import type { SortDescriptor, WhereCondition, WhereConditionGroup } from "$lib/backendQueries/queryGrammar";
   import type { Attribute, AttributeSchema } from "$lib/domain/domainTypes";
 
   // === PROPS ====================================================================================
@@ -11,9 +12,13 @@
     selection?: "none" | "single" | "multiple";
     deleteStrategy: DeleteStrategy<Attribute>;
     rowActionStrategy?: RowActionStrategy<Attribute>;
+    onQueryChange?: (query: {
+      filters: WhereCondition<Attribute> | WhereConditionGroup<Attribute> | null,
+      sort: SortDescriptor<Attribute>[] | null
+    }) => Promise<void> | void;
   };
 
-  const { rows = [], loading = false, selection = "multiple", deleteStrategy, rowActionStrategy }: AttributesGridProps = $props();
+  const { rows = [], loading = false, selection = "multiple", deleteStrategy, rowActionStrategy, onQueryChange }: AttributesGridProps = $props();
 
   // === COLUMNS ==================================================================================
 
@@ -40,4 +45,5 @@
   entity="attribute"
   {deleteStrategy}
   {rowActionStrategy}
+  {onQueryChange}
 />

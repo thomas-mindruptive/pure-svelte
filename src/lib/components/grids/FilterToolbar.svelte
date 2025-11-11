@@ -27,6 +27,7 @@
     combineMode: 'AND' | 'OR';
     activeFilterCount: number;  // Drives "Clear all" button disabled state
     filterResetKey: number;     // Increment to signal all filters to reset
+    initialFilterValues: Map<string, {operator: any, value: any}> | null;  // For UI state restore
     onFilterChange: (key: string, condition: WhereCondition<any> | null) => void;
     onCombineModeToggle: () => void;
     onClearAllFilters: () => void;
@@ -37,6 +38,7 @@
     combineMode,
     activeFilterCount,
     filterResetKey,
+    initialFilterValues,
     onFilterChange,
     onCombineModeToggle,
     onClearAllFilters
@@ -96,12 +98,14 @@
     {#each columns as col}
       {#if isFilterableColumn(col) && col.filterable}
         {@const filterType = detectFilterType(col)}
+        {@const initialValues = initialFilterValues?.get(col.key)}
 
         {#if filterType === 'text'}
           <TextFilter
             columnKey={col.key}
             columnHeader={col.header}
             resetKey={filterResetKey}
+            initialValue={initialValues?.value}
             onChange={(condition) => onFilterChange(col.key, condition)}
           />
         {:else if filterType === 'number'}
@@ -109,6 +113,8 @@
             columnKey={col.key}
             columnHeader={col.header}
             resetKey={filterResetKey}
+            initialValue={initialValues?.value}
+            initialOperator={initialValues?.operator}
             onChange={(condition) => onFilterChange(col.key, condition)}
           />
         {:else if filterType === 'boolean'}
@@ -116,6 +122,7 @@
             columnKey={col.key}
             columnHeader={col.header}
             resetKey={filterResetKey}
+            initialValue={initialValues?.value}
             onChange={(condition) => onFilterChange(col.key, condition)}
           />
         {/if}

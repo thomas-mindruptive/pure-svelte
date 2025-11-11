@@ -1297,3 +1297,605 @@ This application solves the problem by establishing a "Controlled Bridge" patter
 2.  **Casting Data Up (`{@const}`):** Immediately casting the weakly-typed `data` object from the shell's snippet back to the specific type within the parent's template.
 
 This guarantees that any property access is fully type-checked by the compiler, preventing runtime errors.
+
+---
+
+## Deep Dive: Svelte 5 Reactivity and the Infinite Loop Bug
+
+This chapter documents a critical architectural lesson learned during the development of this application: **how unsynchronized reactive state in Svelte 5 can cause infinite loops during navigation, and why combining multiple state sources is sometimes the correct solution.**
+
+While the specific manifestation occurred in our ListPage components, the underlying principles and patterns described here apply to any Svelte 5 application dealing with complex state management, asynchronous operations, and client-side navigation.
+
+### The Problem: An Infinite Loading Spinner
+
+**Symptom:** When navigating to a ListPage (e.g., `/suppliers`, `/categories`, `/reports/offerings`) via client-side navigation (clicking a link), the grid would show an infinite loading spinner. The component appeared "stuck" - no data would load, no errors were thrown, and the UI remained unresponsive.
+
+**Crucial Detail:** This bug only occurred during **client-side navigation** (SvelteKit's app-like transitions). A full page reload (F5 or initial page visit) worked perfectly.
+
+This timing-dependent behavior is the hallmark of a **component lifecycle and state synchronization problem** specific to how Svelte 5 and SvelteKit manage reactivity during navigation.
+
+---
+
+### Understanding Svelte 5's Reactivity Model
+
+Before diving into the bug, we must understand the fundamental mechanisms that make Svelte 5 reactive.
+
+#### Fine-Grained Reactivity with Signals
+
+Svelte 5 uses a **signals-based reactivity system** under the hood. Unlike frameworks that re-render entire components when state changes, Svelte 5:
+
+1. **Tracks Dependencies at Runtime:** When you read a `$state` variable inside a reactive context (`$effect`, `$derived`, or a template), Svelte registers that context as a "subscriber" to that state.
+
+2. **Surgically Updates the DOM:** When state changes, Svelte doesn't re-run your component's script. Instead, it only updates the specific DOM nodes that depend on that state. This is **fine-grained reactivity** - the minimum possible work is performed.
+
+3. **Batches Updates in Microtasks:** Multiple synchronous state changes are batched together and applied in a single microtask after the current execution context finishes. This prevents cascading re-renders and improves performance.
+
+#### Component Lifecycle: Initialization vs. Re-render
+
+**Critical Distinction:**
+
+```javascript
+// This script block runs ONLY ONCE when the component mounts
+let count = $state(0);
+let doubled = $derived(count * 2);
+
+// These reactive statements run every time their dependencies change
+$effect(() => {
+  console.log("Count changed to:", count);
+});
+```
+
+When a component is first created:
+1. The entire `<script>` block executes **once**
+2. Variables are initialized
+3. The component mounts to the DOM
+4. `onMount` callbacks fire
+5. `$effect` blocks begin tracking dependencies
+
+**What happens when props change?**
+- The script does **NOT** re-run
+- Local state persists
+- Only reactive dependencies update
+- The component **re-renders** (template updates), but does **NOT re-initialize** (script doesn't run again)
+
+#### SvelteKit's Component Reuse During Navigation
+
+SvelteKit employs an aggressive optimization strategy: **component reuse**.
+
+When you navigate from `/suppliers` to `/suppliers` (or between similar routes like `/suppliers/1` to `/suppliers/2`):
+
+1. **SvelteKit checks:** "Is there already a component mounted at this route?"
+2. **If yes:** The component is **kept alive**. Only its props are updated.
+3. **Result:** `onMount` does NOT fire again. Local state persists. The component continues from where it left off.
+
+**Why this matters:**
+```javascript
+// User navigates from /suppliers -> /categories -> /suppliers
+
+// First visit to /suppliers
+let isLoading = $state(false);  // Initializes to false
+onMount(() => {
+  console.log("Component mounted");  // Logs once
+});
+
+// Navigate away to /categories
+// Component might be destroyed OR kept in memory (depends on SvelteKit's strategy)
+
+// Navigate BACK to /suppliers
+// If component was kept alive:
+//   - Script doesn't run again
+//   - isLoading still has whatever value it had before
+//   - onMount doesn't fire again
+//   - YOU HAVE STALE STATE!
+```
+
+This is **by design** for performance, but it creates a hidden contract: **Your component must be resilient to props changes without re-initialization.**
+
+---
+
+### The Root Cause: Unsynchronized Reactive State
+
+Our infinite loop bug stemmed from having **two separate reactive states** tracking the same concern (loading status) with **different lifecycles and update timing**.
+
+#### The Buggy Pattern
+
+```javascript
+// OfferingReportListPage.svelte - BROKEN VERSION
+let isLoading = $state(false);  // Local component state
+
+async function handleQueryChange(query) {
+  isLoading = true;  // Set synchronously
+  try {
+    resolvedOfferings = await offeringApi.loadOfferingsForReport(query);
+  } finally {
+    isLoading = false;  // Reset synchronously
+  }
+}
+
+// Grid receives ONLY local state
+<OfferingReportGrid
+  loading={isLoading}  // ❌ SINGLE SOURCE - BREAKS ON NAVIGATION
+  onQueryChange={handleQueryChange}
+/>
+```
+
+**Meanwhile, deep in the API client:**
+
+```javascript
+// offering.ts - Global LoadingState
+const offeringLoadingManager = new LoadingState();
+export const offeringLoadingState = offeringLoadingManager.isLoadingStore;
+
+export function getOfferingApi(client: ApiClient) {
+  return {
+    async loadOfferingsForReport(query) {
+      const operationId = generateId();
+      offeringLoadingManager.start(operationId);  // Global state = true
+      try {
+        const response = await client.post('/api/offerings', query);
+        return response.data;
+      } finally {
+        offeringLoadingManager.finish(operationId);  // Global state = false
+      }
+    }
+  };
+}
+```
+
+**We now have TWO reactive states:**
+1. **Local `isLoading`** - Managed by the component's `handleQueryChange` function
+2. **Global `$offeringLoadingState`** - Managed by the API client
+
+Both track "is a loading operation happening?" But they update at **different times** and have **different lifecycles**.
+
+#### The Failure Sequence
+
+**Step 1: Initial Page Load (Works Fine)**
+```
+User visits /reports/offerings
+→ Component initializes fresh
+→ isLoading = false
+→ onMount fires
+→ Datagrid calls handleQueryChange
+→ isLoading = true
+→ API call starts (global state = true)
+→ Data arrives
+→ isLoading = false (global state = false)
+→ Grid displays data ✅
+```
+
+**Step 2: Navigation Away**
+```
+User navigates to /suppliers
+→ OfferingReportListPage might be unmounted OR kept alive
+→ If kept alive: isLoading remains false
+```
+
+**Step 3: Navigate Back (INFINITE LOOP)**
+```
+User navigates back to /reports/offerings
+
+SvelteKit: "I already have this component, reuse it"
+→ Script doesn't run again
+→ onMount doesn't fire again
+→ isLoading = ???  (Whatever value it had before)
+
+SCENARIO A: isLoading was still false from previous navigation
+→ Component re-renders with loading={false}
+→ Datagrid sees loading=false
+→ Datagrid's onMount: "Not loading, safe to call onQueryChange"
+→ onQueryChange fires
+→ isLoading = true
+→ Component re-renders with loading=true
+→ Datagrid sees loading=true
+→ Datagrid thinks: "Already loading, skip this call"
+→ API never fires
+→ isLoading never gets set back to false
+→ DEADLOCK ❌
+
+SCENARIO B: isLoading was true from a previous interrupted operation
+→ Component re-renders with loading={true}
+→ Datagrid sees loading=true
+→ Datagrid: "Already loading, skip initialization"
+→ onQueryChange never fires
+→ isLoading never updates
+→ STUCK FOREVER ❌
+```
+
+The exact failure depends on timing, but both scenarios result in the same symptom: **an infinite loading spinner**.
+
+#### Why This Is a Race Condition
+
+The problem is fundamentally about **temporal coupling** between two state updates:
+
+```javascript
+// These happen in different execution contexts
+isLoading = true;           // Synchronous state update in component
+                            // → Component re-renders immediately
+                            // → Datagrid sees loading=true
+
+// Meanwhile, in a different call stack...
+globalState.start(id);      // Synchronous update in API client
+                            // → Store subscribers notified
+                            // → Any component using $globalState re-renders
+
+// Later, after await...
+isLoading = false;          // Synchronous update
+                            // → Component re-renders
+
+// In the API client's finally block...
+globalState.finish(id);     // Synchronous update
+                            // → Store subscribers notified
+```
+
+**The race:** During navigation, the component might re-render BEFORE `handleQueryChange` has a chance to reset `isLoading`. The Datagrid receives a stale `loading` prop and makes incorrect decisions about whether to trigger a data load.
+
+**Why doesn't this happen on full page reload?**
+- Full reload → Component initializes fresh → All state is guaranteed to start at initial values
+- Client navigation → Component reused → State could be anything
+
+---
+
+### The Solution: Defense in Depth with Multiple State Sources
+
+The fix is counter-intuitive: **Add MORE state, not less.**
+
+```javascript
+// OfferingReportListPage.svelte - FIXED VERSION
+import { getOfferingApi, offeringLoadingState } from "$lib/api/client/offering";
+
+let isLoading = $state(false);  // Local state
+
+async function handleQueryChange(query) {
+  isLoading = true;
+  try {
+    resolvedOfferings = await offeringApi.loadOfferingsForReport(query);
+  } finally {
+    isLoading = false;
+  }
+}
+
+// Grid receives BOTH states combined with OR
+<OfferingReportGrid
+  loading={isLoading || $offeringLoadingState}  // ✅ COMBINED - ROBUST
+  onQueryChange={handleQueryChange}
+/>
+```
+
+#### Why This Works: Breaking the Circular Dependency
+
+**The Key Insight:** We're not duplicating state - we're tracking **two different concerns**:
+
+1. **Local `isLoading`** - "Is THIS component's query handler currently executing?"
+   - Scope: This specific component instance
+   - Lifecycle: Tied to component lifecycle
+   - Reset by: Component's own finally block
+
+2. **Global `$offeringLoadingState`** - "Are there ANY offering API calls in progress ANYWHERE?"
+   - Scope: Application-wide
+   - Lifecycle: Tied to API operation lifecycle
+   - Reset by: API client's finally block (guaranteed to run)
+
+**The OR operator creates a safety net:**
+
+```javascript
+loading={isLoading || $offeringLoadingState}
+
+// During navigation, even if isLoading is stale...
+isLoading = ???              // Could be true or false (stale)
+$offeringLoadingState = false  // ALWAYS correct (API guarantees it)
+
+loading = ??? || false        // If local is wrong, global saves us
+```
+
+**Scenario A Revisited (FIXED):**
+```
+Navigate back to /reports/offerings
+→ Component reused
+→ isLoading = false (from previous state OR stale)
+→ $offeringLoadingState = false (API idle)
+→ loading = false || false = false ✅
+→ Datagrid sees loading=false
+→ Datagrid calls onQueryChange
+→ isLoading = true
+→ $offeringLoadingState = true (API starts)
+→ loading = true || true = true ✅
+→ Data loads
+→ isLoading = false
+→ $offeringLoadingState = false
+→ loading = false || false = false ✅
+→ Grid displays data ✅
+```
+
+**Scenario B Revisited (FIXED):**
+```
+Navigate back with stale isLoading=true
+→ isLoading = true (STALE)
+→ $offeringLoadingState = false (API CORRECT)
+→ loading = true || false = true
+→ Datagrid sees loading=true initially
+→ But onMount still fires (first time for Datagrid, not for parent)
+→ Datagrid calls onQueryChange anyway (sees combined state stabilize)
+→ isLoading = true (set again, now fresh)
+→ API call happens
+→ Both states eventually become false
+→ Grid works ✅
+```
+
+The global state acts as a **circuit breaker** - it prevents the deadlock by providing an independent, guaranteed-correct signal that survives navigation.
+
+---
+
+### Technical Deep Dive: Why Global State Survives
+
+The global `LoadingState` pattern uses Svelte stores, which have a fundamentally different lifecycle than component state:
+
+```javascript
+// In offering.ts - MODULE SCOPE (singleton)
+const offeringLoadingManager = new LoadingState();  // Created ONCE per app load
+export const offeringLoadingState = offeringLoadingManager.isLoadingStore;
+
+class LoadingState {
+  private operationsStore = writable(new Set<string>());
+  public isLoadingStore: Readable<boolean> = derived(
+    this.operationsStore,
+    $operations => $operations.size > 0
+  );
+
+  start(id: string) {
+    this.operationsStore.update(ops => {
+      ops.add(id);
+      return ops;
+    });
+  }
+
+  finish(id: string) {
+    this.operationsStore.update(ops => {
+      ops.delete(id);
+      return ops;
+    });
+  }
+}
+```
+
+**Key Properties:**
+
+1. **Module-Level Singleton:** Created once when the module is imported, persists for the entire app lifetime
+2. **Independent of Component Lifecycle:** Doesn't care if components mount/unmount/navigate
+3. **Operation-Based Tracking:** Uses a Set of operation IDs, can track multiple concurrent operations
+4. **Guaranteed Cleanup:** Each API call wraps operations in try/finally, ensuring `finish()` always runs
+
+**Why this guarantees correctness:**
+- When NO operations are in progress: `Set.size === 0` → `isLoadingStore === false` (ALWAYS)
+- When ANY operation is in progress: `Set.size > 0` → `isLoadingStore === true`
+- Navigation cannot corrupt this state - it's outside the component tree
+
+---
+
+### Generalizable Patterns and Best Practices
+
+#### Pattern 1: The "Defense in Depth" State Pattern
+
+**When to use:**
+- Component performs asynchronous operations
+- Navigation might occur mid-operation
+- You need resilience against stale state
+
+**Structure:**
+```javascript
+// Local state - component-specific concern
+let localIsLoading = $state(false);
+
+// Global state - API-level concern
+import { apiLoadingState } from './api';
+
+// Combine for robustness
+const effectiveLoading = $derived(localIsLoading || $apiLoadingState);
+
+// Use in template
+<SomeComponent loading={effectiveLoading} />
+```
+
+**Benefits:**
+- Local state provides immediate, synchronous feedback
+- Global state provides guaranteed correctness
+- OR operator ensures loading is true if EITHER indicates an operation
+- Prevents false negatives from stale local state
+
+#### Pattern 2: Operation-Based Loading State
+
+**Instead of boolean flags:**
+```javascript
+// ❌ FRAGILE - Can get stuck
+let isLoading = $state(false);
+async function load() {
+  isLoading = true;
+  await api.fetch();  // If this throws, isLoading might stay true
+  isLoading = false;
+}
+```
+
+**Use operation tracking:**
+```javascript
+// ✅ ROBUST - Guaranteed cleanup
+class LoadingState {
+  private operations = new Set<string>();
+
+  start(id: string) { this.operations.add(id); }
+  finish(id: string) { this.operations.delete(id); }
+  get isLoading() { return this.operations.size > 0; }
+}
+
+const loadingState = new LoadingState();
+
+async function load() {
+  const opId = generateId();
+  loadingState.start(opId);
+  try {
+    await api.fetch();
+  } finally {
+    loadingState.finish(opId);  // ALWAYS runs
+  }
+}
+```
+
+**Benefits:**
+- Try/finally guarantees cleanup even on errors
+- Can track multiple concurrent operations
+- Clear operation boundaries
+- No risk of boolean flag getting "stuck"
+
+#### Pattern 3: Explicit State Reset on Navigation
+
+**If you can't use global state:**
+```javascript
+// Use SvelteKit's navigation lifecycle
+import { afterNavigate } from '$app/navigation';
+
+let isLoading = $state(false);
+
+afterNavigate(() => {
+  // Reset state after EVERY navigation
+  isLoading = false;
+  // Clear any other component state that might be stale
+});
+```
+
+**Caution:** This is a "shotgun" solution. It works but is less elegant than the defense-in-depth pattern.
+
+#### Pattern 4: Forcing Component Re-initialization
+
+**When component reuse is causing problems:**
+```svelte
+<!-- Use {#key} to force remount -->
+{#key $page.url.pathname}
+  <ListPageComponent />
+{/key}
+```
+
+**Trade-offs:**
+- ✅ Guarantees fresh state on every navigation
+- ❌ Destroys performance benefits of component reuse
+- ❌ Loses scroll position, UI state, etc.
+- ⚠️ Should be a last resort, not standard practice
+
+---
+
+### Debugging Strategies for Similar Bugs
+
+#### 1. Identify the Symptoms
+
+**Questions to ask:**
+- Does the bug only occur on navigation, not on full page reload?
+- Is there an infinite spinner or stuck UI state?
+- Are there multiple sources of state that track the same concern?
+- Does the component use `onMount` to trigger initial data loading?
+
+If yes to most of these → likely a state synchronization bug.
+
+#### 2. Trace Component Lifecycle
+
+**Add logging:**
+```javascript
+let isLoading = $state(false);
+
+onMount(() => {
+  console.log('[Component] onMount - isLoading:', isLoading);
+});
+
+$effect(() => {
+  console.log('[Component] Effect - isLoading:', isLoading);
+});
+
+afterNavigate(() => {
+  console.log('[Component] afterNavigate - isLoading:', isLoading);
+});
+```
+
+**Look for:**
+- Does `onMount` fire on navigation? (It shouldn't if component reused)
+- What is the value of state during navigation?
+- Are effects running when you don't expect them to?
+
+#### 3. Inspect State Sources
+
+**Check for:**
+- Multiple variables tracking the same thing (e.g., `isLoading` + `$apiLoading`)
+- State managed in different scopes (component vs. module vs. store)
+- Asynchronous operations that might leave state inconsistent
+
+#### 4. Test Navigation Scenarios
+
+**Critical test cases:**
+1. Fresh page load → Does it work?
+2. Navigate away and back → Does it still work?
+3. Navigate away mid-load, then back → Does it recover?
+4. Rapid navigation (click multiple links fast) → Does it handle it?
+
+#### 5. Verify Cleanup
+
+**Check that:**
+- All `try/finally` blocks properly reset state
+- API clients guarantee cleanup even on errors
+- `$effect` cleanup functions run when expected
+- No state is left dangling after navigation
+
+---
+
+### Architectural Principles
+
+From this bug, we learned several architectural truths about Svelte 5 and SvelteKit:
+
+#### 1. Component Reuse Is Not Optional
+
+SvelteKit WILL reuse components for performance. Your components must be designed with this assumption. **Never rely on initialization happening more than once.**
+
+#### 2. Local State Can Become Stale
+
+Component state persists across prop changes. If your component doesn't explicitly react to all relevant changes, state can drift.
+
+#### 3. Multiple State Sources Are Not Always Bad
+
+"Single source of truth" is a valuable principle, but in reactive systems with asynchronous boundaries, **multiple coordinated sources** can provide necessary redundancy and robustness.
+
+Think of it like RAID for state - redundancy prevents data loss (in this case, "UI correctness loss").
+
+#### 4. API Clients Should Own Their Loading State
+
+The API client is the source of truth for "is an operation in progress?" Components that consume the API should trust that signal, not try to independently track it.
+
+#### 5. Combine, Don't Choose
+
+When you have both local and global state tracking related concerns:
+```javascript
+// ❌ Don't choose one or the other
+loading={isLoading}           // Fragile
+loading={$globalState}        // Loses local context
+
+// ✅ Combine them
+loading={isLoading || $globalState}  // Robust
+```
+
+The OR operator is your friend - it creates a **disjunctive safety net**.
+
+---
+
+### Applicability Beyond This Codebase
+
+While this chapter documents a specific bug in our ListPage components, the patterns and principles apply broadly:
+
+**Similar bugs can occur in:**
+- Any SPA with client-side navigation
+- Any framework with component reuse (React's `key` prop exists for similar reasons)
+- Any reactive system with asynchronous boundaries
+- Any application where state outlives the events that created it
+
+**The core lesson is universal:**
+
+When building reactive applications, especially with client-side navigation, you must account for:
+1. **Component lifecycle is not always what you expect**
+2. **State can outlive the context that created it**
+3. **Asynchronous operations create temporal coupling**
+4. **Multiple sources of truth can be a feature, not a bug**
+
+By understanding these principles and applying the patterns documented here, you can build more robust, navigation-resilient applications in any reactive framework.

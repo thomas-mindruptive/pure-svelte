@@ -17,7 +17,13 @@
       "WebFetch(domain:github.com)",
       "WebFetch(domain:svelte.dev)",
       "Bash(dir C:devpure /b)",
-      "Bash(dir \"C:\\dev\\pure\" /b)"
+      "Bash(dir \"C:\\dev\\pure\" /b)",
+      "WebFetch(domain:jamesy.dev)",
+      "WebFetch(domain:webjose.hashnode.dev)",
+      "WebFetch(domain:mainmatter.com)",
+      "WebFetch(domain:joyofcode.xyz)",
+      "WebFetch(domain:frontendmasters.com)",
+      "WebFetch(domain:imfeld.dev)"
     ],
     "deny": [],
     "ask": []

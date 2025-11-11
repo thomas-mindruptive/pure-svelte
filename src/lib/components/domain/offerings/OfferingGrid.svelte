@@ -1,7 +1,8 @@
 <!-- src/lib/components/domain/offerings/OfferingGrid.svelte -->
 <script lang="ts">
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
-  import type { ColumnDef, DeleteStrategy, RowActionStrategy, SortFunc, ID } from "$lib/components/grids/Datagrid.types";
+  import type { ColumnDef, DeleteStrategy, RowActionStrategy, ID } from "$lib/components/grids/Datagrid.types";
+  import type { SortDescriptor } from "$lib/backendQueries/queryGrammar";
   import type {
     WholesalerOfferingLink,
     Wio_PDef_Cat_Supp_Nested_WithLinks,
@@ -30,7 +31,7 @@
     deleteStrategy: DeleteStrategy<Wio_PDef_Cat_Supp_Nested_WithLinks>;
     rowActionStrategy?: RowActionStrategy<Wio_PDef_Cat_Supp_Nested_WithLinks>;
     // Callback when sort state changes - parent loads data
-    onSort?: SortFunc<Wio_PDef_Cat_Supp_Nested_WithLinks> | undefined;
+    onSort?: ((sortState: SortDescriptor<Wio_PDef_Cat_Supp_Nested_WithLinks>[] | null) => Promise<void> | void) | undefined;
     // Custom toolbar snippet
     toolbar?: Snippet<[ToolbarSnippetProps]>;
     // Custom row actions snippet

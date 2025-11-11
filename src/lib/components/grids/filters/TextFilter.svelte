@@ -25,13 +25,31 @@
     columnKey: string;
     columnHeader: string;
     resetKey: number;  // Increment to clear this filter
+    initialValue?: any;  // For UI state restore from localStorage
     onChange: (condition: WhereCondition<any> | null) => void;
   };
 
-  let { columnKey, columnHeader, resetKey, onChange }: Props = $props();
+  let { columnKey, columnHeader, resetKey, initialValue, onChange }: Props = $props();
 
   let value = $state('');
   const inputId = `filter-text-${columnKey}`;
+  let hasInitialized = false;
+
+  /**
+   * Mount effect: Set initial value from localStorage restore.
+   * This runs once on mount to populate the input with saved filter value.
+   */
+  $effect(() => {
+    if (!hasInitialized && initialValue !== undefined) {
+      // Convert %value% back to value (remove LIKE wildcards)
+      const cleanValue = typeof initialValue === 'string'
+        ? initialValue.replace(/^%|%$/g, '')
+        : String(initialValue);
+
+      value = cleanValue;
+      hasInitialized = true;
+    }
+  });
 
   /**
    * Reset effect: Clears input when resetKey changes.
@@ -45,6 +63,7 @@
   $effect(() => {
     resetKey; // Track resetKey
     value = '';
+    hasInitialized = false;
   });
 
   /**

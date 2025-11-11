@@ -10,21 +10,18 @@
    * - Server-side filtering via QueryGrammar (WhereCondition/WhereConditionGroup)
    * - Server-side sorting via SortDescriptor
    * - Loading state management
-   * - Filter/sort state persistence for combined queries
+   * - Automatic state persistence via Datagrid2 (localStorage)
    *
    * Data Flow:
    * 1. Route loader (+page.ts) returns Promise<offerings> and fetch function
    * 2. $effect resolves initial Promise and populates grid
-   * 3. User filters/sorts -> handleFilter/handleSort -> API call with combined where+sort
-   * 4. New data replaces grid contents
-   *
-   * State Management:
-   * - currentWhere: Active filter conditions (null = no filter)
-   * - currentSort: Active sort descriptors (null = no sort)
-   * - Both are combined when calling API (enables filter + sort simultaneously)
+   * 3. Datagrid2 auto-restores filter/sort from localStorage on mount
+   * 4. User filters/sorts -> handleQueryChange -> API call with combined where+sort
+   * 5. Datagrid2 auto-saves new filter/sort to localStorage
+   * 6. New data replaces grid contents
    */
   import { ApiClient } from "$lib/api/client/apiClient";
-  import { getOfferingApi } from "$lib/api/client/offering";
+  import { getOfferingApi, offeringLoadingState } from "$lib/api/client/offering";
   import OfferingReportGrid from "./OfferingReportGrid.svelte";
   import type {
     SortDescriptor,
@@ -36,92 +33,48 @@
 
   type Props = {
     data: {
-      offerings: Promise<OfferingReportViewWithLinks[]>;
+      // No more offerings Promise! Datagrid controls all loading
       loadEventFetch: typeof fetch;
     };
   };
 
   let { data }: Props = $props();
   let resolvedOfferings = $state<OfferingReportViewWithLinks[]>([]);
-  let isLoading = $state(true);
-  let currentWhere = $state<WhereCondition<any> | WhereConditionGroup<any> | null>(null);
-  let currentSort = $state<SortDescriptor<any>[] | null>(null);
+  let isLoading = $state(false); // Start with false - Datagrid will trigger loading
 
   const client = new ApiClient(data.loadEventFetch);
   const offeringApi = getOfferingApi(client);
 
   /**
    * Initial Load Effect
-   *
-   * Resolves the Promise returned by the route loader (+page.ts).
-   * Uses abort pattern to prevent stale updates if component unmounts.
-   *
-   * Why $effect?
-   * - Runs once on mount (no dependencies tracked)
-   * - Cleanup function (return) aborts pending async operations
-   * - Prevents "setState on unmounted component" errors
+   * NO EFFECT NEEDED! Datagrid will ALWAYS call handleQueryChange on mount.
+   * Either with saved state or with null/null for initial load.
    */
-  $effect(() => {
-    let aborted = false;
-
-    const processPromise = async () => {
-      isLoading = true;
-      try {
-        if (!aborted) {
-          resolvedOfferings = await data.offerings;
-        }
-      } finally {
-        if (!aborted) {
-          isLoading = false;
-        }
-      }
-    };
-
-    processPromise();
-    return () => { aborted = true; };
-  });
 
   /**
-   * Filter Handler
+   * Query Change Handler
    *
-   * Called when user applies/changes filters in the grid.
-   * Combines current sort with new filter conditions and fetches fresh data.
+   * Called by Datagrid2 when filters or sort changes.
+   * Receives both filter and sort in a single callback to avoid race conditions.
    *
-   * Important: Always passes BOTH where and sort to API.
-   * - This allows filtered + sorted results
-   * - Null where = no filter (but sort still applies)
+   * Important: Datagrid2 handles:
+   * - Auto-save to localStorage before calling this
+   * - Auto-restore from localStorage on mount
+   * - Combining filter changes with current sort
+   * - Combining sort changes with current filter
+   *
+   * This handler only needs to:
+   * - Fetch fresh data with the combined query
+   * - Update loading state
    */
-  async function handleFilter(where: WhereConditionGroup<any> | WhereCondition<any> | null) {
-    log.info(`[OfferingReportListPage] Filter triggered:`, where);
-    currentWhere = where;
+  async function handleQueryChange(query: {
+    filters: WhereCondition<any> | WhereConditionGroup<any> | null,
+    sort: SortDescriptor<any>[] | null
+  }) {
+    log.info(`[OfferingReportListPage] Query change - filters:`, query.filters, `sort:`, query.sort);
     isLoading = true;
     try {
-      log.info(`[OfferingReportListPage] Calling API with where:`, where, `sort:`, currentSort);
-      resolvedOfferings = await offeringApi.loadOfferingsForReportWithLinks(where, currentSort);
-      log.info(`[OfferingReportListPage] Received ${resolvedOfferings.length} offerings`);
-      log.debug(`[OfferingReportListPage] First 3 offerings:`, resolvedOfferings.slice(0, 3));
-    } finally {
-      isLoading = false;
-    }
-  }
-
-  /**
-   * Sort Handler
-   *
-   * Called when user clicks column headers to sort.
-   * Combines current filter with new sort descriptors and fetches fresh data.
-   *
-   * Important: Always passes BOTH where and sort to API.
-   * - This allows filtered + sorted results
-   * - Null sort = no sorting (but filter still applies)
-   */
-  async function handleSort(sort: SortDescriptor<any>[] | null) {
-    log.info(`[OfferingReportListPage] Sort triggered:`, sort);
-    currentSort = sort;
-    isLoading = true;
-    try {
-      log.info(`[OfferingReportListPage] Calling API with where:`, currentWhere, `sort:`, sort);
-      resolvedOfferings = await offeringApi.loadOfferingsForReportWithLinks(currentWhere, sort);
+      resolvedOfferings = await offeringApi.loadOfferingsForReportWithLinks(query.filters, query.sort);
       log.info(`[OfferingReportListPage] Received ${resolvedOfferings.length} offerings`);
     } finally {
       isLoading = false;
@@ -133,9 +86,8 @@
   <h1>Offerings Report</h1>
   <OfferingReportGrid
     rows={resolvedOfferings}
-    loading={isLoading}
-    onFilter={handleFilter}
-    onSort={handleSort}
+    loading={isLoading || $offeringLoadingState}
+    onQueryChange={handleQueryChange}
   />
 </div>
 

@@ -1,9 +1,10 @@
 <!-- SupplierGrid.svelte -->
 
 <script lang="ts">
-  // Thin wrapper around Datagrid2 for wholesalers with filtering support
-  import Datagrid2 from "$lib/components/grids/Datagrid2.svelte";
-  import type { DeleteStrategy, RowActionStrategy, SortFunc, FilterFunc, ColumnDef } from "$lib/components/grids/Datagrid.types";
+  // Thin wrapper around Datagrid for wholesalers with filtering support
+  import Datagrid from "$lib/components/grids/Datagrid.svelte";
+  import type { DeleteStrategy, RowActionStrategy, ColumnDef } from "$lib/components/grids/Datagrid.types";
+  import type { WhereCondition, WhereConditionGroup, SortDescriptor } from "$lib/backendQueries/queryGrammar";
   import type { Wholesaler, WholesalerSchema } from "$lib/domain/domainTypes";
 
   // === PROPS ====================================================================================
@@ -14,11 +15,13 @@
     selection?: "none" | "single" | "multiple";
     deleteStrategy: DeleteStrategy<Wholesaler>;
     rowActionStrategy?: RowActionStrategy<Wholesaler>;
-    onSort?: SortFunc<Wholesaler>;
-    onFilter?: FilterFunc<Wholesaler>;
+    onQueryChange?: (query: {
+      filters: WhereCondition<Wholesaler> | WhereConditionGroup<Wholesaler> | null,
+      sort: SortDescriptor<Wholesaler>[] | null
+    }) => Promise<void> | void;
   };
 
-  const { rows, loading = false, selection = "multiple", deleteStrategy, rowActionStrategy, onSort, onFilter }: SupplierGridProps = $props();
+  const { rows, loading = false, selection = "multiple", deleteStrategy, rowActionStrategy, onQueryChange }: SupplierGridProps = $props();
 
   // === COLUMNS ==================================================================================
 
@@ -108,7 +111,7 @@
   const getId = (r: Wholesaler) => r.wholesaler_id;
 </script>
 
-<Datagrid2
+<Datagrid
   {rows}
   {columns}
   {getId}
@@ -118,8 +121,7 @@
   entity="wholesaler"
   {deleteStrategy}
   {rowActionStrategy}
-  {onSort}
-  {onFilter}
+  {onQueryChange}
   maxBodyHeight="750px"
 />
 

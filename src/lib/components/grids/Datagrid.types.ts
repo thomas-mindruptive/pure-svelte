@@ -1,4 +1,4 @@
-import type { WhereConditionGroup, WhereCondition, SortDescriptor, ComparisonOperator } from "$lib/backendQueries/queryGrammar";
+import type { WhereConditionGroup, SortDescriptor, ComparisonOperator } from "$lib/backendQueries/queryGrammar";
 import type { QualifiedColumnsFromBrandedSchemaWithJoins } from "$lib/domain/domainTypes.utils";
 import type z from "zod";
 
@@ -85,14 +85,3 @@ export type DeleteStrategy<T = unknown> = {
 export type ApiLoadFunc<T> = (where: WhereConditionGroup<T> | null, sort: SortDescriptor<T>[] | null) => Promise<T[]>;
 
 export type ApiLoadFuncWithId<T> = (id: number, where: WhereConditionGroup<T> | null, sort: SortDescriptor<T>[] | null) => Promise<T[]>;
-
-/**
- * Sort callback for the DataGrid.
- */
-export type SortFunc<T> = (sortState: SortDescriptor<T>[] | null) => void | Promise<void>;
-
-/**
- * Filter callback for DataGrid2.
- * Receives WhereCondition or WhereConditionGroup based on active filters.
- */
-export type FilterFunc<T> = (where: WhereCondition<T> | WhereConditionGroup<T> | null) => void | Promise<void>;

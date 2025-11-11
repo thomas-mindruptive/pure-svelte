@@ -28,13 +28,27 @@
     columnKey: string;
     columnHeader: string;
     resetKey: number;  // Increment to clear this filter
+    initialValue?: any;  // For UI state restore from localStorage
     onChange: (condition: WhereCondition<any> | null) => void;
   };
 
-  let { columnKey, columnHeader, resetKey, onChange }: Props = $props();
+  let { columnKey, columnHeader, resetKey, initialValue, onChange }: Props = $props();
 
   let value = $state<'all' | 'true' | 'false'>('all');
   const selectId = `filter-boolean-${columnKey}`;
+  let hasInitialized = false;
+
+  /**
+   * Mount effect: Set initial value from localStorage restore.
+   * This runs once on mount to populate the dropdown with saved filter value.
+   */
+  $effect(() => {
+    if (!hasInitialized && initialValue !== undefined) {
+      // Convert boolean to 'true'/'false' string for dropdown
+      value = initialValue === true ? 'true' : initialValue === false ? 'false' : 'all';
+      hasInitialized = true;
+    }
+  });
 
   /**
    * Reset effect: Returns dropdown to "All" when resetKey changes.
@@ -42,6 +56,7 @@
   $effect(() => {
     resetKey; // Track resetKey
     value = 'all';
+    hasInitialized = false;
   });
 
   /**

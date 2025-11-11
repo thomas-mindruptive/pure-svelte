@@ -1,6 +1,7 @@
 <script lang="ts">
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
-  import type { ColumnDef, DeleteStrategy, RowActionStrategy, SortFunc } from "$lib/components/grids/Datagrid.types";
+  import type { ColumnDef, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
+  import type { SortDescriptor, WhereCondition, WhereConditionGroup } from "$lib/backendQueries/queryGrammar";
   import type { ProductCategory, ProductCategorySchema } from "$lib/domain/domainTypes";
 
   // === PROPS ====================================================================================
@@ -11,16 +12,21 @@
     selection?: "none" | "single" | "multiple";
     deleteStrategy: DeleteStrategy<ProductCategory>;
     rowActionStrategy?: RowActionStrategy<ProductCategory>;
-    onSort?: SortFunc<ProductCategory> | undefined;
+    // Support both old onSort and new onQueryChange patterns
+    onSort?: ((sortState: SortDescriptor<ProductCategory>[] | null) => Promise<void> | void) | undefined;
+    onQueryChange?: (query: {
+      filters: WhereCondition<ProductCategory> | WhereConditionGroup<ProductCategory> | null,
+      sort: SortDescriptor<ProductCategory>[] | null
+    }) => Promise<void> | void;
   };
 
-  const { rows = [], loading = false, selection = "multiple", deleteStrategy, rowActionStrategy, onSort }: CategoryGridProps = $props();
+  const { rows = [], loading = false, selection = "multiple", deleteStrategy, rowActionStrategy, onSort, onQueryChange }: CategoryGridProps = $props();
 
   // === COLUMNS ====================================================================================
 
   const columns: ColumnDef<typeof ProductCategorySchema>[] = [
     { key: "name", header: "Name", sortable: true, width: "25rem" },
-    { key: "category_id", header: "id", sortable: true, width: "5rem" },
+    { key: "category_id", header: "id", sortable: true, width: "5rem" },  // No filterable property = not filterable
     { key: "description", header: "description", sortable: true, width: "" },
   ];
 
@@ -41,6 +47,7 @@
   {deleteStrategy}
   {rowActionStrategy}
   {onSort}
+  {onQueryChange}
 />
 
 <!--

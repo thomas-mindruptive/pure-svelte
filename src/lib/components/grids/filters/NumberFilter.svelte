@@ -24,15 +24,34 @@
     columnKey: string;
     columnHeader: string;
     resetKey: number;  // Increment to clear this filter
+    initialValue?: any;  // For UI state restore from localStorage
+    initialOperator?: ComparisonOperator;  // For UI state restore
     onChange: (condition: WhereCondition<any> | null) => void;
   };
 
-  let { columnKey, columnHeader, resetKey, onChange }: Props = $props();
+  let { columnKey, columnHeader, resetKey, initialValue, initialOperator, onChange }: Props = $props();
 
   let value = $state('');
   let operator = $state<ComparisonOperator>(ComparisonOperator.EQUALS);
   const selectId = `filter-number-op-${columnKey}`;
   const inputId = `filter-number-${columnKey}`;
+  let hasInitialized = false;
+
+  /**
+   * Mount effect: Set initial value and operator from localStorage restore.
+   * This runs once on mount to populate the input with saved filter values.
+   */
+  $effect(() => {
+    if (!hasInitialized && (initialValue !== undefined || initialOperator !== undefined)) {
+      if (initialValue !== undefined) {
+        value = String(initialValue);
+      }
+      if (initialOperator !== undefined) {
+        operator = initialOperator;
+      }
+      hasInitialized = true;
+    }
+  });
 
   /**
    * Reset effect: Clears input AND operator when resetKey changes.
@@ -42,6 +61,7 @@
     resetKey; // Track resetKey
     value = '';
     operator = ComparisonOperator.EQUALS;
+    hasInitialized = false;
   });
 
   /**

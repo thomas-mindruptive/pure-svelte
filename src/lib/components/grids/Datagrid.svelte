@@ -187,9 +187,10 @@
   let filterExpanded = $state(savedState.ui.filterExpanded ?? true);
   let filterToggleReady = false;  // Guard: prevent ontoggle during initial render
 
-  // Initial filter values for UI restore (NOT $state - never changes after mount!)
-  const initialFilterValues: Map<string, {operator: any, value: any}> | null =
-    savedState.filters ? convertWhereToFilterValues(savedState.filters) : null;
+  // Initial filter values for UI restore (MUST be $state so Clear All can reset it!)
+  let initialFilterValues = $state<Map<string, {operator: any, value: any}> | null>(
+    savedState.filters ? convertWhereToFilterValues(savedState.filters) : null
+  );
 
   // Rebuild activeFilters Map from saved state (for backend queries)
   if (savedState.filters) {
@@ -560,6 +561,10 @@
   async function handleClearAllFilters() {
     log.debug(`[Datagrid] Clearing all ${activeFilters.size} filters`);
     activeFilters.clear();
+
+    // CRITICAL: Clear initialFilterValues BEFORE filterResetKey++ recreates filter components
+    // Otherwise newly created filters will still show old values from initialFilterValues
+    initialFilterValues = null;
     filterResetKey++;
 
     stateManager.saveFilters(null);

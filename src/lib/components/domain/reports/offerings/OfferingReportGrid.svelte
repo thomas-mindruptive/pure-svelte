@@ -38,9 +38,11 @@
     selection?: "none" | "single" | "multiple";
     onSelectionChange?: SelectionChangeHandler | undefined;
     toolbar?: Snippet<[ToolbarSnippetProps]> | undefined;
+    showSuperuserWhere?: boolean;
+    onRawWhereChange?: (rawWhere: string | null) => void;
   };
 
-  let { rows, onQueryChange, maxBodyHeight, selection = "none", onSelectionChange, toolbar }: Props = $props();
+  let { rows, onQueryChange, maxBodyHeight, selection = "none", onSelectionChange, toolbar, showSuperuserWhere = false, onRawWhereChange }: Props = $props();
 
   // getId and deleteStrategy are imported from .columns.ts for stable references
 </script>
@@ -54,6 +56,8 @@
   {selection}
   {onSelectionChange}
   {toolbar}
+  {showSuperuserWhere}
+  {onRawWhereChange}
   gridId="offerings-report"
   entity="offering"
   maxBodyHeight={maxBodyHeight ?? "80vh"}

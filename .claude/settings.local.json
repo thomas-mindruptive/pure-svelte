@@ -25,7 +25,8 @@
       "WebFetch(domain:frontendmasters.com)",
       "WebFetch(domain:imfeld.dev)",
       "WebFetch(domain:code.claude.com)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(cmd /c \"npm run check\")"
     ],
     "deny": [],
     "ask": []

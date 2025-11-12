@@ -15,6 +15,7 @@ import type { OfferingReportView } from "$lib/domain/domainTypes";
 import { log } from "$lib/utils/logger";
 import { json, type RequestHandler } from "@sveltejs/kit";
 import { v4 as uuidv4 } from "uuid";
+import { validateRawWhere } from "$lib/backendQueries/rawWhereValidator";
 
 /**
  * POST /api/offerings/report-with-links
@@ -28,13 +29,21 @@ export const POST: RequestHandler = async ({ request }) => {
   const transaction = db.transaction();
 
   try {
-    const payload: QueryPayload<OfferingReportView> = await request.json();
+    const payload: QueryPayload<OfferingReportView> & { rawWhere?: string } = await request.json();
     log.info(`[${operationId}] Parsed request payload`, {
       hasWhere: !!payload.where,
       hasOrderBy: !!payload.orderBy,
       limit: payload.limit,
       offset: payload.offset,
+      hasRawWhere: !!payload.rawWhere,
     });
+
+    // SUPERUSER MODE: Validate raw WHERE clause
+    if (payload.rawWhere) {
+      log.warn(`[${operationId}] ⚠️ SUPERUSER MODE: Raw WHERE clause provided`);
+      validateRawWhere(payload.rawWhere);
+      log.info(`[${operationId}] ✅ Raw WHERE validation passed`);
+    }
 
     await transaction.begin();
     log.info(`[${operationId}] Transaction started for view query with links.`);
@@ -47,6 +56,7 @@ export const POST: RequestHandler = async ({ request }) => {
         payload.orderBy,
         payload.limit,
         payload.offset,
+        payload.rawWhere,
       );
       console.log(`[PERF] [${operationId}] View with links query took: ${Date.now() - t0}ms`);
       log.debug(`[${operationId}] Loaded ${offeringsArray.length} offerings from view with links.`);

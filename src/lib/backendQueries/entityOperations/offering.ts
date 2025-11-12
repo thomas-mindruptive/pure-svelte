@@ -731,9 +731,10 @@ export async function loadOfferingsFromViewWithLinks(
   aOrderBy?: SortDescriptor<any>[],
   aLimit?: number,
   aOffset?: number,
+  rawWhere?: string,
 ): Promise<any[]> {
   assertDefined(transaction, "transaction");
-  log.debug(`loadOfferingsFromViewWithLinks`, { aWhere, aOrderBy, aLimit, aOffset });
+  log.debug(`loadOfferingsFromViewWithLinks`, { aWhere, aOrderBy, aLimit, aOffset, rawWhere });
 
   const ctx: BuildContext = {
     parameters: {},
@@ -741,7 +742,12 @@ export async function loadOfferingsFromViewWithLinks(
   };
 
   let whereClause = "";
-  if (aWhere) {
+  if (rawWhere) {
+    // Superuser mode: use raw SQL WHERE clause directly
+    // Validation should be done by caller!
+    whereClause = `WHERE ${rawWhere}`;
+    log.warn(`[SUPERUSER MODE] Using raw WHERE clause: ${rawWhere}`);
+  } else if (aWhere) {
     whereClause = `WHERE ${buildWhereClause(aWhere, ctx, false)}`;
   }
 

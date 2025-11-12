@@ -59,6 +59,10 @@
     // Filter mode (AND/OR)
     filterCombineMode?: 'AND' | 'OR' | undefined;
 
+    // Superuser raw WHERE clause (replaces filter grammar)
+    showSuperuserWhere?: boolean;
+    onRawWhereChange?: ((rawWhere: string | null) => void) | undefined;
+
     // Columns and row ids.
     columns: ColumnDef<any>[];
     getId: (row: any) => number;
@@ -120,6 +124,9 @@
     onQueryChange,
     onSort,
     filterCombineMode = 'AND',
+
+    showSuperuserWhere = false,
+    onRawWhereChange,
 
     deleteStrategy,
     rowActionStrategy,
@@ -602,6 +609,16 @@
     stateManager.saveUI({ filterExpanded });
   }
 
+  function handleRawWhereChange(newRawWhere: string | null) {
+    log.info(`[Datagrid] Raw WHERE changed:`, newRawWhere);
+
+    // 1. Notify parent (parent saves for API call)
+    onRawWhereChange?.(newRawWhere);
+
+    // 2. Trigger reload - EXACTLY like filters! sortState is preserved
+    debouncedQueryChange(buildWhereGroup(), sortState.length > 0 ? sortState : null);
+  }
+
   // ===== SORTING LOGIC =====
 
   async function handleSort(key: AllQualifiedColumns) {
@@ -941,9 +958,11 @@
         {activeFilterCount}
         {filterResetKey}
         {initialFilterValues}
+        {showSuperuserWhere}
         onFilterChange={handleFilterChange}
         onCombineModeToggle={handleCombineModeToggle}
         onClearAllFilters={handleClearAllFilters}
+        onRawWhereChange={handleRawWhereChange}
       />
     </details>
   {/if}

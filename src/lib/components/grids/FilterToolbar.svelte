@@ -31,6 +31,8 @@
     onFilterChange: (key: string, condition: WhereCondition<any> | null) => void;
     onCombineModeToggle: () => void;
     onClearAllFilters: () => void;
+    showSuperuserWhere?: boolean;  // Enable raw SQL WHERE clause input (SUPERUSER MODE)
+    onRawWhereChange?: (rawWhere: string | null) => void;
   };
 
   let {
@@ -41,8 +43,14 @@
     initialFilterValues,
     onFilterChange,
     onCombineModeToggle,
-    onClearAllFilters
+    onClearAllFilters,
+    showSuperuserWhere = false,
+    onRawWhereChange
   }: Props = $props();
+
+  // Superuser raw WHERE state
+  let rawWhereInput = $state("");
+  let rawWhereActive = $state(false);
 
   /**
    * Type guard: Filters out computed columns (key === '<computed>').
@@ -76,6 +84,30 @@
 
     return 'text';  // Default
   }
+
+  /**
+   * Apply raw SQL WHERE clause (SUPERUSER MODE)
+   */
+  function applyRawWhere() {
+    const trimmed = rawWhereInput.trim();
+    if (trimmed.length === 0) {
+      rawWhereActive = false;
+      onRawWhereChange?.(null);
+      return;
+    }
+
+    rawWhereActive = true;
+    onRawWhereChange?.(trimmed);
+  }
+
+  /**
+   * Clear raw WHERE clause
+   */
+  function clearRawWhere() {
+    rawWhereInput = "";
+    rawWhereActive = false;
+    onRawWhereChange?.(null);
+  }
 </script>
 
 <div class="filter-toolbar">
@@ -93,6 +125,34 @@
       Clear all filters ({activeFilterCount})
     </button>
   </div>
+
+  {#if showSuperuserWhere}
+    <div class="superuser-where-section">
+      <div class="superuser-where-header">
+        <span class="superuser-label">⚠️ SUPERUSER MODE: Raw SQL WHERE</span>
+        {#if rawWhereActive}
+          <span class="active-indicator">ACTIVE</span>
+        {/if}
+      </div>
+      <textarea
+        bind:value={rawWhereInput}
+        class="raw-where-input"
+        placeholder="Example: wioPrice > 100 AND wsName LIKE '%ACME%'"
+        rows="2"
+      ></textarea>
+      <div class="superuser-where-actions">
+        <button onclick={applyRawWhere} class="apply-raw-where-btn">
+          Apply Raw WHERE
+        </button>
+        <button onclick={clearRawWhere} class="clear-raw-where-btn" disabled={!rawWhereActive}>
+          Clear
+        </button>
+      </div>
+      <div class="superuser-where-help">
+        Allowed columns: wioId, wioTitle, wioPrice, wsName, pdefTitle, catName, ptName, etc.
+      </div>
+    </div>
+  {/if}
 
   <div class="filter-inputs">
     {#each columns as col (col.key)}
@@ -181,5 +241,97 @@
     display: flex;
     gap: 1rem;
     flex-wrap: wrap;
+  }
+
+  /* Superuser Raw WHERE Section */
+  .superuser-where-section {
+    padding: 1rem;
+    background: #fff8e1;
+    border: 2px solid #ffc107;
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .superuser-where-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .superuser-label {
+    font-weight: 600;
+    color: #f57c00;
+    font-size: 0.875rem;
+  }
+
+  .active-indicator {
+    padding: 0.25rem 0.5rem;
+    background: #4caf50;
+    color: white;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .raw-where-input {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ffc107;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.875rem;
+    resize: vertical;
+  }
+
+  .raw-where-input:focus {
+    outline: none;
+    border-color: #f57c00;
+    box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.2);
+  }
+
+  .superuser-where-actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .apply-raw-where-btn {
+    padding: 0.5rem 1rem;
+    background: #ff9800;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .apply-raw-where-btn:hover {
+    background: #f57c00;
+  }
+
+  .clear-raw-where-btn {
+    padding: 0.5rem 1rem;
+    background: #f44336;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .clear-raw-where-btn:hover:not(:disabled) {
+    background: #d32f2f;
+  }
+
+  .clear-raw-where-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .superuser-where-help {
+    font-size: 0.75rem;
+    color: #666;
+    font-style: italic;
   }
 </style>

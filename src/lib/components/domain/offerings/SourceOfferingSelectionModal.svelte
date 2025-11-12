@@ -37,6 +37,7 @@
   let dialogElement: HTMLDialogElement;
   let offerings = $state<OfferingReportViewWithLinks[]>([]);
   let selectedIds = $state<Set<ID>>(new Set());
+  let rawWhere = $state<string | null>(null);  // Superuser raw WHERE clause
 
   // === API ======================================================================================
 
@@ -85,7 +86,8 @@
         where,
         queryGrammar?.orderBy || null,
         null,
-        null
+        null,
+        rawWhere  // Pass rawWhere to API
       );
 
       offerings = results as OfferingReportViewWithLinks[];
@@ -99,6 +101,12 @@
 
   function handleQueryChange(queryGrammar: any) {
     loadOfferings(queryGrammar);
+  }
+
+  function handleRawWhereChange(newRawWhere: string | null) {
+    log.info(`[SourceOfferingSelectionModal] Raw WHERE changed:`, newRawWhere);
+    rawWhere = newRawWhere;
+    // Datagrid triggers handleQueryChange automatically, just like with filters
   }
 
   async function handleConfirm(selectedIds: Set<ID>) {
@@ -138,6 +146,8 @@
           maxBodyHeight="60vh"
           selection="multiple"
           onSelectionChange={(ids) => selectedIds = ids}
+          showSuperuserWhere={true}
+          onRawWhereChange={handleRawWhereChange}
         >
           {#snippet toolbar({ selectedIds: toolbarSelectedIds })}
             <div class="toolbar-info">
@@ -176,7 +186,7 @@
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
     padding: 0;
     max-width: 90vw;
-    width: 1200px;
+    width: 100vw;
     max-height: 90vh;
   }
 

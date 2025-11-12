@@ -877,23 +877,33 @@ export function getOfferingApi(client: ApiClient) {
     /**
      * Loads offerings for report using the view_offerings_pt_pc_pd view WITH LINKS.
      * Provides complete breadth of data (product type, category, lookups) plus offering links.
+     *
+     * @param rawWhere - SUPERUSER ONLY: Raw SQL WHERE clause (without "WHERE" keyword).
+     *                   If provided, overrides aWhere parameter.
+     *                   ⚠️ Use with caution - validated on backend.
      */
     async loadOfferingsForReportWithLinks(
       aWhere?: WhereConditionGroup<any> | WhereCondition<any> | null,
       aOrderBy?: SortDescriptor<any>[] | null,
       aLimit?: number | null,
       aOffset?: number | null,
+      rawWhere?: string | null,
     ): Promise<any[]> {
       const operationId = `loadOfferingsForReportWithLinks`;
       offeringLoadingManager.start(operationId);
       try {
-        const payload: QueryPayload<any> = {
+        const payload: QueryPayload<any> & { rawWhere?: string } = {
           select: [],
           ...(aWhere && { where: aWhere }),
           ...(aOrderBy && { orderBy: aOrderBy }),
           ...(aLimit && { limit: aLimit }),
           ...(aOffset && { offset: aOffset }),
+          ...(rawWhere && { rawWhere }),
         };
+
+        if (rawWhere) {
+          log.warn(`[${operationId}] ⚠️ SUPERUSER MODE: Using raw WHERE clause: ${rawWhere}`);
+        }
 
         const responseData = await client.apiFetch<QueryResponseData<any>>(
           "/api/offerings/report-with-links",

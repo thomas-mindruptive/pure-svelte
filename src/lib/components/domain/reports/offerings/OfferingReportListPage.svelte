@@ -41,6 +41,7 @@
   let { data }: Props = $props();
   let resolvedOfferings = $state<OfferingReportViewWithLinks[]>([]);
   let isLoading = $state(false);  // Page-level loading (for error handling)
+  let rawWhere = $state<string | null>(null);  // Superuser raw WHERE clause
 
   const client = new ApiClient(data.loadEventFetch);
   const offeringApi = getOfferingApi(client);
@@ -60,11 +61,29 @@
     log.info(`[OfferingReportListPage] Query change - filters:`, query.filters, `sort:`, query.sort);
     isLoading = true;
     try {
-      resolvedOfferings = await offeringApi.loadOfferingsForReportWithLinks(query.filters, query.sort);
+      resolvedOfferings = await offeringApi.loadOfferingsForReportWithLinks(
+        query.filters,
+        query.sort,
+        null,
+        null,
+        rawWhere  // Pass rawWhere to API
+      );
       log.info(`[OfferingReportListPage] Received ${resolvedOfferings.length} offerings`);
     } finally {
       isLoading = false;
     }
+  }
+
+  /**
+   * Raw WHERE Change Handler
+   *
+   * Called when user changes the raw SQL WHERE clause in superuser mode.
+   * Only saves the rawWhere state - Datagrid handles the reload automatically.
+   */
+  function handleRawWhereChange(newRawWhere: string | null) {
+    log.info(`[OfferingReportListPage] Raw WHERE changed:`, newRawWhere);
+    rawWhere = newRawWhere;
+    // Datagrid triggers handleQueryChange automatically, just like with filters
   }
 </script>
 
@@ -76,6 +95,8 @@
   <OfferingReportGrid
     rows={resolvedOfferings}
     onQueryChange={handleQueryChange}
+    showSuperuserWhere={true}
+    onRawWhereChange={handleRawWhereChange}
   />
 </div>
 

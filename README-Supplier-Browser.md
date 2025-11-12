@@ -1302,228 +1302,414 @@ This guarantees that any property access is fully type-checked by the compiler, 
 
 ## Deep Dive: Svelte 5 Reactivity and Component State Management
 
-This chapter documents fundamental principles of Svelte 5's reactivity system, common pitfalls when building reactive components, and the architectural evolution from passive to autonomous component design. The lessons are illustrated through a concrete bug we encountered: **an infinite render loop in our Datagrid during navigation**.
+This chapter explains Svelte 5's reactivity system, common pitfalls when building reactive components, and architectural patterns for avoiding infinite render loops. The lessons are illustrated through real production bugs we encountered and solved.
 
 ---
 
-### Part 1: Svelte 5 Reactivity Fundamentals
+### Part 1: How Svelte 5 Reactivity Actually Works
 
-#### Signals-Based Reactivity
+#### Introduction
 
-Svelte 5 uses a **signals-based reactivity system** - a radical departure from Svelte 4's compile-time reactive statements. Understanding this system is crucial to avoiding reactive cycles and infinite loops.
+Svelte 5 introduced a signals-based reactivity system - a fundamental shift from Svelte 4's compile-time reactive statements. Understanding this system is crucial for avoiding infinite loops and reactive cycles in complex components.
 
-```javascript
-// 1. Signal Creation ($state)
+#### Signals: The Foundation
+
+A **signal** is a value container that notifies subscribers when it changes. Unlike Svelte 4, where reactivity was handled at compile-time, Svelte 5 uses runtime dependency tracking - similar to SolidJS and Vue 3.
+
+**What actually happens when you create reactive state:**
+
+```typescript
 let count = $state(0);
-// Creates a reactive signal that notifies subscribers when changed
-
-// 2. Dependency Tracking ($effect)
-$effect(() => {
-  console.log(count);  // This READ is tracked
-  // Effect automatically subscribes to 'count' signal
-});
-
-// 3. Update Propagation
-count = 5;
-// → Signal notifies all subscribers
-// → Effects re-run in microtask
-// → DOM updates surgically (only affected nodes)
 ```
 
-**Key Properties:**
+Behind the scenes:
+- Svelte creates a signal object internally
+- This signal maintains a list of subscribers (effects, derived values, DOM nodes)
+- When you READ `count` inside a reactive context, you're added to the subscribers list
+- When you WRITE `count = 5`, all subscribers get notified
 
-1. **Runtime Dependency Tracking:** Unlike Svelte 4's compile-time analysis, Svelte 5 tracks dependencies at runtime by recording which signals are READ during effect execution.
+#### Dependency Tracking: How Svelte Knows What Changed
 
-2. **Fine-Grained Updates:** When a signal changes, only the specific DOM nodes and effects that depend on it are updated - not the entire component.
+Dependency tracking happens at **runtime**, not compile-time:
 
-3. **Microtask Batching:** Multiple synchronous state changes are batched and applied in a single microtask, preventing cascading updates.
+1. During `$effect` execution, Svelte records every `$state` value you READ
+2. If your effect reads `count` and `name`, it subscribes to both signals
+3. If only `count` changes, only subscribers of `count` re-run (fine-grained updates)
+4. Multiple synchronous writes are batched in a microtask before updates propagate
+
+**Important distinction:**
+
+```typescript
+// This effect subscribes to 'count'
+$effect(() => {
+  console.log(count); // READ is tracked
+});
+
+// This function does NOT create subscriptions
+function handleClick() {
+  count++; // Just a write, no subscription
+}
+```
 
 #### The Three Reactive Primitives
 
-```javascript
-// $state - creates reactive values
-let name = $state("Alice");
-let items = $state([1, 2, 3]);  // Deep reactivity via Proxies
+**$state - Reactive Values**
 
-// $derived - computed values (no side effects allowed)
-let doubled = $derived(count * 2);
-// Re-evaluates ONLY when count changes
+Creates a reactive signal. For objects and arrays, Svelte uses Proxies to enable deep reactivity:
 
-// $effect - side effects (runs when dependencies change)
+```typescript
+let items = $state([1, 2, 3]);
+items.push(4); // Triggers reactivity (Proxy intercepts the push)
+
+let user = $state({ name: "John", age: 30 });
+user.age = 31; // Triggers reactivity (Proxy intercepts property write)
+```
+
+**$derived - Computed Values**
+
+Automatically recomputes when dependencies change. Must be pure (no side effects):
+
+```typescript
+let firstName = $state("John");
+let lastName = $state("Doe");
+
+// Recomputes automatically when firstName OR lastName changes
+let fullName = $derived(`${firstName} ${lastName}`);
+```
+
+**$effect - Side Effects**
+
+Runs when dependencies change. Used for side effects like logging, API calls, or DOM manipulation. Can return a cleanup function:
+
+```typescript
 $effect(() => {
-  document.title = `Count: ${count}`;  // Side effect
+  const controller = new AbortController();
+
+  fetch('/api/data', { signal: controller.signal })
+    .then(res => res.json())
+    .then(data => console.log(data));
+
+  // Cleanup runs when effect re-runs or component unmounts
+  return () => controller.abort();
 });
 ```
 
-**Critical Distinction:**
-- `$derived`: Pure computation, returns value
-- `$effect`: Impure operation, no return value (or returns cleanup function)
-
 #### Component Lifecycle in Svelte 5
 
+Understanding the lifecycle is critical for avoiding bugs:
+
 **Initialization (happens ONCE):**
-```javascript
+```typescript
 // Component script runs ONCE when mounted
-let localState = $state(0);  // ← Initialized once
+let count = $state(0);  // Initialized once
 
 onMount(() => {
-  console.log("Mounted");  // ← Runs once
-});
-
-$effect(() => {
-  // ← Starts tracking dependencies once mounted
+  console.log("Component mounted"); // Runs once
 });
 ```
 
 **Re-render (happens on prop/state changes):**
-```javascript
-// When props or reactive state changes:
-// - Script does NOT re-run
-// - Local state persists
-// - Only reactive dependencies update
-// - Template re-renders surgically
-```
+- Script does NOT re-run
+- Local state persists (keeps its value)
+- Only reactive dependencies update
+- Template re-renders surgically (only affected DOM nodes)
 
-**SvelteKit Component Reuse:**
+**SvelteKit Component Reuse (Critical for Understanding Navigation Bugs):**
 
-When navigating between similar routes (`/items/1` → `/items/2`), SvelteKit **reuses** the component:
+When navigating between similar routes (`/items/1` → `/items/2`), SvelteKit **reuses** the component as an optimization:
 - `onMount` does NOT fire again
 - Local state keeps its previous value
 - Only props update
 
-This is an **optimization**, but creates a contract: **Components must handle prop changes without re-initialization.**
+**Example of the problem:**
 
----
-
-### Part 2: Common Reactivity Pitfalls
-
-#### Pitfall 1: Reactive Cycles
-
-**The Problem:**
-
-```javascript
-// ❌ INFINITE LOOP
-let count = $state(0);
-
-$effect(() => {
-  count = count + 1;  // Reads count → subscribes
-                      // Writes count → triggers effect again
-                      // → CYCLE!
-});
-```
-
-**Why this happens:**
-1. Effect runs, reads `count` → subscribes to `count` signal
-2. Effect writes `count` → notifies subscribers (including itself!)
-3. Effect re-runs → reads `count` → writes `count` → loop!
-
-**The Solution - Guard Conditions:**
-
-```javascript
-// ✅ SAFE - with guard
-let count = $state(0);
-let needsUpdate = $state(true);
-
-$effect(() => {
-  if (needsUpdate) {
-    count = count + 1;  // Writes count
-    needsUpdate = false;  // Prevents re-trigger
-  }
-});
-```
-
-**When state mutation in effects is OK:**
-- You have an explicit guard condition
-- You use `untrack()` to prevent subscription
-- You're syncing external data sources (one-way flow)
-
-#### Pitfall 2: Multiple Conflicting Reactive Properties
-
-**The Problem:**
-
-```javascript
-// ❌ CONFLICTING SIGNALS
-let isLoading = $state(false);
-let hasError = $state(false);
-let data = $state(null);
-
-// These can contradict each other!
-// isLoading=true + hasError=true + data=[items]  ← Impossible state!
-```
-
-**The Solution - Single Source of Truth:**
-
-```javascript
-// ✅ SINGLE STATE MACHINE
-let status = $state<'idle' | 'loading' | 'error' | 'success'>('idle');
-let data = $state(null);
-let error = $state(null);
-
-// Derived booleans for convenience
-let isLoading = $derived(status === 'loading');
-let hasError = $derived(status === 'error');
-
-// Impossible to have contradictory state!
-```
-
-#### Pitfall 3: Stale State After Navigation
-
-**The Problem:**
-
-```javascript
-// Component at /items
+```typescript
+// Component at /items/[id]
 let selectedId = $state(null);
 
 onMount(() => {
-  // Runs once on first visit
-  selectedId = getIdFromUrl();
+  selectedId = getIdFromUrl(); // Only runs on first visit!
 });
 
 // User navigates: /items/1 → /items/2
 // onMount doesn't fire again!
-// selectedId still = 1  ← STALE!
+// selectedId still shows 1 (STALE!)
 ```
 
-**The Solution - React to Props:**
+**The fix:**
 
-```javascript
-let { data } = $props();  // data.id from URL
+```typescript
+let { data } = $props(); // data.id from URL params
 
-let selectedId = $derived(data.id);  // ✅ Always synced
+// Auto-updates when URL changes
+let selectedId = $derived(data.id);
+```
 
-// OR use $effect if you need side effects
+---
+
+### Part 2: Understanding Reactive Cycles - The Core Problem
+
+#### What is a Reactive Cycle?
+
+A reactive cycle occurs when an effect modifies the same state it depends on. Here's the simplest example:
+
+```typescript
+let count = $state(0);
+
 $effect(() => {
-  selectedId = data.id;  // Runs when data.id changes
+  count = count + 1; // INFINITE LOOP!
 });
 ```
 
-#### Pitfall 4: Async Operations Without Cleanup
+**Why this loops (step by step):**
+
+1. Effect executes for the first time
+2. It READS `count` (value: 0) → Svelte adds this effect to `count`'s subscriber list
+3. It WRITES `count = 1` → `count` signal notifies all subscribers
+4. This effect is a subscriber! → Effect re-runs
+5. READS `count` (value: 1) → WRITES `count = 2` → Notifies subscribers → Re-runs
+6. Loop continues forever, browser freezes
+
+**Important:** This is not a bug in Svelte. This is fundamental to how signals work. YOU must prevent these cycles with guards or proper architecture.
+
+#### Real-World Example 1: The bind:value Initialization Loop
+
+This was the PRIMARY cause of our Datagrid infinite loop bug.
+
+**The Scenario:**
+
+You have filter inputs that should remember their values from localStorage. When the page loads, filters should show the saved values.
+
+**The Broken Code:**
+
+```typescript
+// TextFilter.svelte
+let { initialValue, onChange } = $props();
+
+// Set value from localStorage (e.g., "laptop")
+let value = $state(initialValue || '');
+
+function handleInput(event) {
+  value = event.target.value;
+  onChange(value); // Triggers Datagrid to load data
+}
+```
+
+```svelte
+<input type="text" bind:value={value} oninput={handleInput} />
+```
+
+**What happens (detailed walkthrough):**
+
+1. **Component Creation:** Svelte creates TextFilter component, executes: `value = $state("laptop")`
+2. **Template Rendering:** Svelte evaluates `bind:value={value}`
+3. **bind:value Behavior:** `bind:value` creates two-way binding by setting `input.value = "laptop"` in the DOM
+4. **Browser Event:** When the browser programmatically sets `input.value`, it fires an `oninput` event (this is standard DOM behavior)
+5. **Handler Executes:** `handleInput` runs → calls `onChange("laptop")`
+6. **Parent Updates:** Datagrid receives onChange callback → loads data from API → updates its state
+7. **Re-render Triggered:** Datagrid's state change causes it to re-render → Filter component gets destroyed
+8. **Filter Recreated:** Datagrid creates a new TextFilter component
+9. **GOTO Step 1:** Loop repeats infinitely
+
+**Critical timing:** Step 4 (browser fires `oninput`) happens BEFORE `onMount` fires. The event is triggered during initial DOM setup, not from user interaction.
+
+**The Fix - One-Way Binding:**
+
+```typescript
+// TextFilter.svelte
+let { initialValue, onChange } = $props();
+let value = $state('');
+
+// Set initial value ONCE during script execution
+// This does NOT trigger any browser events
+if (initialValue !== undefined) {
+  value = String(initialValue);
+}
+
+function handleInput(event: Event) {
+  // Manual synchronization: read from DOM, update state
+  value = (event.target as HTMLInputElement).value;
+  onChange(value);
+}
+```
+
+```svelte
+<!-- One-way binding: Svelte → DOM only -->
+<input type="text" {value} oninput={handleInput} />
+```
+
+**Why this works:**
+
+- `{value}` is one-way binding: Svelte writes TO the DOM, but DOM doesn't write back automatically
+- Setting `value = String(initialValue)` in the script does NOT cause the browser to fire events
+- `oninput` only fires from actual user typing, not from programmatic value assignment
+- No initialization loop possible
+
+**Key Takeaway:** Avoid `bind:value` when initializing inputs with external data (props, localStorage, URL params). Use one-way binding with manual event handlers.
+
+**Reference Implementation:**
+- `src/lib/components/grids/filters/TextFilter.svelte`
+- `src/lib/components/grids/filters/NumberFilter.svelte`
+- `src/lib/components/grids/filters/BooleanFilter.svelte`
+
+#### Real-World Example 2: The Filter Toggle Loop
+
+**The Scenario:**
+
+You have a `<details>` element that should remember if it was expanded, stored in localStorage.
+
+**The Broken Code:**
+
+```typescript
+let filterExpanded = $state(true); // From localStorage
+
+function handleToggle() {
+  filterExpanded = !filterExpanded; // Manual toggle
+  saveToLocalStorage(filterExpanded);
+}
+```
+
+```svelte
+<details open={filterExpanded} ontoggle={handleToggle}>
+  <!-- Filter inputs -->
+</details>
+```
+
+**What happens (detailed walkthrough):**
+
+**Problem 1 - Initialization Event:**
+
+1. Component renders: `<details open={true}>`
+2. Browser sets `details.open = true` (DOM property)
+3. Browser fires `toggle` event (standard DOM behavior when `open` attribute changes)
+4. `handleToggle` executes during initialization
+5. If timing is wrong, this can trigger state updates → re-render → loop
+
+**Problem 2 - Desynchronization:**
+
+1. User clicks to close details
+2. Browser sets `details.open = false` internally
+3. Browser fires `toggle` event
+4. `handleToggle` runs: `filterExpanded = !filterExpanded`
+5. But if `filterExpanded` was already updated elsewhere, or if the browser's internal state differs, we have:
+   - `filterExpanded` state ≠ actual DOM `open` state
+6. Next render: Svelte sees prop changed, sets `open={...}` → fires `toggle` event → desynchronizes further
+7. Can create a loop where toggle state flips back and forth
+
+**The Fix - Read from DOM + Guard:**
+
+```typescript
+let filterExpanded = $state(true);
+let filterToggleReady = false; // NOT $state - just a control flag
+
+function handleToggle(event: Event) {
+  // Guard: Block events during initialization
+  if (!filterToggleReady) return;
+
+  // Read DOM as source of truth - don't toggle manually
+  const detailsElement = event.target as HTMLDetailsElement;
+  filterExpanded = detailsElement.open;
+
+  saveToLocalStorage(filterExpanded);
+}
+
+onMount(() => {
+  // Enable toggle handling AFTER initialization complete
+  filterToggleReady = true;
+});
+```
+
+**Why this works:**
+
+- Guard blocks the `toggle` event that fires during initial render
+- Reading `detailsElement.open` ensures we sync FROM the DOM's actual state, not our potentially stale `filterExpanded` variable
+- No manual toggle (`!value`) that can get out of sync
+- DOM is the source of truth
+
+**Key Takeaway:** For DOM elements with internal state (details, dialog, input with browser validation), treat the DOM as source of truth. Read state from the element rather than manually toggling. Always guard against initialization events.
+
+**Reference Implementation:** `src/lib/components/grids/Datagrid.svelte:568-582`
+
+---
+
+### Part 3: Additional Critical Pitfalls
+
+#### Guard Variables Must Not Be Reactive
 
 **The Problem:**
 
-```javascript
-// ❌ RACE CONDITION
+```typescript
+let isMounted = $state(false); // WRONG!
+
+onMount(() => {
+  isMounted = true; // Triggers re-render DURING mount
+});
+
+// Used in template or other reactive code
+if (isMounted) {
+  // Do something
+}
+```
+
+**Why this fails:**
+
+- `$state` makes `isMounted` a reactive signal
+- Setting it to `true` notifies all subscribers
+- If the template or any `$effect` reads `isMounted`, that triggers a re-render
+- Re-render during mount can cause component to re-initialize
+- This can create loops or break initialization logic
+
+**The Fix:**
+
+```typescript
+let isMounted = false; // Normal variable, NOT $state
+
+onMount(() => {
+  isMounted = true; // No notification, no re-render triggered
+});
+```
+
+**When to use $state vs plain variables:**
+
+- **Use `$state`:** When value changes should trigger UI updates or run effects
+- **Don't use `$state`:** For control flow flags that just guard code execution (like `isMounted`, `isReady`, `hasInitialized`)
+
+**Reference Implementation:** `src/lib/components/grids/Datagrid.svelte` (isMounted, filterToggleReady)
+
+#### Async Operations Without Cleanup
+
+**The Problem:**
+
+```typescript
 let query = $state("foo");
 let results = $state([]);
 
 $effect(() => {
-  const q = query;  // Track dependency
+  const q = query; // Track dependency
+
   fetch(`/api/search?q=${q}`)
     .then(res => res.json())
     .then(data => {
-      results = data;  // BUG: Might be from old query!
+      results = data; // BUG: Might be from old query!
     });
 });
-
-// User types fast: "foo" → "bar" → "baz"
-// Three fetches start, but "foo" might finish last
-// → Wrong results displayed!
 ```
 
-**The Solution - Abort Pattern:**
+**Why this fails:**
 
-```javascript
-// ✅ SAFE - abort stale operations
+Imagine user types fast: "foo" → "bar" → "baz"
+
+1. Effect runs with query="foo" → starts fetch #1
+2. User types "bar" → query changes → effect re-runs
+3. Effect runs with query="bar" → starts fetch #2
+4. User types "baz" → query changes → effect re-runs
+5. Effect runs with query="baz" → starts fetch #3
+6. But fetch #1 might complete LAST (network timing is unpredictable)
+7. When fetch #1 completes: `results = dataFromFoo` → displays wrong data!
+
+**The Fix - AbortController Pattern:**
+
+```typescript
 $effect(() => {
   const q = query;
   const controller = new AbortController();
@@ -1532,249 +1718,355 @@ $effect(() => {
     .then(res => res.json())
     .then(data => { results = data; })
     .catch(err => {
-      if (err.name === 'AbortError') return;  // Ignore aborted
+      if (err.name === 'AbortError') return; // Ignore aborted requests
       console.error(err);
     });
 
-  // Cleanup: abort when effect re-runs or unmounts
+  // Cleanup: abort when effect re-runs or component unmounts
   return () => controller.abort();
 });
 ```
 
+**Why this works:**
+
+- When query changes, effect re-runs
+- Before re-running, Svelte calls the cleanup function
+- Cleanup aborts the previous fetch
+- Only the latest fetch can complete successfully
+- Guarantees results always match the current query
+
 ---
 
-### Part 3: The Concrete Bug - Infinite Render Loop
+### Part 4: The Datagrid Case Study - Multiple Root Causes Combined
 
-**Symptom:** During client-side navigation to a ListPage (`/suppliers`, `/offerings`), the Datagrid would enter an **infinite render loop** - continuously re-rendering, freezing the browser, consuming CPU.
+Now we apply everything we learned to the real production bug that prompted this investigation.
 
-**Key Observation:** Only happened on navigation, NOT on full page reload.
+**Symptom:** Navigate to a page with a Datagrid → browser freezes with infinite re-renders, console logs stop updating.
 
-#### The Broken Architecture
+**Context:** Datagrid component with text/number/boolean filters, column sorting, and localStorage persistence of filter/sort state.
 
-```javascript
-// OfferingReportListPage.svelte - BROKEN
-let isLoading = $state(false);  // Page manages loading state
-let resolvedOfferings = $state([]);
+#### Root Cause #1: bind:value in Filter Inputs
 
-async function handleQueryChange(query) {
-  isLoading = true;  // ← Page sets loading
-  try {
-    resolvedOfferings = await offeringApi.load(query);
-  } finally {
-    isLoading = false;  // ← Page clears loading
-  }
+Covered thoroughly in Part 2. This was the PRIMARY root cause. Filters initialized with saved localStorage values triggered onChange during component creation via `bind:value` → infinite loop.
+
+#### Root Cause #2: Individual Filter Debouncing (Architecture Error)
+
+**What we did wrong:**
+
+Each filter component debounced its own `onChange` callback:
+
+```typescript
+// Inside TextFilter.svelte
+const debouncedOnChange = debounce(onChange, 300);
+
+function handleInput(event) {
+  value = event.target.value;
+  debouncedOnChange(buildCondition()); // Separate 300ms timer
 }
-
-// Page passes loading state DOWN to Grid
-<OfferingReportGrid
-  rows={resolvedOfferings}
-  loading={isLoading}  // ← External loading signal
-  onQueryChange={handleQueryChange}
-/>
 ```
 
-```javascript
-// Datagrid.svelte - BROKEN
-let { loading, onQueryChange, rows } = $props();
+**Why this is architecturally wrong:**
 
+Imagine user types in 3 different filters quickly:
+
+1. User types in TextFilter for "name" → starts 300ms timer #1
+2. User types in NumberFilter for "price" → starts 300ms timer #2
+3. User types in TextFilter for "category" → starts 300ms timer #3
+
+Result: 3 separate API calls, each 300ms apart. The last API call completes almost 1 second after the user stopped typing. This is inefficient and creates unnecessary server load.
+
+**The correct architecture - Centralized Debouncing:**
+
+Filters should report changes immediately. The PARENT (Datagrid) should debounce because it sees ALL filter changes and can batch them into ONE API call:
+
+```typescript
+// TextFilter.svelte - NO debounce
+function handleInput(event) {
+  value = event.target.value;
+  onChange(buildCondition()); // Report immediately!
+}
+
+// Datagrid.svelte - Centralized debouncing
+const debouncedQueryChange = debounce(async (filters, sort) => {
+  isLoadingData = true;
+  try {
+    await onQueryChange?.({ filters, sort });
+  } finally {
+    isLoadingData = false;
+  }
+}, 300);
+
+function handleFilterChange(key, condition) {
+  // Update internal map
+  activeFilters.set(key, condition);
+
+  // Build combined query from ALL active filters
+  const allFilters = buildWhereGroup();
+
+  // ONE timer for all filter changes
+  debouncedQueryChange(allFilters, sortState);
+}
+```
+
+**Result:** User types in 3 filters → ONE API call, 300ms after the last keystroke in ANY filter.
+
+**General Principle:** Debounce at the orchestrator level (parent that coordinates), not at the leaf component level (individual filters). Leaf components report events immediately, parent decides when to act on accumulated changes.
+
+**Reference Implementation:** `src/lib/components/grids/Datagrid.svelte:224-244`
+
+#### Root Cause #3: Unstable Column References
+
+**What we did wrong:**
+
+```typescript
+// OfferingReportGrid.svelte
+const columns: ColumnDef[] = [
+  { key: "wioId", header: "ID", sortable: true, filterable: true, ... },
+  { key: "title", header: "Title", ... },
+  // ... 20 more columns
+];
+
+const getId = (row) => row.wioId;
+
+<Datagrid {columns} {getId} ... />
+```
+
+**Why this causes loops:**
+
+Every time OfferingReportGrid re-renders:
+
+1. `columns` constant gets re-evaluated → NEW array reference (even though content is identical)
+2. `getId` constant gets re-evaluated → NEW function reference
+3. Svelte's prop comparison sees: `columns` reference changed
+4. Datagrid receives new `columns` prop → Datagrid re-renders
+5. FilterToolbar (inside Datagrid) sees new `columns` prop
+6. FilterToolbar uses `{#each columns as col (col.key)}` with keying
+7. BUT the array reference changed, so Svelte destroys ALL filter components and recreates them
+8. Filter components re-initialize → can trigger onChange (even with guards, timing can be wrong)
+9. onChange triggers data load → Datagrid updates state → re-renders → GOTO step 1
+
+**The fix - Module-level exports:**
+
+```typescript
+// OfferingReportGrid.columns.ts - Separate file
+export function getId(row: OfferingReportViewWithLinks): number {
+  return row.wioId;
+}
+
+export const columns: ColumnDef<typeof OfferingReportViewSchema>[] = [
+  { key: "wioId", header: "ID", filterable: false, sortable: true, ... },
+  { key: "title", header: "Title", filterable: true, ... },
+  // ... all columns
+];
+
+// OfferingReportGrid.svelte
+import { columns, getId } from "./OfferingReportGrid.columns";
+
+<Datagrid {columns} {getId} ... /> // Same reference every render!
+```
+
+**Why this works:**
+
+- Module-level constants are created ONCE when the module loads
+- Importing them gives you the SAME reference every time
+- Props never change (reference-wise) → no unnecessary re-renders
+- Filter components are never destroyed/recreated unless actually needed
+
+**General Principle:** Configuration objects that should remain stable across component renders must be defined at module scope, not component scope. This includes: column definitions, row ID functions, strategy objects, large constant arrays/objects.
+
+**Reference Implementation:** `src/lib/components/domain/reports/offerings/OfferingReportGrid.columns.ts`
+
+#### Root Cause #4: setTimeout vs await tick()
+
+**What we did wrong:**
+
+```typescript
 onMount(() => {
-  // Grid calls parent's callback
-  if (onQueryChange) {
-    onQueryChange({ filters, sort });  // ← Triggers parent's handleQueryChange
-  }
+  setTimeout(() => {
+    // Load initial data
+  }, 0);
 });
-
-// Grid shows spinner based on EXTERNAL prop
-{#if loading}
-  <div class="spinner"></div>
-{/if}
 ```
 
-**The Responsibility Split:**
-- **Grid**: Triggers the operation (`onQueryChange()`)
-- **Page**: Manages loading state (`isLoading`)
-- **Grid**: Displays loading based on Page's state
+**Why this is a hack:**
 
-This is a **coordination anti-pattern** - two components share responsibility for one operation.
+- `setTimeout` schedules on the JavaScript event loop
+- It doesn't coordinate with Svelte's internal scheduler
+- Svelte batches reactive updates in microtasks
+- We need to wait for Svelte's scheduler to complete pending updates, not just defer to next event loop tick
 
-#### Why It Looped
+**The fix - await tick():**
 
-**The Reactive Cycle:**
+```typescript
+onMount(() => {
+  // IIFE (Immediately Invoked Function Expression) for async execution
+  (async () => {
+    await tick(); // Wait for Svelte's scheduler to complete
 
-```
-1. Navigation → Component reused (SvelteKit optimization)
-2. Datagrid.onMount fires (Grid is new, even if Page is reused)
-3. Grid calls onQueryChange()
-4. Page.handleQueryChange() sets isLoading = true
-5. Grid receives loading={true} via prop
-6. Grid re-renders due to prop change
-7. ???
-8. Something triggers onMount again OR
-   Something updates a reactive dependency
-9. GOTO step 3 → LOOP!
-```
-
-The exact trigger for step 7-8 varied, but the pattern was:
-- **Multiple reactive signals** (Page's isLoading + Grid's internal state)
-- **Bidirectional coupling** (Grid → Page via callback, Page → Grid via prop)
-- **State persisting across navigation** (stale values causing wrong decisions)
-
-#### Attempted Fix #1: Global Loading State
-
-```javascript
-// ❌ BANDAID - doesn't solve root cause
-import { offeringLoadingState } from '$lib/api/client/offering';
-
-<OfferingReportGrid
-  loading={isLoading || $offeringLoadingState}  // "Defense in depth"
-/>
-```
-
-**Why this seemed to work:**
-- Global state provided a "circuit breaker"
-- If local state got stale, global state might save it
-
-**Why this is WRONG:**
-1. **Not generalizable:** What if Page loads multiple different API resources? Combine all their global states?
-2. **Symptom fix:** Doesn't address the architectural problem (split responsibility)
-3. **Adds complexity:** Now three sources of loading state (local, global, Grid's display)
-
----
-
-### Part 4: The Correct Solution - Autonomous Components
-
-#### Principle: Components Should Own Their Operations
-
-**Rule:** If a component **triggers** an async operation, it should **manage** the loading state for that operation.
-
-#### The Fix
-
-```javascript
-// Datagrid.svelte - FIXED
-let { onQueryChange, rows } = $props();  // ← NO loading prop!
-let isLoadingData = $state(false);  // ← Grid owns its loading state
-
-onMount(async () => {
-  if (onQueryChange) {
-    isLoadingData = true;  // ← Set before operation
+    isLoadingData = true;
     try {
-      await onQueryChange({ filters, sort });  // ← Await the operation
+      await onQueryChange?.({ filters, sort });
     } finally {
-      isLoadingData = false;  // ← Always clear (even on error)
+      isLoadingData = false;
     }
-  }
-});
+  })();
 
-// Grid shows spinner based on ITS OWN state
-{#if isLoadingData}
-  <div class="spinner"></div>
-{/if}
+  // Cleanup function (must be returned synchronously)
+  return () => {
+    isMounted = false;
+  };
+});
 ```
 
-```javascript
-// OfferingReportListPage.svelte - FIXED
-let resolvedOfferings = $state([]);
+**Why IIFE pattern:**
 
-// NO isLoading state for Grid! Grid manages its own.
+- `onMount` expects a synchronous function so it can register cleanup
+- We need async execution for `await tick()` and `await onQueryChange()`
+- Solution: Wrap async code in IIFE that executes immediately
+- Return cleanup function synchronously from outer `onMount`
 
-async function handleQueryChange(query) {
-  // Just load data, don't manage loading
-  resolvedOfferings = await offeringApi.load(query);
+**General Principle:** Use `await tick()` when you need to defer execution until Svelte's scheduler completes its current batch of updates. This is the Svelte-native way to handle timing, not `setTimeout`.
+
+**Reference Implementation:** `src/lib/components/grids/Datagrid.svelte:246-292`
+
+#### Root Cause #5: initialFilterValues Immutability
+
+**What we did wrong:**
+
+```typescript
+// Datagrid.svelte
+const initialFilterValues = savedState.filters
+  ? convertWhereToFilterValues(savedState.filters)
+  : null;
+
+function handleClearAllFilters() {
+  activeFilters.clear();
+  filterResetKey++; // Recreates filter components
+
+  await onQueryChange?.({ filters: null, sort });
 }
-
-// NO loading prop!
-<OfferingReportGrid
-  rows={resolvedOfferings}
-  onQueryChange={handleQueryChange}
-/>
 ```
 
-#### Why This Works
+**The problem:**
 
-**Single Responsibility:**
-- Grid triggers operation → Grid manages loading → Grid displays spinner
-- Page provides data source (`onQueryChange` callback)
-- Page updates data (`rows` prop)
-- **No coordination needed between Grid and Page for loading state**
+1. User has saved filters in localStorage: `{ name: "laptop", price: ">100" }`
+2. Grid loads, `initialFilterValues` Map contains these values
+3. Filter components initialize with these values → inputs show "laptop" and ">100"
+4. User clicks "Clear all filters"
+5. `activeFilters.clear()` → backend query has no filters ✅
+6. `filterResetKey++` → Filter components destroyed and recreated
+7. BUT `initialFilterValues` Map still contains `{ name: "laptop", price: ">100" }`
+8. New filter components initialize with `initialValue` from this Map
+9. Input fields show "laptop" and ">100" even though data is unfiltered ❌
 
-**No Reactive Cycles:**
-- Grid's `isLoadingData` is independent of Page's state
-- Grid's `await onQueryChange()` naturally sequences the operation
-- No bidirectional coupling
+**The fix:**
 
-**Navigation-Resilient:**
-- Even if Page component reuses and has stale state, Grid always starts fresh when IT mounts
-- Grid's `onMount` is the single source of truth for initialization
+```typescript
+// initialFilterValues must be $state so it can be cleared
+let initialFilterValues = $state<Map<string, any> | null>(
+  savedState.filters ? convertWhereToFilterValues(savedState.filters) : null
+);
 
-#### When Page Needs Its Own Loading
+function handleClearAllFilters() {
+  activeFilters.clear();
 
-```javascript
-// Page loading multiple resources
-let isPageLoading = $state(false);
-let supplier = $state(null);
-let categories = $state([]);
+  // CRITICAL: Clear initial values BEFORE recreating components
+  initialFilterValues = null;
+  filterResetKey++;
 
-$effect(() => {
-  isPageLoading = true;
-  try {
-    const [s, c] = await Promise.all([
-      supplierApi.load(id),
-      categoryApi.loadFor(id)
-    ]);
-    supplier = s;
-    categories = c;
-  } finally {
-    isPageLoading = false;
-  }
-});
-
-// Page can show ITS loading overlay
-{#if isPageLoading}
-  <div class="page-spinner"></div>
-{:else}
-  <SupplierDetails {supplier} />
-  <Datagrid rows={categories} />
-  <!--  ↑ Grid has ITS OWN loading, independent of page -->
-{/if}
+  await onQueryChange?.({ filters: null, sort });
+}
 ```
 
-**Separation of Concerns:**
-- `isPageLoading`: For Page-level operations (loading master data)
-- `Datagrid.isLoadingData`: For Grid-level operations (loading/sorting grid data)
-- **No conflation, no coordination**
+**Why this works:**
+
+- Setting `initialFilterValues = null` clears the Map
+- THEN `filterResetKey++` destroys and recreates filter components
+- New components receive `initialValue={undefined}` from the now-null Map
+- Input fields are empty ✅
+
+**General Principle:** When using `{#key}` to force component recreation, ensure initial values are cleared/updated BEFORE incrementing the key. Otherwise recreated components will receive stale initialization data.
+
+**Reference Implementation:** `src/lib/components/grids/Datagrid.svelte:190-193, 567`
 
 ---
 
-### Part 5: Generalizable Patterns
+### Part 5: Component-Owned Loading State Pattern
 
-#### Pattern 1: Component-Owned Async State
+This is the architectural principle that solved the original coordination problem in Part 3.
 
-**When a component triggers async work:**
+#### The Principle
 
-```javascript
-// ✅ CORRECT
+**Rule:** The component that triggers an async operation should own the loading state for that operation.
+
+#### Anti-Pattern: Split Responsibility
+
+```typescript
+// ❌ WRONG - Page manages loading for Grid's operation
+// Page.svelte
 let isLoading = $state(false);
 
-async function doWork() {
+async function handleQueryChange(query) {
   isLoading = true;
   try {
-    await someAsyncOperation();
+    const data = await api.load(query);
+    rows = data;
   } finally {
-    isLoading = false;  // Guaranteed cleanup
+    isLoading = false;
   }
 }
 
-{#if isLoading}<spinner />{/if}
+<Grid loading={isLoading} onQueryChange={handleQueryChange} />
+
+// Grid.svelte
+let { loading, onQueryChange } = $props();
+
+onMount(() => {
+  onQueryChange({ filters, sort }); // Triggers parent's function
+});
+
+{#if loading}<spinner />{/if}
 ```
 
-**Don't pass loading as prop IF component controls the operation.**
+**Problem:** Grid triggers the operation but doesn't control the loading state. This creates:
+- Coordination complexity (Grid must wait for Page to update `loading`)
+- Bidirectional coupling (Grid → Page via callback, Page → Grid via prop)
+- Navigation issues (stale state across route changes)
 
-#### Pattern 2: Parent-Owned Async State (When Appropriate)
+#### Correct Pattern: Component-Owned State
 
-**When parent loads data for child to display:**
+```typescript
+// ✅ CORRECT - Grid owns both trigger AND state
+// Grid.svelte
+let { onQueryChange } = $props();
+let isLoadingData = $state(false); // Grid owns this
 
-```javascript
-// Parent loads, child displays
+onMount(() => {
+  (async () => {
+    await tick();
+
+    isLoadingData = true;
+    try {
+      await onQueryChange?.({ filters, sort });
+    } finally {
+      isLoadingData = false; // Always cleared, even on error
+    }
+  })();
+});
+
+{#if isLoadingData}<spinner />{/if}
+```
+
+**Benefits:**
+
+- **Single responsibility:** Grid controls when to load, when to show spinner
+- **Navigation-resilient:** Fresh state on every mount
+- **No coordination:** Page just provides callback, doesn't manage Grid's lifecycle
+
+#### When Parent Loading State is OK
+
+```typescript
+// Parent loads data, child is purely presentational
 let data = $state(null);
 let isLoading = $state(false);
 
@@ -1787,17 +2079,16 @@ onMount(async () => {
   }
 });
 
-// Child is PASSIVE - just displays
+// Child is PASSIVE - just displays what parent loaded
 <DisplayComponent {data} {isLoading} />
 ```
 
-**Use `loading` prop when child is purely presentational.**
+**Use `loading` prop when child is purely presentational and doesn't trigger its own data loading.**
 
-#### Pattern 3: Derived Loading States
+#### Multiple Loading States in Complex Pages
 
-**For complex scenarios with multiple operations:**
-
-```javascript
+```typescript
+// Complex page with multiple independent operations
 let loadingSupplier = $state(false);
 let loadingCategories = $state(false);
 let loadingOrders = $state(false);
@@ -1807,59 +2098,109 @@ let isAnyLoading = $derived(
   loadingSupplier || loadingCategories || loadingOrders
 );
 
-// Display page-level spinner
-{#if isAnyLoading}<spinner />{/if}
+// Show page-level spinner only if something is loading
+{#if isAnyLoading}
+  <div class="page-spinner"></div>
+{:else}
+  <SupplierDetails {supplier} />
+  <CategoryGrid rows={categories} /> <!-- Has ITS OWN loading state -->
+  <OrderGrid rows={orders} />         <!-- Has ITS OWN loading state -->
+{/if}
 ```
 
-**Composition over global state.**
+**Separation of Concerns:**
+- Page loading: For initial data needed to show page structure
+- Grid loading: For Grid's own operations (filtering, sorting, pagination)
+- **No conflation**
 
-#### Pattern 4: Avoid State in $effect (Usually)
+---
 
-```javascript
-// ❌ AVOID - creates dependency
-$effect(() => {
-  isLoading = somethingElse;  // isLoading becomes reactive to somethingElse
-});
+### Part 6: Best Practices Summary
 
-// ✅ PREFER - explicit control
-$derived somethingElse;  // For pure computation
-// OR
-async function handleEvent() {  // For operations
-  isLoading = true;
-  // ...
-}
-```
+#### Filter Implementation Checklist
 
-**Only set state in $effect when:**
-- You're syncing to external data (props, stores)
-- You have explicit guards to prevent cycles
-- You understand the dependency graph
+- [ ] Use one-way binding `{value}`, NOT `bind:value`, for inputs with external initial values
+- [ ] Set initial value in script during variable initialization, NOT in `onMount`
+- [ ] Call `onChange` immediately when user types, do NOT debounce in filter component
+- [ ] Guard variables (`isReady`, `isMounted`) should be plain `let`, NOT `$state`
+
+#### Grid Configuration Checklist
+
+- [ ] Column definitions in module-level `.columns.ts` file (separate from component)
+- [ ] Export `getId`, `deleteStrategy`, etc. from same module-level file
+- [ ] Parent creates stable reference to `onQueryChange` callback
+- [ ] Centralized debouncing in Datagrid (300ms), not in filters
+
+#### State Management Rules
+
+- [ ] Component-owned loading state for operations the component triggers
+- [ ] Use `await tick()` in `onMount` for initialization timing
+- [ ] IIFE pattern for async code inside sync `onMount` function
+- [ ] Always provide cleanup function in `onMount` return
+
+#### Common Anti-Patterns to Avoid
+
+**Don't:**
+- ❌ Use `bind:value` for inputs initialized with props/localStorage/URL params
+- ❌ Make guard flags reactive with `$state` (use plain `let`)
+- ❌ Manually toggle DOM element state with `!value` (read from DOM instead)
+- ❌ Debounce at leaf component level (debounce at orchestrator level)
+- ❌ Define columns/config objects at component level (use module level)
+- ❌ Use `setTimeout` for Svelte timing (use `await tick()`)
+- ❌ Use `const` for values that need runtime clearing (use `$state`)
+
+**Do:**
+- ✅ Use one-way binding with manual event handlers for controlled inputs
+- ✅ Guard initialization events with non-reactive flags
+- ✅ Read DOM state as source of truth for elements with internal state
+- ✅ Report changes immediately from leaf components, debounce in parent
+- ✅ Stable references for configuration via module-level exports
+- ✅ Coordinate with Svelte's scheduler using `await tick()`
+- ✅ Make values reactive when they need runtime updates
+
+---
+
+### Part 7: Reference Implementation
+
+**Filter Components:**
+- `src/lib/components/grids/filters/TextFilter.svelte` - One-way binding pattern
+- `src/lib/components/grids/filters/NumberFilter.svelte` - One-way binding with operator selection
+- `src/lib/components/grids/filters/BooleanFilter.svelte` - Select element with one-way binding
+
+**Datagrid Core:**
+- `src/lib/components/grids/Datagrid.svelte:246-292` - onMount with await tick() and IIFE pattern
+- `src/lib/components/grids/Datagrid.svelte:224-244` - Centralized debouncing implementation
+- `src/lib/components/grids/Datagrid.svelte:568-582` - filterToggle guard pattern
+- `src/lib/components/grids/Datagrid.svelte:190-193, 567` - initialFilterValues as $state
+
+**Grid Configuration:**
+- `src/lib/components/domain/reports/offerings/OfferingReportGrid.columns.ts` - Module-level exports for stable references
 
 ---
 
 ### Key Takeaways
 
-1. **Svelte 5's reactivity is powerful but requires understanding dependencies**
-   - Every read in a reactive context creates a subscription
-   - Every write notifies subscribers
-   - Cycles are easy to create accidentally
+1. **Svelte 5's reactivity requires understanding dependencies**
+   - Every READ in a reactive context creates a subscription
+   - Every WRITE notifies subscribers
+   - Reactive cycles are easy to create accidentally
 
 2. **Component ownership matters**
-   - Component that triggers operation should own its loading state
-   - Don't split responsibility across parent/child boundaries unnecessarily
+   - Component that triggers an operation should own its loading state
+   - Don't split responsibility across parent/child unnecessarily
 
-3. **SvelteKit component reuse is an optimization with tradeoffs**
+3. **SvelteKit component reuse is an optimization with consequences**
    - Components must handle prop changes without re-initialization
    - Use `$derived` or `$effect` to react to prop changes
-   - Don't rely on `onMount` for updates
+   - Don't rely on `onMount` for navigation updates
 
 4. **Avoid global state as a band-aid**
    - Global state can mask architectural problems
-   - Fix root cause (responsibility split) instead of adding "circuit breakers"
+   - Fix root cause (split responsibility) instead of adding "circuit breakers"
 
 5. **Guard against reactive cycles**
-   - Be careful when setting state inside `$effect`
+   - Be careful setting state inside `$effect`
    - Use `untrack()` when reading without subscribing
    - Prefer `$derived` for pure computations
 
-This pattern - component-owned async state - is the foundation for building robust, navigation-resilient Svelte 5 applications.
+This pattern - component-owned async state with proper initialization guards - is the foundation for building robust, navigation-resilient Svelte 5 applications.

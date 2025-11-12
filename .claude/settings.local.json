@@ -23,7 +23,8 @@
       "WebFetch(domain:mainmatter.com)",
       "WebFetch(domain:joyofcode.xyz)",
       "WebFetch(domain:frontendmasters.com)",
-      "WebFetch(domain:imfeld.dev)"
+      "WebFetch(domain:imfeld.dev)",
+      "WebFetch(domain:code.claude.com)"
     ],
     "deny": [],
     "ask": []

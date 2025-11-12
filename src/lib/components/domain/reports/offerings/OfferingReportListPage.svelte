@@ -30,6 +30,8 @@
   } from "$lib/backendQueries/queryGrammar";
   import type { OfferingReportViewWithLinks } from "$lib/domain/domainTypes";
   import { log } from "$lib/utils/logger";
+  import { addNotification } from "$lib/stores/notifications";
+  import { getErrorMessage } from "$lib/api/client/common";
 
   type Props = {
     data: {
@@ -69,6 +71,10 @@
         rawWhere  // Pass rawWhere to API
       );
       log.info(`[OfferingReportListPage] Received ${resolvedOfferings.length} offerings`);
+    } catch (err) {
+      const message = getErrorMessage(err);
+      addNotification(`Failed to load offerings: ${message}`, "error");
+      log.error("[OfferingReportListPage] Failed to load offerings", { error: err });
     } finally {
       isLoading = false;
     }

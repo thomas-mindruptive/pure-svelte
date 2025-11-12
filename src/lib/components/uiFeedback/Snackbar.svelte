@@ -22,7 +22,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-    z-index: 9999;
+    z-index: 99999; /* Higher than dialog elements (10000+) */
   }
   .snackbar {
     padding: 1rem 2rem;

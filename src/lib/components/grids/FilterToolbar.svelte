@@ -149,7 +149,8 @@
         </button>
       </div>
       <div class="superuser-where-help">
-        Allowed columns: wioId, wioTitle, wioPrice, wsName, pdefTitle, catName, ptName, etc.
+        <strong>Allowed columns (copy & paste):</strong><br>
+        wioId, wioTitle, wioPrice, wioSize, wioDimensions, wioWeightGrams, wioComment, wioMaterialName, wioFormName, wioConstrTypeName, wioSurfFinishName, wsId, wsName, pdefId, pdefTitle, pdefMatName, pdefFormName, pdConstrTypeName, pdSurfFinName, pcId, catName, ptId, ptName
       </div>
     </div>
   {/if}

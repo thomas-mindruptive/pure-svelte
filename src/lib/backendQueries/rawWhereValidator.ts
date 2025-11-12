@@ -85,8 +85,8 @@ export function validateRawWhere(rawWhere: string): void {
   for (const match of matches) {
     const columnName = match[1];
     if (!ALLOWED_COLUMNS.has(columnName)) {
-      log.error(`[RAW WHERE VALIDATION] Unknown column: ${columnName}`);
-      throw error(400, `Column '${columnName}' is not allowed. Allowed columns: ${Array.from(ALLOWED_COLUMNS).join(', ')}`);
+      log.error(`[RAW WHERE VALIDATION] Unknown column: ${columnName}. Allowed columns: ${Array.from(ALLOWED_COLUMNS).join(', ')}`);
+      throw error(400, `Column '${columnName}' is not allowed. Check the allowed columns list in the filter toolbar.`);
     }
   }
 

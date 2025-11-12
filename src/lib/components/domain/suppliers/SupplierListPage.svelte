@@ -35,7 +35,7 @@
   // === STATE ====================================================================================
 
   let resolvedSuppliers = $state<Wholesaler[]>([]);
-  let isLoading = $state(false); // Start with false - Datagrid will trigger loading
+  let isLoading = $state(false); // Page-level loading for error handling
   let loadingOrValidationError = $state<{
     message: string;
     status: number;
@@ -92,11 +92,8 @@
   }) {
     log.info(`(SupplierListPage) Query change - filters:`, query.filters, `sort:`, query.sort);
 
-    // Page tracks loading for error handling (Grid has its own loading state)
     isLoading = true;
     loadingOrValidationError = null;
-    // DON'T clear resolvedSuppliers = [] - causes Grid to re-render and triggers loop!
-    // Keep old data visible until new data arrives
 
     try {
       resolvedSuppliers = await supplierApi.loadSuppliersWithWhereAndOrder(query.filters, query.sort);
@@ -142,9 +139,13 @@
     </div>
   {:else}
     <div class="grid-section">
+      {#if isLoading && resolvedSuppliers.length === 0}
+        <p class="loading-message">Loading suppliers...</p>
+      {/if}
       <button
         class="pc-grid__createbtn"
         onclick={handleSupplierCreate}
+        disabled={isLoading}
       >
         Create Supplier
       </button>

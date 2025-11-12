@@ -27,47 +27,27 @@
   type Props = {
     columnKey: string;
     columnHeader: string;
-    resetKey: number;  // Increment to clear this filter
     initialValue?: any;  // For UI state restore from localStorage
     onChange: (condition: WhereCondition<any> | null) => void;
   };
 
-  let { columnKey, columnHeader, resetKey, initialValue, onChange }: Props = $props();
+  let { columnKey, columnHeader, initialValue, onChange }: Props = $props();
 
   let value = $state<'all' | 'true' | 'false'>('all');
   const selectId = `filter-boolean-${columnKey}`;
-  let hasInitialized = false;
 
-  /**
-   * Mount effect: Set initial value from localStorage restore.
-   * This runs once on mount to populate the dropdown with saved filter value.
-   */
-  $effect(() => {
-    if (!hasInitialized && initialValue !== undefined) {
-      // Convert boolean to 'true'/'false' string for dropdown
-      value = initialValue === true ? 'true' : initialValue === false ? 'false' : 'all';
-      hasInitialized = true;
-    }
-  });
+  // Set initial value ONCE during initialization - NO event triggered
+  if (initialValue === true) {
+    value = 'true';
+  } else if (initialValue === false) {
+    value = 'false';
+  }
 
-  /**
-   * Reset effect: Returns dropdown to "All" when resetKey changes.
-   */
-  $effect(() => {
-    resetKey; // Track resetKey
-    value = 'all';
-    hasInitialized = false;
-  });
+  function handleChange(event: Event) {
+    // 1. Update state from DOM
+    value = (event.target as HTMLSelectElement).value as 'all' | 'true' | 'false';
 
-  /**
-   * Handles dropdown selection changes.
-   * Triggers immediately (no debounce) since dropdown changes are deliberate.
-   *
-   * Behavior:
-   * - "All": Clears filter (sends null to DataGrid2)
-   * - "Yes"/"No": Creates EQUALS condition with boolean value
-   */
-  function handleChange() {
+    // 2. Notify parent
     if (value === 'all') {
       log.debug(`[BooleanFilter] ${columnKey}: Clearing filter`);
       onChange(null);
@@ -85,7 +65,7 @@
 
 <div class="filter-input">
   <label for={selectId}>{columnHeader}</label>
-  <select id={selectId} bind:value onchange={handleChange}>
+  <select id={selectId} {value} onchange={handleChange}>
     <option value="all">All</option>
     <option value="true">Yes</option>
     <option value="false">No</option>

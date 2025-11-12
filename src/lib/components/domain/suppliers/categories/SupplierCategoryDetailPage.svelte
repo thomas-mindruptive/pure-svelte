@@ -14,7 +14,7 @@
   import OfferingGrid from "$lib/components/domain/offerings/OfferingGrid.svelte";
 
   // API & Type Imports
-  import { categoryLoadingState, getCategoryApi } from "$lib/api/client/category";
+  import { getCategoryApi } from "$lib/api/client/category";
   import type { Wio_PDef_Cat_Supp } from "$lib/domain/domainTypes";
   import { ApiClient } from "$lib/api/client/apiClient";
   import type { ID, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
@@ -201,7 +201,6 @@
       </button>
       <OfferingGrid
         rows={resolvedData.offerings}
-        loading={$categoryLoadingState}
         {deleteStrategy}
         {rowActionStrategy}
       />

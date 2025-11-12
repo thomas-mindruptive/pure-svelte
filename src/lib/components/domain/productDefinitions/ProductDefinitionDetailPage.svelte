@@ -3,8 +3,8 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import { ApiClient } from "$lib/api/client/apiClient";
-  import { getOfferingApi, offeringLoadingState } from "$lib/api/client/offering";
-  import { getProductDefinitionImageApi, productDefinitionImageLoadingState } from "$lib/api/client/productDefinitionImage";
+  import { getOfferingApi } from "$lib/api/client/offering";
+  import { getProductDefinitionImageApi } from "$lib/api/client/productDefinitionImage";
   import type { ColumnDef, DeleteStrategy, ID, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
   import {
     FormSchema,
@@ -444,7 +444,6 @@
       </button>
       <OfferingGrid
         rows={offerings}
-        loading={$offeringLoadingState}
         {deleteStrategy}
         {rowActionStrategy}
         onSort={handleOfferingsSort}
@@ -472,7 +471,6 @@
         rows={images}
         columns={imagesColumns}
         getId={getImageRowId}
-        loading={$productDefinitionImageLoadingState}
         gridId="images"
         entity="image"
         deleteStrategy={imagesDeleteStrategy}

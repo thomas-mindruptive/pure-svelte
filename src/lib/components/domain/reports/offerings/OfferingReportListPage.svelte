@@ -70,6 +70,9 @@
 
 <div class="page-container">
   <h1>Offerings Report</h1>
+  {#if isLoading && resolvedOfferings.length === 0}
+    <p class="loading-message">Loading offerings...</p>
+  {/if}
   <OfferingReportGrid
     rows={resolvedOfferings}
     onQueryChange={handleQueryChange}

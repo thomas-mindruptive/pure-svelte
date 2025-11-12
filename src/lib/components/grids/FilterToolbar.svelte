@@ -95,37 +95,37 @@
   </div>
 
   <div class="filter-inputs">
-    {#each columns as col}
+    {#each columns as col (col.key)}
       {#if isFilterableColumn(col) && col.filterable}
         {@const filterType = detectFilterType(col)}
         {@const initialValues = initialFilterValues?.get(col.key)}
 
-        {#if filterType === 'text'}
-          <TextFilter
-            columnKey={col.key}
-            columnHeader={col.header}
-            resetKey={filterResetKey}
-            initialValue={initialValues?.value}
-            onChange={(condition) => onFilterChange(col.key, condition)}
-          />
-        {:else if filterType === 'number'}
-          <NumberFilter
-            columnKey={col.key}
-            columnHeader={col.header}
-            resetKey={filterResetKey}
-            initialValue={initialValues?.value}
-            initialOperator={initialValues?.operator}
-            onChange={(condition) => onFilterChange(col.key, condition)}
-          />
-        {:else if filterType === 'boolean'}
-          <BooleanFilter
-            columnKey={col.key}
-            columnHeader={col.header}
-            resetKey={filterResetKey}
-            initialValue={initialValues?.value}
-            onChange={(condition) => onFilterChange(col.key, condition)}
-          />
-        {/if}
+        <!-- CRITICAL: {#key} forces complete recreation on reset, no $effect needed in filters -->
+        {#key filterResetKey}
+          {#if filterType === 'text'}
+            <TextFilter
+              columnKey={col.key}
+              columnHeader={col.header}
+              initialValue={initialValues?.value}
+              onChange={(condition) => onFilterChange(col.key, condition)}
+            />
+          {:else if filterType === 'number'}
+            <NumberFilter
+              columnKey={col.key}
+              columnHeader={col.header}
+              initialValue={initialValues?.value}
+              initialOperator={initialValues?.operator}
+              onChange={(condition) => onFilterChange(col.key, condition)}
+            />
+          {:else if filterType === 'boolean'}
+            <BooleanFilter
+              columnKey={col.key}
+              columnHeader={col.header}
+              initialValue={initialValues?.value}
+              onChange={(condition) => onFilterChange(col.key, condition)}
+            />
+          {/if}
+        {/key}
       {/if}
     {/each}
   </div>

@@ -17,7 +17,6 @@
 
   export type LinkGridProps = {
     rows: WholesalerOfferingLink[];
-    loading?: boolean;
     deleteStrategy: DeleteStrategy<WholesalerOfferingLink>;
     // We navigate to the link externally!
       //rowActionStrategy?: RowActionStrategy<WholesalerOfferingLink>;
@@ -25,7 +24,6 @@
 
   const {
     rows = [] as WholesalerOfferingLink[],
-    loading = false,
     deleteStrategy,
   }:LinkGridProps = $props();
 
@@ -70,7 +68,6 @@
   {rows}
   {columns}
   {getId}
-  {loading}
   gridId="links"
   entity="link"
   {deleteStrategy}

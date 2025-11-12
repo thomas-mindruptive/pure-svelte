@@ -86,7 +86,6 @@
     // Reset state before loading
     isLoading = true;
     loadingOrValidationError = null;
-    // DON'T clear resolvedOrders = [] - causes Grid to re-render and triggers loop!
 
     try {
       const orders = await orderApi.loadOrderWholesalersWithWhereAndOrder(
@@ -154,9 +153,13 @@
     </div>
   {:else}
     <div class="grid-section">
+      {#if isLoading && resolvedOrders.length === 0}
+        <p class="loading-message">Loading orders...</p>
+      {/if}
       <button
         class="pc-grid__createbtn"
         onclick={handleOrderCreate}
+        disabled={isLoading}
       >
         Create Order
       </button>

@@ -8,13 +8,12 @@
 
   export type Props = {
     rows: ProductDefinition[];
-    loading?: boolean;
     selection?: "none" | "single" | "multiple";
     deleteStrategy: DeleteStrategy<ProductDefinition>;
     rowActionStrategy?: RowActionStrategy<ProductDefinition>;
   };
 
-  const { rows = [], loading = false, selection = "multiple", deleteStrategy, rowActionStrategy }: Props = $props();
+  const { rows = [], selection = "multiple", deleteStrategy, rowActionStrategy }: Props = $props();
 
   // === COLUMNS ====================================================================================
 
@@ -40,7 +39,6 @@
   {rows}
   {columns}
   {getId}
-  {loading}
   {selection}
   gridId="product defintions"
   entity="product definition"

@@ -269,7 +269,6 @@
         </button>
         <CategoryProductDefsGrid
           rows={resolvedData.productDefinitions}
-          loading={$categoryLoadingState}
           {deleteStrategy}
           {rowActionStrategy}
         />

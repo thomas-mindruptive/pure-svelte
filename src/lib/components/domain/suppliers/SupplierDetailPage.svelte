@@ -15,7 +15,7 @@
   import "$lib/components/styles/grid-section.css";
   // API & Type Imports
   import { ApiClient } from "$lib/api/client/apiClient";
-  import { categoryLoadingState, getCategoryApi } from "$lib/api/client/category";
+  import { getCategoryApi } from "$lib/api/client/category";
   import { getSupplierApi, supplierLoadingState } from "$lib/api/client/supplier";
   import type { ColumnDef, DeleteStrategy, ID, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
   import type { SortDescriptor } from "$lib/backendQueries/queryGrammar";
@@ -392,7 +392,6 @@
       <!-- <refact01> CHANGED: Use CategoryGrid component (supports sorting) -->
       <CategoryGrid
         rows={categories}
-        loading={$categoryLoadingState}
         deleteStrategy={categoriesDeleteStrategy}
         rowActionStrategy={categoriesRowActionStrategy}
         onSort={handleCategoriesSort}
@@ -418,7 +417,6 @@
         rows={orders}
         columns={ordersColumns}
         getId={getOrdersRowId}
-        loading={isLoading}
         gridId="orders"
         entity="order"
         deleteStrategy={ordersDeleteStrategy}

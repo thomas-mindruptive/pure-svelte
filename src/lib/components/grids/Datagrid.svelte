@@ -30,7 +30,8 @@
   import FilterToolbar from './FilterToolbar.svelte';
   import { SvelteMap } from 'svelte/reactivity';
   import { createGridState } from '$lib/stores/gridState';
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
+  import { debounce } from 'lodash-es';
 
   // ===== PROP TYPES =====
 
@@ -184,11 +185,11 @@
   let combineMode = $state<'AND'|'OR'>(filterCombineMode);
   let filterResetKey = $state(0);
   let filterExpanded = $state(savedState.ui.filterExpanded ?? true);
+  let filterToggleReady = false;  // Guard: prevent ontoggle during initial render
 
-  // Initial filter values for UI restore
-  let initialFilterValues = $state<Map<string, {operator: any, value: any}> | null>(
-    savedState.filters ? convertWhereToFilterValues(savedState.filters) : null
-  );
+  // Initial filter values for UI restore (NOT $state - never changes after mount!)
+  const initialFilterValues: Map<string, {operator: any, value: any}> | null =
+    savedState.filters ? convertWhereToFilterValues(savedState.filters) : null;
 
   // Rebuild activeFilters Map from saved state (for backend queries)
   if (savedState.filters) {
@@ -203,38 +204,91 @@
     }
   }
 
+  /**
+   * CENTRALIZED DEBOUNCE for all filter changes
+   *
+   * Why centralized?
+   * - If user types in multiple filters quickly, we want ONE load after 300ms
+   * - Individual filter debouncing would cause multiple loads (one per filter)
+   * - Datagrid orchestrates all filters → debounce at orchestrator level
+   *
+   * What gets debounced?
+   * - handleFilterChange: User typing in text/number filters
+   * - handleCombineModeToggle: User switching AND/OR mode
+   *
+   * What stays immediate (NOT debounced)?
+   * - handleClearAllFilters: User expects instant clear
+   * - handleSort: User expects instant sort response
+   */
+  let isMounted = false;  // NOT $state - just a guard flag to prevent calls after unmount
+
+  // CRITICAL: Store stable reference to onQueryChange to prevent re-renders
+  // Problem: Parent re-creates onQueryChange function → new reference → prop change → re-render → Loop
+  // Solution: Capture onQueryChange once, use captured version, ignore prop updates
+  let stableOnQueryChange = onQueryChange;
+
+  const debouncedQueryChange = debounce(async (
+    filters: WhereCondition<T> | WhereConditionGroup<T> | null,
+    sort: SortDescriptor<T>[] | null
+  ) => {
+    if (!isMounted) return;  // Don't call if component unmounted
+
+    isLoadingData = true;
+    try {
+      await stableOnQueryChange?.({ filters, sort });
+    } finally {
+      if (isMounted) {  // Only update state if still mounted
+        isLoadingData = false;
+      }
+    }
+  }, 300);
+
   // Restore saved query state OR trigger initial load after component mount
   onMount(() => {
+    console.log(`[Datagrid ${gridId}] MOUNT`);
+    isMounted = true;  // Mark as mounted
+
     // ALWAYS call onQueryChange if it exists
     // This is the ONLY place that triggers data loading
-    if (onQueryChange) {
-      let aborted = false;
+    if (stableOnQueryChange) {
+      // Run async code in IIFE to avoid Promise return issues
+      (async () => {
+        // CRITICAL: Wait for Svelte to fully stabilize
+        await tick();  // Wait for current render cycle to complete
 
-      // CRITICAL: Use setTimeout to decouple from onMount lifecycle
-      // Without this, calling onQueryChange changes parent state DURING child mount
-      // → Parent re-renders while child is still mounting → Grid recreates → LOOP!
-      const timeoutId = setTimeout(async () => {
-        if (aborted) return;  // Component unmounted before timeout fired
+        if (!isMounted) return;  // Component unmounted during tick
 
+        // Call stableOnQueryChange directly (NOT debounced) for initial load
         isLoadingData = true;
         try {
-          await onQueryChange({
+          await stableOnQueryChange({
             filters: savedState.filters || null,
             sort: savedState.sort || null
           });
         } finally {
-          if (!aborted) {
+          if (isMounted) {
             isLoadingData = false;  // Always clear, even on error
           }
         }
-      }, 0);  // 0ms = run after current render cycle completes
 
-      // Cleanup: prevent state updates on unmounted component
-      return () => {
-        aborted = true;
-        clearTimeout(timeoutId);
-      };
+        // CRITICAL: Enable filter toggle AFTER initial render + data load complete
+        // Prevents ontoggle event during <details open={filterExpanded}> initialization
+        filterToggleReady = true;
+        console.log(`[Datagrid ${gridId}] filterToggleReady=true - toggle events now allowed`);
+      })();
+    } else {
+      // No onQueryChange provided, still need to enable toggle after mount
+      filterToggleReady = true;
+      console.log(`[Datagrid ${gridId}] filterToggleReady=true (no onQueryChange)`);
     }
+
+    // Cleanup: prevent state updates on unmounted component + cancel pending debounced calls
+    return () => {
+      console.log(`[Datagrid ${gridId}] UNMOUNT`);
+      isMounted = false;  // Mark as unmounted
+      filterToggleReady = false;  // Reset guard
+      debouncedQueryChange.cancel();  // Cancel any pending debounced calls
+    };
   });
 
   // ===== MORE UTILITY FUNCTIONS =====
@@ -487,15 +541,8 @@
 
     stateManager.saveFilters(whereGroup);
 
-    isLoadingData = true;
-    try {
-      await onQueryChange?.({
-        filters: whereGroup,
-        sort: sortState.length > 0 ? sortState : null
-      });
-    } finally {
-      isLoadingData = false;
-    }
+    // Use debounced version - waits 300ms after last filter change
+    debouncedQueryChange(whereGroup, sortState.length > 0 ? sortState : null);
   }
 
   async function handleCombineModeToggle() {
@@ -506,15 +553,8 @@
 
     stateManager.saveFilters(whereGroup);
 
-    isLoadingData = true;
-    try {
-      await onQueryChange?.({
-        filters: whereGroup,
-        sort: sortState.length > 0 ? sortState : null
-      });
-    } finally {
-      isLoadingData = false;
-    }
+    // Use debounced version - waits 300ms after mode toggle
+    debouncedQueryChange(whereGroup, sortState.length > 0 ? sortState : null);
   }
 
   async function handleClearAllFilters() {
@@ -535,8 +575,19 @@
     }
   }
 
-  function handleFilterToggle() {
-    filterExpanded = !filterExpanded;
+  function handleFilterToggle(event: Event) {
+    // CRITICAL: Block during initial render to prevent loop
+    // The <details> element fires ontoggle when initially set with open={filterExpanded} from localStorage
+    if (!filterToggleReady) {
+      console.log(`[Datagrid ${gridId}] handleFilterToggle: BLOCKED during initial render`);
+      return;
+    }
+
+    // CRITICAL: Read state from DOM, don't toggle manually
+    // If we toggle (!filterExpanded), we might be out of sync with browser's internal state → loop
+    const detailsElement = event.target as HTMLDetailsElement;
+    filterExpanded = detailsElement.open;
+    console.log(`[Datagrid ${gridId}] handleFilterToggle: filterExpanded=${filterExpanded}`);
     stateManager.saveUI({ filterExpanded });
   }
 
@@ -774,23 +825,26 @@
 
   // ===== LIFECYCLE =====
 
-  $effect(() => {
-    const multiselect = selection === "multiple";
-    log.info("Grid mounted (via $effect)", {
-      component: "DataGrid",
-      gridId,
-      entity,
-      selection,
-      multiselect,
-      columns: (columns as ColumnDef<any>[]).map((c: ColumnDef<any>) => c.key),
-    });
-
-    if (!deleteStrategy || typeof deleteStrategy.execute !== "function") {
-      log.warn({ component: "DataGrid", gridId, entity }, "deleteStrategy.execute missing; delete actions will be disabled");
-    }
-
-    return () => {};
-  });
+  // DISABLED: This $effect was causing infinite loops!
+  // Problem: columns prop gets NEW reference on every parent render
+  // → $effect tracks columns → runs on every render → infinite loop
+  // $effect(() => {
+  //   const multiselect = selection === "multiple";
+  //   log.info("Grid mounted (via $effect)", {
+  //     component: "DataGrid",
+  //     gridId,
+  //     entity,
+  //     selection,
+  //     multiselect,
+  //     columns: (columns as ColumnDef<any>[]).map((c: ColumnDef<any>) => c.key),
+  //   });
+  //
+  //   if (!deleteStrategy || typeof deleteStrategy.execute !== "function") {
+  //     log.warn({ component: "DataGrid", gridId, entity }, "deleteStrategy.execute missing; delete actions will be deleted");
+  //   }
+  //
+  //   return () => {};
+  // });
 
   // ===== COMPUTED =====
 

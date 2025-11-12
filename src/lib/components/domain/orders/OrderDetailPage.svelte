@@ -330,7 +330,6 @@
             rows={orderItems!}
             {columns}
             {getId}
-            loading={isLoading}
             gridId="orderItems"
             entity="orderItem"
             {deleteStrategy}

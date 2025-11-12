@@ -67,7 +67,7 @@ INCLUDE_PATTERNS: List[str] = [
     "src/lib/components/grids**",
     "src/lib/components/domain/suppliers**",
     "src/lib/components/domain/reports**",
-    # "src/lib/components/test/**",
+    "src/lib/components/sideBarAndNav**",
     # "src/lib/components/styles/**",
     # "src/lib/utils/pathUtils.ts",
     # "src/lib/utils/pathUtils.types.ts",

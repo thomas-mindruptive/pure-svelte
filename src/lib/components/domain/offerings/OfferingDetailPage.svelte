@@ -28,7 +28,7 @@
   import { getFormApi } from "$lib/api/client/form";
   import { getConstructionTypeApi } from "$lib/api/client/constructionType";
   import { getSurfaceFinishApi } from "$lib/api/client/surfaceFinish";
-  import { getOfferingImageApi, offeringImageLoadingState } from "$lib/api/client/offeringImage";
+  import { getOfferingImageApi } from "$lib/api/client/offeringImage";
   import type { DeleteStrategy, ID, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
   import type {
     Attribute,
@@ -764,7 +764,6 @@
     {:else}
       <AttributeGrid
         rows={attributes}
-        loading={$offeringLoadingState}
         deleteStrategy={attributesDeleteStrategy}
       />
     {/if}
@@ -812,7 +811,6 @@
     {:else}
       <LinkGrid
         rows={links}
-        loading={$offeringLoadingState}
         deleteStrategy={linksDeleteStrategy}
       />
     {/if}
@@ -856,7 +854,6 @@
 
       <OfferingGrid
         rows={sourceOfferings}
-        loading={$offeringLoadingState}
         deleteStrategy={sourceOfferingsDeleteStrategy}
         rowActionStrategy={offeringsRowActionStrategy}
       >
@@ -956,7 +953,6 @@
         rows={images}
         columns={imagesColumns}
         getId={getImageRowId}
-        loading={$offeringImageLoadingState}
         gridId="images"
         entity="image"
         deleteStrategy={imagesDeleteStrategy}

@@ -81,7 +81,6 @@
     // Reset state before loading
     isLoading = true;
     loadingOrValidationError = null;
-    // DON'T clear resolvedCategories = [] - causes Grid to re-render and triggers loop!
 
     try {
       // API expects WhereConditionGroup | null, we have WhereCondition | WhereConditionGroup | null
@@ -134,9 +133,13 @@
     </div>
   {:else}
     <div class="grid-section">
+      {#if isLoading && resolvedCategories.length === 0}
+        <p class="loading-message">Loading categories...</p>
+      {/if}
       <button
         class="pc-grid__createbtn"
         onclick={handleCategoryCreate}
+        disabled={isLoading}
       >
         Create Category
       </button>

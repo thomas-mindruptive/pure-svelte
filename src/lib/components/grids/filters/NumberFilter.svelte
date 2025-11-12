@@ -17,91 +17,65 @@
    */
   import type { WhereCondition } from '$lib/backendQueries/queryGrammar';
   import { ComparisonOperator } from '$lib/backendQueries/queryGrammar';
-  import { debounce } from 'lodash-es';
   import { log } from '$lib/utils/logger';
 
   type Props = {
     columnKey: string;
     columnHeader: string;
-    resetKey: number;  // Increment to clear this filter
     initialValue?: any;  // For UI state restore from localStorage
     initialOperator?: ComparisonOperator;  // For UI state restore
     onChange: (condition: WhereCondition<any> | null) => void;
   };
 
-  let { columnKey, columnHeader, resetKey, initialValue, initialOperator, onChange }: Props = $props();
+  let { columnKey, columnHeader, initialValue, initialOperator, onChange }: Props = $props();
 
   let value = $state('');
-  let operator = $state<ComparisonOperator>(ComparisonOperator.EQUALS);
+  let operator = $state<ComparisonOperator>(initialOperator ?? ComparisonOperator.EQUALS);
   const selectId = `filter-number-op-${columnKey}`;
   const inputId = `filter-number-${columnKey}`;
-  let hasInitialized = false;
 
-  /**
-   * Mount effect: Set initial value and operator from localStorage restore.
-   * This runs once on mount to populate the input with saved filter values.
-   */
-  $effect(() => {
-    if (!hasInitialized && (initialValue !== undefined || initialOperator !== undefined)) {
-      if (initialValue !== undefined) {
-        value = String(initialValue);
-      }
-      if (initialOperator !== undefined) {
-        operator = initialOperator;
-      }
-      hasInitialized = true;
-    }
-  });
+  // Set initial value ONCE during initialization - NO event triggered
+  if (initialValue !== undefined) {
+    value = String(initialValue);
+  }
 
-  /**
-   * Reset effect: Clears input AND operator when resetKey changes.
-   * Unlike text filter, number filter has TWO UI states to reset.
-   */
-  $effect(() => {
-    resetKey; // Track resetKey
-    value = '';
-    operator = ComparisonOperator.EQUALS;
-    hasInitialized = false;
-  });
-
-  /**
-   * Debounced onChange handler.
-   * Waits 300ms after last change (value OR operator) before triggering filter.
-   *
-   * Note: Both number input and operator select call this via handleChange.
-   * Debouncing prevents rapid query triggers when user changes operator multiple times.
-   */
-  const debouncedOnChange = debounce((val: string, op: ComparisonOperator) => {
-    if (val === '') {
+  function update() {
+    if (value === '') {
       log.debug(`[NumberFilter] ${columnKey}: Clearing filter`);
       onChange(null);
     } else {
       const condition: WhereCondition<any> = {
         key: columnKey,
-        whereCondOp: op,
-        val: parseFloat(val)  // Converts string to number for SQL query
+        whereCondOp: operator,
+        val: parseFloat(value)
       };
       log.debug(`[NumberFilter] ${columnKey}: Setting filter`, condition);
       onChange(condition);
     }
-  }, 300);
+  }
 
-  function handleChange() {
-    debouncedOnChange(value, operator);
+  function handleInput(event: Event) {
+    value = (event.target as HTMLInputElement).value;
+    update();
+  }
+
+  function handleSelect(event: Event) {
+    operator = (event.target as HTMLSelectElement).value as ComparisonOperator;
+    update();
   }
 </script>
 
 <div class="filter-input">
   <label for={inputId}>{columnHeader}</label>
   <div class="number-filter">
-    <select id={selectId} bind:value={operator} onchange={handleChange} aria-label={`${columnHeader} comparison operator`}>
+    <select id={selectId} value={operator} onchange={handleSelect} aria-label={`${columnHeader} comparison operator`}>
       <option value={ComparisonOperator.EQUALS}>=</option>
       <option value={ComparisonOperator.GT}>&gt;</option>
       <option value={ComparisonOperator.LT}>&lt;</option>
       <option value={ComparisonOperator.GTE}>&gt;=</option>
       <option value={ComparisonOperator.LTE}>&lt;=</option>
     </select>
-    <input id={inputId} type="number" bind:value oninput={handleChange}/>
+    <input id={inputId} type="number" {value} oninput={handleInput}/>
   </div>
 </div>
 

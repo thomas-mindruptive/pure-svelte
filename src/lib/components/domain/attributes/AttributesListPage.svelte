@@ -74,7 +74,6 @@
     // Reset state before loading
     isLoading = true;
     loadingOrValidationError = null;
-    // DON'T clear resolvedAttributes = [] - causes Grid to re-render and triggers loop!
 
     try {
       // For now, loadAttributes doesn't support filters/sort, so we just load all
@@ -120,9 +119,13 @@
     </div>
   {:else}
     <div class="grid-section">
+      {#if isLoading && resolvedAttributes.length === 0}
+        <p class="loading-message">Loading attributes...</p>
+      {/if}
       <button
         class="pc-grid__createbtn"
         onclick={handleAttributeCreate}
+        disabled={isLoading}
       >
         Create Attribute
       </button>

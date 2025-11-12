@@ -100,14 +100,6 @@
     onRawWhereChange?.(trimmed);
   }
 
-  /**
-   * Clear raw WHERE clause
-   */
-  function clearRawWhere() {
-    rawWhereInput = "";
-    rawWhereActive = false;
-    onRawWhereChange?.(null);
-  }
 </script>
 
 <div class="filter-toolbar">
@@ -142,15 +134,12 @@
       ></textarea>
       <div class="superuser-where-actions">
         <button onclick={applyRawWhere} class="apply-raw-where-btn">
-          Apply Raw WHERE
+          Apply
         </button>
-        <button onclick={clearRawWhere} class="clear-raw-where-btn" disabled={!rawWhereActive}>
-          Clear
-        </button>
-      </div>
-      <div class="superuser-where-help">
-        <strong>Allowed columns (copy & paste):</strong><br>
-        wioId, wioTitle, wioPrice, wioSize, wioDimensions, wioWeightGrams, wioComment, wioMaterialName, wioFormName, wioConstrTypeName, wioSurfFinishName, wsId, wsName, pdefId, pdefTitle, pdefMatName, pdefFormName, pdConstrTypeName, pdSurfFinName, pcId, catName, ptId, ptName
+        <div class="superuser-where-help">
+          <strong>Allowed columns:</strong>
+          wioId, wioTitle, wioPrice, wioSize, wioDimensions, wioWeightGrams, wioComment, wioMaterialName, wioFormName, wioConstrTypeName, wioSurfFinishName, wsId, wsName, pdefId, pdefTitle, pdefMatName, pdefFormName, pdConstrTypeName, pdSurfFinName, pcId, catName, ptId, ptName
+        </div>
       </div>
     </div>
   {/if}
@@ -294,7 +283,8 @@
 
   .superuser-where-actions {
     display: flex;
-    gap: 0.5rem;
+    align-items: center;
+    gap: 1rem;
   }
 
   .apply-raw-where-btn {
@@ -311,28 +301,13 @@
     background: #f57c00;
   }
 
-  .clear-raw-where-btn {
-    padding: 0.5rem 1rem;
-    background: #f44336;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    font-weight: 500;
-    cursor: pointer;
-  }
-
-  .clear-raw-where-btn:hover:not(:disabled) {
-    background: #d32f2f;
-  }
-
-  .clear-raw-where-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
   .superuser-where-help {
     font-size: 0.75rem;
     color: #666;
-    font-style: italic;
+    flex: 1;
+  }
+
+  .superuser-where-help strong {
+    font-weight: 600;
   }
 </style>

@@ -349,118 +349,118 @@ export async function copyLinksForOffering(
   return linkCount;
 }
 
-export async function loadFlatOfferingsWithJoinsAndLinks(
-  transaction: Transaction,
-  aWhere?: WhereConditionGroup<WholesalerItemOffering> | WhereCondition<WholesalerItemOffering>,
-  aOrderBy?: SortDescriptor<WholesalerItemOffering>[],
-  aLimit?: number,
-  aOffset?: number,
-): Promise<any[]> {
-  assertDefined(transaction, "transaction");
+// export async function loadFlatOfferingsWithJoinsAndLinks(
+//   transaction: Transaction,
+//   aWhere?: WhereConditionGroup<WholesalerItemOffering> | WhereCondition<WholesalerItemOffering>,
+//   aOrderBy?: SortDescriptor<WholesalerItemOffering>[],
+//   aLimit?: number,
+//   aOffset?: number,
+// ): Promise<any[]> {
+//   assertDefined(transaction, "transaction");
 
-  const ctx: BuildContext = {
-    parameters: {},
-    paramIndex: 0,
-  };
+//   const ctx: BuildContext = {
+//     parameters: {},
+//     paramIndex: 0,
+//   };
 
-  let whereClause = "";
-  if (aWhere) {
-    whereClause = `WHERE ${buildWhereClause(aWhere, ctx, true)}`; // hasJoins = true (we use JOINs)
-  }
+//   let whereClause = "";
+//   if (aWhere) {
+//     whereClause = `WHERE ${buildWhereClause(aWhere, ctx, true)}`; // hasJoins = true (we use JOINs)
+//   }
 
-  // Build ORDER BY clause
-  let orderByClause = "";
-  if (aOrderBy && aOrderBy.length > 0) {
-    orderByClause = `ORDER BY ${aOrderBy.map((s) => `${String(s.key)} ${s.direction}`).join(", ")}`;
-  } else if (aLimit || aOffset) {
-    // SQL Server requires ORDER BY for OFFSET/FETCH
-    orderByClause = "ORDER BY wio.offering_id ASC";
-  }
+//   // Build ORDER BY clause
+//   let orderByClause = "";
+//   if (aOrderBy && aOrderBy.length > 0) {
+//     orderByClause = `ORDER BY ${aOrderBy.map((s) => `${String(s.key)} ${s.direction}`).join(", ")}`;
+//   } else if (aLimit || aOffset) {
+//     // SQL Server requires ORDER BY for OFFSET/FETCH
+//     orderByClause = "ORDER BY wio.offering_id ASC";
+//   }
 
-  // Build LIMIT/OFFSET clause (SQL Server syntax)
-  let limitClause = "";
-  if (aLimit && aLimit > 0) {
-    limitClause = `OFFSET ${aOffset || 0} ROWS FETCH NEXT ${aLimit} ROWS ONLY`;
-  } else if (aOffset && aOffset > 0) {
-    // Only OFFSET without LIMIT - fetch all remaining rows
-    limitClause = `OFFSET ${aOffset} ROWS`;
-  }
+//   // Build LIMIT/OFFSET clause (SQL Server syntax)
+//   let limitClause = "";
+//   if (aLimit && aLimit > 0) {
+//     limitClause = `OFFSET ${aOffset || 0} ROWS FETCH NEXT ${aLimit} ROWS ONLY`;
+//   } else if (aOffset && aOffset > 0) {
+//     // Only OFFSET without LIMIT - fetch all remaining rows
+//     limitClause = `OFFSET ${aOffset} ROWS`;
+//   }
 
-  const request = transaction.request();
+//   const request = transaction.request();
 
-  // Dynamische Parameter binden
-  for (const [key, value] of Object.entries(ctx.parameters)) {
-    request.input(key, value);
-  }
+//   // Dynamische Parameter binden
+//   for (const [key, value] of Object.entries(ctx.parameters)) {
+//     request.input(key, value);
+//   }
 
-  // Query ausführen - FLAT structure mit LEFT JOINs
-  const result = await request.query(`
-    SELECT
-        wio.offering_id,
-        wio.wholesaler_id,
-        wio.category_id,
-        wio.product_def_id,
-        wio.sub_seller,
-        wio.wholesaler_article_number,
-        wio.material_id,
-        wio.form_id,
-        wio.title,
-        wio.size,
-        wio.dimensions,
-        wio.packaging,
-        wio.weight_grams,
-        wio.weight_range,
-        wio.price,
-        wio.currency,
-        wio.comment,
-        wio.created_at,
-        wio.is_assortment,
-        wio.override_material,
-        pd.title AS product_def_title,
-        pd.description AS product_def_description,
-        pc.name AS category_name,
-        pc.description AS category_description,
-        w.name AS wholesaler_name,
-        (
-            SELECT l.link_id, l.offering_id, l.url, l.notes, l.created_at
-            FROM dbo.wholesaler_offering_links AS l
-            WHERE l.offering_id = wio.offering_id
-            FOR JSON PATH
-        ) AS links
-    FROM dbo.wholesaler_item_offerings AS wio
-    LEFT JOIN dbo.product_definitions pd ON wio.product_def_id = pd.product_def_id
-    LEFT JOIN dbo.product_categories pc ON wio.category_id = pc.category_id
-    LEFT JOIN dbo.wholesalers w ON wio.wholesaler_id = w.wholesaler_id
-    ${whereClause}
-    ${orderByClause}
-    ${limitClause}
-  `);
+//   // Query ausführen - FLAT structure mit LEFT JOINs
+//   const result = await request.query(`
+//     SELECT
+//         wio.offering_id,
+//         wio.wholesaler_id,
+//         wio.category_id,
+//         wio.product_def_id,
+//         wio.sub_seller,
+//         wio.wholesaler_article_number,
+//         wio.material_id,
+//         wio.form_id,
+//         wio.title,
+//         wio.size,
+//         wio.dimensions,
+//         wio.packaging,
+//         wio.weight_grams,
+//         wio.weight_range,
+//         wio.price,
+//         wio.currency,
+//         wio.comment,
+//         wio.created_at,
+//         wio.is_assortment,
+//         wio.override_material,
+//         pd.title AS product_def_title,
+//         pd.description AS product_def_description,
+//         pc.name AS category_name,
+//         pc.description AS category_description,
+//         w.name AS wholesaler_name,
+//         (
+//             SELECT l.link_id, l.offering_id, l.url, l.notes, l.created_at
+//             FROM dbo.wholesaler_offering_links AS l
+//             WHERE l.offering_id = wio.offering_id
+//             FOR JSON PATH
+//         ) AS links
+//     FROM dbo.wholesaler_item_offerings AS wio
+//     LEFT JOIN dbo.product_definitions pd ON wio.product_def_id = pd.product_def_id
+//     LEFT JOIN dbo.product_categories pc ON wio.category_id = pc.category_id
+//     LEFT JOIN dbo.wholesalers w ON wio.wholesaler_id = w.wholesaler_id
+//     ${whereClause}
+//     ${orderByClause}
+//     ${limitClause}
+//   `);
 
-  if (!result.recordset?.length) {
-    throw error(404, "No offerings found for the given criteria.");
-  }
+//   if (!result.recordset?.length) {
+//     throw error(404, "No offerings found for the given criteria.");
+//   }
 
-  // Parse links JSON für jede Row
-  return result.recordset.map((row: any) => ({
-    ...row,
-    links: row.links ? JSON.parse(row.links) : null,
-  }));
-}
+//   // Parse links JSON für jede Row
+//   return result.recordset.map((row: any) => ({
+//     ...row,
+//     links: row.links ? JSON.parse(row.links) : null,
+//   }));
+// }
 
-export async function loadFlatOfferingWithJoinsAndLinksForId(transaction: Transaction, id: number): Promise<any> {
-  assertDefined(transaction, "transaction");
-  assertDefined(id, "id");
+// export async function loadFlatOfferingWithJoinsAndLinksForId(transaction: Transaction, id: number): Promise<any> {
+//   assertDefined(transaction, "transaction");
+//   assertDefined(id, "id");
 
-  const whereCondition: WhereCondition<WholesalerItemOffering> = { key: "wio.offering_id", whereCondOp: "=", val: id };
-  // No need for orderBy/limit/offset when fetching single record by ID
-  const results = await loadFlatOfferingsWithJoinsAndLinks(transaction, whereCondition);
+//   const whereCondition: WhereCondition<WholesalerItemOffering> = { key: "wio.offering_id", whereCondOp: "=", val: id };
+//   // No need for orderBy/limit/offset when fetching single record by ID
+//   const results = await loadFlatOfferingsWithJoinsAndLinks(transaction, whereCondition);
 
-  if (!results || results.length === 0) {
-    throw error(404, `Offering with ID ${id} not found.`);
-  }
+//   if (!results || results.length === 0) {
+//     throw error(404, `Offering with ID ${id} not found.`);
+//   }
 
-  return results[0];
-}
+//   return results[0];
+// }
 
 /**
  * Loads offerings with all lookup data needed for AI image generation analysis.

@@ -15,6 +15,7 @@
   import OfferingGrid from "$lib/components/domain/offerings/OfferingGrid.svelte";
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
   import type { ColumnDef } from "$lib/components/grids/Datagrid.types";
+  import SourceOfferingSelectionModal from "$lib/components/domain/offerings/SourceOfferingSelectionModal.svelte";
   import "$lib/components/styles/assignment-section.css";
   import "$lib/components/styles/detail-page-layout.css";
   import "$lib/components/styles/grid-section.css";
@@ -62,9 +63,7 @@
   import { safeParseFirstN, zodToValidationErrorTree } from "$lib/domain/domainTypes.utils";
   import { cascadeDelete } from "$lib/api/client/cascadeDelete";
   import { stringsToNumbers } from "$lib/utils/typeConversions";
-  import ComboBox2New from "$lib/components/forms/ComboBox2New.svelte";
-  import { getProductDefinitionApi } from "$lib/api/client/productDefinition";
-  import type { WhereCondition, QueryPayload, ComparisonOperator, SortDescriptor } from "$lib/backendQueries/queryGrammar";
+  import type { QueryPayload, ComparisonOperator, SortDescriptor } from "$lib/backendQueries/queryGrammar";
 
   // === TYPES ====================================================================================
 
@@ -109,16 +108,9 @@
   let constructionTypes = $state<ConstructionType[]>([]);
   let surfaceFinishes = $state<SurfaceFinish[]>([]);
 
-  // If this a s shop offering, user can assign source offerings id they are not yet in "sourceOfferings".
-  let potentialSourceOfferings = $state<Wio_PDef_Cat_Supp_Nested_WithLinks[]>([]);
-  let selectedSourceOfferingForLinking = $state<Wio_PDef_Cat_Supp_Nested_WithLinks | null>(null);
+  // Source offering selection modal state
+  let isSourceOfferingModalOpen = $state(false);
   let linkingSourceOffering = $state(false);
-
-  // Filter out already assigned source offerings.
-  // TODO: Add param zo create anti-join in backend.
-  const availableSourceOfferings = $derived(
-    potentialSourceOfferings.filter((potential) => !sourceOfferings.some((assigned) => assigned.offering_id === potential.offering_id)),
-  );
 
   // === API =====================================================================================
 
@@ -132,7 +124,6 @@
   const formApi = getFormApi(client);
   const constructionTypeApi = getConstructionTypeApi(client);
   const surfaceFinishApi = getSurfaceFinishApi(client);
-  const productDefinitionApi = getProductDefinitionApi(client);
   const offeringImageApi = getOfferingImageApi(client);
 
   // === LOAD =====================================================================================
@@ -158,16 +149,6 @@
             errors.offering = zodToValidationErrorTree(offeringVal.error);
           }
 
-          // If we are a shop offering (supplier 99), load potential offerings to assign as source offerings.
-          const where: WhereCondition<WholesalerItemOffering> = { whereCondOp: "!=", key: "wio.offering_id", val: offering.offering_id };
-          potentialSourceOfferings = await productDefinitionApi.loadNestedOfferingsWithLinksForProductDefinition(
-            offering.product_def_id,
-            where,
-          );
-          const potentialSourceOfferingsVal = safeParseFirstN(Wio_PDef_Cat_Supp_Nested_WithLinks_Schema, potentialSourceOfferings, 3);
-          if (!potentialSourceOfferingsVal.success) {
-            errors.potentialSourceOfferings = zodToValidationErrorTree(potentialSourceOfferingsVal.error);
-          }
         }
 
         materials = await materialApi.loadMaterials();
@@ -592,36 +573,78 @@
   };
 
   /**
-   * Link a source offering to this offering.
+   * Bulk link multiple source offerings to this shop offering.
    */
-  async function handleLinkSourceOffering() {
+  async function handleBulkLinkSourceOfferings(selectedOfferings: import("$lib/domain/domainTypes").OfferingReportViewWithLinks[]) {
     if (linkingSourceOffering) return;
     linkingSourceOffering = true;
+
+    let successCount = 0;
+    let errorCount = 0;
+    const errors: string[] = [];
+
     try {
       assertDefined(offering, "offering");
-      assertDefined(selectedSourceOfferingForLinking, "selectedSourceOfferingForLinking");
+
       if (99 !== offering.wholesaler_id) {
         throw new Error(`Can link source offering only if this is a shop offering`);
       }
 
-      log.debug(`Linking source offering to shop offering`, {
+      log.info(`[OfferingDetailPage] Bulk linking ${selectedOfferings.length} source offerings`, {
         shopOfferingId: offering.offering_id,
-        sourceOfferingId: selectedSourceOfferingForLinking.offering_id,
+        sourceOfferingIds: selectedOfferings.map(o => o.wioId)
       });
 
-      const result = await offeringApi.addSourceOfferingLink(offering.offering_id, selectedSourceOfferingForLinking.offering_id);
+      // Loop through all selected offerings
+      for (const sourceOffering of selectedOfferings) {
+        try {
+          const result = await offeringApi.addSourceOfferingLink(
+            offering.offering_id,
+            sourceOffering.wioId
+          );
 
-      if (result.success) {
-        addNotification(`Source offering linked successfully`, "success");
-        selectedSourceOfferingForLinking = null; // Reset selection
-        await reloadSourceOfferings();
-      } else {
-        addNotification(`Failed to link source offering: ${result.message}`, "error");
+          if (result.success) {
+            successCount++;
+          } else {
+            errorCount++;
+            errors.push(`${sourceOffering.wioTitle}: ${result.message || 'Unknown error'}`);
+          }
+        } catch (err) {
+          errorCount++;
+          const message = getErrorMessage(err);
+          errors.push(`${sourceOffering.wioTitle}: ${message}`);
+          // Continue with next offering
+        }
       }
+
+      // Show notifications based on result
+      if (successCount > 0) {
+        addNotification(
+          `Successfully linked ${successCount} source offering${successCount !== 1 ? 's' : ''}`,
+          "success"
+        );
+      }
+
+      if (errorCount > 0) {
+        addNotification(
+          `Failed to link ${errorCount} offering${errorCount !== 1 ? 's' : ''}`,
+          "error"
+        );
+        log.error("[OfferingDetailPage] Bulk link errors", { errors });
+      }
+
+      // Reload source offerings grid
+      await reloadSourceOfferings();
+
+      // Close modal only if at least one success
+      if (successCount > 0) {
+        isSourceOfferingModalOpen = false;
+      }
+
     } catch (err) {
       const message = getErrorMessage(err);
-      addNotification(`Failed to link source offering: ${message}`, "error");
-      log.error("Failed to link source offering", { error: err });
+      addNotification(`Failed to link source offerings: ${message}`, "error");
+      log.error("[OfferingDetailPage] Failed to bulk link source offerings", { error: err });
     } finally {
       linkingSourceOffering = false;
     }
@@ -826,30 +849,14 @@
       <p class="info-message">This is not a shop offering. Source offerings are only available for shop offerings (wholesaler_id = 99).</p>
     {:else}
       <div class="source-offering-assignment">
-        <form class="assignment-controls">
-          <strong>Assing offering:</strong>
-          <ComboBox2New
-            items={availableSourceOfferings}
-            labelPath={["title"]}
-            label={null}
-            showDropdownButton={true}
-            valuePath={["offering_id"]}
-            bind:value={selectedSourceOfferingForLinking}
-          />
-          <button
-            type="button"
-            class="pc-grid__createbtn"
-            onclick={handleLinkSourceOffering}
-          >
-            Link source offering
-          </button>
-          {#if linkingSourceOffering}
-            <span
-              class="pc-grid__spinner"
-              aria-hidden="true"
-            ></span>
-          {/if}
-        </form>
+        <button
+          type="button"
+          class="pc-grid__createbtn"
+          onclick={() => isSourceOfferingModalOpen = true}
+          disabled={linkingSourceOffering}
+        >
+          + Add Source Offerings
+        </button>
       </div>
 
       <OfferingGrid
@@ -934,6 +941,17 @@
           </button>
         {/snippet}
       </OfferingGrid>
+
+      <!-- Source Offering Selection Modal -->
+      <SourceOfferingSelectionModal
+        bind:isOpen={isSourceOfferingModalOpen}
+        shopOfferingId={offering.offering_id}
+        productDefId={offering.product_def_id}
+        alreadyLinkedOfferingIds={sourceOfferings.map(so => so.offering_id)}
+        fetch={data.loadEventFetch}
+        onConfirm={handleBulkLinkSourceOfferings}
+        onCancel={() => isSourceOfferingModalOpen = false}
+      />
     {/if}
   </div>
 {/snippet}
@@ -1143,18 +1161,5 @@
     background: var(--color-background);
     /* border: 1px solid var(--color-border, #e2e8f0);
     border-radius: 8px; */
-  }
-
-  .assignment-controls {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    flex-grow: 1; /* Allow the form to take up remaining space */
-  }
-
-  .assignment-controls :global(.combobox-container) {
-    width: auto;
-    min-width: 350px;
-    flex: 0 1 auto;
   }
 </style>

@@ -20,7 +20,7 @@
   import { log } from "$lib/utils/logger";
   import type { Snippet } from "svelte";
   import { fade } from "svelte/transition";
-  import type { ColumnDef, ConfirmResult, DeleteStrategy, DryRunResult, ID, RowActionStrategy } from "./Datagrid.types";
+  import type { ColumnDef, ConfirmResult, DeleteStrategy, DryRunResult, ID, RowActionStrategy, SelectionChangeHandler, ToolbarSnippetProps } from "./Datagrid.types";
 
   import type { SortDescriptor, WhereCondition, WhereConditionGroup } from "$lib/backendQueries/queryGrammar";
   import "$lib/components/styles/loadingIndicator.css";
@@ -28,7 +28,7 @@
   import { addNotification } from "$lib/stores/notifications";
   import { assertDefined } from "$lib/utils/assertions";
   import FilterToolbar from './FilterToolbar.svelte';
-  import { SvelteMap } from 'svelte/reactivity';
+  import { SvelteMap, SvelteSet } from 'svelte/reactivity';
   import { createGridState } from '$lib/stores/gridState';
   import { onMount, tick } from 'svelte';
   import { debounce } from 'lodash-es';
@@ -66,6 +66,7 @@
     // Select and delte indicator
     selection?: "none" | "single" | "multiple";
     canDelete?: (row: any) => boolean;
+    onSelectionChange?: SelectionChangeHandler | undefined;
 
     // Row strategies
     deleteStrategy: DeleteStrategy<any>;
@@ -80,12 +81,7 @@
   };
 
   // These define the data passed to customizable snippets
-
-  type ToolbarSnippetProps = {
-    selectedIds: Set<ID>;
-    deletingObjectIds: Set<ID>;
-    deleteSelected: () => Promise<void> | void;
-  };
+  // ToolbarSnippetProps is imported from Datagrid.types.ts
 
   type CellSnippetProps = {
     row: any;
@@ -119,6 +115,7 @@
 
     selection = "multiple" as "none" | "single" | "multiple",
     canDelete = (_row: any) => true,
+    onSelectionChange,
 
     onQueryChange,
     onSort,
@@ -167,8 +164,17 @@
 
   // ===== LOCAL STATE =====
 
-  const deletingObjectIds = $state<Set<ID>>(new Set());
-  const selectedIds = $state<Set<ID>>(new Set());
+  const deletingObjectIds = new SvelteSet<ID>();
+  const selectedIds = new SvelteSet<ID>();
+
+  // Notify parent of selection changes (SvelteSet is deeply reactive)
+  $effect(() => {
+    // Access selectedIds.size to subscribe to changes
+    selectedIds.size;
+    if (onSelectionChange) {
+      onSelectionChange(selectedIds);
+    }
+  });
 
   // localStorage state manager
   const stateManager = createGridState<T>(gridId);

@@ -85,3 +85,22 @@ export type DeleteStrategy<T = unknown> = {
 export type ApiLoadFunc<T> = (where: WhereConditionGroup<T> | null, sort: SortDescriptor<T>[] | null) => Promise<T[]>;
 
 export type ApiLoadFuncWithId<T> = (id: number, where: WhereConditionGroup<T> | null, sort: SortDescriptor<T>[] | null) => Promise<T[]>;
+
+// ===== SELECTION ================================================================================
+
+/**
+ * Callback invoked when the selection state changes.
+ * Receives the current set of selected IDs.
+ */
+export type SelectionChangeHandler = (selectedIds: Set<ID>) => void;
+
+// ===== SNIPPETS =================================================================================
+
+/**
+ * Props passed to the toolbar snippet.
+ */
+export type ToolbarSnippetProps = {
+  selectedIds: Set<ID>;
+  deletingObjectIds: Set<ID>;
+  deleteSelected: () => Promise<void> | void;
+};

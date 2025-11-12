@@ -20,8 +20,10 @@
    * - Uses proper URL hierarchy for deep linking and breadcrumbs
    */
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
+  import type { SelectionChangeHandler, ToolbarSnippetProps } from "$lib/components/grids/Datagrid.types";
   import type { WhereCondition, WhereConditionGroup, SortDescriptor } from "$lib/backendQueries/queryGrammar";
   import type { OfferingReportViewWithLinks } from "$lib/domain/domainTypes";
+  import type { Snippet } from "svelte";
   // CRITICAL: Import ALL stable references from separate module
   // If defined inline, props get new reference on every render → infinite loop
   import { columns, getId, deleteStrategy } from "./OfferingReportGrid.columns";
@@ -33,9 +35,12 @@
       sort: SortDescriptor<OfferingReportViewWithLinks>[] | null
     }) => Promise<void> | void;
     maxBodyHeight?: string;
+    selection?: "none" | "single" | "multiple";
+    onSelectionChange?: SelectionChangeHandler | undefined;
+    toolbar?: Snippet<[ToolbarSnippetProps]> | undefined;
   };
 
-  let { rows, onQueryChange, maxBodyHeight }: Props = $props();
+  let { rows, onQueryChange, maxBodyHeight, selection = "none", onSelectionChange, toolbar }: Props = $props();
 
   // getId and deleteStrategy are imported from .columns.ts for stable references
 </script>
@@ -46,7 +51,9 @@
   {getId}
   {onQueryChange}
   {deleteStrategy}
-  selection="none"
+  {selection}
+  {onSelectionChange}
+  {toolbar}
   gridId="offerings-report"
   entity="offering"
   maxBodyHeight={maxBodyHeight ?? "80vh"}

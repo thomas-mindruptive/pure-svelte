@@ -130,7 +130,6 @@ const CategoryWithOfferingCountSchemaBase = z
     category_id: z.number().int().positive(),
     category_name: NameOrTitle,
     description: z.string().max(500).nullable().optional(),
-    product_type_id: z.number().int().positive(),
     offering_count: z.number().int().nonnegative(),
   })
   .describe("CategoryWithOfferingCountSchema");

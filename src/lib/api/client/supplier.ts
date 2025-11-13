@@ -45,6 +45,7 @@ import type {
   AssignmentSuccessData,
   */
   PredefinedQueryRequest,
+  QueryRequestWithPartialPayload,
   QueryResponseData,
   /* <refact01> DEPRECATED: wholesaler_categories removed
   RemoveAssignmentRequest,
@@ -244,20 +245,37 @@ export function getSupplierApi(client: ApiClient) {
     },
 
     /**
-     * Loads categories with total offering count (across all suppliers).
-     * supplierId parameter kept for interface consistency but is unused.
-     * The view shows total offerings per category, not supplier-specific counts.
+     * Loads categories with supplier-specific offering count.
+     * Uses the fn_categories_with_offering_count SQL function to get counts for this supplier only.
      */
     async loadCategoriesWithOfferingCount(
       supplierId: number,
       where?: WhereCondition<CategoryWithOfferingCount> | WhereConditionGroup<CategoryWithOfferingCount> | null,
       orderBy?: SortDescriptor<CategoryWithOfferingCount>[] | null,
     ): Promise<CategoryWithOfferingCount[]> {
-      const categoryApi = getCategoryApi(client);
-      const queryPartial: Partial<QueryPayload<CategoryWithOfferingCount>> = {};
-      if (where) queryPartial.where = where;
-      if (orderBy) queryPartial.orderBy = orderBy;
-      return categoryApi.loadCategoriesWithOfferingCount(queryPartial);
+      const operationId = `loadCategoriesWithOfferingCount-${supplierId}`;
+      supplierLoadingOperations.start(operationId);
+      try {
+        const request: QueryRequestWithPartialPayload<CategoryWithOfferingCount> = {
+          payload: {
+            ...(where && { where }),
+            ...(orderBy && { orderBy })
+          }
+        };
+
+        const responseData = await client.apiFetch<QueryResponseData<CategoryWithOfferingCount>>(
+          `/api/suppliers/${supplierId}/categories-offering-count`,
+          { method: "POST", body: createJsonBody(request) },
+          { context: operationId },
+        );
+
+        return responseData.results as CategoryWithOfferingCount[];
+      } catch (err) {
+        log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
+        throw err;
+      } finally {
+        supplierLoadingOperations.finish(operationId);
+      }
     },
 
     // ===== OFFERINGS =====

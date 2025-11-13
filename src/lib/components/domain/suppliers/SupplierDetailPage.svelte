@@ -3,6 +3,7 @@
   import { goto } from "$app/navigation";
   import { addNotification } from "$lib/stores/notifications";
   import { log } from "$lib/utils/logger";
+  import { getContext } from "svelte";
   // Component Imports
   /* <refact01> DEPRECATED: wholesaler_categories removed - no more category assignments
   import CategoryAssignment from "$lib/components/domain/suppliers/CategoryAssignment.svelte";
@@ -79,6 +80,13 @@
   const errors = $state<Record<string, ValidationErrorTree>>({});
   const allowForceCascadingDelete = $state(true);
 
+  // Get page-local loading context from layout
+  type PageLoadingContext = { isLoading: boolean };
+  const pageLoading = getContext<PageLoadingContext>('page-loading');
+
+  // Derived state for button/form disabled states - disabled during page load OR API operations
+  const isAnyOperationInProgress = $derived(isLoading || $supplierLoadingState);
+
   // === API =====================================================================================
 
   // The following code is executed only ONCE whe the component is mounted => this is OK.
@@ -100,6 +108,7 @@
     const processPromises = async () => {
       // 1. Reset state for each new load.
       isLoading = true;
+      pageLoading.isLoading = true;  // Globaler Spinner AN
       //resolvedData = null;
 
       try {
@@ -148,6 +157,7 @@
         if (!aborted) {
           // 7. Always end the loading state.
           isLoading = false;
+          pageLoading.isLoading = false;  // Globaler Spinner AUS
         }
       }
     };
@@ -410,6 +420,7 @@
       <button
         class="pc-grid__createbtn"
         onclick={handleOrderCreate}
+        disabled={isAnyOperationInProgress}
       >
         Create Order
       </button>
@@ -441,7 +452,7 @@
       <div class="form-section">
         <SupplierForm
           initial={supplier}
-          disabled={$supplierLoadingState}
+          disabled={isAnyOperationInProgress}
           onSubmitted={handleFormSubmitted}
           onCancelled={handleFormCancelled}
           onSubmitError={handleFormSubmitError}

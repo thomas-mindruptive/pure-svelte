@@ -7,6 +7,7 @@
   import { assertDefined } from "$lib/utils/assertions";
   import { buildChildUrl } from "$lib/utils/url";
   import { error } from "@sveltejs/kit";
+  import { getContext } from "svelte";
 
   // Component Imports
   import OfferingForm from "./OfferingForm.svelte";
@@ -112,6 +113,13 @@
   let isSourceOfferingModalOpen = $state(false);
   let linkingSourceOffering = $state(false);
 
+  // Get page-local loading context from layout
+  type PageLoadingContext = { isLoading: boolean };
+  const pageLoading = getContext<PageLoadingContext>('page-loading');
+
+  // Derived state for button disabled states - disabled during page load OR API operations
+  const isAnyOperationInProgress = $derived(isLoading || $offeringLoadingState);
+
   // === API =====================================================================================
 
   if (!data.loadEventFetch) {
@@ -134,6 +142,7 @@
 
     const processPromises = async () => {
       isLoading = true;
+      pageLoading.isLoading = true;  // Globaler Spinner AN
 
       try {
         // Load offering (not in create mode)
@@ -253,6 +262,7 @@
       } finally {
         if (!aborted) {
           isLoading = false;
+          pageLoading.isLoading = false;  // Globaler Spinner AUS
         }
       }
     };
@@ -277,10 +287,12 @@
     } else {
       // Reload offering after update
       isLoading = true;
+      pageLoading.isLoading = true;  // Globaler Spinner beim Reload
       try {
         offering = await offeringApi.loadOffering(data.offeringId);
       } finally {
         isLoading = false;
+        pageLoading.isLoading = false;  // Globaler Spinner aus
       }
     }
   }
@@ -867,7 +879,7 @@
         {#snippet toolbar({ selectedIds, deleteSelected }: { selectedIds: Set<ID>; deleteSelected: () => Promise<void> | void })}
           <button
             class="pc-grid__btn pc-grid__btn--secondary"
-            disabled={selectedIds.size === 0 || $offeringLoadingState}
+            disabled={selectedIds.size === 0 || isAnyOperationInProgress}
             onclick={async () => {
               const ids = Array.from(selectedIds) as ID[];
               await handleSourceOfferingUnlink(ids);
@@ -882,7 +894,7 @@
 
           <button
             class="pc-grid__btn pc-grid__btn--danger"
-            disabled={selectedIds.size === 0 || $offeringLoadingState}
+            disabled={selectedIds.size === 0 || isAnyOperationInProgress}
             onclick={deleteSelected}
             title={selectedIds.size === 0
               ? "Select source offerings to delete"
@@ -905,7 +917,7 @@
           <button
             type="button"
             class="pc-grid__btn pc-grid__btn--danger"
-            disabled={id === null || $offeringLoadingState}
+            disabled={id === null || isAnyOperationInProgress}
             onclick={async (e) => {
               e.stopPropagation();
               if (id !== null) {
@@ -934,7 +946,7 @@
                 await handleSourceOfferingUnlink([id]);
               }
             }}
-            disabled={$offeringLoadingState}
+            disabled={isAnyOperationInProgress}
             title="Unlink this source offering"
           >
             🔗 Unlink
@@ -1048,7 +1060,7 @@
               type="button"
               class="secondary-button"
               onclick={handleCopyForShop}
-              disabled={$offeringLoadingState}
+              disabled={isAnyOperationInProgress}
             >
               📋 Copy for Shop
             </button>

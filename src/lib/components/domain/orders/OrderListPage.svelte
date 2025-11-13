@@ -15,6 +15,7 @@
   import { stringsToNumbers } from "$lib/utils/typeConversions";
   import { cascadeDelete } from "$lib/api/client/cascadeDelete";
   import { page } from "$app/state";
+  import { getContext } from "svelte";
   import { getOrderApi } from "$lib/api/client/order";
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
   import { safeParseFirstN } from "$lib/domain/domainTypes.utils";
@@ -27,12 +28,15 @@
   // === STATE ====================================================================================
 
   let resolvedOrders = $state<Order_Wholesaler[]>([]);
-  let isLoading = $state(false); // Start with false - Datagrid will trigger loading
   let loadingOrValidationError = $state<{
     message: string;
     status: number;
   } | null>(null);
   const allowForceCascadingDelte = $state(true);
+
+  // Get page-local loading context from layout
+  type PageLoadingContext = { isLoading: boolean };
+  const pageLoading = getContext<PageLoadingContext>('page-loading');
 
   // === API ======================================================================================
 
@@ -77,14 +81,19 @@
     goto(`${page.url.pathname}/new`);
   }
 
+  // Track if we've done the first load
+  let firstLoadComplete = false;
+
   async function handleQueryChange(query: {
     filters: WhereCondition<Order_Wholesaler> | WhereConditionGroup<Order_Wholesaler> | null,
     sort: SortDescriptor<Order_Wholesaler>[] | null
   }) {
     log.info(`(OrderListPage) Query change - filters:`, query.filters, `sort:`, query.sort);
 
-    // Reset state before loading
-    isLoading = true;
+    // Only show loading for subsequent queries, not the first one
+    if (firstLoadComplete) {
+      pageLoading.isLoading = true;
+    }
     loadingOrValidationError = null;
 
     try {
@@ -103,6 +112,12 @@
         resolvedOrders = orders;
         log.info(`(OrderListPage) Received ${orders.length} valid orders`);
       }
+
+      // First load is done, clear the initial loading state
+      if (!firstLoadComplete) {
+        firstLoadComplete = true;
+        log.info("(OrderListPage) First load complete");
+      }
     } catch (rawError: any) {
       // Robust error handling from the original $effect
       const status = rawError.status ?? 500;
@@ -114,7 +129,7 @@
       // Log the full error for debugging
       log.error("(OrderListPage) Error loading orders", { rawError });
     } finally {
-      isLoading = false;
+      pageLoading.isLoading = false;
     }
   }
 
@@ -153,13 +168,9 @@
     </div>
   {:else}
     <div class="grid-section">
-      {#if isLoading && resolvedOrders.length === 0}
-        <p class="loading-message">Loading orders...</p>
-      {/if}
       <button
         class="pc-grid__createbtn"
         onclick={handleOrderCreate}
-        disabled={isLoading}
       >
         Create Order
       </button>

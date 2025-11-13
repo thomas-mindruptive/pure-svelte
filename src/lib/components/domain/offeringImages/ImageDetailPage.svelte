@@ -12,6 +12,7 @@
   import { addNotification } from "$lib/stores/notifications";
   import { log } from "$lib/utils/logger";
   import { browser } from "$app/environment";
+  import { getContext } from "svelte";
   import "$lib/components/styles/detail-page-layout.css";
   import "$lib/components/styles/form-elements.css";
   import ImageForm from "./ImageForm.svelte";
@@ -39,6 +40,13 @@
   let constructionTypes: ConstructionType[] = $state([]);
   let surfaceFinishes: SurfaceFinish[] = $state([]);
 
+  // Get page-local loading context from layout
+  type PageLoadingContext = { isLoading: boolean };
+  const pageLoading = getContext<PageLoadingContext>('page-loading');
+
+  // Derived state for button/form disabled states - disabled during page load OR API operations
+  const isAnyOperationInProgress = $derived(isLoading || $offeringImageLoadingState);
+
   // === API ======================================================================================
 
   const client = new ApiClient(fetch);
@@ -59,6 +67,7 @@
 
     const loadData = async () => {
       isLoading = true;
+      pageLoading.isLoading = true;  // Globaler Spinner AN
 
       try {
         // Load lookups and image data in parallel
@@ -114,6 +123,7 @@
       } finally {
         if (!aborted) {
           isLoading = false;
+          pageLoading.isLoading = false;  // Globaler Spinner AUS
         }
       }
     };
@@ -196,7 +206,7 @@
         {forms}
         {constructionTypes}
         {surfaceFinishes}
-        disabled={$offeringImageLoadingState}
+        disabled={isAnyOperationInProgress}
         onSubmitted={handleFormSubmitted}
         onSubmitError={handleFormSubmitError}
         onCancelled={handleFormCancelled}

@@ -7,6 +7,7 @@
   import { log } from "$lib/utils/logger";
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
+  import { getContext } from "svelte";
 
   // Component Imports
   import "$lib/components/styles/grid-section.css";
@@ -57,11 +58,16 @@
   let loadingError = $state<{ message: string; status?: number } | null>(null);
   const allowForceCascadingDelte = $state(true);
 
+  // Get page-local loading context from layout
+  type PageLoadingContext = { isLoading: boolean };
+  const pageLoading = getContext<PageLoadingContext>('page-loading');
+
   // This `$effect` hook resolves the promises passed in the `data` prop.
   $effect(() => {
     let aborted = false;
     const processPromises = async () => {
       isLoading = true;
+      pageLoading.isLoading = true;  // Globaler Spinner AN
       loadingError = null;
       resolvedData = null;
 
@@ -98,6 +104,7 @@
       } finally {
         if (!aborted) {
           isLoading = false;
+          pageLoading.isLoading = false;  // Globaler Spinner AUS
         }
       }
     };
@@ -196,6 +203,7 @@
       <button
         class="pc-grid__createbtn"
         onclick={handleOfferingCreate}
+        disabled={isLoading}
       >
         Create Offering
       </button>

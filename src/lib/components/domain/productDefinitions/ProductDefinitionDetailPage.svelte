@@ -50,6 +50,7 @@
   import { stringsToNumbers } from "$lib/utils/typeConversions";
   import { buildChildUrl, buildSiblingUrl } from "$lib/utils/url";
   import { error } from "@sveltejs/kit";
+  import { getContext } from "svelte";
   import { getErrorMessage } from "$lib/api/client/common";
   import type { SortDescriptor, QueryPayload } from "$lib/backendQueries/queryGrammar";
   import { ComparisonOperator } from "$lib/backendQueries/queryGrammar";
@@ -89,6 +90,10 @@
   let categories: ProductCategory[] = $state([]);
   let allowForceCascadingDelete = $state(true);
 
+  // Get page-local loading context from layout
+  type PageLoadingContext = { isLoading: boolean };
+  const pageLoading = getContext<PageLoadingContext>('page-loading');
+
   // === API ======================================================================================
 
   const client = new ApiClient(loadEventFetch);
@@ -109,6 +114,7 @@
     let aborted = false;
     const processPromises = async () => {
       isLoading = true;
+      pageLoading.isLoading = true;  // Globaler Spinner AN
 
       try {
         if (isCreateMode) {
@@ -221,6 +227,7 @@
       } finally {
         if (!aborted) {
           isLoading = false;
+          pageLoading.isLoading = false;  // Globaler Spinner AUS
         }
       }
     };
@@ -439,6 +446,7 @@
       <button
         class="pc-grid__createbtn"
         onclick={handleOfferingCreate}
+        disabled={isLoading}
       >
         Create Offering
       </button>
@@ -464,6 +472,7 @@
       <button
         class="pc-grid__createbtn"
         onclick={handleImageCreate}
+        disabled={isLoading}
       >
         Create Image
       </button>

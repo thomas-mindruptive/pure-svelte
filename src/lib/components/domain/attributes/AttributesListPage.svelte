@@ -11,6 +11,7 @@
   import { cascadeDelete } from "$lib/api/client/cascadeDelete";
   import { stringsToNumbers } from "$lib/utils/typeConversions";
   import "$lib/components/styles/list-page-layout.css";
+  import { getContext } from "svelte";
 
   // === PROPS ====================================================================================
 
@@ -19,9 +20,12 @@
   // === STATE ====================================================================================
 
   let resolvedAttributes = $state<Attribute[]>([]);
-  let isLoading = $state(false); // Start with false - Datagrid will trigger loading
   let loadingOrValidationError = $state<{ message: string; status: number } | null>(null);
   const allowForceCascadingDelte = $state(true);
+
+  // Get page-local loading context from layout
+  type PageLoadingContext = { isLoading: boolean };
+  const pageLoading = getContext<PageLoadingContext>('page-loading');
 
   // === LOAD =====================================================================================
   // Initial load is now controlled by Datagrid component via onQueryChange
@@ -65,14 +69,19 @@
     goto(`${page.url.pathname}/new`);
   }
 
+  // Track if we've done the first load
+  let firstLoadComplete = false;
+
   async function handleQueryChange(query: {
     filters: WhereCondition<Attribute> | WhereConditionGroup<Attribute> | null,
     sort: SortDescriptor<Attribute>[] | null
   }) {
     log.info(`(AttributesListPage) Query change - filters:`, query.filters, `sort:`, query.sort);
 
-    // Reset state before loading
-    isLoading = true;
+    // Only show loading for subsequent queries, not the first one
+    if (firstLoadComplete) {
+      pageLoading.isLoading = true;
+    }
     loadingOrValidationError = null;
 
     try {
@@ -80,6 +89,12 @@
       // In the future, update to loadAttributesWithWhereAndOrder when available
       resolvedAttributes = await attributeApi.loadAttributes();
       log.info(`(AttributesListPage) Received ${resolvedAttributes.length} attributes`);
+
+      // First load is done, clear the initial loading state
+      if (!firstLoadComplete) {
+        firstLoadComplete = true;
+        log.info("(AttributesListPage) First load complete");
+      }
     } catch (rawError: any) {
       // Robust error handling from the original $effect
       const status = rawError.status ?? 500;
@@ -91,7 +106,7 @@
       // Log the full error for debugging
       log.error("(AttributesListPage) Error loading attributes", { rawError });
     } finally {
-      isLoading = false;
+      pageLoading.isLoading = false;
     }
   }
 
@@ -119,13 +134,9 @@
     </div>
   {:else}
     <div class="grid-section">
-      {#if isLoading && resolvedAttributes.length === 0}
-        <p class="loading-message">Loading attributes...</p>
-      {/if}
       <button
         class="pc-grid__createbtn"
         onclick={handleAttributeCreate}
-        disabled={isLoading}
       >
         Create Attribute
       </button>

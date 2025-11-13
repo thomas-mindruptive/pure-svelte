@@ -30,6 +30,7 @@
   import { stringsToNumbers } from "$lib/utils/typeConversions";
   import { error } from "@sveltejs/kit";
   import { buildChildUrl, buildSiblingUrl } from "$lib/utils/url";
+  import { getContext } from "svelte";
 
   // === PROPS ====================================================================================
 
@@ -43,6 +44,13 @@
   const isCreateMode = $derived(!resolvedData?.category);
   const allowForceCascadingDelte = $state(true);
 
+  // Get page-local loading context from layout
+  type PageLoadingContext = { isLoading: boolean };
+  const pageLoading = getContext<PageLoadingContext>('page-loading');
+
+  // Derived state for button/form disabled states - disabled during page load OR API operations
+  const isAnyOperationInProgress = $derived(isLoading || $categoryLoadingState);
+
   // === LOAD =====================================================================================
 
   // This is the core of the async pattern. It runs whenever the `data` prop changes.
@@ -52,6 +60,7 @@
     const processPromises = async () => {
       // 1. Reset state for each new load.
       isLoading = true;
+      pageLoading.isLoading = true;  // Globaler Spinner AN
       loadingError = null;
       resolvedData = null;
 
@@ -96,6 +105,7 @@
         if (!aborted) {
           // 7. Always end the loading state.
           isLoading = false;
+          pageLoading.isLoading = false;  // Globaler Spinner AUS
         }
       }
     };
@@ -246,7 +256,7 @@
         {isCreateMode}
         initial={resolvedData.category}
         productTypes = {resolvedData.productTypes}
-        disabled={$categoryLoadingState}
+        disabled={isAnyOperationInProgress}
         onSubmitted={handleFormSubmitted}
         onCancelled={handleFormCancelled}
         onSubmitError={handleFormSubmitError}
@@ -264,6 +274,7 @@
         <button
           class="pc-grid__createbtn"
           onclick={handleProductDefCreate}
+          disabled={isAnyOperationInProgress}
         >
           Create Product Definition
         </button>

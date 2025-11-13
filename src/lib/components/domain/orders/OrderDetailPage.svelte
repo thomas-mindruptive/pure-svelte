@@ -3,6 +3,7 @@
   import { goto } from "$app/navigation";
   import { addNotification } from "$lib/stores/notifications";
   import { log } from "$lib/utils/logger";
+  import { getContext } from "svelte";
 // Component Imports
   import "$lib/components/styles/assignment-section.css";
   import "$lib/components/styles/detail-page-layout.css";
@@ -61,6 +62,13 @@
   const errors = $state<Record<string, ValidationErrorTree>>({});
   const allowForceCascadingDelte = $state(true);
 
+  // Get page-local loading context from layout
+  type PageLoadingContext = { isLoading: boolean };
+  const pageLoading = getContext<PageLoadingContext>('page-loading');
+
+  // Derived state for button/form disabled states - disabled during page load OR API operations
+  const isAnyOperationInProgress = $derived(isLoading || $orderLoadingState);
+
   // === API =====================================================================================
 
   // The following code is executed only ONCE whe the component is mounted => this is OK.
@@ -82,6 +90,7 @@
     const processPromises = async () => {
       log.info("processPromises started");
       isLoading = true;
+      pageLoading.isLoading = true;  // Globaler Spinner AN
 
       try {
         // Load wholesalers for the form (needed in both CREATE and EDIT mode)
@@ -152,6 +161,7 @@
       } finally {
         if (!aborted) {
           isLoading = false;
+          pageLoading.isLoading = false;  // Globaler Spinner AUS
         }
       }
     };
@@ -304,7 +314,7 @@
         {availableWholesalers}
         isOrdersRoute={data.isOrdersRoute}
         isSuppliersRoute={data.isSuppliersRoute}
-        disabled={$orderLoadingState}
+        disabled={isAnyOperationInProgress}
         onSubmitted={handleFormSubmitted}
         onCancelled={handleFormCancelled}
         onSubmitError={handleFormSubmitError}
@@ -323,6 +333,7 @@
           <button
             class="pc-grid__createbtn"
             onclick={handleOrderItemCreate}
+            disabled={isAnyOperationInProgress}
           >
             Create Order Item
           </button>

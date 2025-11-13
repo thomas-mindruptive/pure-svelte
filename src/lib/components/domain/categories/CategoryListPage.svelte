@@ -12,6 +12,7 @@
   import { stringsToNumbers } from "$lib/utils/typeConversions";
   import { cascadeDelete } from "$lib/api/client/cascadeDelete";
   import "$lib/components/styles/list-page-layout.css";
+  import { getContext } from "svelte";
 
   // === PROPS ====================================================================================
 
@@ -27,9 +28,12 @@
   // === STATE =====================================================================================
 
   let resolvedCategories = $state<ProductCategory[]>([]);
-  let isLoading = $state(false); // Start with false - Datagrid will trigger loading
   let loadingOrValidationError = $state<{ message: string; status: number } | null>(null);
   const allowForceCascadingDelte = $state(true);
+
+  // Get page-local loading context from layout
+  type PageLoadingContext = { isLoading: boolean };
+  const pageLoading = getContext<PageLoadingContext>('page-loading');
 
   // === LOAD ======================================================================================
   // Initial load is now controlled by Datagrid component via onQueryChange
@@ -72,14 +76,19 @@
     goto(`${page.url.pathname}/new`);
   }
 
+  // Track if we've done the first load
+  let firstLoadComplete = false;
+
   async function handleQueryChange(query: {
     filters: WhereCondition<ProductCategory> | WhereConditionGroup<ProductCategory> | null,
     sort: SortDescriptor<ProductCategory>[] | null
   }) {
     log.info(`(CategoryListPage) Query change - filters:`, query.filters, `sort:`, query.sort);
 
-    // Reset state before loading
-    isLoading = true;
+    // Only show loading for subsequent queries, not the first one
+    if (firstLoadComplete) {
+      pageLoading.isLoading = true;
+    }
     loadingOrValidationError = null;
 
     try {
@@ -90,6 +99,12 @@
         query.sort
       );
       log.info(`(CategoryListPage) Received ${resolvedCategories.length} categories`);
+
+      // First load is done, clear the initial loading state
+      if (!firstLoadComplete) {
+        firstLoadComplete = true;
+        log.info("(CategoryListPage) First load complete");
+      }
     } catch (rawError: any) {
       // Robust error handling from the original $effect
       const status = rawError.status ?? 500;
@@ -101,7 +116,7 @@
       // Log the full error for debugging
       log.error("(CategoryListPage) Error loading categories", { rawError });
     } finally {
-      isLoading = false;
+      pageLoading.isLoading = false;
     }
   }
 
@@ -133,13 +148,9 @@
     </div>
   {:else}
     <div class="grid-section">
-      {#if isLoading && resolvedCategories.length === 0}
-        <p class="loading-message">Loading categories...</p>
-      {/if}
       <button
         class="pc-grid__createbtn"
         onclick={handleCategoryCreate}
-        disabled={isLoading}
       >
         Create Category
       </button>

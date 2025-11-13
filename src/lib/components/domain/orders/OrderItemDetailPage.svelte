@@ -3,6 +3,7 @@
   import { goto } from "$app/navigation";
   import { addNotification } from "$lib/stores/notifications";
   import { log } from "$lib/utils/logger";
+  import { getContext } from "svelte";
   // Component Imports
   import "$lib/components/styles/detail-page-layout.css";
   // API & Type Imports
@@ -51,6 +52,13 @@
   let isLoading = $state(true);
   const errors = $state<Record<string, ValidationErrorTree>>({});
 
+  // Get page-local loading context from layout
+  type PageLoadingContext = { isLoading: boolean };
+  const pageLoading = getContext<PageLoadingContext>('page-loading');
+
+  // Derived state for button/form disabled states - disabled during page load OR API operations
+  const isAnyOperationInProgress = $derived(isLoading || $orderItemLoadingState);
+
   // === API =====================================================================================
 
   const client = new ApiClient(data.loadEventFetch);
@@ -68,6 +76,7 @@
     const processPromises = async () => {
       log.info("processPromises started");
       isLoading = true;
+      pageLoading.isLoading = true;  // Globaler Spinner AN
 
       try {
         // Load order to get wholesaler_id (needed in both CREATE and EDIT mode)
@@ -108,6 +117,7 @@
       } finally {
         if (!aborted) {
           isLoading = false;
+          pageLoading.isLoading = false;  // Globaler Spinner AUS
         }
       }
     };
@@ -179,7 +189,7 @@
         initial={orderItem}
         order={order!}
         {availableOfferings}
-        disabled={$orderItemLoadingState}
+        disabled={isAnyOperationInProgress}
         onSubmitted={handleFormSubmitted}
         onCancelled={handleFormCancelled}
         onSubmitError={handleFormSubmitError}

@@ -7,7 +7,7 @@
    *
    * Key Features:
    * - Filterable columns for all view fields
-   * - Clickable Title column for navigation to offering detail page
+   * - Clickable rows for navigation to offering detail page
    * - Clickable Links column showing first link (opens in new tab)
    * - Server-side filtering and sorting via QueryGrammar
    *
@@ -16,7 +16,8 @@
    * - Flat structure (no nested objects like row.wholesaler.name)
    *
    * Navigation:
-   * - Clicking on Title navigates to: /categories/{categoryId}/productdefinitions/{productDefId}/offerings/{offeringId}
+   * - Clicking on any row navigates to: /categories/{categoryId}/productdefinitions/{productDefId}/offerings/{offeringId}
+   * - Clicking on Links opens wholesaler website in new tab
    * - Uses proper URL hierarchy for deep linking and breadcrumbs
    */
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
@@ -26,7 +27,7 @@
   import type { Snippet } from "svelte";
   // CRITICAL: Import ALL stable references from separate module
   // If defined inline, props get new reference on every render → infinite loop
-  import { columns, getId, deleteStrategy } from "./OfferingReportGrid.columns";
+  import { columns, getId, deleteStrategy, rowActionStrategy } from "./OfferingReportGrid.columns";
 
   type Props = {
     rows: OfferingReportViewWithLinks[];
@@ -44,7 +45,7 @@
 
   let { rows, onQueryChange, maxBodyHeight, selection = "none", onSelectionChange, toolbar, showSuperuserWhere = false, onRawWhereChange }: Props = $props();
 
-  // getId and deleteStrategy are imported from .columns.ts for stable references
+  // getId, deleteStrategy, and rowActionStrategy are imported from .columns.ts for stable references
 </script>
 
 <Datagrid
@@ -53,6 +54,7 @@
   {getId}
   {onQueryChange}
   {deleteStrategy}
+  {rowActionStrategy}
   {selection}
   {onSelectionChange}
   {toolbar}

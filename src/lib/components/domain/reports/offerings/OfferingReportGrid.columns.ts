@@ -31,7 +31,7 @@ export const deleteStrategy = {
 };
 
 /**
- * Navigates to the offering detail page when user clicks on Title.
+ * Navigates to the offering detail page when user clicks on a row.
  */
 function handleOfferingClick(row: OfferingReportViewWithLinks) {
   const categoryId = row.pcId;
@@ -46,6 +46,14 @@ function handleOfferingClick(row: OfferingReportViewWithLinks) {
     log.warn(`[OfferingReportGrid] Cannot navigate - missing IDs`, { categoryId, productDefId, offeringId });
   }
 }
+
+/**
+ * Stable rowActionStrategy for row clicks
+ * CRITICAL: Module-level for stable reference
+ */
+export const rowActionStrategy = {
+  click: handleOfferingClick
+};
 
 /**
  * Column Definitions - using view column names
@@ -67,9 +75,7 @@ export const columns: ColumnDef<typeof OfferingReportViewSchema>[] = [
     sortable: true,
     filterable: true,
     filterType: "text",
-    width: "200px",
-    isLink: true,
-    onClick: handleOfferingClick
+    width: "200px"
   },
   {
     key: "ptName",
@@ -251,7 +257,7 @@ export const columns: ColumnDef<typeof OfferingReportViewSchema>[] = [
     filterType: "text",
     width: "12rem",
     isLink: true,
-    onClick: (row: OfferingReportViewWithLinks) => {
+    onClick: (row: OfferingReportViewWithLinks, col: ColumnDef<typeof OfferingReportViewSchema>) => {
       if (row.links?.[0]?.url) {
         window.open(row.links[0].url, "_blank");
       }

@@ -405,7 +405,6 @@
       <p>Categories will be available after supplier has been saved.</p>
     {:else}
       <h2>Product Categories</h2>
-      <p>Browse all product categories. Click a category to view offerings for this supplier.</p>
       <!-- <refact01> CHANGED: Use CategoryGrid component (supports sorting) -->
       <CategoryGrid
         rows={categories}

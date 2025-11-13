@@ -135,7 +135,6 @@
 
 <div class="list-page-content-wrapper">
   <h1>Categories</h1>
-  <p>Select a category to view their details and manage their products.</p>
 
   <!-- 
     4. The template is now extremely simple and clean. It is purely presentational,

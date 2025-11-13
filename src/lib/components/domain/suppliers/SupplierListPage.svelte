@@ -124,8 +124,6 @@
 
 <div class="list-page-content-wrapper">
   <h1>Suppliers</h1>
-  <p>Select a supplier to view their details and manage their product categories.</p>
-
   <!-- 
     4. The template is now extremely simple and clean. It is purely presentational,
        containing no complex logic. It just renders the current state.

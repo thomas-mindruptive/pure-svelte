@@ -11,18 +11,22 @@
   import Field from "$lib/components/forms/Field.svelte";
   import FormComboBox2 from "$lib/components/forms/FormComboBox2.svelte";
   import type {
-      CancelledCallback,
-      ChangedCallback,
-      SubmitErrorCallback,
-      SubmittedCallback,
-      ValidateResult
+    CancelledCallback,
+    ChangedCallback,
+    SubmitErrorCallback,
+    SubmittedCallback,
+    ValidateResult,
   } from "$lib/components/forms/forms.types";
   import FormShell, { type FieldsSnippetProps } from "$lib/components/forms/FormShell.svelte";
   import "$lib/components/styles/form.css";
   import "$lib/components/styles/grid.css";
   import type { ValidationErrors } from "$lib/components/validation/validation.types";
   import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
-  import { Wio_PDef_Cat_Supp_Nested_WithLinks_Schema, type WholesalerItemOffering, type Wio_PDef_Cat_Supp_Nested_WithLinks } from "$lib/domain/domainTypes";
+  import {
+    Wio_PDef_Cat_Supp_Nested_WithLinks_Schema,
+    type WholesalerItemOffering,
+    type Wio_PDef_Cat_Supp_Nested_WithLinks,
+  } from "$lib/domain/domainTypes";
   import { zodToValidationErrors } from "$lib/domain/domainTypes.utils";
   import { assertDefined } from "$lib/utils/assertions";
   import { log } from "$lib/utils/logger";
@@ -95,7 +99,7 @@
           category_id: data.categoryId,
           product_def_id: data.productDefId,
           wholesaler_id: data.supplierId,
-          ...data.offering
+          ...data.offering,
         } as Wio_PDef_Cat_Supp_Nested_WithLinks;
       }
     }
@@ -316,7 +320,7 @@
 
     // Navigate to the copied offering detail page
     // Keep the same route context (suppliers or categories)
-    const basePath = initialLoadedData.urlPathName.replace(/\/offerings\/.*$/, '');
+    const basePath = initialLoadedData.urlPathName.replace(/\/offerings\/.*$/, "");
     window.location.href = `${basePath}/offerings/${copiedOfferingId}`;
   }
 </script>
@@ -532,6 +536,16 @@
             placeholder="Supplier Article Number"
             class="span-1"
           />
+
+          <!-- qiality --------------------------------------------------------------------------->
+          <Field
+            {fieldProps}
+            path={["quality"]}
+            label="Quality"
+            type="text"
+            placeholder="Quality"
+            class="span-1"
+          />
         </div>
         <!-- end row ----------------------------------------------------------------------------->
 
@@ -546,7 +560,7 @@
             {fieldProps}
             path={["override_material"]}
             label="override Material"
-            type="checkbox"   
+            type="checkbox"
             class="span-1"
           />
 

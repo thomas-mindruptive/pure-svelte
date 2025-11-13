@@ -28,9 +28,11 @@
     activeFilterCount: number;  // Drives "Clear all" button disabled state
     filterResetKey: number;     // Increment to signal all filters to reset
     initialFilterValues: Map<string, {operator: any, value: any}> | null;  // For UI state restore
+    filterExpanded: boolean;    // Controlled by parent (Datagrid), saved to localStorage
     onFilterChange: (key: string, condition: WhereCondition<any> | null) => void;
     onCombineModeToggle: () => void;
     onClearAllFilters: () => void;
+    onFilterToggle: (open: boolean) => void;  // Called when details opens/closes
     showSuperuserWhere?: boolean;  // Enable raw SQL WHERE clause input (SUPERUSER MODE)
     onRawWhereChange?: (rawWhere: string | null) => void;
   };
@@ -41,9 +43,11 @@
     activeFilterCount,
     filterResetKey,
     initialFilterValues,
+    filterExpanded,
     onFilterChange,
     onCombineModeToggle,
     onClearAllFilters,
+    onFilterToggle,
     showSuperuserWhere = false,
     onRawWhereChange
   }: Props = $props();
@@ -102,23 +106,31 @@
 
 </script>
 
-<div class="filter-toolbar">
-  <div class="filter-controls">
-    <button onclick={onCombineModeToggle} class="combine-toggle">
-      {combineMode === 'AND' ? 'All match (AND)' : 'Any match (OR)'}
-    </button>
+<details class="filter-details" open={filterExpanded} ontoggle={(e) => onFilterToggle((e.target as HTMLDetailsElement).open)}>
+  <summary class="filter-summary">
+    <span class="filter-summary-text">
+      Filters {activeFilterCount > 0 ? `(${activeFilterCount} active)` : ''}
+    </span>
+    <div class="filter-summary-buttons">
+      <button
+        onclick={(e) => { e.preventDefault(); onCombineModeToggle(); }}
+        class="combine-toggle"
+      >
+        {combineMode === 'AND' ? 'All match' : 'Any match'}
+      </button>
+      <button
+        onclick={(e) => { e.preventDefault(); onClearAllFilters(); }}
+        class="clear-all-btn"
+        disabled={activeFilterCount === 0}
+        title="Clear all filters"
+      >
+        Clear all filters
+      </button>
+    </div>
+  </summary>
 
-    <button
-      onclick={onClearAllFilters}
-      class="clear-all-btn"
-      disabled={activeFilterCount === 0}
-      title="Clear all filters"
-    >
-      Clear all filters ({activeFilterCount})
-    </button>
-  </div>
-
-  {#if showSuperuserWhere}
+  <div class="filter-toolbar-content">
+    {#if showSuperuserWhere}
     <div class="superuser-where-section">
       <div class="superuser-where-header">
         <span class="superuser-label">⚠️ SUPERUSER MODE: Raw SQL WHERE</span>
@@ -179,22 +191,49 @@
       {/if}
     {/each}
   </div>
-</div>
+  </div>
+</details>
 
 <style>
-  .filter-toolbar {
+  .filter-details {
+    border: 1px solid var(--color-border, #ddd);
+    border-radius: 4px;
+    margin-bottom: 1rem;
+    background: var(--color-surface, #fff);
+  }
+
+  .filter-summary {
+    padding: 0.75rem 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+    background: var(--color-surface-alt, #f8f9fa);
+    border-radius: 4px;
+  }
+
+  .filter-summary:hover {
+    background: var(--color-surface-hover, #e9ecef);
+  }
+
+  .filter-summary-text {
+    display: inline-block;
+    margin-right: 1rem;
+  }
+
+  .filter-summary-buttons {
+    display: inline-flex;
+    gap: 0.5rem;
+    align-items: center;
+    float: right;
+  }
+
+  .filter-toolbar-content {
     padding: 1rem;
     background: var(--color-background-secondary);
-    border-bottom: 1px solid var(--color-border);
+    border-top: 1px solid var(--color-border);
     display: flex;
     flex-direction: column;
     gap: 1rem;
-  }
-
-  .filter-controls {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
   }
 
   .combine-toggle {

@@ -198,7 +198,7 @@
   let combineMode = $state<'AND'|'OR'>(filterCombineMode);
   let filterResetKey = $state(0);
   let filterExpanded = $state(savedState.ui.filterExpanded ?? true);
-  let filterToggleReady = false;  // Guard: prevent ontoggle during initial render
+  let filterToolbarReady = $state(false);  // Only render toolbar when state is loaded
 
   // Initial filter values for UI restore (MUST be $state so Clear All can reset it!)
   let initialFilterValues = $state<Map<string, {operator: any, value: any}> | null>(
@@ -285,22 +285,21 @@
           }
         }
 
-        // CRITICAL: Enable filter toggle AFTER initial render + data load complete
-        // Prevents ontoggle event during <details open={filterExpanded}> initialization
-        filterToggleReady = true;
-        console.log(`[Datagrid ${gridId}] filterToggleReady=true - toggle events now allowed`);
+        // CRITICAL: Enable filter toolbar rendering AFTER state is loaded
+        filterToolbarReady = true;
+        log.info(`[Datagrid ${gridId}] filterToolbarReady=true - toolbar can render`);
       })();
     } else {
-      // No onQueryChange provided, still need to enable toggle after mount
-      filterToggleReady = true;
-      console.log(`[Datagrid ${gridId}] filterToggleReady=true (no onQueryChange)`);
+      // No onQueryChange provided, still enable toolbar after mount
+      filterToolbarReady = true;
+      log.info(`[Datagrid ${gridId}] filterToolbarReady=true (no onQueryChange)`);
     }
 
     // Cleanup: prevent state updates on unmounted component + cancel pending debounced calls
     return () => {
-      console.log(`[Datagrid ${gridId}] UNMOUNT`);
+      log.info(`[Datagrid ${gridId}] UNMOUNT`);
       isMounted = false;  // Mark as unmounted
-      filterToggleReady = false;  // Reset guard
+      filterToolbarReady = false;  // Reset guard
       debouncedQueryChange.cancel();  // Cancel any pending debounced calls
     };
   });
@@ -593,21 +592,6 @@
     }
   }
 
-  function handleFilterToggle(event: Event) {
-    // CRITICAL: Block during initial render to prevent loop
-    // The <details> element fires ontoggle when initially set with open={filterExpanded} from localStorage
-    if (!filterToggleReady) {
-      console.log(`[Datagrid ${gridId}] handleFilterToggle: BLOCKED during initial render`);
-      return;
-    }
-
-    // CRITICAL: Read state from DOM, don't toggle manually
-    // If we toggle (!filterExpanded), we might be out of sync with browser's internal state → loop
-    const detailsElement = event.target as HTMLDetailsElement;
-    filterExpanded = detailsElement.open;
-    console.log(`[Datagrid ${gridId}] handleFilterToggle: filterExpanded=${filterExpanded}`);
-    stateManager.saveUI({ filterExpanded });
-  }
 
   function handleRawWhereChange(newRawWhere: string | null) {
     log.info(`[Datagrid] Raw WHERE changed:`, newRawWhere);
@@ -617,6 +601,12 @@
 
     // 2. Trigger reload - EXACTLY like filters! sortState is preserved
     debouncedQueryChange(buildWhereGroup(), sortState.length > 0 ? sortState : null);
+  }
+
+  function handleFilterToggle(open: boolean) {
+    log.info(`[Datagrid ${gridId}] handleFilterToggle: filterExpanded=${open}`);
+    filterExpanded = open;
+    stateManager.saveUI({ filterExpanded });
   }
 
   // ===== SORTING LOGIC =====
@@ -947,24 +937,21 @@
   </div>
 
   <!-- FILTER TOOLBAR (auto-rendered if any column is filterable) --------------------------------->
-  {#if hasFilterableColumns}
-    <details class="filter-details" open={filterExpanded} ontoggle={handleFilterToggle}>
-      <summary class="filter-summary">
-        Filters {activeFilterCount > 0 ? `(${activeFilterCount} active)` : ''}
-      </summary>
-      <FilterToolbar
-        {columns}
-        {combineMode}
-        {activeFilterCount}
-        {filterResetKey}
-        {initialFilterValues}
-        {showSuperuserWhere}
-        onFilterChange={handleFilterChange}
-        onCombineModeToggle={handleCombineModeToggle}
-        onClearAllFilters={handleClearAllFilters}
-        onRawWhereChange={handleRawWhereChange}
-      />
-    </details>
+  {#if hasFilterableColumns && filterToolbarReady}
+    <FilterToolbar
+      {columns}
+      {combineMode}
+      {activeFilterCount}
+      {filterResetKey}
+      {initialFilterValues}
+      {filterExpanded}
+      {showSuperuserWhere}
+      onFilterChange={handleFilterChange}
+      onCombineModeToggle={handleCombineModeToggle}
+      onClearAllFilters={handleClearAllFilters}
+      onFilterToggle={handleFilterToggle}
+      onRawWhereChange={handleRawWhereChange}
+    />
   {/if}
 
   <!-- TABLE CONTAINER --------------------------------------------------------------------------->
@@ -1166,25 +1153,3 @@
     {@render meta({ selectedIds, deletingObjectIds, deleteSelected })}
   {/if}
 </div>
-
-<style>
-  .filter-details {
-    border: 1px solid var(--color-border, #ddd);
-    border-radius: 4px;
-    margin-bottom: 1rem;
-    background: var(--color-surface, #fff);
-  }
-
-  .filter-summary {
-    padding: 0.75rem 1rem;
-    font-weight: 600;
-    cursor: pointer;
-    user-select: none;
-    background: var(--color-surface-alt, #f8f9fa);
-    border-radius: 4px;
-  }
-
-  .filter-summary:hover {
-    background: var(--color-surface-hover, #e9ecef);
-  }
-</style>

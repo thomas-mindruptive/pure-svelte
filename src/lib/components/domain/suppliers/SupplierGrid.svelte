@@ -95,8 +95,6 @@
         return "-";
       },
       sortable: true,
-      filterable: true,
-      filterType: "text",
       width: "180px",
       isLink: true,
       onClick: (r) => {

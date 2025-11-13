@@ -42,8 +42,11 @@
 
   let { data }: Props = $props();
   let resolvedOfferings = $state<OfferingReportViewWithLinks[]>([]);
-  let isLoading = $state(false);  // Page-level loading (for error handling)
+  let isLoading = $state(false);  // Page-level loading (for error handling), used for future UI enhancements
   let rawWhere = $state<string | null>(null);  // Superuser raw WHERE clause
+
+  // Suppress unused warning - isLoading is part of the standard page pattern
+  $effect(() => void isLoading);
 
   const client = new ApiClient(data.loadEventFetch);
   const offeringApi = getOfferingApi(client);
@@ -95,9 +98,6 @@
 
 <div class="page-container">
   <h1>Offerings Report</h1>
-  {#if isLoading && resolvedOfferings.length === 0}
-    <p class="loading-message">Loading offerings...</p>
-  {/if}
   <OfferingReportGrid
     rows={resolvedOfferings}
     onQueryChange={handleQueryChange}

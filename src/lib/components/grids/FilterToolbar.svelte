@@ -16,20 +16,21 @@
    * - Implicit: Parse column key for patterns (_id, price, is_, has_)
    * - Fallback: text filter
    */
-  import type { ColumnDef } from './Datagrid.types';
-  import type { WhereCondition } from '$lib/backendQueries/queryGrammar';
+  import type { ColumnDef, CustomFilterDef } from './Datagrid.types';
+  import type { WhereCondition, WhereConditionGroup } from '$lib/backendQueries/queryGrammar';
   import TextFilter from './filters/TextFilter.svelte';
   import NumberFilter from './filters/NumberFilter.svelte';
   import BooleanFilter from './filters/BooleanFilter.svelte';
 
   type Props = {
     columns: ColumnDef<any>[];
+    customFilters?: CustomFilterDef<any>[];  // NEW: Custom filter definitions
     combineMode: 'AND' | 'OR';
     activeFilterCount: number;  // Drives "Clear all" button disabled state
     filterResetKey: number;     // Increment to signal all filters to reset
     initialFilterValues: Map<string, {operator: any, value: any}> | null;  // For UI state restore
     filterExpanded: boolean;    // Controlled by parent (Datagrid), saved to localStorage
-    onFilterChange: (key: string, condition: WhereCondition<any> | null) => void;
+    onFilterChange: (key: string, condition: WhereCondition<any> | WhereConditionGroup<any> | null) => void;
     onCombineModeToggle: () => void;
     onClearAllFilters: () => void;
     onFilterToggle: (open: boolean) => void;  // Called when details opens/closes
@@ -39,6 +40,7 @@
 
   let {
     columns,
+    customFilters = [],  // NEW: Custom filters array
     combineMode,
     activeFilterCount,
     filterResetKey,
@@ -55,6 +57,63 @@
   // Superuser raw WHERE state
   let rawWhereInput = $state("");
   let rawWhereActive = $state(false);
+
+  // Custom filter state management
+  let customFilterStates = $state<Map<string, any>>(new Map());
+
+  // Determine if FilterToolbar should render (self-decision)
+  const hasColumnFilters = $derived(
+    columns.some(col => col.key !== '<computed>' && 'filterable' in col && col.filterable === true)
+  );
+
+  const hasQuickFilters = $derived(
+    customFilters.some(f => f.placement.type === 'quickfilter')
+  );
+
+  const shouldRender = $derived(
+    hasColumnFilters || hasQuickFilters
+  );
+
+  // Sort custom filters by placement
+  const quickFilters = $derived(
+    customFilters
+      .filter(f => f.placement.type === 'quickfilter')
+      .sort((a, b) => a.placement.pos - b.placement.pos)
+  );
+
+  // TODO: Implement column placement filters in future iteration
+  // const columnInsertFilters = $derived(
+  //   customFilters
+  //     .filter(f => f.placement.type === 'column')
+  //     .sort((a, b) => a.placement.pos - b.placement.pos)
+  // );
+
+  /**
+   * Initialize custom filter states from initialFilterValues or defaults
+   */
+  $effect(() => {
+    customFilters.forEach(filter => {
+      const savedValue = initialFilterValues?.get(filter.id);
+      if (savedValue !== undefined) {
+        customFilterStates.set(filter.id, savedValue.value);
+      } else if (filter.defaultValue !== undefined) {
+        customFilterStates.set(filter.id, filter.defaultValue);
+      }
+    });
+  });
+
+  /**
+   * Handle custom filter state changes
+   */
+  function handleCustomFilterChange(filterId: string, newValue: any) {
+    customFilterStates.set(filterId, newValue);
+
+    const filter = customFilters.find(f => f.id === filterId);
+    if (!filter) return;
+
+    const condition = filter.buildCondition(newValue);
+    onFilterChange(filterId, condition);
+  }
 
   /**
    * Type guard: Filters out computed columns (key === '<computed>').
@@ -106,6 +165,7 @@
 
 </script>
 
+{#if shouldRender}
 <details class="filter-details" open={filterExpanded} ontoggle={(e) => onFilterToggle((e.target as HTMLDetailsElement).open)}>
   <summary class="filter-summary">
     <span class="filter-summary-text">
@@ -156,6 +216,63 @@
     </div>
   {/if}
 
+  <!-- Quick Filters Section -->
+  {#if quickFilters.length > 0}
+    <div class="quick-filters-section">
+      <span class="quick-filter-label">Quick Filters:</span>
+      {#each quickFilters as filter (filter.id)}
+        {#key filterResetKey}
+          {#if filter.type === 'checkbox'}
+            <label class="quick-filter-checkbox">
+              <input
+                type="checkbox"
+                checked={customFilterStates.get(filter.id) ?? filter.defaultValue ?? false}
+                onchange={(e) => handleCustomFilterChange(filter.id, (e.target as HTMLInputElement).checked)}
+              />
+              <span>{filter.label}</span>
+            </label>
+          {:else if filter.type === 'select'}
+            <div class="quick-filter-select">
+              <label for="quick-filter-{filter.id}">{filter.label}:</label>
+              <select
+                id="quick-filter-{filter.id}"
+                value={customFilterStates.get(filter.id) ?? filter.defaultValue ?? ''}
+                onchange={(e) => handleCustomFilterChange(filter.id, (e.target as HTMLSelectElement).value)}
+              >
+                <option value="">All</option>
+                {#each filter.options ?? [] as option}
+                  <option value={option.value}>{option.label}</option>
+                {/each}
+              </select>
+            </div>
+          {:else if filter.type === 'radio'}
+            <div class="quick-filter-radio">
+              <span>{filter.label}:</span>
+              {#each filter.options ?? [] as option}
+                <label>
+                  <input
+                    type="radio"
+                    name={filter.id}
+                    value={option.value}
+                    checked={(customFilterStates.get(filter.id) ?? filter.defaultValue) === option.value}
+                    onchange={() => handleCustomFilterChange(filter.id, option.value)}
+                  />
+                  {option.label}
+                </label>
+              {/each}
+            </div>
+          {:else if filter.type === 'custom' && filter.component}
+            {@const Component = filter.component}
+            <Component
+              value={customFilterStates.get(filter.id) ?? filter.defaultValue}
+              onChange={(newValue: any) => handleCustomFilterChange(filter.id, newValue)}
+            />
+          {/if}
+        {/key}
+      {/each}
+    </div>
+  {/if}
+
   <div class="filter-inputs">
     {#each columns as col (col.key)}
       {#if isFilterableColumn(col) && col.filterable}
@@ -193,6 +310,7 @@
   </div>
   </div>
 </details>
+{/if}
 
 <style>
   .filter-details {
@@ -270,6 +388,69 @@
     display: flex;
     gap: 1rem;
     flex-wrap: wrap;
+  }
+
+  /* Quick Filters Styles */
+  .quick-filters-section {
+    padding: 0.75rem 1rem;
+    background: var(--color-surface-alt, #f8f9fa);
+    border-bottom: 1px solid var(--color-border, #dee2e6);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .quick-filter-label {
+    font-weight: 600;
+    color: var(--color-text-muted, #6c757d);
+    margin-right: 0.5rem;
+  }
+
+  .quick-filter-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .quick-filter-checkbox input {
+    cursor: pointer;
+  }
+
+  .quick-filter-select {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .quick-filter-select label {
+    font-weight: 500;
+  }
+
+  .quick-filter-select select {
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--color-border, #ddd);
+    border-radius: 3px;
+    background: var(--color-surface, #fff);
+  }
+
+  .quick-filter-radio {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .quick-filter-radio > span {
+    font-weight: 500;
+  }
+
+  .quick-filter-radio label {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    cursor: pointer;
   }
 
   /* Superuser Raw WHERE Section */

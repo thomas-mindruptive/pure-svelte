@@ -23,6 +23,7 @@ import {
   WholesalerSchema,
   type Order_Wholesaler,
   type ProductCategory,
+  type CategoryWithOfferingCount,
   type Wholesaler,
   /* <refact01> DEPRECATED: wholesaler_categories removed
   type WholesalerCategory,
@@ -240,6 +241,23 @@ export function getSupplierApi(client: ApiClient) {
       if (where) queryPartial.where = where;
       if (orderBy) queryPartial.orderBy = orderBy;
       return categoryApi.loadCategories(queryPartial);
+    },
+
+    /**
+     * Loads categories with total offering count (across all suppliers).
+     * supplierId parameter kept for interface consistency but is unused.
+     * The view shows total offerings per category, not supplier-specific counts.
+     */
+    async loadCategoriesWithOfferingCount(
+      supplierId: number,
+      where?: WhereCondition<CategoryWithOfferingCount> | WhereConditionGroup<CategoryWithOfferingCount> | null,
+      orderBy?: SortDescriptor<CategoryWithOfferingCount>[] | null,
+    ): Promise<CategoryWithOfferingCount[]> {
+      const categoryApi = getCategoryApi(client);
+      const queryPartial: Partial<QueryPayload<CategoryWithOfferingCount>> = {};
+      if (where) queryPartial.where = where;
+      if (orderBy) queryPartial.orderBy = orderBy;
+      return categoryApi.loadCategoriesWithOfferingCount(queryPartial);
     },
 
     // ===== OFFERINGS =====

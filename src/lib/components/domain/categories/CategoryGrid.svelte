@@ -1,36 +1,53 @@
 <script lang="ts">
+  import { ComparisonOperator, type SortDescriptor, type WhereCondition, type WhereConditionGroup } from "$lib/backendQueries/queryGrammar";
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
-  import type { ColumnDef, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
-  import type { SortDescriptor, WhereCondition, WhereConditionGroup } from "$lib/backendQueries/queryGrammar";
-  import type { ProductCategory, ProductCategorySchema } from "$lib/domain/domainTypes";
+  import type { ColumnDef, CustomFilterDef, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
+  import { type CategoryWithOfferingCount, CategoryWithOfferingCountSchema } from "$lib/domain/domainTypes";
 
   // === PROPS ====================================================================================
 
   export type CategoryGridProps = {
-    rows: ProductCategory[];
+    rows: CategoryWithOfferingCount[];
     selection?: "none" | "single" | "multiple";
-    deleteStrategy: DeleteStrategy<ProductCategory>;
-    rowActionStrategy?: RowActionStrategy<ProductCategory>;
-    // Support both old onSort and new onQueryChange patterns
-    onSort?: ((sortState: SortDescriptor<ProductCategory>[] | null) => Promise<void> | void) | undefined;
+    deleteStrategy: DeleteStrategy<CategoryWithOfferingCount>;
+    rowActionStrategy?: RowActionStrategy<CategoryWithOfferingCount>;
     onQueryChange?: (query: {
-      filters: WhereCondition<ProductCategory> | WhereConditionGroup<ProductCategory> | null,
-      sort: SortDescriptor<ProductCategory>[] | null
+      filters: WhereCondition<CategoryWithOfferingCount> | WhereConditionGroup<CategoryWithOfferingCount> | null,
+      sort: SortDescriptor<CategoryWithOfferingCount>[] | null
     }) => Promise<void> | void;
   };
 
-  const { rows = [], selection = "multiple", deleteStrategy, rowActionStrategy, onSort, onQueryChange }: CategoryGridProps = $props();
+  const { rows = [], selection = "multiple", deleteStrategy, rowActionStrategy, onQueryChange }: CategoryGridProps = $props();
 
   // === COLUMNS ====================================================================================
 
-  const columns: ColumnDef<typeof ProductCategorySchema>[] = [
-    { key: "name", header: "Name", sortable: true, width: "25rem" },
-    { key: "category_id", header: "id", sortable: true, width: "5rem" },  // No filterable property = not filterable
-    { key: "description", header: "description", sortable: true, width: "" },
+  const columns: ColumnDef<typeof CategoryWithOfferingCountSchema>[] = [
+    { key: "category_name", header: "Name", sortable: true, filterable: true, width: "20rem" },
+    { key: "category_id", header: "ID", sortable: true, width: "5rem" },
+    { key: "offering_count", header: "Offerings", sortable: true, filterable: true, filterType: 'number', width: "8rem" },
+    { key: "description", header: "Description", sortable: true, filterable: true },
   ];
 
-  // Composite key for categories (wholesaler_id + category_id)
-  const getId = (r: ProductCategory): number => r.category_id;
+  // Custom filters
+  const customFilters: CustomFilterDef<CategoryWithOfferingCount>[] = [
+    {
+      id: 'has_offerings',
+      label: 'Show categories with offerings only',
+      type: 'checkbox',
+      placement: { type: 'quickfilter', pos: 0 },
+      defaultValue: false,
+      buildCondition: (checked: boolean) => checked
+        ? {
+            key: 'offering_count',
+            whereCondOp: ComparisonOperator.GT,
+            val: 0
+          }
+        : null
+    }
+  ];
+
+  // Get ID for categories
+  const getId = (r: CategoryWithOfferingCount): number => r.category_id;
 </script>
 
 <!--- TEMPLATE ----------------------------------------------------------------------------------->
@@ -38,13 +55,13 @@
 <Datagrid
   {rows}
   {columns}
+  {customFilters}
   {getId}
   {selection}
   gridId="categories"
   entity="category"
   {deleteStrategy}
   {rowActionStrategy}
-  {onSort}
   {onQueryChange}
 />
 

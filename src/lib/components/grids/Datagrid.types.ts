@@ -1,5 +1,6 @@
-import type { WhereConditionGroup, SortDescriptor, ComparisonOperator } from "$lib/backendQueries/queryGrammar";
+import type { WhereCondition, WhereConditionGroup, SortDescriptor, ComparisonOperator } from "$lib/backendQueries/queryGrammar";
 import type { QualifiedColumnsFromBrandedSchemaWithJoins } from "$lib/domain/domainTypes.utils";
+import type { SvelteComponent } from "svelte";
 import type z from "zod";
 
 // ===== COLUMNS ==================================================================================
@@ -103,4 +104,63 @@ export type ToolbarSnippetProps = {
   selectedIds: Set<ID>;
   deletingObjectIds: Set<ID>;
   deleteSelected: () => Promise<void> | void;
+};
+
+// ===== CUSTOM FILTERS ==========================================================================
+
+/**
+ * Callback that generates WhereCondition(s) based on custom UI state.
+ * Returns null to clear/remove the filter.
+ */
+export type CustomFilterCallback<T> = (
+  state: any
+) => WhereCondition<T> | WhereConditionGroup<T> | null;
+
+/**
+ * Placement configuration for custom filters.
+ */
+export type CustomFilterPlacement = {
+  /** Where to place the filter */
+  type: 'quickfilter' | 'column';
+  /** Position within that placement area (0 = first, 1 = second, etc.) */
+  pos: number;
+};
+
+/**
+ * Definition for a custom filter UI component.
+ */
+export type CustomFilterDef<T> = {
+  /** Unique identifier for this custom filter (used as Map key) */
+  id: string;
+
+  /** Display label for the filter UI */
+  label: string;
+
+  /** Type of UI component to render */
+  type: 'checkbox' | 'radio' | 'select' | 'custom';
+
+  /** Options for select/radio types */
+  options?: Array<{
+    label: string;
+    value: any;
+    description?: string;
+  }>;
+
+  /** Default state value when filter is initialized */
+  defaultValue?: any;
+
+  /** Where to place this filter in the UI */
+  placement: CustomFilterPlacement;
+
+  /**
+   * Callback that converts UI state into WhereCondition(s).
+   * Return null to remove the filter.
+   */
+  buildCondition: CustomFilterCallback<T>;
+
+  /**
+   * Optional: Custom Svelte component for 'custom' type.
+   * Component receives props: { value: any, onChange: (newValue: any) => void }
+   */
+  component?: typeof SvelteComponent;
 };

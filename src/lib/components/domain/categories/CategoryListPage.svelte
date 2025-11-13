@@ -5,9 +5,9 @@
   import { log } from "$lib/utils/logger";
   import { ApiClient } from "$lib/api/client/apiClient";
   import type { ID, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
-  import type { SortDescriptor, WhereCondition, WhereConditionGroup } from "$lib/backendQueries/queryGrammar";
+  import type { QueryPayload, SortDescriptor, WhereCondition, WhereConditionGroup } from "$lib/backendQueries/queryGrammar";
   import { page } from "$app/state";
-  import type { ProductCategory } from "$lib/domain/domainTypes";
+  import type { CategoryWithOfferingCount } from "$lib/domain/domainTypes";
   import { getCategoryApi } from "$lib/api/client/category";
   import { stringsToNumbers } from "$lib/utils/typeConversions";
   import { cascadeDelete } from "$lib/api/client/cascadeDelete";
@@ -27,7 +27,7 @@
 
   // === STATE =====================================================================================
 
-  let resolvedCategories = $state<ProductCategory[]>([]);
+  let resolvedCategories = $state<CategoryWithOfferingCount[]>([]);
   let loadingOrValidationError = $state<{ message: string; status: number } | null>(null);
   const allowForceCascadingDelte = $state(true);
 
@@ -45,7 +45,7 @@
   const client = new ApiClient(data.loadEventFetch);
   const categoryApi = getCategoryApi(client);
 
-  function handleCategorySelect(category: ProductCategory): void {
+  function handleCategorySelect(category: CategoryWithOfferingCount): void {
     log.info(`Navigating to detail for categoryId: ${category.category_id}`);
     goto(`${page.url.pathname}/${category.category_id}`);
   }
@@ -67,7 +67,7 @@
     );
 
     if (dataChanged) {
-      resolvedCategories = await categoryApi.loadCategories();
+      resolvedCategories = await categoryApi.loadCategoriesWithOfferingCount();
     }
   }
 
@@ -80,8 +80,8 @@
   let firstLoadComplete = false;
 
   async function handleQueryChange(query: {
-    filters: WhereCondition<ProductCategory> | WhereConditionGroup<ProductCategory> | null,
-    sort: SortDescriptor<ProductCategory>[] | null
+    filters: WhereCondition<CategoryWithOfferingCount> | WhereConditionGroup<CategoryWithOfferingCount> | null,
+    sort: SortDescriptor<CategoryWithOfferingCount>[] | null
   }) {
     log.info(`(CategoryListPage) Query change - filters:`, query.filters, `sort:`, query.sort);
 
@@ -92,12 +92,12 @@
     loadingOrValidationError = null;
 
     try {
-      // API expects WhereConditionGroup | null, we have WhereCondition | WhereConditionGroup | null
-      // Cast to match API expectation (WhereCondition gets wrapped in a group internally)
-      resolvedCategories = await categoryApi.loadCategoriesWithWhereAndOrder(
-        query.filters as WhereConditionGroup<ProductCategory> | null,
-        query.sort
-      );
+      // Use loadCategoriesWithOfferingCount to get the offering counts
+      const queryPartial: Partial<QueryPayload<CategoryWithOfferingCount>> = {};
+      if (query.filters) queryPartial.where = query.filters;
+      if (query.sort) queryPartial.orderBy = query.sort;
+
+      resolvedCategories = await categoryApi.loadCategoriesWithOfferingCount(queryPartial);
       log.info(`(CategoryListPage) Received ${resolvedCategories.length} categories`);
 
       // First load is done, clear the initial loading state
@@ -122,11 +122,11 @@
 
   // === GRID STRATEGIES ==========================================================================
 
-  const deleteStrategy: DeleteStrategy<ProductCategory> = {
+  const deleteStrategy: DeleteStrategy<CategoryWithOfferingCount> = {
     execute: handleCategoryDelete,
   };
 
-  const rowActionStrategy: RowActionStrategy<ProductCategory> = {
+  const rowActionStrategy: RowActionStrategy<CategoryWithOfferingCount> = {
     click: handleCategorySelect,
   };
 </script>

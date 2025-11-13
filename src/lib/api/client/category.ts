@@ -18,11 +18,15 @@ import {
 } from "$lib/backendQueries/queryGrammar";
 import {
   type ProductCategory,
+  ProductCategorySchema,
+  type CategoryWithOfferingCount,
+  CategoryWithOfferingCountSchema,
   type ProductDefinition,
   type Wholesaler,
   type WholesalerItemOffering,
   type Wio_PDef_Cat_Supp_Nested_WithLinks
 } from "$lib/domain/domainTypes";
+import { genTypedQualifiedColumns } from "$lib/domain/domainTypes.utils";
 import { log } from "$lib/utils/logger";
 import type { ApiClient } from "./apiClient";
 import { createJsonAndWrapInPayload, createJsonAndWrapInPayloadPartial, createJsonBody, getErrorMessage } from "./common";
@@ -48,9 +52,10 @@ export function getCategoryApi(client: ApiClient) {
       const operationId = "loadCategories";
       categoryLoadingManager.start(operationId);
       try {
+        const cols = genTypedQualifiedColumns(ProductCategorySchema, false);
         const fullQuery: QueryPayload<ProductCategory> = {
-          select: ["category_id", "name", "description"],
-          orderBy: [{ key: "name", direction: "asc" }],
+          select: cols,
+          orderBy: [{ key: "pc.name", direction: "asc" }],
           limit: 100,
           ...query,
         };
@@ -60,6 +65,38 @@ export function getCategoryApi(client: ApiClient) {
           { context: operationId },
         );
         return responseData.results as ProductCategory[];
+      } catch (err) {
+        log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
+        throw err;
+      } finally {
+        categoryLoadingManager.finish(operationId);
+      }
+    },
+
+    /**
+     * Loads categories with offering count from the view_categories_with_offering_count view.
+     * Supports filtering and sorting through query payload.
+     */
+    async loadCategoriesWithOfferingCount(
+      query: Partial<QueryPayload<CategoryWithOfferingCount>> = {}
+    ): Promise<CategoryWithOfferingCount[]> {
+      const operationId = "loadCategoriesWithOfferingCount";
+      categoryLoadingManager.start(operationId);
+      try {
+        const cols = genTypedQualifiedColumns(CategoryWithOfferingCountSchema, false);
+        const fullQuery: QueryPayload<CategoryWithOfferingCount> = {
+          from: { table: "dbo.view_categories_with_offering_count", alias: "cwoc" },
+          select: cols,
+          orderBy: [{ key: "cwoc.category_name", direction: "asc" }],
+          limit: 100,
+          ...query,
+        };
+        const responseData = await client.apiFetch<QueryResponseData<CategoryWithOfferingCount>>(
+          "/api/query",
+          { method: "POST", body: createJsonAndWrapInPayload(fullQuery) },
+          { context: operationId },
+        );
+        return responseData.results as CategoryWithOfferingCount[];
       } catch (err) {
         log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
         throw err;

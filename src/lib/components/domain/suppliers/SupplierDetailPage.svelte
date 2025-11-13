@@ -19,13 +19,13 @@
   import { getCategoryApi } from "$lib/api/client/category";
   import { getSupplierApi, supplierLoadingState } from "$lib/api/client/supplier";
   import type { ColumnDef, DeleteStrategy, ID, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
-  import type { SortDescriptor } from "$lib/backendQueries/queryGrammar";
+  import type { SortDescriptor, WhereCondition, WhereConditionGroup } from "$lib/backendQueries/queryGrammar";
   import {
     type Order,
     type Order_Wholesaler,
     Order_Wholesaler_Schema,
-    type ProductCategory,
-    ProductCategorySchema,
+    type CategoryWithOfferingCount,
+    CategoryWithOfferingCountSchema,
     type Wholesaler,
     /* <refact01> DEPRECATED: wholesaler_categories removed
     type WholesalerCategory,
@@ -72,7 +72,7 @@
   let assignedCategories = $state<WholesalerCategory_Category_Nested[]>([]);
   let availableCategories = $state<ProductCategory[]>([]);
   */
-  let categories = $state<ProductCategory[]>([]); // <refact01> All categories, no assignments
+  let categories = $state<CategoryWithOfferingCount[]>([]);
   let orders = $state<Order_Wholesaler[]>([]);
 
   //let resolvedData = $state<SupplierDetailPage_LoadData | null>(null);
@@ -123,9 +123,9 @@
         // === Categories path=================================================
         if ("categories" === data.activeChildPath) {
           // <refact01> CHANGED: Load ALL categories (no more assignments)
-          categories = await supplierApi.loadCategoriesForSupplier(data.supplierId);
+          categories = await supplierApi.loadCategoriesWithOfferingCount(data.supplierId);
           if (aborted) return;
-          const categoriesVal = safeParseFirstN(ProductCategorySchema, categories, 3);
+          const categoriesVal = safeParseFirstN(CategoryWithOfferingCountSchema, categories, 3);
           if (categoriesVal.error) {
             errors.categories = zodToValidationErrorTree(categoriesVal.error);
             log.error("Categories validation failed", errors.categories);
@@ -297,7 +297,7 @@
     if (dataChanged) {
       // Reload categories after delete
       assertDefined(supplier, "supplier must be defined");
-      categories = await supplierApi.loadCategoriesForSupplier(supplier.wholesaler_id);
+      categories = await supplierApi.loadCategoriesWithOfferingCount(supplier.wholesaler_id);
     }
   }
 
@@ -305,25 +305,32 @@
    * Navigates to the offerings page for this supplier and category.
    * <refact01> CHANGED: Navigate to /suppliers/N/categories/M (stays in supplier context)
    */
-  function handleCategorySelect(category: ProductCategory) {
+  function handleCategorySelect(category: CategoryWithOfferingCount) {
     goto(buildChildUrl(page.url.pathname, "categories", category.category_id));
   }
 
-  const categoriesRowActionStrategy: RowActionStrategy<ProductCategory> = {
+  const categoriesRowActionStrategy: RowActionStrategy<CategoryWithOfferingCount> = {
     click: handleCategorySelect,
   };
 
   // <refact01> CHANGED: Delete now performs master-data delete (not assignment delete)
-  const categoriesDeleteStrategy: DeleteStrategy<ProductCategory> = {
+  const categoriesDeleteStrategy: DeleteStrategy<CategoryWithOfferingCount> = {
     execute: handleCategoryDelete,
   };
 
   /**
-   * Handles category grid sorting.
-   * <refact01> CHANGED: Now uses categoryApi.loadCategories directly with orderBy
+   * Handle categories query changes (filter and sort).
    */
-  async function handleCategoriesSort(sortState: SortDescriptor<ProductCategory>[] | null) {
-    categories = await categoryApi.loadCategoriesWithWhereAndOrder(null, sortState);
+  async function handleCategoriesQueryChange(query: {
+    filters: WhereCondition<CategoryWithOfferingCount> | WhereConditionGroup<CategoryWithOfferingCount> | null,
+    sort: SortDescriptor<CategoryWithOfferingCount>[] | null
+  }) {
+    assertDefined(supplier, "supplier must be defined");
+    categories = await supplierApi.loadCategoriesWithOfferingCount(
+      supplier.wholesaler_id,
+      query.filters,
+      query.sort
+    );
   }
 
   // === ORDERS GRID ==============================================================================
@@ -404,7 +411,7 @@
         rows={categories}
         deleteStrategy={categoriesDeleteStrategy}
         rowActionStrategy={categoriesRowActionStrategy}
-        onSort={handleCategoriesSort}
+        onQueryChange={handleCategoriesQueryChange}
       />
     {/if}
   </div>

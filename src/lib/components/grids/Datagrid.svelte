@@ -20,7 +20,7 @@
   import { log } from "$lib/utils/logger";
   import type { Snippet } from "svelte";
   import { fade } from "svelte/transition";
-  import type { ColumnDef, ConfirmResult, DeleteStrategy, DryRunResult, ID, RowActionStrategy, SelectionChangeHandler, ToolbarSnippetProps } from "./Datagrid.types";
+  import type { ColumnDef, ConfirmResult, CustomFilterDef, DeleteStrategy, DryRunResult, ID, RowActionStrategy, SelectionChangeHandler, ToolbarSnippetProps } from "./Datagrid.types";
 
   import type { SortDescriptor, WhereCondition, WhereConditionGroup } from "$lib/backendQueries/queryGrammar";
   import "$lib/components/styles/loadingIndicator.css";
@@ -65,6 +65,7 @@
 
     // Columns and row ids.
     columns: ColumnDef<any>[];
+    customFilters?: CustomFilterDef<T>[];  // NEW: Custom filter definitions
     getId: (row: any) => number;
 
     // Select and delte indicator
@@ -115,6 +116,7 @@
 
     rows = [] as any[],
     columns = [] as ColumnDef<any>[],
+    customFilters = [],
     getId,
 
     selection = "multiple" as "none" | "single" | "multiple",
@@ -194,7 +196,7 @@
   let isLoadingData = $state(false);  // Grid owns its data loading state
 
   // Filtering (from Datagrid2) - initialize with saved state
-  let activeFilters = new SvelteMap<string, WhereCondition<T>>();
+  let activeFilters = new SvelteMap<string, WhereCondition<T> | WhereConditionGroup<T>>();
   let combineMode = $state<'AND'|'OR'>(filterCombineMode);
   let filterResetKey = $state(0);
   let filterExpanded = $state(savedState.ui.filterExpanded ?? true);
@@ -540,7 +542,7 @@
     };
   }
 
-  async function handleFilterChange(columnKey: string, condition: WhereCondition<T> | null) {
+  async function handleFilterChange(columnKey: string, condition: WhereCondition<T> | WhereConditionGroup<T> | null) {
     log.debug(`[Datagrid] Filter change for key: ${columnKey}`, condition);
 
     if (condition) {
@@ -936,10 +938,11 @@
     {/if}
   </div>
 
-  <!-- FILTER TOOLBAR (auto-rendered if any column is filterable) --------------------------------->
-  {#if hasFilterableColumns && filterToolbarReady}
+  <!-- FILTER TOOLBAR (self-decides whether to render) ------------------------------------------->
+  {#if filterToolbarReady}
     <FilterToolbar
       {columns}
+      {customFilters}
       {combineMode}
       {activeFilterCount}
       {filterResetKey}

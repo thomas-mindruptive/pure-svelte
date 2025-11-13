@@ -119,6 +119,31 @@ const tempProductCategoryForCreate = ProductCategorySchema.omit({
 }).describe("ProductCategoryForCreateSchema");
 export const ProductCategoryForCreateSchema = copyMetaFrom(ProductCategorySchema, tempProductCategoryForCreate);
 
+// ===== CATEGORY WITH OFFERING COUNT VIEW (dbo.view_categories_with_offering_count) =====
+
+/**
+ * Schema for the view_categories_with_offering_count database view.
+ * Provides category information with aggregated offering count.
+ */
+const CategoryWithOfferingCountSchemaBase = z
+  .object({
+    category_id: z.number().int().positive(),
+    category_name: NameOrTitle,
+    description: z.string().max(500).nullable().optional(),
+    product_type_id: z.number().int().positive(),
+    offering_count: z.number().int().nonnegative(),
+  })
+  .describe("CategoryWithOfferingCountSchema");
+
+export const CategoryWithOfferingCountSchema = createSchemaWithMeta(
+  CategoryWithOfferingCountSchemaBase,
+  {
+    alias: "cwoc",
+    tableName: "view_categories_with_offering_count",
+    dbSchema: "dbo",
+  } as const
+);
+
 // ===== ATTRIBUTE (dbo.attributes) =====
 
 const AttributeSchemaBase = z
@@ -828,6 +853,7 @@ export const OfferingReportViewSchema = createSchemaWithMeta(OfferingReportViewS
 
 export type Wholesaler = z.infer<typeof WholesalerSchema>;
 export type ProductCategory = z.infer<typeof ProductCategorySchema>;
+export type CategoryWithOfferingCount = z.infer<typeof CategoryWithOfferingCountSchema>;
 export type Attribute = z.infer<typeof AttributeSchema>;
 export type ProductDefinition = z.infer<typeof ProductDefinitionSchema>;
 export type ProdDef_mat_form_surf_constr_Nested = z.infer<typeof ProdDef_mat_form_surf_constr_Nested_Schema>;
@@ -885,6 +911,7 @@ export type OfferingReportViewWithLinks = OfferingReportView & {
 export const AllBrandedSchemas = {
   WholesalerSchema,
   ProductCategorySchema,
+  CategoryWithOfferingCountSchema,
   ProductDefinitionSchema,
   WholesalerItemOfferingSchema: Wio_Schema,
   AttributeSchema,

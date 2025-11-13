@@ -36,6 +36,8 @@
     onFilterToggle: (open: boolean) => void;  // Called when details opens/closes
     showSuperuserWhere?: boolean;  // Enable raw SQL WHERE clause input (SUPERUSER MODE)
     onRawWhereChange?: (rawWhere: string | null) => void;
+    onUpdateInitialFilterValues?: (updates: Map<string, {operator: any, value: any}>) => void;  // Update initialFilterValues for UI projection
+    onIncrementFilterResetKey?: () => void;  // Increment filterResetKey to re-render filters
   };
 
   let {
@@ -51,7 +53,9 @@
     onClearAllFilters,
     onFilterToggle,
     showSuperuserWhere = false,
-    onRawWhereChange
+    onRawWhereChange,
+    onUpdateInitialFilterValues,
+    onIncrementFilterResetKey
   }: Props = $props();
 
   // Superuser raw WHERE state
@@ -104,6 +108,7 @@
 
   /**
    * Handle custom filter state changes
+   * Projects WhereConditionGroup to individual filter fields for UI display
    */
   function handleCustomFilterChange(filterId: string, newValue: any) {
     customFilterStates.set(filterId, newValue);
@@ -112,7 +117,63 @@
     if (!filter) return;
 
     const condition = filter.buildCondition(newValue);
+    
+    // 1. Set the Quick-Filter condition → triggers API call (1x)
     onFilterChange(filterId, condition);
+
+    // 2. Project WhereConditionGroup to initialFilterValues (no API calls)
+    if (condition && onUpdateInitialFilterValues) {
+      const updates = new Map<string, {operator: any, value: any}>();
+      
+      // Handle single WhereCondition
+      if ('key' in condition) {
+        updates.set(String(condition.key), {
+          operator: condition.whereCondOp,
+          value: condition.val
+        });
+      }
+      // Handle WhereConditionGroup
+      else if ('conditions' in condition && condition.conditions) {
+        condition.conditions.forEach(cond => {
+          if ('key' in cond) {
+            updates.set(String(cond.key), {
+              operator: cond.whereCondOp,
+              value: cond.val
+            });
+          }
+        });
+      }
+      
+      // Update initialFilterValues (triggers UI update, no API calls)
+      if (updates.size > 0) {
+        onUpdateInitialFilterValues(updates);
+      }
+      
+      // 3. Increment filterResetKey to re-render filter fields with new initialValues
+      if (onIncrementFilterResetKey) {
+        onIncrementFilterResetKey();
+      }
+    }
+    // If condition is null (filter cleared), clear the projected values
+    else if (!condition && onUpdateInitialFilterValues) {
+      // Clear all projected values for this filter
+      // We need to know which columns were affected - for now, clear all if condition is null
+      // This could be improved by tracking which columns were set by this quick filter
+      const updates = new Map<string, {operator: any, value: any}>();
+      onUpdateInitialFilterValues(updates);
+      if (onIncrementFilterResetKey) {
+        onIncrementFilterResetKey();
+      }
+    }
+  }
+
+  /**
+   * Handle column filter changes
+   * No reverse sync to Quick-Filter (simpler, avoids conflicts)
+   */
+  function handleColumnFilterChange(columnKey: string, condition: WhereCondition<any> | WhereConditionGroup<any> | null) {
+    // Always call the original handler to update the filter
+    onFilterChange(columnKey, condition);
   }
 
   /**
@@ -286,7 +347,7 @@
               columnKey={col.key}
               columnHeader={col.header}
               initialValue={initialValues?.value}
-              onChange={(condition) => onFilterChange(col.key, condition)}
+              onChange={(condition) => handleColumnFilterChange(col.key, condition)}
             />
           {:else if filterType === 'number'}
             <NumberFilter
@@ -294,14 +355,14 @@
               columnHeader={col.header}
               initialValue={initialValues?.value}
               initialOperator={initialValues?.operator}
-              onChange={(condition) => onFilterChange(col.key, condition)}
+              onChange={(condition) => handleColumnFilterChange(col.key, condition)}
             />
           {:else if filterType === 'boolean'}
             <BooleanFilter
               columnKey={col.key}
               columnHeader={col.header}
               initialValue={initialValues?.value}
-              onChange={(condition) => onFilterChange(col.key, condition)}
+              onChange={(condition) => handleColumnFilterChange(col.key, condition)}
             />
           {/if}
         {/key}

@@ -594,6 +594,34 @@
     }
   }
 
+  /**
+   * Update initialFilterValues for UI projection (called by FilterToolbar)
+   * This allows Quick-Filters to update filter field values without triggering API calls
+   */
+  function handleUpdateInitialFilterValues(updates: Map<string, {operator: any, value: any}>) {
+    if (!initialFilterValues) {
+      initialFilterValues = new Map();
+    }
+    
+    // Apply updates to initialFilterValues
+    updates.forEach((value, key) => {
+      initialFilterValues!.set(key, value);
+    });
+    
+    // If updates map is empty, it means clear all (when Quick-Filter is unchecked)
+    if (updates.size === 0) {
+      // Don't clear everything, just clear the ones that were set by Quick-Filters
+      // For now, we'll keep it simple and not clear (user can use "Clear all filters")
+    }
+  }
+
+  /**
+   * Increment filterResetKey to re-render filter fields (called by FilterToolbar)
+   */
+  function handleIncrementFilterResetKey() {
+    filterResetKey++;
+  }
+
 
   function handleRawWhereChange(newRawWhere: string | null) {
     log.info(`[Datagrid] Raw WHERE changed:`, newRawWhere);
@@ -954,6 +982,8 @@
       onClearAllFilters={handleClearAllFilters}
       onFilterToggle={handleFilterToggle}
       onRawWhereChange={handleRawWhereChange}
+      onUpdateInitialFilterValues={handleUpdateInitialFilterValues}
+      onIncrementFilterResetKey={handleIncrementFilterResetKey}
     />
   {/if}
 

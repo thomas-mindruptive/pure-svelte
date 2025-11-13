@@ -36,6 +36,7 @@
       type: 'checkbox',
       placement: { type: 'quickfilter', pos: 0 },
       defaultValue: false,
+      syncToColumnKey: 'offering_count',  // Synchronize with offering_count filter
       buildCondition: (checked: boolean) => checked
         ? {
             key: 'offering_count',

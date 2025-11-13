@@ -9,10 +9,10 @@
   import { offeringLoadingState } from "$lib/api/client/offering.js";
   import { productDefinitionLoadingState } from "$lib/api/client/productDefinition.js";
   import { supplierLoadingState } from "$lib/api/client/supplier.js";
-  import { derived } from "svelte/store";
   import { fade } from "svelte/transition";
   import type { RuntimeHierarchyTreeNode } from "$lib/components/sidebarAndNav/HierarchySidebar.types.js";
   import "$lib/components/styles/loadingIndicator.css";
+  import { setContext } from "svelte";
 
   const { data, children } = $props();
 
@@ -24,15 +24,36 @@
   const activeNode = $derived(data.activeNode);
   const urlParams = $derived(data.urlParams);
 
+  // === PAGE-LOCAL LOADING CONTEXT ===
+  // Each browser tab has its own instance, preventing cross-tab interference
+  // Using object for reactivity - pages will mutate isLoading property
+  // Start with true - pages will set to false when ready
+  const pageLoadingState = $state({ isLoading: true });
+  setContext('page-loading', pageLoadingState);
+
   // === LOADING INDICATOR ===
 
-  const isAnythingLoading = derived(
-    [supplierLoadingState, categoryLoadingState, offeringLoadingState, attributeLoadingState, productDefinitionLoadingState],
-    ([$supplierLoading, $categoryLoading, $offeringLoading, $attributeLoading, $productDefLoading]) => {
-      log.debug(`isAnythingLoading changed:`, {$supplierLoading, $categoryLoading, $offeringLoading, $attributeLoading, $productDefLoading });
-      return $supplierLoading || $categoryLoading || $offeringLoading || $attributeLoading || $productDefLoading;
-    },
+  // Direkt in $derived mit $ prefix für Stores - sollte funktionieren!
+  const isAnythingLoading = $derived(
+    pageLoadingState.isLoading ||
+    $supplierLoadingState ||
+    $categoryLoadingState ||
+    $offeringLoadingState ||
+    $attributeLoadingState ||
+    $productDefinitionLoadingState
   );
+
+  $effect(() => {
+    log.debug(`isAnythingLoading changed:`, {
+      pageLoading: pageLoadingState.isLoading,
+      supplierLoading: $supplierLoadingState,
+      categoryLoading: $categoryLoadingState,
+      offeringLoading: $offeringLoadingState,
+      attributeLoading: $attributeLoadingState,
+      productDefLoading: $productDefinitionLoadingState,
+      combined: isAnythingLoading
+    });
+  });
 
   $effect(() => {
     log.debug("Layout props:", { crumbItems, activeNode, urlParams, hierarchy });
@@ -96,7 +117,7 @@
         />
       </div>
 
-      {#if $isAnythingLoading}
+      {#if isAnythingLoading}
         <div
           class="loader-wrapper"
           transition:fade={{ duration: 150, delay: 200 }}

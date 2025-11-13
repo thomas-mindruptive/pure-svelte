@@ -21,6 +21,7 @@
 
   import { cascadeDelete } from "$lib/api/client/cascadeDelete";
   import { stringsToNumbers } from "$lib/utils/typeConversions";
+  import { getContext } from "svelte";
 
    // === PROPS ====================================================================================
 
@@ -35,12 +36,15 @@
   // === STATE ====================================================================================
 
   let resolvedSuppliers = $state<Wholesaler[]>([]);
-  let isLoading = $state(false); // Page-level loading for error handling
   let loadingOrValidationError = $state<{
     message: string;
     status: number;
   } | null>(null);
   const allowForceCascadingDelte = $state(true);
+
+  // Get page-local loading context from layout
+  type PageLoadingContext = { isLoading: boolean };
+  const pageLoading = getContext<PageLoadingContext>('page-loading');
 
   // === LOAD =====================================================================================
   // Initial load is now controlled by Datagrid component via onQueryChange

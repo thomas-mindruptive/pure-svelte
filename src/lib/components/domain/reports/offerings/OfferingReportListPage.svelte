@@ -23,6 +23,7 @@
   import { ApiClient } from "$lib/api/client/apiClient";
   import { getOfferingApi } from "$lib/api/client/offering";
   import OfferingReportGrid from "./OfferingReportGrid.svelte";
+  import { getContext } from "svelte";
   import type {
     SortDescriptor,
     WhereCondition,
@@ -42,14 +43,17 @@
 
   let { data }: Props = $props();
   let resolvedOfferings = $state<OfferingReportViewWithLinks[]>([]);
-  let isLoading = $state(false);  // Page-level loading (for error handling), used for future UI enhancements
   let rawWhere = $state<string | null>(null);  // Superuser raw WHERE clause
 
-  // Suppress unused warning - isLoading is part of the standard page pattern
-  $effect(() => void isLoading);
+  // Get page-local loading context from layout
+  type PageLoadingContext = { isLoading: boolean };
+  const pageLoading = getContext<PageLoadingContext>('page-loading');
 
   const client = new ApiClient(data.loadEventFetch);
   const offeringApi = getOfferingApi(client);
+
+  // Track if we've done the first load
+  let firstLoadComplete = false;
 
   /**
    * Query Change Handler
@@ -64,7 +68,12 @@
     sort: SortDescriptor<any>[] | null
   }) {
     log.info(`[OfferingReportListPage] Query change - filters:`, query.filters, `sort:`, query.sort);
-    isLoading = true;
+
+    // Only show loading for subsequent queries, not the first one
+    if (firstLoadComplete) {
+      pageLoading.isLoading = true;
+    }
+
     try {
       resolvedOfferings = await offeringApi.loadOfferingsForReportWithLinks(
         query.filters,
@@ -74,12 +83,18 @@
         rawWhere  // Pass rawWhere to API
       );
       log.info(`[OfferingReportListPage] Received ${resolvedOfferings.length} offerings`);
+
+      // First load is done, clear the initial loading state
+      if (!firstLoadComplete) {
+        firstLoadComplete = true;
+        log.info("[OfferingReportListPage] First load complete");
+      }
     } catch (err) {
       const message = getErrorMessage(err);
       addNotification(`Failed to load offerings: ${message}`, "error");
       log.error("[OfferingReportListPage] Failed to load offerings", { error: err });
     } finally {
-      isLoading = false;
+      pageLoading.isLoading = false;
     }
   }
 

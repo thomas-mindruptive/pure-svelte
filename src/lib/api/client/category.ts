@@ -230,21 +230,6 @@ export function getCategoryApi(client: ApiClient) {
       const operationId = `loadOfferingsForSupplierCategory-${supplierId}-${categoryId}`;
       categoryLoadingManager.start(operationId);
       try {
-        // const cols = genTypedQualifiedColumns(Wio_PDef_Cat_Supp_Nested_Schema, true);
-        // const request: PredefinedQueryRequest<Wio_PDef_Cat_Supp_Nested> = {
-        //   namedQuery: "offering->product_def->category->wholesaler",
-        //   payload: {
-        //     select: cols,
-        //     where: {
-        //       whereCondOp: "AND",
-        //       conditions: [
-        //         { key: "wio.wholesaler_id", whereCondOp: "=", val: supplierId },
-        //         { key: "wio.category_id", whereCondOp: "=", val: categoryId },
-        //       ],
-        //     },
-        //     orderBy: [{ key: "wio.created_at", direction: "desc" }],
-        //   },
-        // };
         const offeringClient = getOfferingApi(client);
         const orderBy: SortDescriptor<WholesalerItemOffering>[] = [{ key: "wio.created_at", direction: "desc" }];
 
@@ -258,13 +243,6 @@ export function getCategoryApi(client: ApiClient) {
         const offerings = await offeringClient.loadNestedOfferingsWithLinks(where, orderBy);
         return offerings;
 
-        // const responseData = await client.apiFetch<QueryResponseData<Wio_PDef_Cat_Supp_Nested>>(
-        //   "/api/query",
-        //   { method: "POST", body: createJsonBody(request) },
-        //   { context: operationId },
-        // );
-        // const transformed = transformToNestedObjects(responseData.results as Record<string, unknown>[], Wio_PDef_Cat_Supp_Nested_Schema);
-        // return transformed;
       } catch (err) {
         log.error(`[${operationId}] Failed.`, { error: getErrorMessage(err) });
         throw err;

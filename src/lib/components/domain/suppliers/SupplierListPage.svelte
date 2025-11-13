@@ -90,18 +90,30 @@
     goto(`${page.url.pathname}/new`);
   }
 
+  // Track if we've done the first load
+  let firstLoadComplete = false;
+
   async function handleQueryChange(query: {
     filters: WhereCondition<Wholesaler> | WhereConditionGroup<Wholesaler> | null,
     sort: SortDescriptor<Wholesaler>[] | null
   }) {
     log.info(`(SupplierListPage) Query change - filters:`, query.filters, `sort:`, query.sort);
 
-    isLoading = true;
+    // Only show loading for subsequent queries, not the first one
+    if (firstLoadComplete) {
+      pageLoading.isLoading = true;
+    }
     loadingOrValidationError = null;
 
     try {
       resolvedSuppliers = await supplierApi.loadSuppliersWithWhereAndOrder(query.filters, query.sort);
       log.info(`(SupplierListPage) Received ${resolvedSuppliers.length} suppliers`);
+
+      // First load is done, clear the initial loading state
+      if (!firstLoadComplete) {
+        firstLoadComplete = true;
+        log.info("(SupplierListPage) First load complete");
+      }
     } catch (rawError: any) {
       const status = rawError.status ?? 500;
       const message = rawError.body?.message || rawError.message || "An unknown error occurred while loading suppliers.";
@@ -109,7 +121,7 @@
       loadingOrValidationError = { message, status };
       log.error("(SupplierListPage) Error loading suppliers", { rawError });
     } finally {
-      isLoading = false;
+      pageLoading.isLoading = false;
     }
   }
 
@@ -141,13 +153,9 @@
     </div>
   {:else}
     <div class="grid-section">
-      {#if isLoading && resolvedSuppliers.length === 0}
-        <p class="loading-message">Loading suppliers...</p>
-      {/if}
       <button
         class="pc-grid__createbtn"
         onclick={handleSupplierCreate}
-        disabled={isLoading}
       >
         Create Supplier
       </button>

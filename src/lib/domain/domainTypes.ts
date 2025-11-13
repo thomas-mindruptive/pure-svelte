@@ -414,6 +414,7 @@ const Wio_BaseSchema = z
       }),
     currency: z.string().length(3).nullable().optional(),
     comment: z.string().max(4000).nullable().optional(),
+    quality: z.string().max(255).nullable().optional(),
     is_assortment: z.boolean().nullable().optional(),
     override_material: z.boolean().default(false), // Allow material override from ProductDef
     // Shopify integration fields (for shop offerings with wholesaler_id = 99)
@@ -813,6 +814,7 @@ const OfferingReportViewSchemaBase = z.object({
   wioSurfFinishName: z.string().max(200).nullable().optional(),
   wioDimensions: z.string().max(200).nullable().optional(),
   wioComment: z.string().max(4000).nullable().optional(),
+  wioQuality: z.string().max(255).nullable().optional(),
   wioWeightGrams: z.number().nullable().optional(),
 }).describe("OfferingReportViewSchema");
 

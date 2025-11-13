@@ -22,6 +22,7 @@ const ALLOWED_COLUMNS = new Set([
   "wioDimensions",
   "wioWeightGrams",
   "wioComment",
+  "wioQuality",
   "wioMaterialName",
   "wioFormName",
   "wioConstrTypeName",

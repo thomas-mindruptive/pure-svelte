@@ -138,7 +138,7 @@
         </button>
         <div class="superuser-where-help">
           <strong>Allowed columns:</strong>
-          wioId, wioTitle, wioPrice, wioSize, wioDimensions, wioWeightGrams, wioComment, wioMaterialName, wioFormName, wioConstrTypeName, wioSurfFinishName, wsId, wsName, pdefId, pdefTitle, pdefMatName, pdefFormName, pdConstrTypeName, pdSurfFinName, pcId, catName, ptId, ptName
+          wioId, wioTitle, wioPrice, wioSize, wioDimensions, wioWeightGrams, wioComment, wioQuality, wioMaterialName, wioFormName, wioConstrTypeName, wioSurfFinishName, wsId, wsName, pdefId, pdefTitle, pdefMatName, pdefFormName, pdConstrTypeName, pdSurfFinName, pcId, catName, ptId, ptName
         </div>
       </div>
     </div>

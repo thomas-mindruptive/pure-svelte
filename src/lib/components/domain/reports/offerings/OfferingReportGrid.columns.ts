@@ -225,6 +225,15 @@ export const columns: ColumnDef<typeof OfferingReportViewSchema>[] = [
     width: "200px"
   },
   {
+    key: "wioQuality",
+    header: "Quality",
+    accessor: (row) => row.wioQuality || "-",
+    sortable: true,
+    filterable: true,
+    filterType: "text",
+    width: "120px"
+  },
+  {
     key: "links" as any,
     header: "Links",
     accessor: (row: OfferingReportViewWithLinks) => {

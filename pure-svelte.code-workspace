@@ -10,5 +10,26 @@
 			"path": "../pure-shopify"
 		}
 	],
-	"settings": {}
+	"settings": {
+		"sqltools.connections": [
+			{
+				"connectionTimeout": 15,
+				"mssqlOptions": {
+					"appName": "SQLTools",
+					"useUTC": true,
+					"encrypt": false,
+					"trustServerCertificate": true
+				},
+				"ssh": "Disabled",
+				"previewLimit": 50,
+				"server": "localhost",
+				"port": 1433,
+				"driver": "MSSQL",
+				"name": "local",
+				"username": "sa",
+				"password": "ichBinAdmin@123",
+				"database": "pureenergyworks"
+			}
+		]
+	}
 }

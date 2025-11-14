@@ -100,26 +100,7 @@ export async function loadNestedOfferingsOptimized(
     -- STEP 2: Query for offerings and nested data (returns single JSON string)
     SELECT (
         SELECT
-            wio.offering_id,
-            wio.wholesaler_id,
-            wio.category_id,
-            wio.product_def_id,
-            wio.sub_seller,
-            wio.wholesaler_article_number,
-            wio.material_id,
-            wio.form_id,
-            wio.title,
-            wio.size,
-            wio.dimensions,
-            wio.packaging,
-            wio.price,
-            wio.weight_grams,
-            wio.weight_range,
-            wio.currency,
-            wio.comment,
-            wio.created_at,
-            wio.is_assortment,
-            wio.override_material,
+            wio.*,
             -- Product definition (nested via dotted alias)
             pd.product_def_id AS 'product_def.product_def_id',
             pd.category_id AS 'product_def.category_id',
@@ -165,6 +146,7 @@ export async function loadNestedOfferingsOptimized(
             shop.weight_range AS 'shop_offering.weight_range',
             shop.currency AS 'shop_offering.currency',
             shop.comment AS 'shop_offering.comment',
+            shop.quality AS 'shop_offering.quality',
             shop.created_at AS 'shop_offering.created_at',
             shop.is_assortment AS 'shop_offering.is_assortment',
             shop.override_material AS 'shop_offering.override_material'

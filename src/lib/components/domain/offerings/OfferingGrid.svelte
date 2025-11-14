@@ -2,7 +2,7 @@
 <script lang="ts">
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
   import type { ColumnDef, DeleteStrategy, RowActionStrategy, ID } from "$lib/components/grids/Datagrid.types";
-  import type { SortDescriptor } from "$lib/backendQueries/queryGrammar";
+  import type { SortDescriptor, WhereCondition, WhereConditionGroup } from "$lib/backendQueries/queryGrammar";
   import type {
     WholesalerOfferingLink,
     Wio_PDef_Cat_Supp_Nested_WithLinks,
@@ -29,8 +29,11 @@
     selection?: "none" | "single" | "multiple";
     deleteStrategy: DeleteStrategy<Wio_PDef_Cat_Supp_Nested_WithLinks>;
     rowActionStrategy?: RowActionStrategy<Wio_PDef_Cat_Supp_Nested_WithLinks>;
-    // Callback when sort state changes - parent loads data
-    onSort?: ((sortState: SortDescriptor<Wio_PDef_Cat_Supp_Nested_WithLinks>[] | null) => Promise<void> | void) | undefined;
+    // Callback when query changes (filters + sort combined) - parent loads data
+    onQueryChange?: (query: {
+      filters: WhereCondition<Wio_PDef_Cat_Supp_Nested_WithLinks> | WhereConditionGroup<Wio_PDef_Cat_Supp_Nested_WithLinks> | null,
+      sort: SortDescriptor<Wio_PDef_Cat_Supp_Nested_WithLinks>[] | null
+    }) => Promise<void> | void;
     // Custom toolbar snippet
     toolbar?: Snippet<[ToolbarSnippetProps]>;
     // Custom row actions snippet
@@ -48,7 +51,7 @@
     // Strategies (Dependency Injection pattern)
     deleteStrategy,
     rowActionStrategy,
-    onSort,
+    onQueryChange,
     toolbar,
     rowActions,
 
@@ -61,6 +64,13 @@
 
   const columns: ColumnDef<typeof Wio_PDef_Cat_Supp_Nested_WithLinks_Schema>[] = [
     {
+      key: "wio.offering_id",
+      header: "ID",
+      accessor: (offering) => offering.offering_id,
+      sortable: true,
+      width: "4rem",
+    },
+    {
       key: "wio.title",
       header: "Offering",
       accessor: (offering) => offering.title,
@@ -71,6 +81,8 @@
       key: "pd.title",
       header: "Product",
       sortable: true,
+      filterable: true,
+      filterType: "text",
       width: "15rem",
       accessor: (offering) => offering.product_def.title || "Unnamed Product",
     },
@@ -78,6 +90,8 @@
       key: "w.name",
       header: "Supplier",
       sortable: true,
+      filterable: true,
+      filterType: "text",
       width: "12rem",
       accessor: (offering) => offering.wholesaler.name || "Unnamed Supplier",
     },
@@ -92,6 +106,8 @@
       key: "wio.material_id",
       header: "Material",
       sortable: true,
+      filterable: true,
+      filterType: "text",
       width: "5rem",
       accessor: (offering) => offering.material_id || "—",
     },
@@ -99,6 +115,8 @@
       key: "wio.price",
       header: "Price",
       sortable: true,
+      filterable: true,
+      filterType: "number",
       width: "8rem",
       accessor: (offering) => {
         if (offering.price == null) return "—";
@@ -125,6 +143,15 @@
       sortable: true,
       width: "8rem",
       accessor: (offering) => offering.weight_range || (offering.weight_grams ? `${offering.weight_grams}g` : "—"),
+    },
+    {
+      key: "quality",
+      header: "Quality",
+      sortable: true,
+      filterable: true,
+      filterType: "text",
+      width: "4rem",
+      accessor: (offering) => offering.quality || "—",
     },
     {
       key: "comment",
@@ -169,7 +196,7 @@
   entity="offering"
   {deleteStrategy}
   {rowActionStrategy}
-  {onSort}
+  {onQueryChange}
   {toolbar}
   {rowActions}
   {maxBodyHeight}

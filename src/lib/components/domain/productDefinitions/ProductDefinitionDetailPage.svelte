@@ -52,7 +52,7 @@
   import { error } from "@sveltejs/kit";
   import { getContext } from "svelte";
   import { getErrorMessage } from "$lib/api/client/common";
-  import type { SortDescriptor, QueryPayload } from "$lib/backendQueries/queryGrammar";
+  import type { SortDescriptor, WhereCondition, WhereConditionGroup, QueryPayload } from "$lib/backendQueries/queryGrammar";
   import { ComparisonOperator } from "$lib/backendQueries/queryGrammar";
   import { getSurfaceFinishApi } from "$lib/api/client/surfaceFinish";
   import { getConstructionTypeApi } from "$lib/api/client/constructionType";
@@ -290,16 +290,19 @@
     }
   }
 
-  async function handleOfferingsSort(sortState: SortDescriptor<Wio_PDef_Cat_Supp_Nested_WithLinks>[] | null) {
+  async function handleOfferingsQueryChange(query: {
+    filters: WhereCondition<Wio_PDef_Cat_Supp_Nested_WithLinks> | WhereConditionGroup<Wio_PDef_Cat_Supp_Nested_WithLinks> | null,
+    sort: SortDescriptor<Wio_PDef_Cat_Supp_Nested_WithLinks>[] | null
+  }) {
     try {
-      // Type assertion is safe here because SortDescriptor only uses keys that exist in both types
+      // Type assertion is safe here because SortDescriptor and WhereCondition only use keys that exist in both types
       offerings = await productDefinitionApi.loadNestedOfferingsWithLinksForProductDefinition(
         productDefId,
-        null,
-        sortState as SortDescriptor<WholesalerItemOffering>[] | null
+        query.filters as WhereCondition<WholesalerItemOffering> | WhereConditionGroup<WholesalerItemOffering> | null,
+        query.sort as SortDescriptor<WholesalerItemOffering>[] | null
       );
     } catch (e: unknown) {
-      addNotification(`Error during sorting API: ${getErrorMessage(e)}`);
+      addNotification(`Error during query API: ${getErrorMessage(e)}`);
     }
   }
 
@@ -454,8 +457,7 @@
         rows={offerings}
         {deleteStrategy}
         {rowActionStrategy}
-        onSort={handleOfferingsSort}
-
+        onQueryChange={handleOfferingsQueryChange}
         maxBodyHeight={"50vh"}
       />
     {:else}

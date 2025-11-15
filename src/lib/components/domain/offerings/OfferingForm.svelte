@@ -546,6 +546,8 @@
             placeholder="Quality"
             class="span-1"
           />
+
+
         </div>
         <!-- end row ----------------------------------------------------------------------------->
 
@@ -582,7 +584,8 @@
         <!-- end row ----------------------------------------------------------------------------->
 
         <div class="form-row-grid">
-          <!-- price ----------------------------------------------------------------------------->
+          <!-- price -----------------------------------------------------------------------------
+          -->
           <Field
             {fieldProps}
             path={["price"]}
@@ -592,6 +595,18 @@
             min="0"
             required
             placeholder="e.g., 199.99"
+            class="span-1"
+          />
+
+          <!-- price_per_piece ------------------------------------------------------------------->
+          <Field
+            {fieldProps}
+            path={["price_per_piece"]}
+            label="Price per piece"
+            type="number"
+            step="0.01"
+            min="0"
+            placeholder="e.g., 3.50"
             class="span-1"
           />
 
@@ -656,6 +671,16 @@
             placeholder="Unit required: 250g, 50-80g, ca. 100g"
             class="span-1"
           />
+
+          <!-- origin ------------------------------------------------------------------------------>
+          <Field
+            {fieldProps}
+            path={["origin"]}
+            label="Origin"
+            type="text"
+            placeholder="e.g., origin / source"
+            class="span-1"
+          />
         </div>
         <!-- end row ----------------------------------------------------------------------------->
 
@@ -699,7 +724,24 @@
               class="span-2"
             />
           </div>
-          <!-- end row ----------------------------------------------------------------------------->
+          <!-- end row -----------------------------------------------------------------------------
+          -->
+
+          <div class="form-row-grid">
+            <!-- wholesaler_price ------------------------------------------------------------------>
+            <Field
+              {fieldProps}
+              path={["wholesaler_price"]}
+              label="Wholesaler Price"
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="Desired/max price at wholesaler"
+              class="span-2"
+            />
+          </div>
+          <!-- end row -----------------------------------------------------------------------------
+          -->
 
           <div class="form-row-grid">
             <!-- shopify_product_id (readonly) ----------------------------------------------------->

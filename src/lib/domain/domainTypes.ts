@@ -425,6 +425,7 @@ const Wio_BaseSchema = z
       }),
     packaging: z.string().max(100).nullable().optional(),
     price: z.number().multipleOf(0.01).nullable().optional(), // precision [18,2]
+    price_per_piece: z.number().multipleOf(0.01).nullable().optional(),
     weight_grams: z.number().positive().nullable().optional(),
     weight_range: z.string().max(50).nullable().optional()
       .superRefine((val, ctx) => {
@@ -436,6 +437,7 @@ const Wio_BaseSchema = z
           });
         }
       }),
+    origin: z.string().max(255).nullable().optional(),
     currency: z.string().length(3).nullable().optional(),
     comment: z.string().max(4000).nullable().optional(),
     quality: z.string().max(255).nullable().optional(),
@@ -446,6 +448,7 @@ const Wio_BaseSchema = z
     shopify_variant_id: z.number().int().positive().nullable().optional(),
     shopify_sku: z.string().max(100).nullable().optional(),
     shopify_price: z.number().multipleOf(0.01).nullable().optional(),
+    wholesaler_price: z.number().multipleOf(0.01).nullable().optional(),
     shopify_synced_at: z.string().nullable().optional(), // ISO datetime string
     created_at: z.string().optional(),
   })

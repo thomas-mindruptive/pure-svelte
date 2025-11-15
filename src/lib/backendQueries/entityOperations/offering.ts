@@ -524,6 +524,7 @@ export async function loadOfferingsForImageAnalysis(
         wio.packaging,
         wio.weight_grams,
         wio.weight_range,
+        wio.origin,
         wio.price,
         wio.currency,
         wio.comment,

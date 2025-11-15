@@ -19,6 +19,7 @@
   import type { WhereCondition } from '$lib/backendQueries/queryGrammar';
   import { ComparisonOperator } from '$lib/backendQueries/queryGrammar';
   import { log } from '$lib/utils/logger';
+  import "$lib/components/styles/form-elements.css";
 
   type Props = {
     columnKey: string;
@@ -75,11 +76,5 @@
   label {
     font-size: 0.875rem;
     font-weight: 500;
-  }
-
-  input {
-    padding: 0.5rem;
-    border: 1px solid var(--color-border);
-    border-radius: 4px;
   }
 </style>

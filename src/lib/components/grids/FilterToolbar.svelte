@@ -492,10 +492,7 @@
   }
 
   .quick-filter-select select {
-    padding: 0.25rem 0.5rem;
-    border: 1px solid var(--color-border, #ddd);
-    border-radius: 3px;
-    background: var(--color-surface, #fff);
+    /* Styles from form-elements.css will apply */
   }
 
   .quick-filter-radio {

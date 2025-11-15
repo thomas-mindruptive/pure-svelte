@@ -100,7 +100,7 @@
       header: "WS Relevance",
       sortable: true,
       filterable: true,
-      filterType: "number",
+      filterType: "text",
       width: "8rem",
       accessor: (offering) => offering.wholesaler.relevance ?? "—",
     },

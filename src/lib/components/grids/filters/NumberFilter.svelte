@@ -18,6 +18,7 @@
   import type { WhereCondition } from '$lib/backendQueries/queryGrammar';
   import { ComparisonOperator } from '$lib/backendQueries/queryGrammar';
   import { log } from '$lib/utils/logger';
+  import "$lib/components/styles/form-elements.css";
 
   type Props = {
     columnKey: string;
@@ -98,18 +99,12 @@
   }
 
   select {
-    padding: 0.5rem;
-    border: 1px solid var(--color-border);
-    border-radius: 4px;
     width: 60px;
     flex-shrink: 0;
   }
 
   input {
     flex: 1;
-    padding: 0.5rem;
-    border: 1px solid var(--color-border);
-    border-radius: 4px;
     min-width: 0;
   }
 </style>

@@ -133,9 +133,15 @@
     goto(buildChildUrl(page.url.pathname, "offerings", "new"));
   }
 
-  function handleOfferingSelect(offering: Wio_PDef_Cat_Supp): void {
-    log.info(`(CategoryDetailPage) Navigating to offering detail for offeringId: ${offering.offering_id}`);
-    goto(buildChildUrl(page.url.pathname, "offerings", offering.offering_id));
+  function handleOfferingSelect(offering: Wio_PDef_Cat_Supp, options?: { _blankWindow?: boolean }): void {
+    const url = buildChildUrl(page.url.pathname, "offerings", offering.offering_id);
+    if (options?._blankWindow) {
+      log.info(`(CategoryDetailPage) Opening in new tab for offeringId: ${offering.offering_id}`);
+      window.open(url, "_blank");
+    } else {
+      log.info(`(CategoryDetailPage) Navigating to offering detail for offeringId: ${offering.offering_id}`);
+      goto(url);
+    }
   }
 
   async function handleOfferingDelete(ids: ID[]): Promise<void> {

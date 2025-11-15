@@ -223,8 +223,13 @@
   /**
    * Navigates to the next hierarchy level (offerings for a category).
    */
-  function handleProductDefSelect(pd: ProductDefinition) {
-    goto(buildChildUrl(page.url.pathname, "productdefinitions", pd.product_def_id));
+  function handleProductDefSelect(pd: ProductDefinition, options?: { _blankWindow?: boolean }) {
+    const url = buildChildUrl(page.url.pathname, "productdefinitions", pd.product_def_id);
+    if (options?._blankWindow) {
+      window.open(url, "_blank");
+    } else {
+      goto(url);
+    }
   }
 
   // ===== ROW STRATEGIES =====

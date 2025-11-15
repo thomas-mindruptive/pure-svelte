@@ -567,16 +567,18 @@
     execute: handleSourceOfferingDelete,
   };
 
-  function handleOfferingSelect(selectedOffering: Wio_PDef_Cat_Supp_Nested_WithLinks) {
+  function handleOfferingSelect(selectedOffering: Wio_PDef_Cat_Supp_Nested_WithLinks, options?: { _blankWindow?: boolean }) {
     // Navigate to offering detail page
+    let url: string;
     if (data.isSuppliersRoute) {
-      goto(
-        `/suppliers/${selectedOffering.wholesaler.wholesaler_id}/categories/${selectedOffering.category.category_id}/offerings/${selectedOffering.offering_id}`,
-      );
+      url = `/suppliers/${selectedOffering.wholesaler.wholesaler_id}/categories/${selectedOffering.category.category_id}/offerings/${selectedOffering.offering_id}`;
     } else {
-      goto(
-        `/categories/${selectedOffering.category.category_id}/productdefinitions/${selectedOffering.product_def.product_def_id}/offerings/${selectedOffering.offering_id}`,
-      );
+      url = `/categories/${selectedOffering.category.category_id}/productdefinitions/${selectedOffering.product_def.product_def_id}/offerings/${selectedOffering.offering_id}`;
+    }
+    if (options?._blankWindow) {
+      window.open(url, "_blank");
+    } else {
+      goto(url);
     }
   }
 
@@ -679,13 +681,18 @@
     goto(buildChildUrl(page.url.pathname, "images", "new"));
   }
 
-  function handleImageSelect(image: OfferingImage_Image) {
+  function handleImageSelect(image: OfferingImage_Image, options?: { _blankWindow?: boolean }) {
     log.info(`Selected image: `, image);
     const { image_id } = image;
     if (image_id) {
       const targetUrl = buildChildUrl(page.url.pathname, "images", image_id);
-      log.debug(`Going to: ${targetUrl}`);
-      goto(targetUrl);
+      if (options?._blankWindow) {
+        log.debug(`Opening in new tab: ${targetUrl}`);
+        window.open(targetUrl, "_blank");
+      } else {
+        log.debug(`Going to: ${targetUrl}`);
+        goto(targetUrl);
+      }
     } else {
       log.error("Cannot navigate to image, missing image_id", { image });
       addNotification("Cannot navigate: image data is incomplete.", "error");

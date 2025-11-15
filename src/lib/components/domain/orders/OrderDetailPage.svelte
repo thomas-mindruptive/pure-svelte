@@ -220,8 +220,13 @@
   /**
    * Navigates to the next hierarchy level.
    */
-  function handleOrderItemSelect(orderItem: OrderItem_ProdDef_Category) {
-    goto(buildChildUrl(page.url.pathname, "orderitems", orderItem.order_item_id));
+  function handleOrderItemSelect(orderItem: OrderItem_ProdDef_Category, options?: { _blankWindow?: boolean }) {
+    const url = buildChildUrl(page.url.pathname, "orderitems", orderItem.order_item_id);
+    if (options?._blankWindow) {
+      window.open(url, "_blank");
+    } else {
+      goto(url);
+    }
   }
 
   // ===== SORT HANDLERS =====

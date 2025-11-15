@@ -36,9 +36,15 @@
   const client = new ApiClient(data.loadEventFetch);
   const attributeApi = getAttributeApi(client);
 
-  function handleAttributeSelect(attribute: Attribute): void {
-    log.info(`(AttributeListPage) Navigating to detail for attributeId: ${attribute.attribute_id}`);
-    goto(`${page.url.pathname}/${attribute.attribute_id}`);
+  function handleAttributeSelect(attribute: Attribute, options?: { _blankWindow?: boolean }): void {
+    const url = `${page.url.pathname}/${attribute.attribute_id}`;
+    if (options?._blankWindow) {
+      log.info(`(AttributeListPage) Opening in new tab for attributeId: ${attribute.attribute_id}`);
+      window.open(url, "_blank");
+    } else {
+      log.info(`(AttributeListPage) Navigating to detail for attributeId: ${attribute.attribute_id}`);
+      goto(url);
+    }
   }
 
   async function handleAttributeDelete(ids: ID[]): Promise<void> {

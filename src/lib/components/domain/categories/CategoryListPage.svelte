@@ -45,9 +45,15 @@
   const client = new ApiClient(data.loadEventFetch);
   const categoryApi = getCategoryApi(client);
 
-  function handleCategorySelect(category: CategoryWithOfferingCount): void {
-    log.info(`Navigating to detail for categoryId: ${category.category_id}`);
-    goto(`${page.url.pathname}/${category.category_id}`);
+  function handleCategorySelect(category: CategoryWithOfferingCount, options?: { _blankWindow?: boolean }): void {
+    const url = `${page.url.pathname}/${category.category_id}`;
+    if (options?._blankWindow) {
+      log.info(`Opening in new tab for categoryId: ${category.category_id}`);
+      window.open(url, "_blank");
+    } else {
+      log.info(`Navigating to detail for categoryId: ${category.category_id}`);
+      goto(url);
+    }
   }
 
   async function handleCategoryDelete(ids: ID[]): Promise<void> {

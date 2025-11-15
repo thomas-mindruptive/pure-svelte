@@ -58,9 +58,15 @@
 
   // === EVENTS ===================================================================================
 
-  function handleSupplierSelect(supplier: Wholesaler): void {
-    log.info(`(SupplierListPage) Navigating to detail for supplierId: ${supplier.wholesaler_id}`);
-    goto(`${page.url.pathname}/${supplier.wholesaler_id}`);
+  function handleSupplierSelect(supplier: Wholesaler, options?: { _blankWindow?: boolean }): void {
+    const url = `${page.url.pathname}/${supplier.wholesaler_id}`;
+    if (options?._blankWindow) {
+      log.info(`(SupplierListPage) Opening in new tab for supplierId: ${supplier.wholesaler_id}`);
+      window.open(url, "_blank");
+    } else {
+      log.info(`(SupplierListPage) Navigating to detail for supplierId: ${supplier.wholesaler_id}`);
+      goto(url);
+    }
   }
 
   async function handleSupplierDelete(ids: ID[]): Promise<void> {

@@ -66,7 +66,7 @@ export type ConfirmResult = {
 
 // Strategy pattern for handling row interactions
 export type RowActionStrategy<T = unknown> = {
-  click?: (row: T) => void; // Primary click action (usually navigation)
+  click?: (row: T, options?: { _blankWindow?: boolean }) => void; // Primary click action (usually navigation). options._blankWindow=true opens in new tab
   doubleClick?: (row: T) => void; // Double-click action
   hover?: (row: T) => void; // Hover action (e.g., preview)
 };

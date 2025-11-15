@@ -49,9 +49,15 @@
 
   // === EVENTS ===================================================================================
 
-  function handleOrderSelect(order: Order_Wholesaler): void {
-    log.info(`Navigating to detail for: ${order.order_id}`);
-    goto(`${page.url.pathname}/${order.order_id}`);
+  function handleOrderSelect(order: Order_Wholesaler, options?: { _blankWindow?: boolean }): void {
+    const url = `${page.url.pathname}/${order.order_id}`;
+    if (options?._blankWindow) {
+      log.info(`Opening in new tab for order: ${order.order_id}`);
+      window.open(url, "_blank");
+    } else {
+      log.info(`Navigating to detail for: ${order.order_id}`);
+      goto(url);
+    }
   }
 
   async function handleOrderDelete(ids: ID[]): Promise<void> {

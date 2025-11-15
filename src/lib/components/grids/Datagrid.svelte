@@ -466,7 +466,7 @@
   function handleRowClick(row: any) {
     try {
       if (rowActionStrategy?.click) {
-        rowActionStrategy.click(row);
+        rowActionStrategy.click(row); // Normal click - no options
         log.debug(
           {
             component: "DataGrid: handleRowClick",
@@ -523,6 +523,49 @@
           error: String(error),
         },
         "handleRowDoubleClick failed",
+      );
+    }
+  }
+
+  function handleRowContextMenu(row: any, event: MouseEvent) {
+    try {
+      // Prevent default browser context menu
+      event.preventDefault();
+      // Stop propagation to prevent onclick from firing after contextmenu
+      event.stopPropagation();
+      
+      if (rowActionStrategy?.click) {
+        // Call click handler with _blankWindow option to open in new tab
+        rowActionStrategy.click(row, { _blankWindow: true });
+        log.debug(
+          {
+            component: "DataGrid:handleRowContextMenu",
+            gridId,
+            entity,
+            rowId: safeGetId(row),
+          },
+          "Row context menu triggered - opening in new tab",
+        );
+      } else {
+        log.debug(
+          {
+            component: "DataGrid:handleRowContextMenu",
+            gridId,
+            entity,
+            rowId: safeGetId(row),
+          },
+          "No rowActionStrategy.click provided",
+        );
+      }
+    } catch (error) {
+      log.error(
+        {
+          component: "DataGrid:handleRowContextMenu",
+          gridId,
+          entity,
+          error: String(error),
+        },
+        "handleRowContextMenu failed",
       );
     }
   }
@@ -1073,6 +1116,7 @@
             <tr
               onclick={() => handleRowClick(row)}
               ondblclick={() => handleRowDoubleClick(row)}
+              oncontextmenu={(e) => handleRowContextMenu(row, e)}
               data-deleting={rowIsDeleting(row) ? "true" : undefined}
               aria-selected={rowIsSelected(row) ? "true" : undefined}
               class={rowClass(row)}

@@ -31,19 +31,36 @@ export const deleteStrategy = {
 };
 
 /**
- * Navigates to the offering detail page when user clicks on a row.
+ * Builds the URL for an offering detail page.
+ * Returns null if required IDs are missing.
  */
-function handleOfferingClick(row: OfferingReportViewWithLinks) {
+function buildOfferingUrl(row: OfferingReportViewWithLinks): string | null {
   const categoryId = row.pcId;
   const productDefId = row.pdefId;
   const offeringId = row.wioId;
 
   if (categoryId && productDefId && offeringId) {
-    const url = `/categories/${categoryId}/productdefinitions/${productDefId}/offerings/${offeringId}`;
-    log.info(`[OfferingReportGrid] Navigating to: ${url}`);
-    goto(url);
+    return `/categories/${categoryId}/productdefinitions/${productDefId}/offerings/${offeringId}`;
+  }
+  return null;
+}
+
+/**
+ * Navigates to the offering detail page when user clicks on a row.
+ * If options._blankWindow is true, opens in a new tab instead.
+ */
+function handleOfferingClick(row: OfferingReportViewWithLinks, options?: { _blankWindow?: boolean }) {
+  const url = buildOfferingUrl(row);
+  if (url) {
+    if (options?._blankWindow) {
+      log.info(`[OfferingReportGrid] Opening in new tab: ${url}`);
+      window.open(url, "_blank");
+    } else {
+      log.info(`[OfferingReportGrid] Navigating to: ${url}`);
+      goto(url);
+    }
   } else {
-    log.warn(`[OfferingReportGrid] Cannot navigate - missing IDs`, { categoryId, productDefId, offeringId });
+    log.warn(`[OfferingReportGrid] Cannot navigate - missing IDs`, { categoryId: row.pcId, productDefId: row.pdefId, offeringId: row.wioId });
   }
 }
 

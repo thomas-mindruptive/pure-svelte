@@ -257,13 +257,18 @@
     goto(buildChildUrl(page.url.pathname, "offerings", "new"));
   }
 
-  function handleOfferingSelect(offering: Wio_PDef_Cat_Supp) {
+  function handleOfferingSelect(offering: Wio_PDef_Cat_Supp, options?: { _blankWindow?: boolean }) {
     log.info(`Selected offering: `, offering);
     const { wholesaler_id, category_id, offering_id, product_def_id } = offering;
     if (wholesaler_id && category_id && offering_id && product_def_id) {
       const targetUrl = buildChildUrl(page.url.pathname, "offerings", offering_id);
-      log.debug(`Going to: ${targetUrl}`);
-      goto(targetUrl);
+      if (options?._blankWindow) {
+        log.debug(`Opening in new tab: ${targetUrl}`);
+        window.open(targetUrl, "_blank");
+      } else {
+        log.debug(`Going to: ${targetUrl}`);
+        goto(targetUrl);
+      }
     } else {
       log.error("Cannot navigate to offering, missing IDs", { offering });
       addNotification("Cannot navigate: offering data is incomplete.", "error");
@@ -332,13 +337,18 @@
     goto(buildChildUrl(page.url.pathname, "images", "new"));
   }
 
-  function handleImageSelect(image: ProductDefinitionImage_Image) {
+  function handleImageSelect(image: ProductDefinitionImage_Image, options?: { _blankWindow?: boolean }) {
     log.info(`Selected image: `, image);
     const { image_id } = image;
     if (image_id) {
       const targetUrl = buildChildUrl(page.url.pathname, "images", image_id);
-      log.debug(`Going to: ${targetUrl}`);
-      goto(targetUrl);
+      if (options?._blankWindow) {
+        log.debug(`Opening in new tab: ${targetUrl}`);
+        window.open(targetUrl, "_blank");
+      } else {
+        log.debug(`Going to: ${targetUrl}`);
+        goto(targetUrl);
+      }
     } else {
       log.error("Cannot navigate to image, missing image_id", { image });
       addNotification("Cannot navigate: image data is incomplete.", "error");

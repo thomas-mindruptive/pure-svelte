@@ -305,8 +305,13 @@
    * Navigates to the offerings page for this supplier and category.
    * <refact01> CHANGED: Navigate to /suppliers/N/categories/M (stays in supplier context)
    */
-  function handleCategorySelect(category: CategoryWithOfferingCount) {
-    goto(buildChildUrl(page.url.pathname, "categories", category.category_id));
+  function handleCategorySelect(category: CategoryWithOfferingCount, options?: { _blankWindow?: boolean }) {
+    const url = buildChildUrl(page.url.pathname, "categories", category.category_id);
+    if (options?._blankWindow) {
+      window.open(url, "_blank");
+    } else {
+      goto(url);
+    }
   }
 
   const categoriesRowActionStrategy: RowActionStrategy<CategoryWithOfferingCount> = {
@@ -376,8 +381,13 @@
     goto(buildChildUrl(page.url.pathname, "orders", "new"));
   }
 
-  function handleOrderSelect(order: Order_Wholesaler) {
-    goto(buildChildUrl(page.url.pathname, "orders", order.order_id));
+  function handleOrderSelect(order: Order_Wholesaler, options?: { _blankWindow?: boolean }) {
+    const url = buildChildUrl(page.url.pathname, "orders", order.order_id);
+    if (options?._blankWindow) {
+      window.open(url, "_blank");
+    } else {
+      goto(url);
+    }
   }
 
   const ordersDeleteStrategy: DeleteStrategy<Order_Wholesaler> = {

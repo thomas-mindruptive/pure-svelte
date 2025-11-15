@@ -113,7 +113,7 @@ export async function validateProductDefConstraints(
 		const offeringsResult = await transaction.request()
 			.input("product_def_id", productDef.product_def_id)
 			.query(`
-				SELECT offering_id, material_id, form_id, surface_finish_id, construction_type_id
+				SELECT offering_id, material_id, form_id, surface_finish_id, construction_type_id, override_material
 				FROM dbo.wholesaler_item_offerings
 				WHERE product_def_id = @product_def_id
 			`);
@@ -157,6 +157,11 @@ export async function validateProductDefConstraints(
 
 				// Offering has same value as new value → no conflict
 				if (offeringValue === newValue) {
+					return false;
+				}
+
+				// For material_id: If offering has override_material=true, it's allowed to have different value → no conflict
+				if (field === 'material_id' && off.override_material === true) {
 					return false;
 				}
 

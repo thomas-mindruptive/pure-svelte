@@ -52,6 +52,21 @@ The application leverages SvelteKit's file-based routing to provide a robust and
 
 ---
 
+## Do / Don't (Enforced)
+
+- **Do:**
+  - Use `validateAndInsertEntity` / `validateAndUpdateEntity` for all create/update flows.
+  - Keep view alias names and report schema names exactly aligned (1:1).
+  - Use `onQueryChange` for Datagrid (filters + sort combined); persist with `gridId`.
+  - Write idempotent ALTER scripts; update the view safely.
+- **Don't:**
+  - Don't write INSERT/UPDATE SQL in API routes.
+  - Don't add report grid columns without matching view + report schema fields.
+  - Don't use `onSort` for new code (legacy).
+  - Don't add UI fields that do not exist in the schema.
+
+---
+
 ## Generic Type System 
 
 ### Core Generic Types with Request Pattern Distinction
@@ -169,6 +184,21 @@ When implementing a new entity, follow this exact 5-endpoint structure:
 - **Create**: `POST /api/entity/new` with entity data
 - **Update**: `PUT /api/entity/[id]` with partial updates
 - **Delete**: `DELETE /api/entity/[id]` with cascade/forceCascade flags
+
+#### Server Create/Update Pattern (Canonical)
+
+**MANDATORY:** All create/update operations must use the generic validation helpers. Never write manual SQL in API routes.
+
+- **Create:**
+```ts
+return validateAndInsertEntity(WholesalerItemOfferingForCreateSchema, requestData, "offering", validateOfferingConstraints);
+```
+- **Update:**
+```ts
+return validateAndUpdateEntity(Wio_Schema, offering_id, "offering_id", requestData, "offering", validateOfferingConstraints);
+```
+
+The schema and the generic helpers are the single source of truth. After schema changes, no code changes are needed in POST/PUT handlers.
 
 ### Relationship Endpoint Pattern: `/api/<parent>-<child>`
 
@@ -440,20 +470,6 @@ export function validateJoinSelectColumns(selectColumns: string[]): void {
   }
 }
 ```
-
-**Benefits Achieved:**
-- **✅ Single Source of Truth:** Column definitions only exist in Zod schemas
-- **✅ Runtime Validation:** QueryBuilder validates SELECT columns against schemas
-- **✅ Type Safety:** Compile-time types automatically derived from schemas
-- **✅ JOIN Support:** Complex queries with schema-based column validation
-- **✅ Auto-Completion:** Perfect IntelliSense for all qualified columns like "w.name", "pc.category_id"
-
-**Migration Completed:**
-1. **✅ Phase 1:** Table Registry implemented with automatic type generation
-2. **✅ Phase 2:** QueryBuilder enhanced with schema-based validation
-3. **✅ Phase 3:** Hardcoded column lists removed from queryConfig
-4. **✅ Phase 4:** Type system fully generated from Table Registry
-5. **✅ Phase 5:** Legacy queryConfig.types.ts removed
 
 #### Current Query Config Pattern (Updated)
 QueryConfig now focuses purely on JOIN configurations, with table security handled by Table Registry:
@@ -872,6 +888,26 @@ To improve the user experience with long lists of data, the Datagrid now support
 -   **Dynamic Height Control:** The height of the scrollable area is controlled via a `maxBodyHeight` prop, which sets a `--pc-grid-body-max-height` CSS variable. This allows parent components to flexibly define the grid's dimensions (e.g., `maxBodyHeight="75vh"`).
 -   **Implementation:** The component's internal structure uses a CSS Flexbox layout. The toolbar and table header (`<thead>`) have a fixed size (`flex-shrink: 0`), while the table body container (`.pc-grid__scroller`) is configured to grow and fill the remaining available space (`flex-grow: 1`) and manage its own vertical scrollbar. The `<thead>` uses `position: sticky` to remain visible within this scrollable container.
 
+#### Grid Query Pattern (Canonical)
+
+**MANDATORY:** All grids must use `onQueryChange` for filtering and sorting. Never use `onSort` in new code.
+
+- Always wire `onQueryChange({ filters, sort })`. Do not use `onSort` in new code.
+- Column definitions: set `filterable` and a precise `filterType` (`text|number|boolean|select`).
+- FilterToolbar:
+  - AND/OR toggle and "Clear all filters" are inline next to the "Filters" summary.
+  - Quick-Filter sets WhereCondition once; UI projection via `onUpdateInitialFilterValues` + `onIncrementFilterResetKey` (no extra API calls).
+- Persist state with `gridId` (via `gridState`).
+
+#### Report View + Report Grid Contract
+
+When exposing data in reports:
+
+- Add/rename fields in `dbo.view_offerings_pt_pc_pd` with final aliases (e.g., `wioPricePerPiece`, `wsRelevance`, `wsPriceRange`).
+- Update `OfferingReportViewSchema` to match the aliases exactly.
+- Add columns in `OfferingReportGrid.columns.ts` (module-level for stable references). Accessors must handle nulls and formatting.
+- The report page must only use `onQueryChange`. No manual SQL; filters/sort go through QueryGrammar.
+
 ### Frontend Navigation Architecture: Context Conservation
 The application employs a **"Context Conservation"** pattern to create an intuitive hierarchical browsing experience. The system remembers the deepest path the user has explored and reflects this state consistently across the `HierarchySidebar` and `Breadcrumb` components, only pruning the path when the user explicitly changes context on a higher level.
 
@@ -909,6 +945,47 @@ When implementing a new entity (e.g., Orders), follow this comprehensive checkli
 - [ ] Include both base schema and `ForCreateSchema` variant
 - [ ] Add entity to `AllEntitiesSchema` enum
 - [ ] Update `AllSchemas` mapping object
+
+#### End-to-End Field Change (Authoritative Checklist)
+
+When adding or modifying fields in existing entities (e.g., `wholesaler_item_offerings`):
+
+1) **Database**
+- Write an idempotent ALTER script (check `INFORMATION_SCHEMA.COLUMNS` or use `sp_rename` for renames).
+- If a report needs the field, extend `dbo.view_offerings_pt_pc_pd` with stable aliases that match our TS schema (e.g., `wioPricePerPiece`, `wsRelevance`, `wsPriceRange`).
+
+2) **Zod Schemas (TS)**
+- Entity data: extend `Wio_Schema` (e.g., `origin`, `price_per_piece`, `wholesaler_price`).
+- Report data: extend `OfferingReportViewSchema` to mirror view aliases exactly.
+- Do not omit the new field from `WholesalerItemOfferingForCreateSchema` unless it is server-generated.
+
+3) **Backend Queries**
+- If a loader uses `wio.*`, the new column comes automatically.
+- If a loader has an explicit `SELECT` list, add the column (e.g., `loadOfferingsForImageAnalysis`).
+
+4) **API (Server)**
+- Use only:
+  - `validateAndInsertEntity(schema, body, "offering")`
+  - `validateAndUpdateEntity(schema, id, "offering_id", body, "offering")`
+- No ad‑hoc SQL in routes.
+
+5) **UI**
+- Grids: add column definitions with `filterable` + `filterType` and wire `onQueryChange`.
+- Forms: add 1:1 fields that exist in the schema.
+
+6) **Checks**
+- Run `npm run check`. Manually verify filter/sort on new columns if applicable.
+
+#### Naming Conventions (Authoritative)
+
+- **Table aliases and qualified keys (nested data/grids):**
+  - `wio.*` → `wholesaler_item_offerings`
+  - `w.*` → `wholesalers`
+  - `pd.*` → `product_definitions`
+  - `pc.*` → `product_categories`
+- **Report view (flat model):**
+  - `wioXxx` (offerings), `wsXxx` (wholesaler), `pdefXxx` (product def), `catXxx` (category), `ptXxx` (product type)
+- **Schema fields must match view aliases exactly** (case-sensitive for consistency).
 
 ### 2. Table Registry & Query Configuration
 - [ ] **Table Registry:** Add entity to `src/lib/backendQueries/tableRegistry.ts` in the `TableRegistry` object with schema reference, table name, DB schema, and alias
@@ -2204,3 +2281,60 @@ let isAnyLoading = $derived(
    - Prefer `$derived` for pure computations
 
 This pattern - component-owned async state with proper initialization guards - is the foundation for building robust, navigation-resilient Svelte 5 applications.
+
+---
+
+## Minimal Copy/Paste Snippets
+
+### ALTER Add Field (Idempotent)
+```sql
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='wholesaler_item_offerings' AND COLUMN_NAME='price_per_piece')
+  ALTER TABLE dbo.wholesaler_item_offerings ADD price_per_piece DECIMAL(10,2) NULL;
+```
+
+### View Add Field
+```sql
+..., wio.price_per_piece as wioPricePerPiece, ws.relevance as wsRelevance, ws.price_range as wsPriceRange, ...
+```
+
+### Zod Schema (Entity)
+```ts
+price_per_piece: z.number().multipleOf(0.01).nullable().optional(),
+origin: z.string().max(255).nullable().optional(),
+wholesaler_price: z.number().multipleOf(0.01).nullable().optional(),
+```
+
+### Zod Schema (Report View)
+```ts
+wioPricePerPiece: z.number().nullable().optional(),
+wsRelevance: z.number().nullable().optional(),
+wsPriceRange: z.string().max(200).nullable().optional(),
+```
+
+### Grid Column Definition (Entity Grid)
+```ts
+{ key: "wio.price_per_piece", header: "Price/pc", filterable: true, filterType: "number", accessor: r => r.price_per_piece == null ? "—" : `${r.currency ?? "USD"} ${r.price_per_piece.toFixed(2)}` }
+```
+
+---
+
+## Troubleshooting (Known Issues)
+
+- **"CREATE VIEW must be the first statement":**
+  - Split batches with `GO`; run DROP and CREATE separately; or use `CREATE OR ALTER VIEW`.
+- **Report Grid TS error "Property X does not exist":**
+  - Update `OfferingReportViewSchema` and ensure `DDL-Views.sql` has matching alias names.
+- **Filters not visible:**
+  - No columns with `filterable: true`, or toolbar was not mounted.
+- **Sorting wired but nothing happens:**
+  - You used `onSort`. Switch to `onQueryChange({ filters, sort })`.
+
+---
+
+## PR Checklist (Enforce Before Merge)
+
+- [ ] ALTER script is idempotent; view updated safely.
+- [ ] Zod schemas match DB/view (entity + report).
+- [ ] Report aliases and TS schema names match exactly.
+- [ ] Grids use `onQueryChange`; columns have correct `filterType`.
+- [ ] `npm run check` passes; manual filter/sort sanity check done.

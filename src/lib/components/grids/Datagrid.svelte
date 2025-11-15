@@ -682,6 +682,30 @@
     stateManager.saveUI({ filterExpanded });
   }
 
+  // ===== RELOAD LOGIC =====
+
+  async function handleReload() {
+    if (!stableOnQueryChange) {
+      log.warn(`[Datagrid ${gridId}] Cannot reload - no onQueryChange provided`);
+      return;
+    }
+
+    isLoadingData = true;
+    try {
+      const whereGroup = buildWhereGroup();
+      const sortToUse = sortState.length > 0 ? sortState : null;
+      log.debug(`[Datagrid ${gridId}] Reloading with filters: ${activeFilters.size}, sort: ${sortState.length}`);
+      await stableOnQueryChange({
+        filters: whereGroup,
+        sort: sortToUse
+      });
+    } catch (error) {
+      log.error(`[Datagrid ${gridId}] Reload failed`, error);
+    } finally {
+      isLoadingData = false;
+    }
+  }
+
   // ===== SORTING LOGIC =====
 
   async function handleSort(key: AllQualifiedColumns) {
@@ -987,6 +1011,16 @@
         title={`Clear all sortings: ${JSON.stringify(sortState)}`}
       >
         Clear all sortings ({sortState.length})
+      </button>
+
+      <!-- RELOAD --------------------------------------------------------------------------------->
+      <button
+        class="pc-grid__btn"
+        disabled={isLoadingData || !stableOnQueryChange}
+        onclick={() => handleReload()}
+        title="Reload data with current filters and sorting"
+      >
+        ↻ Reload
       </button>
 
       <!-- DELETE SPINNER ------------------------------------------------------------------------>

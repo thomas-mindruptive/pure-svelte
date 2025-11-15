@@ -96,6 +96,24 @@
       accessor: (offering) => offering.wholesaler.name || "Unnamed Supplier",
     },
     {
+      key: "w.relevance",
+      header: "WS Relevance",
+      sortable: true,
+      filterable: true,
+      filterType: "number",
+      width: "8rem",
+      accessor: (offering) => offering.wholesaler.relevance ?? "—",
+    },
+    {
+      key: "w.price_range",
+      header: "WS PriceRange",
+      sortable: true,
+      filterable: true,
+      filterType: "text",
+      width: "10rem",
+      accessor: (offering) => offering.wholesaler.price_range || "—",
+    },
+    {
       key: "wio.sub_seller",
       header: "Subseller",
       sortable: true,
@@ -121,6 +139,18 @@
       accessor: (offering) => {
         if (offering.price == null) return "—";
         return `${offering.currency || "USD"} ${offering.price.toFixed(2)}`;
+      },
+    },
+    {
+      key: "wio.price_per_piece",
+      header: "Price/pc",
+      sortable: true,
+      filterable: true,
+      filterType: "number",
+      width: "8rem",
+      accessor: (offering) => {
+        if (offering.price_per_piece == null) return "—";
+        return `${offering.currency || "USD"} ${offering.price_per_piece.toFixed(2)}`;
       },
     },
     {

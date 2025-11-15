@@ -830,6 +830,7 @@ const OfferingReportViewSchemaBase = z.object({
   wioId: z.number().int().positive(),
   wioTitle: z.string().max(500),
   wioPrice: z.number().nullable().optional(),
+  wioPricePerPiece: z.number().nullable().optional(),
   wioSize: z.string().max(200).nullable().optional(),
   wioFormId: z.number().int().positive().nullable().optional(),
   wioFormName: z.string().max(200).nullable().optional(),
@@ -842,6 +843,8 @@ const OfferingReportViewSchemaBase = z.object({
   wioDimensions: z.string().max(200).nullable().optional(),
   wioComment: z.string().max(4000).nullable().optional(),
   wioQuality: z.string().max(255).nullable().optional(),
+  wsRelevance: z.number().nullable().optional(),
+  wsPriceRange: z.string().max(200).nullable().optional(),
   wioWeightGrams: z.number().nullable().optional(),
 }).describe("OfferingReportViewSchema");
 

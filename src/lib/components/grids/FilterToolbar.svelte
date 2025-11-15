@@ -403,7 +403,8 @@
     display: inline-flex;
     gap: 0.5rem;
     align-items: center;
-    float: right;
+    margin-left: 1rem;
+    float: none;
   }
 
   .filter-toolbar-content {

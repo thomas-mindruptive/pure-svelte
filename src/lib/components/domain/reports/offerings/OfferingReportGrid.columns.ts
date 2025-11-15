@@ -114,6 +114,24 @@ export const columns: ColumnDef<typeof OfferingReportViewSchema>[] = [
     width: "150px"
   },
   {
+    key: "wsRelevance",
+    header: "WS Relevance",
+    accessor: (row) => row.wsRelevance ?? "-",
+    sortable: true,
+    filterable: true,
+    filterType: "number",
+    width: "100px"
+  },
+  {
+    key: "wsPriceRange",
+    header: "WS PriceRange",
+    accessor: (row) => row.wsPriceRange || "-",
+    sortable: true,
+    filterable: true,
+    filterType: "text",
+    width: "120px"
+  },
+  {
     key: "pdefMatName",
     header: "PDef Material",
     accessor: (row) => row.pdefMatName || "-",
@@ -195,6 +213,15 @@ export const columns: ColumnDef<typeof OfferingReportViewSchema>[] = [
     width: "100px"
   },
   {
+    key: "wioPricePerPiece",
+    header: "Price/pc",
+    accessor: (row) => row.wioPricePerPiece ? row.wioPricePerPiece.toFixed(2) : "-",
+    sortable: true,
+    filterable: true,
+    filterType: "number",
+    width: "100px"
+  },
+  {
     key: "wioSize",
     header: "Size",
     accessor: (row) => row.wioSize || "-",
@@ -239,6 +266,7 @@ export const columns: ColumnDef<typeof OfferingReportViewSchema>[] = [
     filterType: "text",
     width: "120px"
   },
+
   {
     key: "links" as any,
     header: "Links",

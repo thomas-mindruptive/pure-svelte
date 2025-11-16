@@ -76,7 +76,13 @@
       <option value={ComparisonOperator.GTE}>&gt;=</option>
       <option value={ComparisonOperator.LTE}>&lt;=</option>
     </select>
-    <input id={inputId} type="number" {value} oninput={handleInput}/>
+    <input
+      id={inputId}
+      type="number"
+      {value}
+      oninput={handleInput}
+      onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); } }}
+    />
   </div>
 </div>
 

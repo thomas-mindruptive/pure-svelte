@@ -85,13 +85,6 @@
       .sort((a, b) => a.placement.pos - b.placement.pos)
   );
 
-  // TODO: Implement column placement filters in future iteration
-  // const columnInsertFilters = $derived(
-  //   customFilters
-  //     .filter(f => f.placement.type === 'column')
-  //     .sort((a, b) => a.placement.pos - b.placement.pos)
-  // );
-
   /**
    * Initialize custom filter states from initialFilterValues or defaults
    */
@@ -234,12 +227,14 @@
     </span>
     <div class="filter-summary-buttons">
       <button
+        type="button"
         onclick={(e) => { e.preventDefault(); onCombineModeToggle(); }}
         class="combine-toggle"
       >
         {combineMode === 'AND' ? 'All match' : 'Any match'}
       </button>
       <button
+        type="button"
         onclick={(e) => { e.preventDefault(); onClearAllFilters(); }}
         class="clear-all-btn"
         disabled={activeFilterCount === 0}
@@ -266,7 +261,7 @@
         rows="2"
       ></textarea>
       <div class="superuser-where-actions">
-        <button onclick={applyRawWhere} class="apply-raw-where-btn">
+        <button type="button" onclick={applyRawWhere} class="apply-raw-where-btn">
           Apply
         </button>
         <div class="superuser-where-help">
@@ -489,10 +484,6 @@
 
   .quick-filter-select label {
     font-weight: 500;
-  }
-
-  .quick-filter-select select {
-    /* Styles from form-elements.css will apply */
   }
 
   .quick-filter-radio {

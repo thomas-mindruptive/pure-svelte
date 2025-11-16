@@ -163,14 +163,4 @@ export type CustomFilterDef<T> = {
    * Component receives props: { value: any, onChange: (newValue: any) => void }
    */
   component?: typeof SvelteComponent;
-
-  /**
-   * Optional: Column key to synchronize with.
-   * When this Quick-Filter changes, the corresponding column filter will be updated.
-   * When the column filter changes, this Quick-Filter will be updated (if possible).
-   * 
-   * Example: If quickFilter.id = 'has_offerings' and syncToColumnKey = 'offering_count',
-   * then setting the quick filter will also set offering_count > 0 in the normal filter.
-   */
-  syncToColumnKey?: string;
 };

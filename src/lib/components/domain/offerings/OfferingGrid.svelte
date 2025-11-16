@@ -75,6 +75,8 @@
       header: "Offering",
       accessor: (offering) => offering.title,
       sortable: true,
+      filterable: true,
+      filterType: "text",
       width: "15rem",
     },
     {

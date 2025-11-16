@@ -62,7 +62,14 @@
 
 <div class="filter-input">
   <label for={inputId}>{columnHeader}</label>
-  <input id={inputId} type="text" {value} oninput={handleInput} placeholder="Search..."/>
+  <input
+    id={inputId}
+    type="text"
+    {value}
+    oninput={handleInput}
+    onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); } }}
+    placeholder="Search..."
+  />
 </div>
 
 <style>

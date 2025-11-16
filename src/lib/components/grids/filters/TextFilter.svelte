@@ -21,7 +21,7 @@
   import { log } from '$lib/utils/logger';
   import "$lib/components/styles/form-elements.css";
 
-  type Props = {
+  export type Props = {
     columnKey: string;
     columnHeader: string;
     initialValue?: any;  // For UI state restore from localStorage

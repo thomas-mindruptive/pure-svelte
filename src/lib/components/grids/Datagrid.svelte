@@ -1050,6 +1050,7 @@
       {customFilters}
       {combineMode}
       {activeFilterCount}
+      currentWhere={buildWhereGroup()}
       {filterResetKey}
       {initialFilterValues}
       {filterExpanded}

@@ -27,6 +27,7 @@
     customFilters?: CustomFilterDef<any>[];  // NEW: Custom filter definitions
     combineMode: 'AND' | 'OR';
     activeFilterCount: number;  // Drives "Clear all" button disabled state
+    currentWhere?: WhereCondition<any> | WhereConditionGroup<any> | null; // Combined effective filters from Grid
     filterResetKey: number;     // Increment to signal all filters to reset
     initialFilterValues: Map<string, {operator: any, value: any}> | null;  // For UI state restore
     filterExpanded: boolean;    // Controlled by parent (Datagrid), saved to localStorage
@@ -45,6 +46,7 @@
     customFilters = [],  // NEW: Custom filters array
     combineMode,
     activeFilterCount,
+    currentWhere = null,
     filterResetKey,
     initialFilterValues,
     filterExpanded,
@@ -64,6 +66,27 @@
 
   // Custom filter state management
   let customFilterStates = $state<Map<string, any>>(new Map());
+
+  // Popover element reference (for programmatic close via ✕)
+  let wherePopoverEl = $state<HTMLDivElement | null>(null);
+
+  function prettyWhere(): string {
+    try {
+      return JSON.stringify(currentWhere, null, 2) ?? 'null';
+    } catch {
+      return String(currentWhere);
+    }
+  }
+
+  // Using native popover toggling via popovertarget on the button; no JS toggle needed
+
+  async function copyWhereToClipboard() {
+    try {
+      await navigator.clipboard.writeText(prettyWhere());
+    } catch {
+      // no-op
+    }
+  }
 
   // Determine if FilterToolbar should render (self-decision)
   const hasColumnFilters = $derived(
@@ -141,11 +164,8 @@
       if (updates.size > 0) {
         onUpdateInitialFilterValues(updates);
       }
-      
-      // 3. Increment filterResetKey to re-render filter fields with new initialValues
-      if (onIncrementFilterResetKey) {
-        onIncrementFilterResetKey();
-      }
+      // DON'T increment filterResetKey here - it destroys and recreates the component,
+      // causing focus loss. Only increment on actual reset operations.
     }
     // If condition is null (filter cleared), clear the projected values
     else if (!condition && onUpdateInitialFilterValues) {
@@ -242,10 +262,53 @@
       >
         Clear all filters
       </button>
+      <button
+        type="button"
+        class="where-json-btn"
+        id="where-json-button"
+        popovertarget="where-json-popover"
+        popovertargetaction="toggle"
+        title="Show effective filter JSON"
+        aria-haspopup="true"
+      >
+        ℹ Filters
+      </button>
     </div>
   </summary>
 
   <div class="filter-toolbar-content">
+    <!-- Native HTML Popover for effective Where JSON -->
+    <div
+      id="where-json-popover"
+      popover="auto"
+      bind:this={wherePopoverEl}
+      class="where-popover"
+      role="dialog"
+      aria-label="Effective filters (JSON)"
+    >
+      <div class="where-popover__header">
+        <strong>Effective filters (JSON)</strong>
+        <div class="where-popover__actions">
+          <button type="button" onclick={copyWhereToClipboard} class="copy-btn">Copy</button>
+          <button
+            type="button"
+            class="close-btn"
+            onclick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              // @ts-ignore
+              wherePopoverEl?.hidePopover?.();
+            }}
+            aria-label="Close"
+            title="Close"
+          >
+            ✕
+          </button>
+        </div>
+      </div>
+      <pre class="where-popover__content">{prettyWhere()}</pre>
+    </div>
+
     {#if showSuperuserWhere}
     <div class="superuser-where-section">
       <div class="superuser-where-header">
@@ -342,7 +405,7 @@
               columnKey={col.key}
               columnHeader={col.header}
               initialValue={initialValues?.value}
-              onChange={(condition) => handleColumnFilterChange(col.key, condition)}
+              onChange={(condition: WhereCondition<any> | null) => handleColumnFilterChange(col.key, condition)}
             />
           {:else if filterType === 'number'}
             <NumberFilter
@@ -350,14 +413,14 @@
               columnHeader={col.header}
               initialValue={initialValues?.value}
               initialOperator={initialValues?.operator}
-              onChange={(condition) => handleColumnFilterChange(col.key, condition)}
+              onChange={(condition: WhereCondition<any> | null) => handleColumnFilterChange(col.key, condition)}
             />
           {:else if filterType === 'boolean'}
             <BooleanFilter
               columnKey={col.key}
               columnHeader={col.header}
               initialValue={initialValues?.value}
-              onChange={(condition) => handleColumnFilterChange(col.key, condition)}
+              onChange={(condition: WhereCondition<any> | null) => handleColumnFilterChange(col.key, condition)}
             />
           {/if}
         {/key}
@@ -439,6 +502,22 @@
   .clear-all-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+
+  .where-json-btn {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--color-border);
+    background: #eef5ff;
+    color: #0b5fff;
+    cursor: pointer;
+    border-radius: 4px;
+    font-weight: 600;
+    /* Anchor for CSS anchor positioning of popover */
+    anchor-name: --filters-json-btn;
+  }
+
+  .where-json-btn:hover {
+    background: #dbe9ff;
   }
 
   .filter-inputs {
@@ -579,5 +658,54 @@
 
   .superuser-where-help strong {
     font-weight: 600;
+  }
+
+  /* Where JSON Popover */
+  .where-popover {
+    width: min(800px, 92vw);
+    max-height: 70vh;
+    overflow: auto;
+    padding: 0.75rem;
+    border: 1px solid var(--color-border, #ddd);
+    border-radius: 6px;
+    background: var(--color-surface, #fff);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+    /* Position directly under the button using CSS anchor positioning */
+    position-anchor: --filters-json-btn;
+    inset: anchor(bottom) auto auto anchor(left);
+    margin-top: 8px;
+  }
+
+  .where-popover__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .where-popover__actions {
+    display: inline-flex;
+    gap: 0.5rem;
+  }
+
+  .copy-btn, .close-btn {
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--color-border, #ddd);
+    background: #f8f9fa;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  .copy-btn:hover, .close-btn:hover {
+    background: #eef1f4;
+  }
+
+  .where-popover__content {
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+    margin: 0;
   }
 </style>

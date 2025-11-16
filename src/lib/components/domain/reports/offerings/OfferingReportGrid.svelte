@@ -21,13 +21,15 @@
    * - Uses proper URL hierarchy for deep linking and breadcrumbs
    */
   import Datagrid from "$lib/components/grids/Datagrid.svelte";
-  import type { SelectionChangeHandler, ToolbarSnippetProps } from "$lib/components/grids/Datagrid.types";
+  import type { SelectionChangeHandler, ToolbarSnippetProps, CustomFilterDef } from "$lib/components/grids/Datagrid.types";
+  import { ComparisonOperator } from "$lib/backendQueries/queryGrammar";
   import type { WhereCondition, WhereConditionGroup, SortDescriptor } from "$lib/backendQueries/queryGrammar";
   import type { OfferingReportViewWithLinks } from "$lib/domain/domainTypes";
   import type { Snippet } from "svelte";
   // CRITICAL: Import ALL stable references from separate module
   // If defined inline, props get new reference on every render → infinite loop
   import { columns, getId, deleteStrategy, rowActionStrategy } from "./OfferingReportGrid.columns";
+  import QuickTextInput from "$lib/components/grids/filters/QuickTextInput.svelte";
 
   type Props = {
     rows: OfferingReportViewWithLinks[];
@@ -46,12 +48,37 @@
   let { rows, onQueryChange, maxBodyHeight, selection = "none", onSelectionChange, toolbar, showSuperuserWhere = false, onRawWhereChange }: Props = $props();
 
   // getId, deleteStrategy, and rowActionStrategy are imported from .columns.ts for stable references
+
+  // Quick Filters (module-local, simple reference)
+  const customFilters: CustomFilterDef<any>[] = [
+    {
+      id: 'qf-material-like',
+      label: 'Material contains',
+      type: 'custom',
+      placement: { type: 'quickfilter', pos: 0 },
+      // Simple inline input (uses FilterToolbar's custom component contract)
+      component: QuickTextInput as any,
+      buildCondition: (term: string) => {
+        const trimmed = (term ?? '').trim();
+        if (trimmed.length === 0) return null;
+        const likeVal = `%${trimmed}%`;
+        return {
+          whereCondOp: 'OR',
+          conditions: [
+            { key: 'wioMaterialName', whereCondOp: ComparisonOperator.LIKE, val: likeVal },
+            { key: 'pdefMatName', whereCondOp: ComparisonOperator.LIKE, val: likeVal },
+          ]
+        } as WhereConditionGroup<any>;
+      }
+    }
+  ];
 </script>
 
 <Datagrid
   {columns}
   {rows}
   {getId}
+  {customFilters}
   {onQueryChange}
   {deleteStrategy}
   {rowActionStrategy}

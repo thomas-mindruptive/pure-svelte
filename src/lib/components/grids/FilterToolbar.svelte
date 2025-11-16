@@ -237,6 +237,19 @@
     onRawWhereChange?.(trimmed);
   }
 
+  /**
+   * Ensure "Clear all filters" also clears local quick-filter UI state.
+   * We keep the centralized clear (Datagrid) as the single source of truth
+   * and additionally reset our local customFilterStates so custom components
+   * like QuickTwoTextFilter are visually cleared.
+   */
+  function handleClearAllClick(e: Event) {
+    e.preventDefault();
+    // Reset all quick filter UI states (they read from this Map)
+    customFilterStates = new Map();
+    // Delegate to parent to clear backend filters and trigger re-render
+    onClearAllFilters();
+  }
 </script>
 
 {#if shouldRender}
@@ -255,7 +268,7 @@
       </button>
       <button
         type="button"
-        onclick={(e) => { e.preventDefault(); onClearAllFilters(); }}
+        onclick={handleClearAllClick}
         class="clear-all-btn"
         disabled={activeFilterCount === 0}
         title="Clear all filters"
@@ -310,30 +323,32 @@
     </div>
 
     {#if showSuperuserWhere}
-    <div class="superuser-where-section">
-      <div class="superuser-where-header">
+    <details class="superuser-where-details">
+      <summary>
         <span class="superuser-label">⚠️ SUPERUSER MODE: Raw SQL WHERE</span>
         {#if rawWhereActive}
           <span class="active-indicator">ACTIVE</span>
         {/if}
-      </div>
-      <textarea
-        bind:value={rawWhereInput}
-        class="raw-where-input"
-        placeholder="Example: wioPrice > 100 AND wsName LIKE '%ACME%'"
-        rows="2"
-      ></textarea>
-      <div class="superuser-where-actions">
-        <button type="button" onclick={applyRawWhere} class="apply-raw-where-btn">
-          Apply
-        </button>
-        <div class="superuser-where-help">
-          <strong>Allowed columns:</strong>
-          wioId, wioTitle, wioPrice, wioSize, wioDimensions, wioWeightGrams, wioComment, wioQuality, wioMaterialName, wioFormName, wioConstrTypeName, wioSurfFinishName, wsId, wsName, pdefId, pdefTitle, pdefMatName, pdefFormName, pdConstrTypeName, pdSurfFinName, pcId, catName, ptId, ptName
+      </summary>
+      <div class="superuser-where-section">
+        <textarea
+          bind:value={rawWhereInput}
+          class="raw-where-input"
+          placeholder="Example: wioPrice > 100 AND wsName LIKE '%ACME%'"
+          rows="2"
+        ></textarea>
+        <div class="superuser-where-actions">
+          <button type="button" onclick={applyRawWhere} class="apply-raw-where-btn">
+            Apply
+          </button>
+          <div class="superuser-where-help">
+            <strong>Allowed columns:</strong>
+            wioId, wioTitle, wioPrice, wioSize, wioDimensions, wioWeightGrams, wioComment, wioQuality, wioMaterialName, wioFormName, wioConstrTypeName, wioSurfFinishName, wsId, wsName, pdefId, pdefTitle, pdefMatName, pdefFormName, pdConstrTypeName, pdSurfFinName, pcId, catName, ptId, ptName
+          </div>
         </div>
       </div>
-    </div>
-  {/if}
+    </details>
+    {/if}
 
   <!-- Quick Filters Section -->
   {#if quickFilters.length > 0}
@@ -392,41 +407,44 @@
     </div>
   {/if}
 
-  <div class="filter-inputs">
-    {#each columns as col (col.key)}
-      {#if isFilterableColumn(col) && col.filterable}
-        {@const filterType = detectFilterType(col)}
-        {@const initialValues = initialFilterValues?.get(col.key)}
+  <details class="field-filters-details">
+    <summary>Field filters</summary>
+    <div class="filter-inputs">
+      {#each columns as col (col.key)}
+        {#if isFilterableColumn(col) && col.filterable}
+          {@const filterType = detectFilterType(col)}
+          {@const initialValues = initialFilterValues?.get(col.key)}
 
-        <!-- CRITICAL: {#key} forces complete recreation on reset, no $effect needed in filters -->
-        {#key filterResetKey}
-          {#if filterType === 'text'}
-            <TextFilter
-              columnKey={col.key}
-              columnHeader={col.header}
-              initialValue={initialValues?.value}
-              onChange={(condition: WhereCondition<any> | null) => handleColumnFilterChange(col.key, condition)}
-            />
-          {:else if filterType === 'number'}
-            <NumberFilter
-              columnKey={col.key}
-              columnHeader={col.header}
-              initialValue={initialValues?.value}
-              initialOperator={initialValues?.operator}
-              onChange={(condition: WhereCondition<any> | null) => handleColumnFilterChange(col.key, condition)}
-            />
-          {:else if filterType === 'boolean'}
-            <BooleanFilter
-              columnKey={col.key}
-              columnHeader={col.header}
-              initialValue={initialValues?.value}
-              onChange={(condition: WhereCondition<any> | null) => handleColumnFilterChange(col.key, condition)}
-            />
-          {/if}
-        {/key}
-      {/if}
-    {/each}
-  </div>
+          <!-- CRITICAL: {#key} forces complete recreation on reset, no $effect needed in filters -->
+          {#key filterResetKey}
+            {#if filterType === 'text'}
+              <TextFilter
+                columnKey={col.key}
+                columnHeader={col.header}
+                initialValue={initialValues?.value}
+                onChange={(condition: WhereCondition<any> | null) => handleColumnFilterChange(col.key, condition)}
+              />
+            {:else if filterType === 'number'}
+              <NumberFilter
+                columnKey={col.key}
+                columnHeader={col.header}
+                initialValue={initialValues?.value}
+                initialOperator={initialValues?.operator}
+                onChange={(condition: WhereCondition<any> | null) => handleColumnFilterChange(col.key, condition)}
+              />
+            {:else if filterType === 'boolean'}
+              <BooleanFilter
+                columnKey={col.key}
+                columnHeader={col.header}
+                initialValue={initialValues?.value}
+                onChange={(condition: WhereCondition<any> | null) => handleColumnFilterChange(col.key, condition)}
+              />
+            {/if}
+          {/key}
+        {/if}
+      {/each}
+    </div>
+  </details>
   </div>
 </details>
 {/if}

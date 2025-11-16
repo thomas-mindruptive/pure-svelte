@@ -29,7 +29,7 @@
   // CRITICAL: Import ALL stable references from separate module
   // If defined inline, props get new reference on every render → infinite loop
   import { columns, getId, deleteStrategy, rowActionStrategy } from "./OfferingReportGrid.columns";
-  import QuickTextInput from "$lib/components/grids/filters/QuickTextInput.svelte";
+  import QuickTwoTextFilter from "$lib/components/grids/filters/QuickTwoTextFilter.svelte";
 
   type Props = {
     rows: OfferingReportViewWithLinks[];
@@ -52,22 +52,52 @@
   // Quick Filters (module-local, simple reference)
   const customFilters: CustomFilterDef<any>[] = [
     {
-      id: 'qf-material-like',
-      label: 'Material contains',
+      id: 'qf-material-form-like',
+      label: 'Filter by Material & Form',
       type: 'custom',
       placement: { type: 'quickfilter', pos: 0 },
-      // Simple inline input (uses FilterToolbar's custom component contract)
-      component: QuickTextInput as any,
-      buildCondition: (term: string) => {
-        const trimmed = (term ?? '').trim();
-        if (trimmed.length === 0) return null;
-        const likeVal = `%${trimmed}%`;
+      component: QuickTwoTextFilter as any,
+      /**
+       * value: { material?: string; form?: string }
+       * Build: (wioMaterialName LIKE %m% OR pdefMatName LIKE %m%) AND (wioFormName LIKE %f% OR pdefFormName LIKE %f%)
+       * If only one term present, return just that subgroup (OR of the two view columns). If none, return null.
+       */
+      buildCondition: (value: { material?: string; form?: string }) => {
+        const material = (value?.material ?? '').trim();
+        const form = (value?.form ?? '').trim();
+        const subGroups: Array<WhereConditionGroup<any>> = [];
+
+        if (material) {
+          const mLike = `%${material}%`;
+          subGroups.push({
+            whereCondOp: 'OR',
+            conditions: [
+              { key: 'wioMaterialName', whereCondOp: ComparisonOperator.LIKE, val: mLike },
+              { key: 'pdefMatName', whereCondOp: ComparisonOperator.LIKE, val: mLike },
+            ]
+          } as WhereConditionGroup<any>);
+        }
+
+        if (form) {
+          const fLike = `%${form}%`;
+          subGroups.push({
+            whereCondOp: 'OR',
+            conditions: [
+              { key: 'wioFormName', whereCondOp: ComparisonOperator.LIKE, val: fLike },
+              { key: 'pdefFormName', whereCondOp: ComparisonOperator.LIKE, val: fLike },
+            ]
+          } as WhereConditionGroup<any>);
+        }
+
+        if (subGroups.length === 0) {
+          return null;
+        }
+        if (subGroups.length === 1) {
+          return subGroups[0];
+        }
         return {
-          whereCondOp: 'OR',
-          conditions: [
-            { key: 'wioMaterialName', whereCondOp: ComparisonOperator.LIKE, val: likeVal },
-            { key: 'pdefMatName', whereCondOp: ComparisonOperator.LIKE, val: likeVal },
-          ]
+          whereCondOp: 'AND',
+          conditions: subGroups as any[]
         } as WhereConditionGroup<any>;
       }
     }

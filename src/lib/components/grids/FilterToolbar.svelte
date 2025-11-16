@@ -325,7 +325,7 @@
     {#if showSuperuserWhere}
     <details class="superuser-where-details">
       <summary>
-        <span class="superuser-label">⚠️ SUPERUSER MODE: Raw SQL WHERE</span>
+        <span class="superuser-label">⚠️Raw SQL WHERE</span>
         {#if rawWhereActive}
           <span class="active-indicator">ACTIVE</span>
         {/if}

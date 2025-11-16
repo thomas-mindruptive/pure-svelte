@@ -58,13 +58,16 @@
       placement: { type: 'quickfilter', pos: 0 },
       component: QuickTwoTextFilter as any,
       /**
-       * value: { material?: string; form?: string }
-       * Build: (wioMaterialName LIKE %m% OR pdefMatName LIKE %m%) AND (wioFormName LIKE %f% OR pdefFormName LIKE %f%)
-       * If only one term present, return just that subgroup (OR of the two view columns). If none, return null.
+       * value: { material?: string; form?: string; constructionType?: string }
+       * Build: (wioMaterialName LIKE %m% OR pdefMatName LIKE %m%)
+       *    AND (wioFormName LIKE %f% OR pdefFormName LIKE %f%)
+       *    AND (wioConstrTypeName LIKE %c% OR pdConstrTypeName LIKE %c%)
+       * If only some terms present, combine only those subgroups with AND. If none, return null.
        */
-      buildCondition: (value: { material?: string; form?: string }) => {
+      buildCondition: (value: { material?: string; form?: string; constructionType?: string }) => {
         const material = (value?.material ?? '').trim();
         const form = (value?.form ?? '').trim();
+        const constructionType = (value?.constructionType ?? '').trim();
         const subGroups: Array<WhereConditionGroup<any>> = [];
 
         if (material) {
@@ -85,6 +88,17 @@
             conditions: [
               { key: 'wioFormName', whereCondOp: ComparisonOperator.LIKE, val: fLike },
               { key: 'pdefFormName', whereCondOp: ComparisonOperator.LIKE, val: fLike },
+            ]
+          } as WhereConditionGroup<any>);
+        }
+
+        if (constructionType) {
+          const cLike = `%${constructionType}%`;
+          subGroups.push({
+            whereCondOp: 'OR',
+            conditions: [
+              { key: 'wioConstrTypeName', whereCondOp: ComparisonOperator.LIKE, val: cLike },
+              { key: 'pdConstrTypeName', whereCondOp: ComparisonOperator.LIKE, val: cLike },
             ]
           } as WhereConditionGroup<any>);
         }

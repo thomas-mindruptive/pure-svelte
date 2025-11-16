@@ -124,14 +124,20 @@
     if (type === "checkbox") {
       value = (target as HTMLInputElement).checked;
     } else {
-      value = target.value;
+      const raw = target.value;
 
-      // Parse number inputs to actual numbers
-      if (type === "number" && value !== "") {
-        value = parseFloat(value);
-        if (isNaN(value)) {
-          value = null;
+      // Number inputs: empty -> undefined, else parsed number or undefined if NaN
+      if (type === "number") {
+        if (raw === "") {
+          value = undefined;
+        } else {
+          const parsed = parseFloat(raw);
+          value = Number.isNaN(parsed) ? undefined : parsed;
         }
+      }
+      // Text / textarea / other string-like: empty -> undefined, else string
+      else {
+        value = raw === "" ? undefined : raw;
       }
     }
 

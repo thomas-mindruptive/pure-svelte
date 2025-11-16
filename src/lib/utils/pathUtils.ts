@@ -86,9 +86,7 @@ export function set<T>(
   if (keyOrPath == null) {
     throw new Error("PathUtils.set: keyOrPath must be defined");
   }
-  if (value === undefined) {
-    throw new Error("PathUtils.set: value must be defined");
-  }
+  // Special handling: value === undefined means "unset" → delete property if it exists
 
   if (Array.isArray(keyOrPath)) {
     const path = keyOrPath;
@@ -105,19 +103,27 @@ export function set<T>(
       cur = (cur as Record<PropertyKey, unknown>)[k];
     }
 
-    // Set value on the last key
+    // Set or delete value on the last key
     const lastKey = path[path.length - 1] as PropertyKey;
     if (typeof cur !== "object" || cur === null) {
       throw new Error(`Invalid path: cannot set "${String(lastKey)}" on non-object`);
     }
-    (cur as Record<PropertyKey, unknown>)[lastKey] = value;
+    if (value === undefined) {
+      delete (cur as Record<PropertyKey, unknown>)[lastKey];
+    } else {
+      (cur as Record<PropertyKey, unknown>)[lastKey] = value;
+    }
   } else {
     // Handle single key
     const k = keyOrPath as PropertyKey;
     if (typeof obj !== "object" || obj === null) {
       throw new Error(`Invalid target: cannot set "${String(k)}" on non-object`);
     }
-    (obj as Record<PropertyKey, unknown>)[k] = value;
+    if (value === undefined) {
+      delete (obj as Record<PropertyKey, unknown>)[k];
+    } else {
+      (obj as Record<PropertyKey, unknown>)[k] = value;
+    }
   }
 }
 

@@ -133,5 +133,5 @@
   {onRawWhereChange}
   gridId="offerings-report"
   entity="offering"
-  maxBodyHeight={maxBodyHeight ?? "80vh"}
+  maxBodyHeight={maxBodyHeight ?? "50vh"}
 />

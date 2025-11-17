@@ -305,4 +305,59 @@ If you see “Query change” fires with every keystroke, look for local input d
 If you need this content as a Confluence page, an onboarding PDF, or a training deck with diagrams, I can export this report and add sequence diagrams and screenshots to aid future triage. 
 
 
+## 12) Later Mistakes in the Same Session (Meta-Level Patterns)
 
+This section captures additional, later errors from the same working session that reflect the **same underlying thinking problems**, even though the technical surface changed (other components, other features). For support and engineering, these are important because they tend to reappear in future work unless they are made explicit.
+
+### 12.1 Residual State and Misattributed Root Causes
+
+- **What happened (abstract)**: Earlier in the session, a feature was briefly introduced in one context and then moved to a different, more appropriate context. While the code in the wrong context was removed, its **persisted state** (e.g., locally stored filters or configuration) remained. Later, when an error surfaced, the blame was initially placed on the new, correct context instead of recognizing that the problem originated from **stale state created by the now-removed implementation**.
+- **User-visible symptom**: A request failed with a complaint about invalid filter keys or unexpected parameters, even though the current code looked correct. From the outside, it seemed as if the new feature was broken, but in reality the system was replaying **old, incompatible configuration** that had been persisted earlier.
+- **Process failure**: I did not systematically consider **“historic state”** (e.g., local persistence, stored filters) as a first-class cause. I reasoned only from the current code, ignoring that earlier, incorrect versions had already written bad data into the environment.
+- **How to avoid this next time**:
+  - For any regression appearing *after* a larger refactor or relocation of features, explicitly check for **persisted configuration/state** (local storage, user preferences, feature flags) that might still reflect the old design.
+  - Add a standard triage step: “Could this be caused by state written by a previous, now-removed implementation?”. If yes, provide a migration or cleanup path instead of only debugging the new code.
+
+### 12.2 Contract Changes on Core Components Without Exhaustive Call-Site Review
+
+- **What happened (abstract)**: A core UI component that acts as an orchestrator for data (such as a grid or form shell) was gradually migrated from an older callback contract (e.g., separate callbacks for sorting and filtering) to a newer, more unified contract (e.g., a single combined query callback). It was not enough to implement the new contract in the core component; I also needed to verify that **all existing usages** either:
+  - had been updated to the new contract, or
+  - still had a clear, supported path via the old contract if they were intentionally left as-is.
+- **User-visible symptom**: In some places the new contract was used correctly, in others not. The inconsistency could lead to missing updates, dead callbacks, or unexpected behavior that only appears in specific views that still relied on the old behavior.
+- **Process failure**: I treated a major API/prop change on a central component as a local edit and did not perform a **global call-site impact analysis**. This contradicted the principle that any change to a foundational component needs a corresponding, systematic review of all its consumers.
+- **How to avoid this next time**:
+  - Treat changes to core component contracts (props, callbacks, required hooks) as **breaking changes**, even if they appear backward compatible at first glance.
+  - Maintain a short checklist for such changes:
+    - Enumerate all call-sites (e.g., via code search).
+    - For each call-site, decide: adopt new contract now, or explicitly remain on the legacy behavior.
+    - Document any remaining legacy usages explicitly so that future work can clean them up.
+
+### 12.3 Violating Low-Level Invariants When Tweaking High-Level Components
+
+- **What happened (abstract)**: A low-level utility provided a strict invariant: “values written via this path-based setter must always be defined.” A high-level form field component was then changed so that, on delete, it attempted to write an undefined value to express “field cleared.” This violated the low-level invariant and caused runtime errors in the internal data layer. Only later did I explicitly reconcile the invariant (by making “undefined” mean “delete the property” in the low-level utility) so that the high-level behavior matched the underlying rules.
+- **User-visible symptom**: The user experienced seemingly unrelated runtime errors when clearing form fields. Internally, logs showed that the path setter rejected undefined values with an error, even though “clearing a field” is a valid action from a business perspective.
+- **Process failure**: I modified the behavior of a high-level component (the form field) **without first re-reading and internalizing the constraints** of the foundational utility it uses (the path setter). My assumption “undefined is a safe way to represent ‘cleared’” was incompatible with the existing contract.
+- **How to avoid this next time**:
+  - Before changing a high-level component that sits on top of a utility layer, explicitly list the **invariants of the underlying layer** (for example: “undefined is not allowed as a value”, “null means ‘empty’”, “missing key means ‘not set’”).
+  - If the desired behavior at the high level conflicts with these invariants, change the **lower-level semantics consciously and consistently** (e.g., define that “undefined via the setter means delete”), instead of introducing a one-off workaround at the higher level.
+  - Add unit-level checks that assert these invariants, so future changes that violate them fail early, before they reach users.
+
+### 12.4 Why These Later Mistakes Matter for Support
+
+For a support or reliability team, these meta-level patterns are as important as the original technical bugs because they tend to **recur across features and components**:
+
+- **Residual state vs. current code**: Many “mystery regressions” are not caused by the latest deployment, but by the interaction of new code with old, persisted data. Having this explicitly in mind speeds up triage.
+- **Contract drift in core components**: When central components evolve, partial migrations can leave some parts of the app on old assumptions. This pattern often explains why “only one specific page” misbehaves.
+- **Invariants between layers**: Misalignment between high-level components and low-level utilities usually manifests as sporadic runtime errors on common actions (like clearing fields). Understanding the invariant hierarchy helps to quickly narrow down the layer where the fix must happen.
+
+Capturing these patterns is part of ensuring that **future support incidents can be classified quickly**: not only by which function is broken, but by which underlying thinking error is likely at play. This, more than any single bug fix, is what reduces long-term support load and prevents the same classes of errors from reappearing in different technical clothing.
+
+### 12.5 Responding from Templates Instead of the Actual Code
+
+- **What happened (abstract)**: When confronted with a validation error on a numeric field that could not be cleared, I initially suggested a generic “convert empty string to undefined in the input handler” solution, without first inspecting the existing form infrastructure. In reality, the form already used a dedicated field abstraction and a schema that allowed optional values; the real problem was the mismatch between what the field wrote (a string on delete) and what the validation layer expected (a missing or nullable numeric value).
+- **User-visible symptom**: Even after clearing a numeric input, the value appeared again after reload or triggered type errors on submit. The advice I gave did not match the actual code structure, leading to additional confusion and rework.
+- **Process failure**: Instead of **reading the concrete implementation (Field component, form shell, schema)** and aligning with the established pattern, I answered from a mental template (“just handle empty strings in the input event”) that might fit a different codebase but not this one. This violated the basic rule of this collaboration: never change or advise on code without first understanding the existing design.
+- **How to avoid this next time**:
+  - Always inspect the actual component and its surrounding infrastructure (form wrappers, schema, utilities) **before** proposing a fix. Treat every “simple” question as a cue to read the real code, not to rely on generic recipes.
+  - When the user explicitly references an existing pattern (“we already do this in the combobox field”), locate that exact implementation and mirror it, instead of improvising a new approach.
+  - If I ever realize mid-discussion that I misattributed the cause (e.g., blaming a different grid, a different layer, or a browser plugin), I should explicitly correct the record in the conversation and in this document, so that future readers see both the mistake and the corrected understanding.

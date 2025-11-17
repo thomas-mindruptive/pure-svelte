@@ -74,11 +74,15 @@ export function parseWeightRange(input: string | null | undefined): ParseResult<
     return { valid: true };
   }
 
-  const trimmed = input.trim().toLowerCase();
+  // Normalize all Unicode whitespace (including non-breaking spaces, tabs, etc.) to regular spaces, then trim
+  // This handles pasted text that may contain invisible whitespace characters
+  const normalized = input.replace(/[\s\u00A0\u2000-\u200B\u2028\u2029\uFEFF]/g, ' ').trim();
 
-  if (trimmed === '') {
+  if (normalized === '') {
     return { valid: true };
   }
+
+  const trimmed = normalized.toLowerCase();
 
   // Pattern 1: Single value - "250g", "0.25kg" (unit REQUIRED)
   const singleMatch = trimmed.match(/^(\d+(?:\.\d+)?)\s*(g|kg)$/);

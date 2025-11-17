@@ -234,6 +234,51 @@
 
       const updateData = dataToSubmit as Partial<WholesalerItemOffering>;
 
+      // CRITICAL: If optional fields were deleted (missing in formStateClone but present in initial data),
+      // explicitly set them to null so the backend knows to clear them.
+      // Without this, missing properties are ignored by PATCH semantics (backend doesn't change them).
+      const initialData = initialValidatedOfferingData;
+      if (initialData) {
+        // List of optional fields that can be cleared (nullable/optional in schema)
+        const optionalFields: (keyof WholesalerItemOffering)[] = [
+          'price_per_piece',
+          'price',
+          'weight_grams',
+          'sub_seller',
+          'wholesaler_article_number',
+          'material_id',
+          'form_id',
+          'construction_type_id',
+          'surface_finish_id',
+          'color_variant',
+          'title',
+          'size',
+          'dimensions',
+          'packaging',
+          'weight_range',
+          'origin',
+          'currency',
+          'comment',
+          'quality',
+          'is_assortment',
+          'shopify_product_id',
+          'shopify_variant_id',
+          'shopify_sku',
+          'shopify_price',
+          'wholesaler_price',
+          'shopify_synced_at',
+        ];
+
+        for (const field of optionalFields) {
+          // If field existed in initial data (was not null/undefined) but is missing in updateData,
+          // explicitly set it to null to signal "clear this field"
+          if (initialData[field] != null && !(field in updateData)) {
+            (updateData as any)[field] = null;
+            log.debug(`(OfferingForm) Field ${String(field)} was deleted, explicitly setting to null in update payload`);
+          }
+        }
+      }
+
       log.warn(`(OfferingForm) Submitting UPDATE to API...`, { id: dataToSubmit.offering_id, updateData });
       return await offeringApi.updateOffering(dataToSubmit.offering_id, updateData);
     }

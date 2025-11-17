@@ -437,6 +437,16 @@ const Wio_BaseSchema = z
           });
         }
       }),
+    package_weight: z.string().max(50).nullable().optional()
+      .superRefine((val, ctx) => {
+        const result = parseWeightRange(val);
+        if (!result.valid) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: result.error || "Invalid package weight format"
+          });
+        }
+      }),
     origin: z.string().max(255).nullable().optional(),
     currency: z.string().length(3).nullable().optional(),
     comment: z.string().max(4000).nullable().optional(),
@@ -846,6 +856,8 @@ const OfferingReportViewSchemaBase = z.object({
   wsRelevance: z.number().nullable().optional(),
   wsPriceRange: z.string().max(200).nullable().optional(),
   wioWeightGrams: z.number().nullable().optional(),
+  wioWeightRange: z.string().max(50).nullable().optional(),
+  wioPackageWeight: z.string().max(50).nullable().optional(),
 }).describe("OfferingReportViewSchema");
 
 export const OfferingReportViewSchema = createSchemaWithMeta(OfferingReportViewSchemaBase, {

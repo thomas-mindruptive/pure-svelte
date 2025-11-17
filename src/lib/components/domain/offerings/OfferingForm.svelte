@@ -256,6 +256,7 @@
           'dimensions',
           'packaging',
           'weight_range',
+          'package_weight',
           'origin',
           'currency',
           'comment',
@@ -712,6 +713,16 @@
             {fieldProps}
             path={["weight_range"]}
             label="Weight Range"
+            type="text"
+            placeholder="Unit required: 250g, 50-80g, ca. 100g"
+            class="span-1"
+          />
+
+          <!-- package_weight ------------------------------------------------------------------------>
+          <Field
+            {fieldProps}
+            path={["package_weight"]}
+            label="Package Weight"
             type="text"
             placeholder="Unit required: 250g, 50-80g, ca. 100g"
             class="span-1"

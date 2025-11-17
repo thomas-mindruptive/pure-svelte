@@ -266,6 +266,24 @@ export const columns: ColumnDef<typeof OfferingReportViewSchema>[] = [
     width: "100px"
   },
   {
+    key: "wioWeightRange",
+    header: "Weight Range",
+    accessor: (row) => row.wioWeightRange || "-",
+    sortable: true,
+    filterable: true,
+    filterType: "text",
+    width: "120px"
+  },
+  {
+    key: "wioPackageWeight",
+    header: "Package Weight",
+    accessor: (row) => row.wioPackageWeight || "-",
+    sortable: true,
+    filterable: true,
+    filterType: "text",
+    width: "120px"
+  },
+  {
     key: "wioComment",
     header: "Comment",
     accessor: (row) => row.wioComment ? row.wioComment.substring(0, 50) + "..." : "-",

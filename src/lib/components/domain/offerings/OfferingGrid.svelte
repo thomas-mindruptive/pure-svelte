@@ -177,6 +177,15 @@
       accessor: (offering) => offering.weight_range || (offering.weight_grams ? `${offering.weight_grams}g` : "—"),
     },
     {
+      key: "wio.package_weight",
+      header: "Package Weight",
+      sortable: true,
+      filterable: true,
+      filterType: "text",
+      width: "8rem",
+      accessor: (offering) => offering.package_weight || "—",
+    },
+    {
       key: "quality",
       header: "Quality",
       sortable: true,

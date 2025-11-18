@@ -15,17 +15,31 @@
     constructionTypeLabel = 'Const. Type'
   }: Props = $props();
 
+  // Maintain local state that syncs with prop - ensures we always have the latest value
+  let localValue = $state<TwoTextValue>(value ?? {});
+
+  // Sync local state when prop changes (e.g., when customFilterStates updates)
+  $effect(() => {
+    localValue = value ?? {};
+  });
+
   function onMaterialInput(e: Event) {
     const v = (e.target as HTMLInputElement).value;
-    onChange({ ...value, material: v });
+    const newValue = { ...localValue, material: v };
+    localValue = newValue;
+    onChange(newValue);
   }
   function onFormInput(e: Event) {
     const v = (e.target as HTMLInputElement).value;
-    onChange({ ...value, form: v });
+    const newValue = { ...localValue, form: v };
+    localValue = newValue;
+    onChange(newValue);
   }
   function onConstructionTypeInput(e: Event) {
     const v = (e.target as HTMLInputElement).value;
-    onChange({ ...value, constructionType: v });
+    const newValue = { ...localValue, constructionType: v };
+    localValue = newValue;
+    onChange(newValue);
   }
 </script>
 
@@ -51,7 +65,7 @@
       <input
         type="text"
         class="qtworow__input"
-        value={value?.material ?? ''}
+        value={localValue?.material ?? ''}
         oninput={onMaterialInput}
         onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); } }}
         placeholder="e.g. quartz"
@@ -61,7 +75,7 @@
       <input
         type="text"
         class="qtworow__input"
-        value={value?.form ?? ''}
+        value={localValue?.form ?? ''}
         oninput={onFormInput}
         onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); } }}
         placeholder="e.g. sphere"
@@ -71,7 +85,7 @@
       <input
         type="text"
         class="qtworow__input"
-        value={value?.constructionType ?? ''}
+        value={localValue?.constructionType ?? ''}
         oninput={onConstructionTypeInput}
         onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); } }}
         placeholder="e.g. carved"

@@ -158,7 +158,9 @@ export function parseWeightRange(input: string | null | undefined): ParseResult<
 function parseSingleAspect(input: string): ParseResult<DimensionAspect> {
   const trimmed = input.trim().toLowerCase();
 
-  // Pattern 1: Range of Multi-dimensional - "2x3cm - 4x5cm", "2x3x5mm - 3x4x6mm"
+  // Pattern 1: Range of Multi-dimensional - supports two formats:
+  // - "2x3cm - 4x5cm", "2x3x5mm - 3x4x6mm" (values with x, then unit, then dash, then values with x, then unit)
+  // - "38-53mm x 9-12mm", "10-20cm x 5-8cm x 2-3cm" (range-unit x range-unit)
   const multiDimRangeMatch = trimmed.match(/^((?:\d+(?:[.,]\d+)?\s*x\s*)+\d+(?:[.,]\d+)?)\s*(cm|mm|m)\s*[-–—]\s*((?:\d+(?:[.,]\d+)?\s*x\s*)+\d+(?:[.,]\d+)?)\s*(cm|mm|m)$/);
   if (multiDimRangeMatch) {
     const unit1 = multiDimRangeMatch[2];
@@ -198,6 +200,48 @@ function parseSingleAspect(input: string): ParseResult<DimensionAspect> {
       }
     }
 
+    return {
+      valid: true,
+      data: { multiDimRange: { min: minValues, max: maxValues }, unit }
+    };
+  }
+
+  // Check for "range-unit x range-unit" format (e.g., "38-53mm x 9-12mm")
+  // This is handled by extracting all range parts and converting to multiDimRange format
+  const rangeUnitXPattern = /^(\d+(?:[.,]\d+)?)\s*[-–—]\s*(\d+(?:[.,]\d+)?)\s*(cm|mm|m)(?:\s*x\s*(\d+(?:[.,]\d+)?)\s*[-–—]\s*(\d+(?:[.,]\d+)?)\s*(cm|mm|m))+$/;
+  if (rangeUnitXPattern.test(trimmed)) {
+    // Extract all "min-max unit" parts
+    const rangeRegex = /(\d+(?:[.,]\d+)?)\s*[-–—]\s*(\d+(?:[.,]\d+)?)\s*(cm|mm|m)/g;
+    const rangeParts: Array<{ min: number; max: number; unit: string }> = [];
+    const units: string[] = [];
+    let match;
+    
+    while ((match = rangeRegex.exec(trimmed)) !== null) {
+      const min = parseFloat(match[1].replace(',', '.'));
+      const max = parseFloat(match[2].replace(',', '.'));
+      const unit = match[3];
+      
+      if (isNaN(min) || isNaN(max) || min <= 0 || max <= 0) {
+        return { valid: false, error: `All dimension values must be valid numbers greater than 0: "${input}"` };
+      }
+      if (min > max) {
+        return { valid: false, error: `Minimum must be less than or equal to maximum for each dimension: "${input}"` };
+      }
+      
+      rangeParts.push({ min, max, unit });
+      units.push(unit);
+    }
+    
+    // Validate: all units must be the same
+    if (units.length > 0 && !units.every(u => u === units[0])) {
+      return { valid: false, error: `All dimensions must use the same unit: "${input}"` };
+    }
+    
+    // Convert to multiDimRange format
+    const minValues = rangeParts.map(r => r.min);
+    const maxValues = rangeParts.map(r => r.max);
+    const unit = units[0];
+    
     return {
       valid: true,
       data: { multiDimRange: { min: minValues, max: maxValues }, unit }
@@ -262,7 +306,7 @@ function parseSingleAspect(input: string): ParseResult<DimensionAspect> {
 
   return {
     valid: false,
-    error: `Invalid dimension format: "${input}". Use: "10cm", "5-10mm", "10 x 5 x 3 m", or "2x3cm - 4x5cm" (unit required: mm, cm, m)`
+    error: `Invalid dimension format: "${input}". Use: "10cm", "5-10mm", "10 x 5 x 3 m", "38-53mm x 9-12mm", or "2x3cm - 4x5cm" (unit required: mm, cm, m)`
   };
 }
 
@@ -273,6 +317,7 @@ function parseSingleAspect(input: string): ParseResult<DimensionAspect> {
  * - Single value: "3cm", "10mm", "1.5m", "1,5cm"
  * - Range: "1-3cm", "5-10mm", "1,5 – 3 cm" (supports -, –, and —)
  * - Multi-dimensional: "10x5cm", "10 x 5 x 3 mm"
+ * - Multi-dimensional with ranges: "38-53mm x 9-12mm", "10-20cm x 5-8cm x 2-3cm"
  * - Range of multi-dimensional: "2x3cm - 4x5cm", "2x3x5mm - 3x4x6mm"
  * - Bracket notation (1-3 aspects): "[25-40cm][2-3cm]", "[15cm][3x5mm]"
  * - Accepts comma or dot as decimal separator
@@ -285,6 +330,7 @@ function parseSingleAspect(input: string): ParseResult<DimensionAspect> {
  * parseDimensions("3cm")                 // { valid: true, data: { values: [3], unit: 'cm' } }
  * parseDimensions("1-3cm")               // { valid: true, data: { range: { min: 1, max: 3 }, unit: 'cm' } }
  * parseDimensions("10 x 5 cm")           // { valid: true, data: { values: [10, 5], unit: 'cm' } }
+ * parseDimensions("38-53mm x 9-12mm")    // { valid: true, data: { multiDimRange: { min: [38, 9], max: [53, 12] }, unit: 'mm' } }
  * parseDimensions("2x3cm - 4x5cm")       // { valid: true, data: { multiDimRange: { min: [2,3], max: [4,5] }, unit: 'cm' } }
  * parseDimensions("[25-40cm][2-3cm]")    // { valid: true, data: { aspects: [...], unit: 'cm' } }
  * parseDimensions("3")                   // { valid: false, error: "..." } - unit required
@@ -317,7 +363,7 @@ export function parseDimensions(input: string | null | undefined): ParseResult<P
     for (const content of bracketContents) {
       const result = parseSingleAspect(content);
       if (!result.valid) {
-        return { valid: false, error: `Invalid bracket content: ${result.error}` };
+        return { valid: false, error: `Invalid bracket content: ${'error' in result ? result.error : 'Unknown error'}` };
       }
       aspects.push(result.data!);
     }

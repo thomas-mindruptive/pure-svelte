@@ -110,9 +110,14 @@
 
   /**
    * Initialize custom filter states from initialFilterValues or defaults
+   * Only runs once on mount - initialFilterValues is for column filters, not QuickFilters
    */
   $effect(() => {
     customFilters.forEach(filter => {
+      // Only initialize if not already set (prevents overwriting QuickFilter state)
+      if (customFilterStates.has(filter.id)) {
+        return; // Skip - already has a value from QuickFilter
+      }
       const savedValue = initialFilterValues?.get(filter.id);
       if (savedValue !== undefined) {
         customFilterStates.set(filter.id, savedValue.value);
@@ -123,16 +128,47 @@
   });
 
   /**
+   * Recursively extracts all WhereCondition objects from a WhereConditionGroup
+   * Handles nested structures like: { whereCondOp: 'AND', conditions: [ { whereCondOp: 'OR', conditions: [...] }, ... ] }
+   */
+  function extractAllWhereConditionsRecursive(
+    condition: WhereCondition<any> | WhereConditionGroup<any>
+  ): Array<{ key: string; operator: any; value: any }> {
+    const results: Array<{ key: string; operator: any; value: any }> = [];
+    
+    // Base case: single WhereCondition
+    if ('key' in condition && 'whereCondOp' in condition && 'val' in condition) {
+      results.push({
+        key: String(condition.key),
+        operator: condition.whereCondOp,
+        value: condition.val
+      });
+      return results;
+    }
+    
+    // Recursive case: WhereConditionGroup
+    if ('conditions' in condition && Array.isArray(condition.conditions)) {
+      condition.conditions.forEach(cond => {
+        results.push(...extractAllWhereConditionsRecursive(cond));
+      });
+    }
+    
+    return results;
+  }
+
+  /**
    * Handle custom filter state changes
    * Projects WhereConditionGroup to individual filter fields for UI display
    */
   function handleCustomFilterChange(filterId: string, newValue: any) {
+    console.log('[FilterToolbar] handleCustomFilterChange', { filterId, newValue });
     customFilterStates.set(filterId, newValue);
 
     const filter = customFilters.find(f => f.id === filterId);
     if (!filter) return;
 
     const condition = filter.buildCondition(newValue);
+    console.log('[FilterToolbar] buildCondition result', condition);
     
     // 1. Set the Quick-Filter condition → triggers API call (1x)
     onFilterChange(filterId, condition);
@@ -150,13 +186,13 @@
       }
       // Handle WhereConditionGroup
       else if ('conditions' in condition && condition.conditions) {
-        condition.conditions.forEach(cond => {
-          if ('key' in cond) {
-            updates.set(String(cond.key), {
-              operator: cond.whereCondOp,
-              value: cond.val
-            });
-          }
+        // ✅ Recursively extract ALL WhereConditions from nested structure
+        const allConditions = extractAllWhereConditionsRecursive(condition);
+        allConditions.forEach(cond => {
+          updates.set(cond.key, {
+            operator: cond.operator,
+            value: cond.value
+          });
         });
       }
       
@@ -609,12 +645,6 @@
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-  }
-
-  .superuser-where-header {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
   }
 
   .superuser-label {

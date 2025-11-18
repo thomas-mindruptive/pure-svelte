@@ -19,6 +19,8 @@
   import type { Wio_PDef_Cat_Supp } from "$lib/domain/domainTypes";
   import { ApiClient } from "$lib/api/client/apiClient";
   import type { ID, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
+  import type { WhereCondition, WhereConditionGroup, SortDescriptor } from "$lib/backendQueries/queryGrammar";
+  import { ComparisonOperator } from "$lib/backendQueries/queryGrammar";
   import {
     SupplierCategoryDetailPage_LoadDataSchema,
     type SupplierCategoryDetailPage_LoadData,
@@ -118,12 +120,35 @@
   // FUNCTIONS & EVENT HANDLERS
   // ========================================================================
 
-  async function reloadOfferings() {
-    // <refact01> CHANGED: Use supplierId and categoryId directly from resolvedData
-    assertDefined(resolvedData, "reloadOfferings needs resolvedData");
+  async function handleQueryChange(query: {
+    filters: WhereCondition<Wio_PDef_Cat_Supp> | WhereConditionGroup<Wio_PDef_Cat_Supp> | null,
+    sort: SortDescriptor<Wio_PDef_Cat_Supp>[] | null
+  }): Promise<void> {
+    assertDefined(resolvedData, "handleQueryChange needs resolvedData");
     const { supplierId, categoryId } = resolvedData;
-    log.info(`Re-fetching offerings for supplier ${supplierId}, category ${categoryId}`);
-    const updatedOfferings = await categoryApi.loadOfferingsForSupplierCategory(supplierId, categoryId);
+    
+    // Base filter: always filter by supplierId and categoryId
+    const baseFilter: WhereConditionGroup<Wio_PDef_Cat_Supp> = {
+      whereCondOp: "AND",
+      conditions: [
+        { key: "wio.wholesaler_id", whereCondOp: ComparisonOperator.EQUALS, val: supplierId },
+        { key: "wio.category_id", whereCondOp: ComparisonOperator.EQUALS, val: categoryId },
+      ],
+    };
+
+    // Combine base filter with user filters
+    let finalWhere: WhereConditionGroup<Wio_PDef_Cat_Supp> | WhereCondition<Wio_PDef_Cat_Supp>;
+    if (query.filters) {
+      finalWhere = {
+        whereCondOp: "AND",
+        conditions: [baseFilter, query.filters],
+      };
+    } else {
+      finalWhere = baseFilter;
+    }
+
+    log.info(`Re-fetching offerings for supplier ${supplierId}, category ${categoryId} with filters and sort`);
+    const updatedOfferings = await offeringApi.loadNestedOfferingsWithLinks(finalWhere, query.sort);
     resolvedData.offerings = updatedOfferings;
     log.info("Local state for offerings updated.");
   }
@@ -160,7 +185,8 @@
     );
 
     if (dataChanged) {
-      await reloadOfferings();
+      // Reload with current filters/sort (if any)
+      await handleQueryChange({ filters: null, sort: null });
     }
   }
 
@@ -217,6 +243,7 @@
         rows={resolvedData.offerings}
         {deleteStrategy}
         {rowActionStrategy}
+        onQueryChange={handleQueryChange}
       />
     </div>
   </div>

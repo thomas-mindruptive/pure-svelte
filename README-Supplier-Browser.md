@@ -926,169 +926,46 @@ QuickFilters enable complex, multi-column filtering logic that cannot be express
    - Extracts all individual `WhereCondition` objects at any nesting level
    - Updates `initialFilterValues` Map for "show effective filters" display
 
-**Example Implementation:**
+4. **Reactive currentWhere:**
+   - `currentWhere` prop passed to FilterToolbar must be reactive (`$derived`) so it updates when `activeFilters` or `combineMode` changes
+   - This ensures "show effective filters" always displays the actual `WhereConditionGroup` sent to the API
+   - Non-reactive `currentWhere` would show stale data when filters change
 
-```typescript
-// OfferingReportGrid.svelte
-const customFilters: CustomFilterDef<any>[] = [
-  {
-    id: 'qf-material-form-like',
-    label: 'Filter by Material & Form',
-    type: 'custom',
-    placement: { type: 'quickfilter', pos: 0 },
-    component: QuickTwoTextFilter as any,
-    /**
-     * Builds: (wioMaterialName LIKE %m% OR pdefMatName LIKE %m%)
-     *      AND (wioFormName LIKE %f% OR pdefFormName LIKE %f%)
-     *      AND (wioConstrTypeName LIKE %c% OR pdConstrTypeName LIKE %c%)
-     * Only includes subgroups for non-empty values, returns null if all empty.
-     */
-    buildCondition: (value: { material?: string; form?: string; constructionType?: string }) => {
-      const material = (value?.material ?? '').trim();
-      const form = (value?.form ?? '').trim();
-      const constructionType = (value?.constructionType ?? '').trim();
-      const subGroups: Array<WhereConditionGroup<any>> = [];
-
-      if (material) {
-        const mLike = `%${material}%`;
-        subGroups.push({
-          whereCondOp: 'OR',
-          conditions: [
-            { key: 'wioMaterialName', whereCondOp: ComparisonOperator.LIKE, val: mLike },
-            { key: 'pdefMatName', whereCondOp: ComparisonOperator.LIKE, val: mLike },
-          ]
-        } as WhereConditionGroup<any>);
-      }
-
-      if (form) {
-        const fLike = `%${form}%`;
-        subGroups.push({
-          whereCondOp: 'OR',
-          conditions: [
-            { key: 'wioFormName', whereCondOp: ComparisonOperator.LIKE, val: fLike },
-            { key: 'pdefFormName', whereCondOp: ComparisonOperator.LIKE, val: fLike },
-          ]
-        } as WhereConditionGroup<any>);
-      }
-
-      if (constructionType) {
-        const cLike = `%${constructionType}%`;
-        subGroups.push({
-          whereCondOp: 'OR',
-          conditions: [
-            { key: 'wioConstrTypeName', whereCondOp: ComparisonOperator.LIKE, val: cLike },
-            { key: 'pdConstrTypeName', whereCondOp: ComparisonOperator.LIKE, val: cLike },
-          ]
-        } as WhereConditionGroup<any>);
-      }
-
-      if (subGroups.length === 0) return null;
-      if (subGroups.length === 1) return subGroups[0];
-      
-      return {
-        whereCondOp: 'AND',
-        conditions: subGroups as any[]
-      } as WhereConditionGroup<any>;
-    }
-  }
-];
-```
+**buildCondition Pattern:**
+- Each QuickFilter defines a `buildCondition` function that converts the filter's value object into a `WhereConditionGroup`
+- The function should handle multiple fields by creating OR-groups for each field (e.g., search in multiple columns) and combining them with AND
+- Only non-empty fields should create subgroups; if all fields are empty, return `null` to indicate no filter applied
+- Example logic: For each field, create an OR-group with LIKE conditions for multiple columns, then combine all OR-groups with AND
 
 **Critical Pitfalls & Solutions:**
 
 **Pitfall 1: CustomFilter Components Must Use Local State**
 
-**Problem:** If `onChange` uses the `value` prop directly, it may read a stale value when the prop hasn't been updated yet. This causes lost input when typing in multiple fields.
+**Problem:** If `onChange` uses the `value` prop directly, it may read a stale value when the prop hasn't been updated yet. This causes lost input when typing in multiple fields (e.g., typing "form" after "material" loses the material value).
 
-**Solution:** CustomFilter components must maintain local `$state` that syncs with the `value` prop:
+**Solution:** CustomFilter components must maintain local `$state` that syncs with the `value` prop via `$effect`. When handling input events, always read from the local state (which contains all current field values) rather than the prop.
 
-```typescript
-// QuickTwoTextFilter.svelte
-let { value = {}, onChange }: Props = $props();
-
-// Maintain local state that syncs with prop
-let localValue = $state<TwoTextValue>(value ?? {});
-
-// Sync local state when prop changes
-$effect(() => {
-  localValue = value ?? {};
-});
-
-function onMaterialInput(e: Event) {
-  const v = (e.target as HTMLInputElement).value;
-  const newValue = { ...localValue, material: v }; // Use localValue, not value
-  localValue = newValue;
-  onChange(newValue);
-}
-```
-
-**Why this works:** `localValue` always contains the latest combined state (all fields), ensuring `onChange` receives the complete object even when typing rapidly across multiple inputs.
+**Why this works:** Local state always contains the latest combined state (all fields), ensuring `onChange` receives the complete object even when typing rapidly across multiple inputs. The `$effect` keeps local state synchronized with prop updates.
 
 **Reference Implementation:** `src/lib/components/grids/filters/QuickTwoTextFilter.svelte:18-43`
 
 **Pitfall 2: $effect Must Not Overwrite Existing QuickFilter State**
 
-**Problem:** The initialization `$effect` in `FilterToolbar` runs whenever `initialFilterValues` changes. Without a guard, it overwrites `customFilterStates` even when QuickFilters already have active values, causing state loss.
+**Problem:** The initialization `$effect` in `FilterToolbar` runs whenever `initialFilterValues` changes. Without a guard, it overwrites `customFilterStates` even when QuickFilters already have active values from user input, causing state loss.
 
-**Solution:** Guard against overwriting existing QuickFilter state:
+**Solution:** Guard against overwriting existing QuickFilter state by checking if `customFilterStates.has(filter.id)` before initializing. Only initialize QuickFilters that don't already have state. Skip initialization for QuickFilters that have active user input.
 
-```typescript
-// FilterToolbar.svelte
-$effect(() => {
-  customFilters.forEach(filter => {
-    // Only initialize if not already set (prevents overwriting QuickFilter state)
-    if (customFilterStates.has(filter.id)) {
-      return; // Skip - already has a value from QuickFilter
-    }
-    const savedValue = initialFilterValues?.get(filter.id);
-    if (savedValue !== undefined) {
-      customFilterStates.set(filter.id, savedValue.value);
-    } else if (filter.defaultValue !== undefined) {
-      customFilterStates.set(filter.id, filter.defaultValue);
-    }
-  });
-});
-```
-
-**Why this works:** `initialFilterValues` is for column filters, not QuickFilters. Once a QuickFilter has state (from user input), it should not be overwritten by `initialFilterValues` updates.
+**Why this works:** `initialFilterValues` is for column filters, not QuickFilters. Once a QuickFilter has state (from user input), it should not be overwritten by `initialFilterValues` updates triggered by other filter changes.
 
 **Reference Implementation:** `src/lib/components/grids/FilterToolbar.svelte:115-128`
 
 **Pitfall 3: Recursive Extraction Required for Nested Structures**
 
-**Problem:** Non-recursive traversal of `WhereConditionGroup` only captures the first level, losing nested conditions. This causes the "show effective filters" display to show incomplete information (e.g., only "form = kugel" when both "material" and "form" are set).
+**Problem:** Non-recursive traversal of `WhereConditionGroup` only captures the first level, losing nested conditions. This causes the "show effective filters" display to show incomplete information (e.g., only "form = kugel" when both "material" and "form" are set in a QuickFilter).
 
-**Solution:** Use recursive extraction function that handles arbitrary nesting:
+**Solution:** Use recursive extraction function that handles arbitrary nesting depth. The function must handle two cases: base case (single `WhereCondition`) and recursive case (`WhereConditionGroup` with nested `conditions` array). Recursively traverse all nested levels to extract every individual `WhereCondition` object.
 
-```typescript
-// FilterToolbar.svelte
-function extractAllWhereConditionsRecursive(
-  condition: WhereCondition<any> | WhereConditionGroup<any>
-): Array<{ key: string; operator: any; value: any }> {
-  const results: Array<{ key: string; operator: any; value: any }> = [];
-  
-  // Base case: single WhereCondition
-  if ('key' in condition && 'whereCondOp' in condition && 'val' in condition) {
-    results.push({
-      key: String(condition.key),
-      operator: condition.whereCondOp,
-      value: condition.val
-    });
-    return results;
-  }
-  
-  // Recursive case: WhereConditionGroup
-  if ('conditions' in condition && Array.isArray(condition.conditions)) {
-    condition.conditions.forEach(cond => {
-      results.push(...extractAllWhereConditionsRecursive(cond));
-    });
-  }
-  
-  return results;
-}
-```
-
-**Why this works:** Handles structures like `{ whereCondOp: 'AND', conditions: [ { whereCondOp: 'OR', conditions: [...] }, ... ] }` at any depth, extracting all individual `WhereCondition` objects for UI projection.
+**Why this works:** QuickFilters create structures like `{ whereCondOp: 'AND', conditions: [ { whereCondOp: 'OR', conditions: [...] }, ... ] }` at arbitrary depth. Only recursive traversal can extract all individual `WhereCondition` objects from any nesting level for proper UI projection.
 
 **Reference Implementation:** `src/lib/components/grids/FilterToolbar.svelte:130-157`
 
@@ -1100,10 +977,12 @@ function extractAllWhereConditionsRecursive(
 - Projection flows **only** from QuickFilter → column filters (for UI display), never reverse
 - **DON'T** increment `filterResetKey` during projection (causes focus loss in inputs)
 - Use `extractAllWhereConditionsRecursive` for UI projection, not manual traversal
+- `currentWhere` prop passed to FilterToolbar must be reactive (`$derived`) to ensure "show effective filters" always displays current state
+- When filters are cleared (condition = null), also remove from `initialFilterValues` to maintain UI consistency (prevents stale values in input fields)
 
 **Reference Implementations:**
-- `src/lib/components/grids/FilterToolbar.svelte:130-157` - `extractAllWhereConditionsRecursive`
-- `src/lib/components/grids/FilterToolbar.svelte:158-206` - `handleCustomFilterChange`
+- `src/lib/components/grids/FilterToolbar.svelte:130-160` - `extractAllWhereConditionsRecursive`
+- `src/lib/components/grids/FilterToolbar.svelte:162-245` - `handleCustomFilterChange`
 - `src/lib/components/grids/filters/QuickTwoTextFilter.svelte` - CustomFilter with local state pattern
 - `src/lib/components/domain/reports/offerings/OfferingReportGrid.svelte:53-118` - QuickFilter definition example
 

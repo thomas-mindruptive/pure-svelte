@@ -585,6 +585,10 @@
     };
   }
 
+  // CRITICAL: currentWhere must be reactive ($derived) so it updates when activeFilters or combineMode changes
+  // This ensures "show effective filters" always displays the actual WhereConditionGroup sent to the API
+  const currentWhere = $derived(buildWhereGroup());
+
   async function handleFilterChange(columnKey: string, condition: WhereCondition<T> | WhereConditionGroup<T> | null) {
     log.debug(`[Datagrid] Filter change for key: ${columnKey}`, condition);
 
@@ -592,6 +596,11 @@
       activeFilters.set(columnKey, condition);
     } else {
       activeFilters.delete(columnKey);
+      // CRITICAL: Also remove from initialFilterValues when filter is cleared
+      // Otherwise the filter value remains visible in the UI even though it's not active
+      if (initialFilterValues) {
+        initialFilterValues.delete(columnKey);
+      }
     }
 
     const whereGroup = buildWhereGroup();
@@ -1050,7 +1059,7 @@
       {customFilters}
       {combineMode}
       {activeFilterCount}
-      currentWhere={buildWhereGroup()}
+      {currentWhere}
       {filterResetKey}
       {initialFilterValues}
       {filterExpanded}

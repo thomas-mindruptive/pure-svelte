@@ -66,6 +66,9 @@
 
   // Custom filter state management
   let customFilterStates = $state<Map<string, any>>(new Map());
+  
+  // Track which column keys each QuickFilter projects (for cleanup when filter is cleared)
+  let quickFilterProjectedKeys = $state<Map<string, Set<string>>>(new Map());
 
   // Popover element reference (for programmatic close via ✕)
   let wherePopoverEl = $state<HTMLDivElement | null>(null);
@@ -161,14 +164,12 @@
    * Projects WhereConditionGroup to individual filter fields for UI display
    */
   function handleCustomFilterChange(filterId: string, newValue: any) {
-    console.log('[FilterToolbar] handleCustomFilterChange', { filterId, newValue });
     customFilterStates.set(filterId, newValue);
 
     const filter = customFilters.find(f => f.id === filterId);
     if (!filter) return;
 
     const condition = filter.buildCondition(newValue);
-    console.log('[FilterToolbar] buildCondition result', condition);
     
     // 1. Set the Quick-Filter condition → triggers API call (1x)
     onFilterChange(filterId, condition);
@@ -176,13 +177,16 @@
     // 2. Project WhereConditionGroup to initialFilterValues (no API calls)
     if (condition && onUpdateInitialFilterValues) {
       const updates = new Map<string, {operator: any, value: any}>();
+      const projectedKeys = new Set<string>();
       
       // Handle single WhereCondition
       if ('key' in condition) {
-        updates.set(String(condition.key), {
+        const key = String(condition.key);
+        updates.set(key, {
           operator: condition.whereCondOp,
           value: condition.val
         });
+        projectedKeys.add(key);
       }
       // Handle WhereConditionGroup
       else if ('conditions' in condition && condition.conditions) {
@@ -193,8 +197,12 @@
             operator: cond.operator,
             value: cond.value
           });
+          projectedKeys.add(cond.key);
         });
       }
+      
+      // Track which keys this QuickFilter projects
+      quickFilterProjectedKeys.set(filterId, projectedKeys);
       
       // Update initialFilterValues (triggers UI update, no API calls)
       if (updates.size > 0) {
@@ -205,11 +213,30 @@
     }
     // If condition is null (filter cleared), clear the projected values
     else if (!condition && onUpdateInitialFilterValues) {
-      // Clear all projected values for this filter
-      // We need to know which columns were affected - for now, clear all if condition is null
-      // This could be improved by tracking which columns were set by this quick filter
-      const updates = new Map<string, {operator: any, value: any}>();
-      onUpdateInitialFilterValues(updates);
+      // CRITICAL: Delete all column keys that were projected by this QuickFilter
+      const keysToDelete = quickFilterProjectedKeys.get(filterId);
+      if (keysToDelete && keysToDelete.size > 0) {
+        // We need to delete these keys from initialFilterValues
+        // Since we don't have direct access, we'll need to pass them to handleUpdateInitialFilterValues
+        // But handleUpdateInitialFilterValues only sets values, doesn't delete...
+        
+        // SOLUTION: Extend handleUpdateInitialFilterValues to support deletion
+        // For now, we can work around by setting values to null/undefined and letting Datagrid handle it
+        // OR: We can pass a callback to delete keys
+        
+        // Actually, the best solution is to extend handleUpdateInitialFilterValues
+        // But for a quick fix, we can access initialFilterValues directly if it's passed as a prop
+        
+        // WORKAROUND: Call handleFilterChange for each key with null condition
+        // This will delete them from activeFilters AND initialFilterValues (via handleFilterChange fix)
+        keysToDelete.forEach(key => {
+          onFilterChange(key, null);
+        });
+      }
+      
+      // Clear the tracked keys for this QuickFilter
+      quickFilterProjectedKeys.delete(filterId);
+      
       if (onIncrementFilterResetKey) {
         onIncrementFilterResetKey();
       }

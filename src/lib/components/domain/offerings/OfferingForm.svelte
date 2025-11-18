@@ -24,6 +24,7 @@
   import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
   import {
     Wio_PDef_Cat_Supp_Nested_WithLinks_Schema,
+    Wio_PDef_Cat_Supp_Nested_WithLinks_ForCreate_Schema,
     type WholesalerItemOffering,
     type Wio_PDef_Cat_Supp_Nested_WithLinks,
   } from "$lib/domain/domainTypes";
@@ -166,16 +167,23 @@
    * Performs custom business rule validation.
    * This is a pure function: it receives data and returns a validation result
    * without any DOM side effects. It handles rules that HTML cannot.
+   * Uses different schema for create vs. update mode:
+   * - Create mode: nested objects (product_def, category, wholesaler) are optional
+   * - Update mode: nested objects are required
    * @param data The current form data.
    * @returns A ValidateResult object containing any errors for custom rules.
    */
   function validateOfferingForSubmit(raw: Record<string, any>): ValidateResult<Wio_PDef_Cat_Supp_Nested_WithLinks> {
-    log.debug(`Validating offering form data`, raw);
+    log.debug(`Validating offering form data (isCreateMode: ${isCreateMode})`, raw);
     assertDefined(raw, "validateOfferingForSubmit");
     const data = raw as Wio_PDef_Cat_Supp_Nested_WithLinks;
-    //const errors: Errors<Wio_PDef_Cat_Supp_Nested_WithLinks> = {};
 
-    const offeringVal = Wio_PDef_Cat_Supp_Nested_WithLinks_Schema.safeParse(data);
+    // Use different schema based on create/update mode
+    const schema = isCreateMode 
+      ? Wio_PDef_Cat_Supp_Nested_WithLinks_ForCreate_Schema 
+      : Wio_PDef_Cat_Supp_Nested_WithLinks_Schema;
+    
+    const offeringVal = schema.safeParse(data);
 
     let errors: ValidationErrors<Wio_PDef_Cat_Supp_Nested_WithLinks> | undefined = undefined;
     if (offeringVal.error) {

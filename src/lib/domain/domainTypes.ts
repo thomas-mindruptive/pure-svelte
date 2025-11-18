@@ -532,6 +532,18 @@ const tempWioNestedWithLinks = Wio_PDef_Cat_Supp_Nested_Schema.extend({
 export const Wio_PDef_Cat_Supp_Nested_WithLinks_Schema = copyMetaFrom(Wio_Schema, tempWioNestedWithLinks);
 
 /**
+ * Schema for CREATE mode - nested objects are optional since they are not yet loaded.
+ * Used when creating a new offering before it is saved to the database.
+ */
+const tempWioNestedWithLinksForCreate = Wio_PDef_Cat_Supp_Nested_WithLinks_Schema.extend({
+  offering_id: z.number().int().positive().optional(),
+  product_def: ProductDefinitionSchema.nullable().optional(),
+  category: ProductCategorySchema.nullable().optional(),
+  wholesaler: WholesalerSchema.nullable().optional(),
+}).describe("WholesalerItemOffering_ProductDef_Category_Supplier_Nested_WithLinks_ForCreateSchema");
+export const Wio_PDef_Cat_Supp_Nested_WithLinks_ForCreate_Schema = copyMetaFrom(Wio_Schema, tempWioNestedWithLinksForCreate);
+
+/**
  * NESTED SCHEMA with all lookup data for AI image generation analysis.
  * Used by loadOfferingsForImageAnalysis() which includes JOINs for:
  * product_def (with its lookups), material, form, surface_finish, construction_type.
@@ -888,6 +900,7 @@ export type Wio_PDef_Cat_Supp = z.infer<typeof Wio_PDef_Cat_Supp_Schema>;
 export type Wio_PDef_Cat_Supp_Nested = z.infer<typeof Wio_PDef_Cat_Supp_Nested_Schema>;
 export type Wio_PDef_Cat_Supp_WithLinks = z.infer<typeof Wio_PDef_Cat_Supp_WithLinks_Schema>;
 export type Wio_PDef_Cat_Supp_Nested_WithLinks = z.infer<typeof Wio_PDef_Cat_Supp_Nested_WithLinks_Schema>;
+export type Wio_PDef_Cat_Supp_Nested_WithLinks_ForCreate = z.infer<typeof Wio_PDef_Cat_Supp_Nested_WithLinks_ForCreate_Schema>;
 export type Wio_pdef_mat_form_surf_constr_Nested = z.infer<typeof Wio_pdef_mat_form_surf_constr_Nested_Schema>;
 
 export type WholesalerOfferingLink = z.infer<typeof WholesalerOfferingLinkSchema>;

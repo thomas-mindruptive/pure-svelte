@@ -76,7 +76,11 @@ export function parseWeightRange(input: string | null | undefined): ParseResult<
 
   // Normalize all Unicode whitespace (including non-breaking spaces, tabs, etc.) to regular spaces, then trim
   // This handles pasted text that may contain invisible whitespace characters
-  const normalized = input.replace(/[\s\u00A0\u2000-\u200B\u2028\u2029\uFEFF]/g, ' ').trim();
+  let normalized = input.replace(/[\s\u00A0\u2000-\u200B\u2028\u2029\uFEFF]/g, ' ').trim();
+
+  // Normalize Unicode dash characters (En-Dash – U+2013, Em-Dash — U+2014) to regular hyphen
+  // This handles pasted text that may contain typographic dashes instead of ASCII hyphens
+  normalized = normalized.replace(/[\u2013\u2014]/g, '-').trim();
 
   if (normalized === '') {
     return { valid: true };

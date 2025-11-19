@@ -12,7 +12,6 @@ export function buildAuditMarkdown(data: AuditRow[]): string {
     md += `|---|---|---|---|---|\n`;
     
     data.forEach(row => {
-        // Pipes im Trace ersetzen, damit die Markdown-Tabelle nicht bricht
         const trace = row.Calculation_Trace.replace(/\|/g, '<br>'); 
         const product = row.Product_Title.replace(/\|/g, '-');
         
@@ -24,6 +23,7 @@ export function buildAuditMarkdown(data: AuditRow[]): string {
 
 /**
  * Baut den String für den Best-Buy Report (Gruppiert & Ranked).
+ * LOGIK: Iteriert über ALLE Kandidaten einer Gruppe (nicht nur Top 2).
  */
 export function buildBestBuyMarkdown(data: AuditRow[]): string {
     const now = new Date().toISOString().split('T')[0];
@@ -38,10 +38,10 @@ export function buildBestBuyMarkdown(data: AuditRow[]): string {
         groups[row.Group_Key].push(row);
     });
 
-    // 2. Markdown Header
+    // 2. Header
     let md = `# 🏆 Best Price Report (${now})\n\n`;
     md += `Strategischer Einkaufs-Report nach Use-Case und Material.\n`;
-    md += `> **Legende:** 🇨🇳 China-Importe enthalten bereits +25% Kalkulationsaufschlag (Zoll/Versand).\n\n`;
+    md += `> **Legende:** 🇨🇳 China-Importe enthalten bereits +25% Kalkulationsaufschlag.\n\n`;
 
     // 3. Gruppen durchgehen
     const sortedKeys = Object.keys(groups).sort();
@@ -53,6 +53,8 @@ export function buildBestBuyMarkdown(data: AuditRow[]): string {
         candidates.sort((a, b) => a.Final_Normalized_Price - b.Final_Normalized_Price);
         
         if (candidates.length === 0) return;
+        
+        // Der Gewinner (Referenz für Preisvergleich)
         const winner = candidates[0];
 
         // Section Header
@@ -63,29 +65,35 @@ export function buildBestBuyMarkdown(data: AuditRow[]): string {
         md += `| Rang | Händler | Herkunft | Produkt | Preis (Norm.) | vs. Winner | Info |\n`;
         md += `|:---:|---|:---:|---|---|---|---|\n`;
 
-        // Zeilen generieren
+        // --- SCHLEIFE ÜBER ALLE ANGEBOTE ---
         candidates.forEach((row, index) => {
-            const rank = index === 0 ? '🏆 1' : `${index + 1}`;
+            let rankDisplay = `${index + 1}.`;
+            if (index === 0) rankDisplay = '🏆 1';
+            else if (index === 1) rankDisplay = '🥈 2';
+            else if (index === 2) rankDisplay = '🥉 3';
             
             // Diff berechnen
             let diffStr = '-';
             if (index > 0) {
                 const diffPct = ((row.Final_Normalized_Price - winner.Final_Normalized_Price) / winner.Final_Normalized_Price) * 100;
-                diffStr = `+${diffPct.toFixed(0)}%`;
+                const indicator = diffPct > 100 ? '🔺' : '+'; 
+                diffStr = `${indicator}${diffPct.toFixed(0)}%`;
             }
 
-            // Icons für Info-Spalte
-            let info = '';
-            if (row.Calculation_Trace.includes('Bulk')) info += '📦 Bulk ';
-            if (row.Calculation_Trace.includes('Regex')) info += '⚖️ Calc.Weight ';
-            if (row.Origin_Country !== 'DE' && !['AT','NL'].includes(row.Origin_Country)) info += `🌍 ${row.Origin_Country}`;
+            // Info-Spalte Icons
+            let info = [];
+            if (row.Calculation_Trace.includes('Bulk')) info.push('📦 Bulk');
+            if (row.Calculation_Trace.includes('Regex')) info.push('⚖️ Calc.W.');
+            if (!['DE', 'AT', 'NL'].includes(row.Origin_Country) && row.Origin_Country !== 'UNKNOWN') {
+                info.push(`🌍 ${row.Origin_Country}`);
+            }
 
-            // Preis fett für Winner
+            // Preis Formatierung (Gewinner fett)
             const priceDisplay = index === 0 
-                ? `**${row.Final_Normalized_Price.toFixed(2)} ${row.Unit}**`
-                : `${row.Final_Normalized_Price.toFixed(2)} ${row.Unit}`;
+                ? `**${row.Final_Normalized_Price.toFixed(2)}**`
+                : `${row.Final_Normalized_Price.toFixed(2)}`;
             
-            md += `| ${rank} | ${row.Wholesaler} | ${row.Origin_Country} | ${row.Product_Title} | ${priceDisplay} | ${diffStr} | ${info} |\n`;
+            md += `| ${rankDisplay} | ${row.Wholesaler} | ${row.Origin_Country} | ${row.Product_Title} | ${priceDisplay} | ${diffStr} | ${info.join(' ')} |\n`;
         });
 
         md += `\n---\n`;

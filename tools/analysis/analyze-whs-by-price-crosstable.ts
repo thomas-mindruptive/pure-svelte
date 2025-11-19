@@ -23,124 +23,12 @@ import {
     saveReportFile, 
     printConsoleSummary 
 } from './output.js';
+import { parseCSV, parseMoney, getBestPrice, extractWeightKg } from './parser-utils.js';
 
 // Workaround für __dirname in ESM
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// ==========================================
-// 3. HELPER FUNKTIONEN (Business Logik)
-// ==========================================
-
-/**
- * Liest CSV ein und mappt sie auf das RawOffering Interface.
- * Behandelt Anführungszeichen korrekt.
- */
-function parseCSV(text: string): RawOffering[] {
-    const lines = text.trim().split('\n');
-    if (lines.length < 2) return [];
-
-    // Header bereinigen (Quotes entfernen)
-    const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
-    
-    const result: RawOffering[] = [];
-
-    for (let i = 1; i < lines.length; i++) {
-        const line = lines[i];
-        if (!line) continue;
-
-        // Regex Split: Trennt bei Komma, außer das Komma ist in Quotes
-        const rowData = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
-        
-        // Fallback für einfaches Split, falls Regex keine Matches liefert (leere Zeilen etc.)
-        const values = rowData 
-            ? rowData.map(v => v.replace(/^"|"$/g, '').trim()) 
-            : line.split(',');
-
-        const obj: any = {};
-        headers.forEach((header, index) => {
-            // 'NULL' Strings in echte leere Strings oder Nichts wandeln, falls nötig
-            // Hier behalten wir 'NULL' Strings bei, filtern sie aber später
-            obj[header] = values[index] || 'NULL';
-        });
-        result.push(obj as RawOffering);
-    }
-    return result;
-}
-
-/**
- * Wandelt Währungsstrings in saubere Floats um.
- */
-function parseMoney(val: string): number {
-    if (!val || val === 'NULL') return 0;
-    // Entferne €, $, Leerzeichen und tausche Komma zu Punkt
-    return parseFloat(val.replace(/[€$]/g, '').replace(',', '.'));
-}
-
-/**
- * Versucht das Gewicht zu ermitteln.
- * Priorität: 1. Spalte "WeightGrams" -> 2. Regex im Titel/Verpackung
- */
-function extractWeightKg(row: RawOffering): { weight: number | null, source: string } {
-    // 1. Priorität: Explizites Feld
-    const rawW = parseMoney(row.offeringWeightGrams);
-    if (rawW > 0) return { weight: rawW / 1000, source: 'Column (g)' };
-
-    // 2. Priorität: Text-Mining
-    const textToScan = (row.offeringTitle + ' ' + (row.offeringPackaging || '')).toLowerCase();
-
-    // Suche nach "1.5 kg" oder "1kg"
-    const kgMatch = textToScan.match(/(\d+[\.,]?\d*)\s*kg/);
-    if (kgMatch) {
-        return { 
-            weight: parseFloat(kgMatch[1].replace(',', '.')), 
-            source: 'Regex (Title/Pack kg)' 
-        };
-    }
-    
-    // Suche nach "500 g" (Boundary \b wichtig, damit "gold" nicht matcht)
-    const gMatch = textToScan.match(/(\d+)\s*g\b/); 
-    if (gMatch) {
-        return { 
-            weight: parseFloat(gMatch[1]) / 1000, 
-            source: 'Regex (Title/Pack g)' 
-        };
-    }
-
-    return { weight: null, source: 'None' };
-}
-
-/**
- * Prüft, ob im Kommentarfeld ein günstigerer Staffelpreis versteckt ist.
- */
-function getBestPrice(row: RawOffering, listPrice: number): { price: number, source: string } {
-    if (!row.offeringComment || row.offeringComment === 'NULL') {
-        return { price: listPrice, source: 'List' };
-    }
-
-    // Suche nach Preismustern (Zahl mit Dezimalstelle oder Währungssymbol)
-    // Regex fängt z.B. "2.55" in "Bulk 50+ 2.55"
-    const matches = row.offeringComment.match(/[\$€]?\s?(\d+[\.,]\d{2})/g);
-    
-    if (matches) {
-        let lowest = listPrice;
-        matches.forEach(m => {
-            const val = parseFloat(m.replace(/[€$]/g, '').replace(',', '.'));
-            // Plausibilitätscheck:
-            // - Muss billiger sein als Liste
-            // - Darf nicht fast 0 sein (z.B. Fehlerkennung von Maßen wie "0.50 cm")
-            // - Sollte > 10% des Listenpreises sein (Schutz vor Tippfehlern)
-            if (val < lowest && val > (listPrice * 0.1)) {
-                lowest = val;
-            }
-        });
-
-        if (lowest < listPrice) {
-            return { price: lowest, source: 'Bulk (Comment)' };
-        }
-    }
-    return { price: listPrice, source: 'List' };
-}
 
 // ==========================================
 // 4. MAIN LOGIK: KARTESISCHES PRODUKT

@@ -22,7 +22,7 @@
 		"img:buildAndGen": "cls && npm run tools:build && node tools/dist/tools/images/generateMissingImages.js",
 		"img:genProd": "npm run img:gen -- --no-dry-run",
 		"// --- ANALYSIS TOOL SCRIPTS ---": "",
-		"an-build-run:ws-price": "npm run tools:build && node tools/dist/tools/analysis/analyze-whs-by-price-crosstable.js",
+		"an:build-run:ws-price": "npm run tools:build && node tools/dist/tools/analysis/analyze-whs-by-price-crosstable.js",
 		"an:ws-price": "node tools/dist/tools/analysis/analyze-whs-by-price-crosstable.js",
 		"// --- TESTS ---": "",
 		"test": "vitest",

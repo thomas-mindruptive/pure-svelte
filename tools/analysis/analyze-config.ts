@@ -1,0 +1,80 @@
+import * as path from 'path';
+
+// ==========================================
+// 1. PFADE & KONSTANTEN
+// ==========================================
+
+// Input
+export const CSV_FILENAME = 'C:/dev/pure/pureenergy-schema/data-exports/complete-offerings-bom!.csv';
+
+// Output
+export const OUTPUT_DIR = 'C:/dev/pure/pureenergy-schema/reports'; 
+
+// Kalkulation
+export const IMPORT_MARKUP = 1.25; 
+
+// ISO-Codes der EU-Zollunion (Kein Markup)
+export const EU_ZONE = new Set([
+    'DE', 'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 'GR', 'HU', 'IE', 'IT', 
+    'LV', 'LT', 'LU', 'MT', 'NL', 'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE'
+]);
+
+// Strategie-Mapping: Welcher Use-Case erzwingt welche Berechnung?
+export const STRATEGY_MAP: Record<string, 'WEIGHT' | 'UNIT' | 'AUTO'> = {
+    'Wasserenergetisierer': 'WEIGHT',
+    'Handstein': 'WEIGHT',          
+    'Stand/Tischstein': 'AUTO',     
+    'Halskette': 'UNIT',
+    'Anhänger': 'UNIT',
+    'Pendel': 'UNIT',
+    'Massagestab/Griffel': 'UNIT',
+    'Halbedelstein': 'AUTO'         
+};
+
+// ==========================================
+// 2. TYPEN & INTERFACES
+// ==========================================
+
+// Entspricht exakt den Spalten deiner CSV
+export interface RawOffering {
+    wholesalerName: string;
+    wholesalerId: string;
+    wholesalerCountry: string; // Wichtig für Zoll
+    productTypeName: string;   // Wichtig für Strategie
+    finalMaterialName: string;
+    finalFormName: string;
+    offeringTitle: string;
+    offeringPrice: string;
+    offeringPricePerPiece: string;
+    offeringWeightGrams: string;
+    offeringComment: string;
+    offeringSize: string;
+    offeringPackaging: string; 
+    // Weitere Felder sind optional, da für Preisberechnung nicht kritisch
+    [key: string]: string; 
+}
+
+// Das Ergebnis einer einzelnen analysierten Zeile
+export interface AuditRow {
+    Row_ID: string;
+    Group_Key: string;      // UseCase > Material > Form
+    Wholesaler: string;
+    Origin_Country: string;
+    Product_Title: string;
+
+    // Eingabewerte
+    Raw_Price_List: number;
+    Raw_Weight_Input: string;
+
+    // Erkannte / Berechnete Werte
+    Detected_Bulk_Price: number;
+    Detected_Weight_Kg: number | null;
+    Applied_Markup_Pct: number; // z.B. 0 oder 25
+    
+    // Ergebnis
+    Final_Normalized_Price: number;
+    Unit: '€/kg' | '€/Stk' | 'ERR';
+
+    // Der Trace String (für Tooltips/Debugging)
+    Calculation_Trace: string; 
+}

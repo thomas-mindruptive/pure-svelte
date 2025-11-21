@@ -31,6 +31,7 @@
   import { getConstructionTypeApi } from "$lib/api/client/constructionType";
   import { getSurfaceFinishApi } from "$lib/api/client/surfaceFinish";
   import { getOfferingImageApi } from "$lib/api/client/offeringImage";
+  import { getProductDefinitionApi } from "$lib/api/client/productDefinition";
   import type { DeleteStrategy, ID, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
   import type {
     Attribute,
@@ -188,16 +189,46 @@
           errors.surfaceFinishes = zodToValidationErrorTree(surfaceFinishesVal.error);
         }
 
-        // <refact01> CHANGED: Load products AND suppliers on BOTH routes (no more constraints)
-        // Load products for category
-        availableProducts = await categoryApi.loadProductDefsForCategory(data.categoryId);
-        if (aborted) return;
-        const productsVal = safeParseFirstN(ProductDefinitionSchema, availableProducts, 3);
-        if (!productsVal.success) {
-          errors.availableProducts = zodToValidationErrorTree(productsVal.error);
+        // Load products AND suppliers based on route
+        // On /suppliers/... route: Load all products for combobox
+        // On /categories/... route: Load only the specific product_def (for validation and title display)
+        if (data.isSuppliersRoute) {
+          // Load all product defs for category because multiple offerings for same product def may exist, e.g. with different sizes.
+          availableProducts = await categoryApi.loadProductDefsForCategory(data.categoryId);
+          if (aborted) return;
+          const productsVal = safeParseFirstN(ProductDefinitionSchema, availableProducts, 3);
+          if (!productsVal.success) {
+            errors.availableProducts = zodToValidationErrorTree(productsVal.error);
+          }
+        } else {
+          // isCategoriesRoute
+          // IMPORTANT: Load only the specific product_def (not all products)
+          // This allows us to:
+          // 1. Set offering.product_def for validation during form editing
+          // 2. Display product_def.title in form header (like in edit mode)
+          if (data.isCreateMode && data.productDefId) {
+            const productDefApi = getProductDefinitionApi(client);
+            const productDef = await productDefApi.loadProductDefinition(data.productDefId);
+            if (aborted) return;
+            
+            // IMPORTANT: Set offering.product_def for validation and title display
+            // We create a minimal offering object with only product_def for validation
+            // The ForCreate schema allows offering_id to be optional, and wholesaler_id can be set later
+            // We only set product_def here - other fields will be set by OfferingForm in create mode
+            // Note: We use type assertion because we're creating a partial object for validation only
+            offering = {
+              // offering_id is optional in ForCreate schema (not set in create mode)
+              // wholesaler_id will be set by user via combobox on /categories/... route
+              category_id: data.categoryId!,
+              product_def_id: data.productDefId!,
+              product_def: productDef, // Optional in ForCreate schema, but we set it for validation
+            } as any as Wio_PDef_Cat_Supp_Nested_WithLinks;
+          }
+          // availableProducts stays empty array on /categories/... route (no combobox needed)
+          availableProducts = [];
         }
 
-        // Load suppliers for category
+        // Load suppliers for category (on both routes)
         availableSuppliers = await categoryApi.loadSuppliersForCategory(data.categoryId);
         if (aborted) return;
         const suppliersVal = safeParseFirstN(WholesalerSchema, availableSuppliers, 3);

@@ -33,8 +33,10 @@ async function exportToCsv() {
         
         // Create data lines
         const dataLines = rows.map(row => {
+            // Type assertion: row is a Record since we're iterating dynamically over keys
+            const rowRecord = row as Record<string, any>;
             return headers.map(header => {
-                const val = row[header];
+                const val = rowRecord[header];
                 
                 if (val === null || val === undefined) {
                     return '';

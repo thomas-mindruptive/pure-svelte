@@ -512,6 +512,7 @@ export const Wio_PDef_Cat_Supp_WithLinks_Schema = copyMetaFrom(Wio_Schema, tempW
 /**
  * NESTED SCHEMA (RECOMMENDED): Uses nested branded schemas for joined data.
  */
+// Base schema without validation (validation moved to validateOfferingForSubmit to only run on submit, not on initialization)
 const tempWioNestedSchema = Wio_Schema.extend({
   product_def: ProductDefinitionSchema,
   category: ProductCategorySchema,
@@ -535,12 +536,31 @@ export const Wio_PDef_Cat_Supp_Nested_WithLinks_Schema = copyMetaFrom(Wio_Schema
  * Schema for CREATE mode - nested objects are optional since they are not yet loaded.
  * Used when creating a new offering before it is saved to the database.
  */
-const tempWioNestedWithLinksForCreate = Wio_PDef_Cat_Supp_Nested_WithLinks_Schema.extend({
+/**
+ * Schema for CREATE mode - nested objects are optional since they are not yet loaded.
+ * Used when creating a new offering before it is saved to the database.
+ * IMPORTANT: Create schema from Wio_Schema using .omit() to remove required fields, then add them as optional
+ */
+// First omit the fields we want to make optional, then extend with optional versions
+const tempWioNestedWithLinksForCreateBase = Wio_Schema.omit({
+  offering_id: true,
+  wholesaler_id: true,
+}).extend({
+  // Links (same as WithLinks schema)
+  links: z.array(WholesalerOfferingLinkSchema).nullable().optional(),
+  shop_offering: Wio_Schema.nullable().optional(),
+  // Make offering_id optional for create mode
   offering_id: z.number().int().positive().optional(),
+  // Make wholesaler_id optional for create mode (will be set by user via combobox)
+  wholesaler_id: z.number().int().positive().optional(),
+  // Make nested objects optional for create mode
   product_def: ProductDefinitionSchema.nullable().optional(),
   category: ProductCategorySchema.nullable().optional(),
   wholesaler: WholesalerSchema.nullable().optional(),
-}).describe("WholesalerItemOffering_ProductDef_Category_Supplier_Nested_WithLinks_ForCreateSchema");
+}).describe("WholesalerItemOffering_ProductDef_Category_Supplier_Nested_WithLinks_ForCreateSchema_Base");
+
+// No validation in schema - validation moved to validateOfferingForSubmit (runs only on submit, not on initialization)
+const tempWioNestedWithLinksForCreate = tempWioNestedWithLinksForCreateBase;
 export const Wio_PDef_Cat_Supp_Nested_WithLinks_ForCreate_Schema = copyMetaFrom(Wio_Schema, tempWioNestedWithLinksForCreate);
 
 /**
@@ -878,6 +898,59 @@ export const OfferingReportViewSchema = createSchemaWithMeta(OfferingReportViewS
   dbSchema: "dbo",
 } as const);
 
+// ===== VIEW: view_offerings_enriched  =====
+
+const OfferingEnrichedViewSchemaBase = z.object({
+  // Wholesaler info
+  wholesalerName: z.string().max(200),
+  wholesalerId: z.number().int().positive(),
+  wholesalerRelevance: z.string().max(200).nullable().optional(),
+  wholesalerPriceRange: z.string().max(200).nullable().optional(),
+  wholesalerCountry: z.string().max(200).nullable().optional(),
+
+  // Product structure
+  productTypeName: z.string().max(200),
+  categoryId: z.number().int().positive(),
+  categoryName: z.string().max(200),
+  categoryDescription: z.string().max(500).nullable().optional(),
+
+  // Product definition (raw)
+  productDefId: z.number().int().positive(),
+  productDefTitle: z.string().max(500),
+
+  // Merged (final) attributes with overrides
+  finalMaterialName: z.string().max(200).nullable().optional(),
+  finalMaterialId: z.number().int().positive().nullable().optional(),
+  finalFormName: z.string().max(200).nullable().optional(),
+  finalFormId: z.number().int().positive().nullable().optional(),
+  finalConstructionTypeName: z.string().max(200).nullable().optional(),
+  finalConstructionTypeId: z.number().int().positive().nullable().optional(),
+  finalSurfaceFinishName: z.string().max(200).nullable().optional(),
+  finalSurfaceFinishId: z.number().int().positive().nullable().optional(),
+
+  // Raw offering data
+  offeringId: z.number().int().positive(),
+  offeringTitle: z.string().max(500),
+  offeringPrice: z.number().nullable().optional(),
+  offeringPricePerPiece: z.number().nullable().optional(),
+  offeringSize: z.string().max(200).nullable().optional(),
+  offeringDimensions: z.string().max(200).nullable().optional(),
+  offeringComment: z.string().max(4000).nullable().optional(),
+  offeringQuality: z.string().max(255).nullable().optional(),
+  offeringOrigin: z.string().max(200).nullable().optional(),
+  offeringWholesalerPrice: z.number().nullable().optional(),
+  offeringWeightGrams: z.number().nullable().optional(),
+  offeringWeightRange: z.string().max(50).nullable().optional(),
+  offeringPackageWeight: z.string().max(50).nullable().optional(),
+  offeringPackaging: z.string().max(200).nullable().optional(),
+}).describe("OfferingEnrichedViewSchema");
+
+export const OfferingEnrichedViewSchema = createSchemaWithMeta(OfferingEnrichedViewSchemaBase, {
+  alias: "v",
+  tableName: "view_offerings_enriched",
+  dbSchema: "dbo",
+} as const);
+
 // ===== SCHEMAS => TYPES  =====
 
 export type Wholesaler = z.infer<typeof WholesalerSchema>;
@@ -935,6 +1008,8 @@ export type OfferingReportView = z.infer<typeof OfferingReportViewSchema>;
 export type OfferingReportViewWithLinks = OfferingReportView & {
   links?: WholesalerOfferingLink[];
 };
+
+export type OfferingEnrichedView = z.infer<typeof OfferingEnrichedViewSchema>;
 
 // ===== ALL BRANDED SCHEMAS (= with meta info)  =====
 

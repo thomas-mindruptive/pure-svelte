@@ -15,8 +15,7 @@
   import OfferingGrid from "$lib/components/domain/offerings/OfferingGrid.svelte";
 
   // API & Type Imports
-  import { getCategoryApi } from "$lib/api/client/category";
-  import type { Wio_PDef_Cat_Supp } from "$lib/domain/domainTypes";
+  import type { Wio_PDef_Cat_Supp_Nested_WithLinks, WholesalerItemOffering } from "$lib/domain/domainTypes";
   import { ApiClient } from "$lib/api/client/apiClient";
   import type { ID, DeleteStrategy, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
   import type { WhereCondition, WhereConditionGroup, SortDescriptor } from "$lib/backendQueries/queryGrammar";
@@ -48,7 +47,6 @@
   // ========================================================================
 
   const client = new ApiClient(fetch);
-  const categoryApi = getCategoryApi(client);
   const offeringApi = getOfferingApi(client);
 
   // ========================================================================
@@ -121,14 +119,14 @@
   // ========================================================================
 
   async function handleQueryChange(query: {
-    filters: WhereCondition<Wio_PDef_Cat_Supp> | WhereConditionGroup<Wio_PDef_Cat_Supp> | null,
-    sort: SortDescriptor<Wio_PDef_Cat_Supp>[] | null
+    filters: WhereCondition<Wio_PDef_Cat_Supp_Nested_WithLinks> | WhereConditionGroup<Wio_PDef_Cat_Supp_Nested_WithLinks> | null,
+    sort: SortDescriptor<Wio_PDef_Cat_Supp_Nested_WithLinks>[] | null
   }): Promise<void> {
     assertDefined(resolvedData, "handleQueryChange needs resolvedData");
     const { supplierId, categoryId } = resolvedData;
     
     // Base filter: always filter by supplierId and categoryId
-    const baseFilter: WhereConditionGroup<Wio_PDef_Cat_Supp> = {
+    const baseFilter: WhereConditionGroup<Wio_PDef_Cat_Supp_Nested_WithLinks> = {
       whereCondOp: "AND",
       conditions: [
         { key: "wio.wholesaler_id", whereCondOp: ComparisonOperator.EQUALS, val: supplierId },
@@ -137,7 +135,7 @@
     };
 
     // Combine base filter with user filters
-    let finalWhere: WhereConditionGroup<Wio_PDef_Cat_Supp> | WhereCondition<Wio_PDef_Cat_Supp>;
+    let finalWhere: WhereConditionGroup<Wio_PDef_Cat_Supp_Nested_WithLinks> | WhereCondition<Wio_PDef_Cat_Supp_Nested_WithLinks>;
     if (query.filters) {
       finalWhere = {
         whereCondOp: "AND",
@@ -148,7 +146,11 @@
     }
 
     log.info(`Re-fetching offerings for supplier ${supplierId}, category ${categoryId} with filters and sort`);
-    const updatedOfferings = await offeringApi.loadNestedOfferingsWithLinks(finalWhere, query.sort);
+    // Type cast: Filter keys (wio.*) are compatible between Wio_PDef_Cat_Supp_Nested_WithLinks and WholesalerItemOffering
+    const updatedOfferings = await offeringApi.loadNestedOfferingsWithLinks(
+      finalWhere as WhereConditionGroup<WholesalerItemOffering> | WhereCondition<WholesalerItemOffering>,
+      query.sort as SortDescriptor<WholesalerItemOffering>[] | null
+    );
     resolvedData.offerings = updatedOfferings;
     log.info("Local state for offerings updated.");
   }
@@ -158,7 +160,7 @@
     goto(buildChildUrl(page.url.pathname, "offerings", "new"));
   }
 
-  function handleOfferingSelect(offering: Wio_PDef_Cat_Supp, options?: { _blankWindow?: boolean }): void {
+  function handleOfferingSelect(offering: Wio_PDef_Cat_Supp_Nested_WithLinks, options?: { _blankWindow?: boolean }): void {
     const url = buildChildUrl(page.url.pathname, "offerings", offering.offering_id);
     if (options?._blankWindow) {
       log.info(`(CategoryDetailPage) Opening in new tab for offeringId: ${offering.offering_id}`);
@@ -194,11 +196,11 @@
   // GRID STRATEGIES
   // ========================================================================
 
-  const deleteStrategy: DeleteStrategy<Wio_PDef_Cat_Supp> = {
+  const deleteStrategy: DeleteStrategy<Wio_PDef_Cat_Supp_Nested_WithLinks> = {
     execute: handleOfferingDelete,
   };
 
-  const rowActionStrategy: RowActionStrategy<Wio_PDef_Cat_Supp> = {
+  const rowActionStrategy: RowActionStrategy<Wio_PDef_Cat_Supp_Nested_WithLinks> = {
     click: handleOfferingSelect,
     doubleClick: handleOfferingSelect
   };

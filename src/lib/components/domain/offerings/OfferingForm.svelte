@@ -87,20 +87,26 @@
     let finalErrors: any[] = [];
 
     if (data.isCreateMode) {
-      if (finalInitialData) {
+      // Allow offering with only product_def (for /categories/... route validation)
+      // But not a full offering object with offering_id (which would be an error)
+      if (finalInitialData && finalInitialData.offering_id) {
         finalErrors.push({
-          message: "In create mode, initialValidatedOfferingData should be null",
+          message: "In create mode, initialValidatedOfferingData should not have offering_id",
           code: "custom",
           path: ["initialValidatedOfferingData"],
         });
       } else {
         // ⚠️⚠️⚠️ NOTE: This initialisation is key. Otherwise form validation and submit fails!
         // Create mode: NESTED structure with empty nested objects
+        // On /categories/... route, data.offering includes product_def for validation
+        // IMPORTANT: Only spread product_def from data.offering (if it exists)
+        // We can't spread the whole offering object because it doesn't have all required fields
+        const productDefFromOffering = data.offering?.product_def;
         finalInitialData = {
           category_id: data.categoryId,
           product_def_id: data.productDefId,
           wholesaler_id: data.supplierId,
-          ...data.offering,
+          ...(productDefFromOffering ? { product_def: productDefFromOffering } : {}),
         } as Wio_PDef_Cat_Supp_Nested_WithLinks;
       }
     }
@@ -185,15 +191,85 @@
     
     const offeringVal = schema.safeParse(data);
 
+    // Initialize errors from schema validation
     let errors: ValidationErrors<Wio_PDef_Cat_Supp_Nested_WithLinks> | undefined = undefined;
     if (offeringVal.error) {
       log.error(`Validation of offering failed: `, offeringVal.error);
       errors = zodToValidationErrors(offeringVal.error);
+    } else {
+      // Initialize empty errors object if no schema errors
+      errors = {} as ValidationErrors<Wio_PDef_Cat_Supp_Nested_WithLinks>;
     }
 
+    // IMPORTANT: Custom validation for Material/Form (only runs on submit, not on initialization)
+    // product_def must always be present for validation
+    // On /categories/... route: loaded during initialization → should always be present (if missing = internal error)
+    // On /suppliers/... route: set via combobox onChange → should be present on submit (if missing = validation error)
+    if (!data.product_def) {
+      // Internal error: product_def should always be present
+      const errorMessage = isCategoriesRoute 
+        ? 'Internal error: Product definition not loaded. Please refresh the page.'
+        : 'Product definition is required. Please select a product.';
+      
+      log.error(`Internal error: product_def missing in validateOfferingForSubmit`, { 
+        isCreateMode, 
+        isCategoriesRoute, 
+        isSuppliersRoute,
+        productDefId: data.product_def_id 
+      });
+      
+      addNotification(
+        isCategoriesRoute 
+          ? 'Internal error: Product definition not loaded. Please refresh the page.' 
+          : 'Please select a product before submitting.',
+        'error'
+      );
+      
+      // Add validation error to prevent form submission
+      if (!errors.product_def) errors.product_def = [];
+      errors.product_def.push(errorMessage);
+      
+      return {
+        valid: false,
+        errors,
+      };
+    }
+
+    // Material validation
+    // SPECIAL CASE: If ProductDef has material_id = 2 (Halbedelstein), it's a generic placeholder
+    // and the Offering MUST set a specific material (not 2)
+    const productDefMaterialId = data.product_def.material_id;
+    const offeringMaterialId = data.material_id;
+    
+    // Special case: Material ID 2 (Halbedelstein) is a generic placeholder
+    // If ProductDef has material_id = 2, Offering MUST have a different material
+    if (productDefMaterialId === 2) {
+      if (!offeringMaterialId || offeringMaterialId === 2) {
+        if (!errors.material_id) errors.material_id = [];
+        errors.material_id.push('Material is required. The ProductDefinition has "Halbedelstein" as a generic placeholder - you must specify the actual material.');
+      }
+    } else if (!productDefMaterialId && !offeringMaterialId) {
+      // Normal case: If ProductDef has no material, Offering MUST have material
+      if (!errors.material_id) errors.material_id = [];
+      errors.material_id.push('Material is required because the ProductDefinition has no material');
+    }
+    
+    // Form validation
+    // Check: If ProductDef has no form, Offering MUST have form
+    const productDefFormId = data.product_def.form_id;
+    const offeringFormId = data.form_id;
+    
+    if (!productDefFormId && !offeringFormId) {
+      if (!errors.form_id) errors.form_id = [];
+      errors.form_id.push('Form is required because the ProductDefinition has no form');
+    }
+
+    // Check if we have any errors
+    const hasErrors = errors && Object.keys(errors).length > 0;
+
     return {
-      valid: offeringVal.success,
-      errors,
+      valid: offeringVal.success && !hasErrors,
+      errors: hasErrors ? errors : undefined,
     };
   }
 
@@ -467,6 +543,15 @@
     label="Product"
     onChange={(value, product) => {
       log.debug("Product selected via Combobox:", { value, product_title: product?.title });
+      
+      // IMPORTANT: Set the nested product_def object for validation
+      // The FormComboBox2 only sets product_def_id, but validation needs the full product_def object
+      if (product && formShell) {
+        formShell.set(["product_def"], product);
+        log.debug("Set product_def object for validation", product);
+      }
+      // Note: If product is null, we don't clear product_def - let FormShell handle it
+      // Setting to null/undefined would cause type errors
     }}
   />
 {/snippet}
@@ -515,6 +600,8 @@
         <div>
           {#if data.offering_id}
             <h3>{data.product_def?.title || "Unnamed Product"} ➜ {data.title || "Unnamed Product"}</h3>
+          {:else if data.product_def?.title}
+            <h3>{data.product_def.title} ➜ New Offering</h3>
           {:else}
             <h3>New Product Offering</h3>
           {/if}

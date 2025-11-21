@@ -7,7 +7,8 @@ import {
   SurfaceFinishSchema,
   WholesalerOfferingAttribute_AttributeSchema,
   WholesalerSchema,
-  Wio_PDef_Cat_Supp_Nested_WithLinks_Schema
+  Wio_PDef_Cat_Supp_Nested_WithLinks_Schema,
+  Wio_PDef_Cat_Supp_Nested_WithLinks_ForCreate_Schema
 } from "$lib/domain/domainTypes";
 import type { PromisifyComplex } from "$lib/utils/typeUtils";
 import z from "zod";
@@ -20,7 +21,10 @@ export const OfferingDetail_LoadDataSchema = z.object({
     supplierId: z.number().int().positive().optional().nullable(),                           // Needed for the "create" in route context "/suppliers"
     categoryId: z.number().int().positive().optional().nullable(),                           // Needed for the "create" mode in both route contexts
     productDefId: z.number().int().positive().optional().nullable(),                         // Needed for the "create" in route context "/categories"
-    offering: z.nullable(Wio_PDef_Cat_Supp_Nested_WithLinks_Schema).optional(),   // CREATE-mode: can be null. NESTED structure with product_def, category, wholesaler, links, shop_offering
+    // IMPORTANT: Use ForCreate schema for offering to allow partial objects in create mode
+    // On /categories/... route, we set offering with only product_def for validation
+    // The ForCreate schema makes nested objects optional, allowing this partial structure
+    offering: z.nullable(Wio_PDef_Cat_Supp_Nested_WithLinks_ForCreate_Schema).optional(),   // CREATE-mode: can be null or partial. NESTED structure with product_def, category, wholesaler, links, shop_offering (all optional in create mode)
     availableProducts: z.array(ProductDefinitionSchema).nullable().optional(),               // This is only needed for the "create" mode: We need the available products for the combobox.
     availableSuppliers: z.array(WholesalerSchema).nullable().optional(),                     // This is only needed for the "create" mode: We need the available suppliers for the combobox.
     materials: z.array(MaterialSchema).nullable().optional(),

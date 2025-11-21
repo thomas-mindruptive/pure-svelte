@@ -176,3 +176,4 @@ export function loadOfferingDetailBasisData({
     return asyncLoadData;
   }
 }
+

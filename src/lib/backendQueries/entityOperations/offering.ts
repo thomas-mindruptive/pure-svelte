@@ -1,4 +1,4 @@
-import type { WholesalerItemOffering, Wio_PDef_Cat_Supp_Nested_WithLinks } from "$lib/domain/domainTypes";
+import type { WholesalerItemOffering, Wio_PDef_Cat_Supp_Nested_WithLinks, OfferingEnrichedView } from "$lib/domain/domainTypes";
 import { WholesalerItemOfferingForCreateSchema } from "$lib/domain/domainTypes";
 import type { Transaction } from "mssql";
 import { buildWhereClause, type BuildContext } from "../queryBuilder";
@@ -711,11 +711,11 @@ export async function loadOfferingsFromView(
  */
 export async function loadOfferingsFromEnrichedView(
   transaction: Transaction,
-  aWhere?: WhereConditionGroup<any> | WhereCondition<any>,
-  aOrderBy?: SortDescriptor<any>[],
+  aWhere?: WhereConditionGroup<OfferingEnrichedView> | WhereCondition<OfferingEnrichedView>,
+  aOrderBy?: SortDescriptor<OfferingEnrichedView>[],
   aLimit?: number,
   aOffset?: number,
-): Promise<any[]> {
+): Promise<OfferingEnrichedView[]> {
   assertDefined(transaction, "transaction");
   log.debug(`loadOfferingsFromEnrichedView`, { aWhere, aOrderBy, aLimit, aOffset });
 

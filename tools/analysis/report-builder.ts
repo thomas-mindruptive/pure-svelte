@@ -13,7 +13,9 @@ export function buildAuditMarkdown(data: AuditRow[]): string {
     
     data.forEach(row => {
         const trace = row.Calculation_Trace.replace(/\|/g, '<br>'); 
-        const product = row.Product_Title.replace(/\|/g, '-');
+        // WICHTIG: Pipe-Zeichen im Titel ESCAPEN (nicht ersetzen!), damit Markdown-Tabelle nicht bricht
+        // Markdown escapt Pipe-Zeichen mit Backslash: | wird zu \|
+        const product = row.Product_Title.replace(/\|/g, '\\|');
         
         md += `| ${row.Row_ID} | **${row.Wholesaler}** (${row.Origin_Country}) | ${product} | **${row.Final_Normalized_Price.toFixed(2)}** ${row.Unit} | <small>${trace}</small> |\n`;
     });
@@ -93,7 +95,13 @@ export function buildBestBuyMarkdown(data: AuditRow[]): string {
                 ? `**${row.Final_Normalized_Price.toFixed(2)}**`
                 : `${row.Final_Normalized_Price.toFixed(2)}`;
             
-            md += `| ${rankDisplay} | ${row.Wholesaler} | ${row.Origin_Country} | ${row.Product_Title} | ${priceDisplay} | ${diffStr} | ${info.join(' ')} |\n`;
+            // WICHTIG: Pipe-Zeichen im Titel ESCAPEN (nicht ersetzen!), damit Markdown-Tabelle nicht bricht
+            // WARUM: Pipe-Zeichen (|) in Produkttiteln (z.B. "Bergkristall Wand| Doppelender")
+            //        würden die Markdown-Tabelle zerbrechen, da | als Spaltentrenner verwendet wird
+            // LÖSUNG: Escapen mit Backslash - | wird zu \| (wird in Markdown als normales Zeichen angezeigt)
+            const productTitle = row.Product_Title.replace(/\|/g, '\\|');
+            
+            md += `| ${rankDisplay} | ${row.Wholesaler} | ${row.Origin_Country} | ${productTitle} | ${priceDisplay} | ${diffStr} | ${info.join(' ')} |\n`;
         });
 
         md += `\n---\n`;

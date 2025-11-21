@@ -370,6 +370,16 @@
     // Clear the Svelte error state before repopulating it.
     clearErrors();
 
+    // IMPORTANT: Write customErrors directly to formState.validationErrors
+    // This ensures custom validation errors are displayed even for Custom Components
+    // (like FormComboBox2) that don't have native form elements with name attributes
+    // Custom Components won't be found in allElements, so their errors need to be set directly
+    for (const [fieldName, errorMessages] of Object.entries(customErrors)) {
+      if (errorMessages && errorMessages.length > 0) {
+        (formState.validationErrors as any)[fieldName] = errorMessages;
+      }
+    }
+
     if (!isFormValid) {
       log.detdebug(`Form is invalid => Reading DOM val messages`);
       // If the form is invalid, we read the validation messages from the DOM
@@ -382,6 +392,7 @@
           if (fieldName) {
             // `validationMessage` will be our custom message if we set one,
             // otherwise it will be the browser's default message (e.g., "Please fill out this field.").
+            // Overwrite customErrors with DOM message if DOM element exists (DOM takes precedence)
             (formState.validationErrors as any)[fieldName] = [element.validationMessage];
           } else {
             (formState.validationErrors as any)["general_errors"] = [`No fieldname set for element`];
@@ -390,11 +401,18 @@
       }
       log.debug(`HTML/DOM: Form is invalid. All merged errors for UI:`, { entity, errors: { ...formState.validationErrors } });
     } else {
-      log.detdebug(`Validation passed.`, { entity });
+      // Even if form is valid (no DOM errors), we might have customErrors for Custom Components
+      const hasCustomErrors = Object.keys(customErrors).length > 0;
+      if (hasCustomErrors) {
+        log.detdebug(`Form DOM is valid but has custom errors (Custom Components):`, customErrors);
+      } else {
+        log.detdebug(`Validation passed.`, { entity });
+      }
     }
 
-    // Return the final result.
-    return isFormValid;
+    // Return false if we have any errors (DOM or custom)
+    const hasAnyErrors = Object.keys(formState.validationErrors).length > 0;
+    return !hasAnyErrors;
   }
 
   /**

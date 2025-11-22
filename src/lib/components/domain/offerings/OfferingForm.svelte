@@ -23,8 +23,8 @@
   import type { ValidationErrors } from "$lib/components/validation/validation.types";
   import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
   import {
-    Wio_PDef_Cat_Supp_Nested_WithLinks_Schema,
-    Wio_PDef_Cat_Supp_Nested_WithLinks_ForCreate_Schema,
+    Wio_Schema,
+    WholesalerItemOfferingForCreateSchema,
     type WholesalerItemOffering,
     type Wio_PDef_Cat_Supp_Nested_WithLinks,
   } from "$lib/domain/domainTypes";
@@ -198,10 +198,11 @@
     assertDefined(raw, "validateOfferingForSubmit");
     const data = raw as Wio_PDef_Cat_Supp_Nested_WithLinks;
 
-    // Use different schema based on create/update mode
+    // Schema validation: Only validate editable fields, not nested objects
+    // Nested objects (product_def, category, wholesaler) are only used for custom validation, not schema validation
     const schema = isCreateMode 
-      ? Wio_PDef_Cat_Supp_Nested_WithLinks_ForCreate_Schema 
-      : Wio_PDef_Cat_Supp_Nested_WithLinks_Schema;
+      ? WholesalerItemOfferingForCreateSchema 
+      : Wio_Schema;
     
     const offeringVal = schema.safeParse(data);
 

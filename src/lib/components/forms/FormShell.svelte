@@ -204,50 +204,55 @@
     });
   }
 
-  // React to changes in initial prop (e.g., when offering is loaded async in EDIT mode)
-  // This ensures formState.data is updated when initial prop changes from null to a value (after async load completes)
-  $effect(() => {
-    if (initial && typeof initial === 'object') {
-      const formDataKeys = Object.keys(formState.data);
-      const initialKeys = Object.keys(initial);
-      
-      // If formState.data is empty (was initialized from null initial), update it when initial becomes available
-      if (initialKeys.length > 0 && formDataKeys.length === 0) {
-        log.debug(`[FormShell] Initial prop loaded (was null), updating formState.data`, {
-          entity,
-          initialKeysCount: initialKeys.length,
-        });
-        const cleanInitial = pureDataDeepClone(initial as FormData<T>);
-        formState.data = pureDataDeepClone(cleanInitial);
-        formState.snapshot = pureDataDeepClone(cleanInitial);
-        
-        // Trigger validation now that data is loaded
-        void runValidate();
-      }
-    }
-  });
-
   // Form DOM element reference for keyboard event handling
   let formEl: HTMLFormElement;
 
-  // This effect runs after the component has been mounted to the DOM.
-  // It should wait for initial prop to be loaded before running validation.
+  // Combined effect: Handles initial data loading and validation
+  // This effect reacts to changes in the `initial` prop (e.g., when offering is loaded async in EDIT mode)
+  // It ensures formState.data is updated when initial prop changes from null to a value (after async load completes)
+  // and runs validation once after the data is complete
   $effect(() => {
-    // Skip initial validation if initial prop is null/undefined (data not yet loaded)
+    // Skip if initial prop is null/undefined (data not yet loaded)
     // This prevents validation from running with empty data when:
     // - In CREATE mode with no initial data
     // - In EDIT mode when data is still loading asynchronously
     if (!initial) {
-      log.debug(`[FormShell] Skipping initial validation - initial prop is null/undefined`, { entity });
+      log.debug(`[FormShell] Skipping - initial prop is null/undefined`, { entity });
       return;
     }
-    
-    log.debug(`Component has mounted. Running initial form validation.`);
 
-    // We call `runValidate()` to perform the initial check of the data.
-    // The `void` operator is used to explicitly signal that we are not
-    // awaiting the promise, as we just want to trigger the validation side effects
-    // (populating `formState.errors` and setting the CSS state).
+    if (typeof initial !== 'object') {
+      return;
+    }
+
+    const formDataKeys = Object.keys(formState.data);
+    const initialKeys = Object.keys(initial);
+    
+    // Check if formState.data needs to be updated from initial
+    // Update if:
+    // 1. formState.data is empty (was initialized from null initial)
+    // 2. OR initial has nested objects that formState.data doesn't have (after async load completes)
+    const initialHasNestedObjects = !!(initial as any)?.category || !!(initial as any)?.wholesaler || !!(initial as any)?.product_def;
+    const formDataHasNestedObjects = !!(formState.data as any)?.category || !!(formState.data as any)?.wholesaler || !!(formState.data as any)?.product_def;
+    
+    const needsUpdate = (initialKeys.length > 0 && formDataKeys.length === 0) || 
+                       (initialHasNestedObjects && !formDataHasNestedObjects);
+
+    if (needsUpdate) {
+      log.debug(`[FormShell] Updating formState.data from initial prop`, {
+        entity,
+        initialKeysCount: initialKeys.length,
+        formDataKeysCount: formDataKeys.length,
+        initialHasNestedObjects,
+        formDataHasNestedObjects,
+      });
+      const cleanInitial = pureDataDeepClone(initial as FormData<T>);
+      formState.data = pureDataDeepClone(cleanInitial);
+      formState.snapshot = pureDataDeepClone(cleanInitial);
+    }
+
+    // Run validation after ensuring formState.data is up to date with initial
+    log.debug(`[FormShell] Running validation`);
     void runValidate();
   });
 

@@ -102,12 +102,21 @@
         // IMPORTANT: Only spread product_def from data.offering (if it exists)
         // We can't spread the whole offering object because it doesn't have all required fields
         const productDefFromOffering = data.offering?.product_def;
+        log.debug(`[OfferingForm] Initializing finalInitialData for create mode`, {
+          hasProductDefFromOffering: !!productDefFromOffering,
+          productDefId: data.productDefId,
+          productDefTitle: productDefFromOffering?.title,
+        });
         finalInitialData = {
           category_id: data.categoryId,
           product_def_id: data.productDefId,
           wholesaler_id: data.supplierId,
           ...(productDefFromOffering ? { product_def: productDefFromOffering } : {}),
         } as Wio_PDef_Cat_Supp_Nested_WithLinks;
+        log.debug(`[OfferingForm] finalInitialData initialized`, {
+          hasProductDef: !!finalInitialData.product_def,
+          productDefId: finalInitialData.product_def_id,
+        });
       }
     }
 
@@ -180,7 +189,12 @@
    * @returns A ValidateResult object containing any errors for custom rules.
    */
   function validateOfferingForSubmit(raw: Record<string, any>): ValidateResult<Wio_PDef_Cat_Supp_Nested_WithLinks> {
-    log.debug(`Validating offering form data (isCreateMode: ${isCreateMode})`, raw);
+    log.debug(`[validateOfferingForSubmit] Validating offering form data (isCreateMode: ${isCreateMode})`, {
+      raw,
+      hasProductDef: !!raw.product_def,
+      productDefId: raw.product_def_id,
+      productDefTitle: raw.product_def?.title,
+    });
     assertDefined(raw, "validateOfferingForSubmit");
     const data = raw as Wio_PDef_Cat_Supp_Nested_WithLinks;
 

@@ -169,6 +169,17 @@
 
   // Create clean initial data for consistent state management
   const cleanInitial = pureDataDeepClone(initial ?? ({} as FormData<T>));
+  
+  // DEBUG: Log initial data to track product_def
+  if (entity === "Offering") {
+    log.debug(`[FormShell] Initializing formState for ${entity}`, {
+      hasInitial: !!initial,
+      hasProductDef: !!(initial as any)?.product_def,
+      productDefId: (initial as any)?.product_def_id,
+      productDefTitle: (initial as any)?.product_def?.title,
+      cleanInitialHasProductDef: !!(cleanInitial as any)?.product_def,
+    });
+  }
 
   /**
    * Centralized form state using Svelte 5 runes
@@ -183,14 +194,54 @@
     submitting: false,                           // Form submission in progress
     validating: false,                          // Validation in progress
   });
+  
+  // DEBUG: Log formState.data after initialization
+  if (entity === "Offering") {
+    log.debug(`[FormShell] formState.data initialized for ${entity}`, {
+      hasProductDef: !!(formState.data as any)?.product_def,
+      productDefId: (formState.data as any)?.product_def_id,
+      productDefTitle: (formState.data as any)?.product_def?.title,
+    });
+  }
+
+  // React to changes in initial prop (e.g., when offering is loaded async in EDIT mode)
+  // This ensures formState.data is updated when initial prop changes from null to a value (after async load completes)
+  $effect(() => {
+    if (initial && typeof initial === 'object') {
+      const formDataKeys = Object.keys(formState.data);
+      const initialKeys = Object.keys(initial);
+      
+      // If formState.data is empty (was initialized from null initial), update it when initial becomes available
+      if (initialKeys.length > 0 && formDataKeys.length === 0) {
+        log.debug(`[FormShell] Initial prop loaded (was null), updating formState.data`, {
+          entity,
+          initialKeysCount: initialKeys.length,
+        });
+        const cleanInitial = pureDataDeepClone(initial as FormData<T>);
+        formState.data = pureDataDeepClone(cleanInitial);
+        formState.snapshot = pureDataDeepClone(cleanInitial);
+        
+        // Trigger validation now that data is loaded
+        void runValidate();
+      }
+    }
+  });
 
   // Form DOM element reference for keyboard event handling
   let formEl: HTMLFormElement;
 
-  // This effect runs after the component has been mounted to the DOM,
-  // ensuring that `formEl` is available.
-  // It will run once when the form is first created.
+  // This effect runs after the component has been mounted to the DOM.
+  // It should wait for initial prop to be loaded before running validation.
   $effect(() => {
+    // Skip initial validation if initial prop is null/undefined (data not yet loaded)
+    // This prevents validation from running with empty data when:
+    // - In CREATE mode with no initial data
+    // - In EDIT mode when data is still loading asynchronously
+    if (!initial) {
+      log.debug(`[FormShell] Skipping initial validation - initial prop is null/undefined`, { entity });
+      return;
+    }
+    
     log.debug(`Component has mounted. Running initial form validation.`);
 
     // We call `runValidate()` to perform the initial check of the data.
@@ -346,6 +397,14 @@
     log.detdebug(`Custom errors after await validate:`, customErrors);
 
     // --- Step 2: Inject custom errors into the DOM ---
+    // Check if formEl is available before accessing its elements
+    if (!formEl) {
+      log.debug(`[FormShell] runValidate: formEl not yet bound to DOM, skipping DOM validation`, { entity });
+      // Still update Svelte state with custom errors for immediate feedback
+      formState.validationErrors = customErrors as Errors<T>;
+      return customResult.valid;
+    }
+
     // This loop informs the browser's validation engine about our custom business rule violations.
     const allElements = Array.from(formEl.elements).filter(
       (el): el is HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement =>
@@ -460,6 +519,16 @@
 
     try {
       const pureDataClone = pureDataDeepClone(formState.data);
+      
+      // DEBUG: Log formState.data before submit to track product_def
+      if (entity === "Offering") {
+        log.debug(`[FormShell] Submitting form data for ${entity}`, {
+          hasProductDef: !!(pureDataClone as any)?.product_def,
+          productDefId: (pureDataClone as any)?.product_def_id,
+          productDefTitle: (pureDataClone as any)?.product_def?.title,
+          formStateDataHasProductDef: !!(formState.data as any)?.product_def,
+        });
+      }
 
       // Call parent's submit handler, pass "old" data for information.
       const result = await submitCbk(pureDataClone);

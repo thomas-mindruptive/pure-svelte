@@ -14,10 +14,8 @@ import {
 } from './analyze-config.js';
 
 // 2. IMPORTS: Report Builder & Output
-import {
-    buildAuditMarkdown,
-    buildBestBuyMarkdown
-} from './report-builder.js';
+import { ReportBuilder } from './report-builder.js';
+import type { ReportBuilder as ReportBuilderType } from './report-builder.js';
 
 import {
     saveReportFile,
@@ -218,7 +216,16 @@ function extractWeightKgFromNormalized(row: NormalizedOffering): { weight: numbe
  * @param listPrice - Base list price from the offering
  * @returns Best price and source information
  */
-function getBestPriceFromNormalized(row: NormalizedOffering, listPrice: number): { price: number, source: string, commentExcerpt?: string } {
+export function getBestPriceFromNormalized(row: NormalizedOffering, listPrice: number, reportBuilder?: ReportBuilder): { price: number, source: string, commentExcerpt?: string } {
+    // Add legend entry for bulk price detection if reportBuilder is provided
+    if (reportBuilder && !reportBuilder['legendEntries'].has('Preis (Norm.)_Bulk')) {
+        reportBuilder.addToLegend(
+            'Preis (Norm.)_Bulk',
+            'Bulk-Preis aus Comment-Feld extrahiert',
+            'Regex-Pattern `[€$]?\\s?(\\d+[\\.,]?\\d{0,2})` durchsucht Comment nach Preisen. Niedrigster gültiger Preis (muss < Listenpreis und > 10% des Listenpreises sein) wird verwendet. Quelle: `offeringComment` Feld aus Datenbank/CSV'
+        );
+    }
+
     if (!row.offeringComment) {
         return { price: listPrice, source: 'List' };
     }
@@ -257,10 +264,12 @@ function getBestPriceFromNormalized(row: NormalizedOffering, listPrice: number):
         if (lowest < listPrice && lowestMatch !== null) {
             // Extract relevant comment excerpt (max 50 chars around the match)
             // TypeScript knows lowestMatch is string here due to null check above
-            const commentText = row.offeringComment; // TypeScript knows this is string from earlier check
-            const matchIndex = commentText.indexOf(lowestMatch);
+            const commentText = row.offeringComment!; // TypeScript knows this is string from earlier check
+            const matchString: string = lowestMatch; // Explicit type for TypeScript
+            const matchIndex = commentText.indexOf(matchString);
+            const matchLength = matchString.length;
             const start = Math.max(0, matchIndex - 20);
-            const end = Math.min(commentText.length, matchIndex + lowestMatch.length + 20);
+            const end = Math.min(commentText.length, matchIndex + matchLength + 20);
             const excerpt = commentText.substring(start, end).trim();
             
             return { 
@@ -286,9 +295,10 @@ function getBestPriceFromNormalized(row: NormalizedOffering, listPrice: number):
  * D. Normalization: Calculate final comparable price in consistent unit
  * 
  * @param normalizedOfferings - Array of normalized offerings ready for transformation
+ * @param reportBuilder - Optional ReportBuilder instance for legend entries
  * @returns Array of audit rows with calculated prices and normalized values
  */
-function transformOfferingsToAuditRows(normalizedOfferings: NormalizedOffering[]): AuditRow[] {
+export function transformOfferingsToAuditRows(normalizedOfferings: NormalizedOffering[], reportBuilder?: ReportBuilder): AuditRow[] {
     log.info(`Starting transformation of ${normalizedOfferings.length} offerings`);
 
     const auditData: AuditRow[] = normalizedOfferings
@@ -304,7 +314,7 @@ function transformOfferingsToAuditRows(normalizedOfferings: NormalizedOffering[]
             // WHY: Vendors sometimes put better prices in comments instead of main price field
             log.debug(`Processing offering ${index + 1}: ${row.offeringTitle}`);
             const listPrice = row.offeringPrice;
-            const priceInfo = getBestPriceFromNormalized(row, listPrice);
+            const priceInfo = getBestPriceFromNormalized(row, listPrice, reportBuilder);
 
             if (priceInfo.source !== 'List') {
                 trace.push(`💰 Bulk Found: ${priceInfo.price.toFixed(2)} (was ${listPrice.toFixed(2)})`);
@@ -324,6 +334,15 @@ function transformOfferingsToAuditRows(normalizedOfferings: NormalizedOffering[]
                 ? row.wholesalerCountry.toUpperCase() 
                 : 'UNKNOWN';
 
+            // Add legend entry for Herkunft column if reportBuilder is provided
+            if (reportBuilder && !reportBuilder['legendEntries'].has('Herkunft')) {
+                reportBuilder.addToLegend(
+                    'Herkunft',
+                    'Herkunftsland (Wholesaler Country)',
+                    'Aus `wholesalerCountry` Feld. Wenn fehlend: zeigt "UNKNOWN". Nicht-EU-Länder bekommen Import-Markup (+25%) angewendet. Quelle: Datenbank/CSV Feld `wholesalerCountry`'
+                );
+            }
+
             const isEu = EU_ZONE.has(country);
             let markupPct = 0;
             let effectivePrice = priceInfo.price;
@@ -339,6 +358,15 @@ function transformOfferingsToAuditRows(normalizedOfferings: NormalizedOffering[]
                 effectivePrice = priceInfo.price * IMPORT_MARKUP;
                 trace.push(`✈️ Origin: ${country} (+${markupPct.toFixed(0)}% Markup = ${effectivePrice.toFixed(2)})`);
                 log.debug(`Non-EU origin, applying ${markupPct}% markup`);
+            }
+
+            // Add legend entry for Import Markup if reportBuilder is provided
+            if (reportBuilder && !reportBuilder['legendEntries'].has('Preis (Norm.)_Import')) {
+                reportBuilder.addToLegend(
+                    'Preis (Norm.)_Import',
+                    'Effektiver Preis nach Import-Markup für Nicht-EU-Länder',
+                    `Wenn Land NICHT in EU-Zone: \`price * 1.25\` (+25% Markup). EU-Länder (DE, AT, NL, etc.): kein Markup. Quelle: Bulk-Preis oder Listenpreis aus vorherigem Schritt`
+                );
             }
 
             // ========================================
@@ -405,11 +433,29 @@ function transformOfferingsToAuditRows(normalizedOfferings: NormalizedOffering[]
                     trace.push(`❌ ERROR: Strategy is WEIGHT but no weight found!`);
                     log.warn(`Weight strategy selected but no weight found for offering: ${row.offeringTitle}`);
                 }
+
+                // Add legend entry for Weight Normalization if reportBuilder is provided
+                if (reportBuilder && !reportBuilder['legendEntries'].has('Preis (Norm.)_Weight')) {
+                    reportBuilder.addToLegend(
+                        'Preis (Norm.)_Weight',
+                        'Preis pro Kilogramm (für Rohmaterialien)',
+                        `FORMULA: \`effectivePrice / weightInKg\`. Gewicht extrahiert aus \`offeringWeightGrams\` (umgerechnet in kg) oder aus Comment via Regex. Strategie: WEIGHT (erzwungen durch Produkttyp oder auto-gewählt wenn Gewicht verfügbar). Einheit: €/kg`
+                    );
+                }
             } else {
                 // Unit-based normalization: Price per piece
                 // WHY: Standard comparison for finished products where each piece is comparable
                 finalNormalizedPrice = effectivePrice;
                 unitLabel = '€/Stk';
+
+                // Add legend entry for Unit Normalization if reportBuilder is provided
+                if (reportBuilder && !reportBuilder['legendEntries'].has('Preis (Norm.)_Unit')) {
+                    reportBuilder.addToLegend(
+                        'Preis (Norm.)_Unit',
+                        'Preis pro Stück (für Fertigprodukte)',
+                        `FORMULA: \`effectivePrice\` (keine Division). Strategie: UNIT (erzwungen durch Produkttyp oder auto-gewählt wenn kein Gewicht verfügbar). Einheit: €/Stk`
+                    );
+                }
             }
 
             // ========================================
@@ -460,33 +506,7 @@ function transformOfferingsToAuditRows(normalizedOfferings: NormalizedOffering[]
 // 6. REPORT GENERATION LOGIC
 // ==========================================
 
-/**
- * Generates and saves audit reports from sorted audit data.
- * 
- * WHAT: Creates two markdown reports:
- * 1. audit_log.md: Detailed flat table with all offerings and calculation traces
- * 2. best_buy_report.md: Grouped report showing best prices per product group
- * 
- * @param sortedData - Audit rows sorted by group and price
- */
-function generateReports(sortedData: AuditRow[]): void {
-    log.info(`Generating reports from ${sortedData.length} audit rows`);
-
-    // Build reports using builder pattern
-    const auditMarkdown = buildAuditMarkdown(sortedData);
-    const bestBuyMarkdown = buildBestBuyMarkdown(sortedData);
-
-    log.info('Reports generated, saving files...');
-
-    // Print console summary
-    printConsoleSummary(sortedData);
-
-    // Save report files
-    saveReportFile('audit_log.md', auditMarkdown);
-    saveReportFile('best_buy_report.md', bestBuyMarkdown);
-
-    log.info('Reports saved successfully');
-}
+// NOTE: generateReports() function moved to ReportBuilder class
 
 // ==========================================
 // 7. MAIN FUNCTIONS (ENTRY POINTS)
@@ -498,7 +518,7 @@ function generateReports(sortedData: AuditRow[]): void {
  * 
  * USAGE: Useful for offline analysis or when DB access is not available.
  */
-function createAuditTableFromCsv() {
+export function createAuditTableFromCsv() {
     log.info('Starting audit table creation from CSV');
     
     const filePath = path.isAbsolute(CSV_FILENAME)
@@ -522,8 +542,11 @@ function createAuditTableFromCsv() {
         return;
     }
 
+    // Create ReportBuilder instance for generating reports
+    const reportBuilder = new ReportBuilder();
+
     // Process data using the refactored function
-    createAuditTable(rawData);
+    createAuditTable(rawData, reportBuilder);
 }
 
 /**
@@ -532,7 +555,7 @@ function createAuditTableFromCsv() {
  * 
  * USAGE: Preferred method - uses live data from database with proper typing.
  */
-async function createAuditTableFromDb() {
+export async function createAuditTableFromDb() {
     log.info('Starting audit table creation from database');
     
     const pool = await db;
@@ -559,9 +582,12 @@ async function createAuditTableFromDb() {
         transactionCommitted = true;
         log.info('Transaction committed successfully');
 
+        // Create ReportBuilder instance for generating reports
+        const reportBuilder = new ReportBuilder();
+
         // Process data using the new function (outside of transaction context)
         // WHY: Data processing doesn't need to be inside transaction - data is already loaded
-        createAuditTableFromEnrichedView(rows);
+        createAuditTableFromEnrichedView(rows, reportBuilder);
     } catch (error) {
         log.error('Error loading data from database', { error });
         // Only rollback if transaction hasn't been committed
@@ -595,8 +621,9 @@ async function createAuditTableFromDb() {
  * PIPELINE: CSV strings → Normalized → Transformed → Sorted → Reports
  * 
  * @param rawData - Array of raw offerings from CSV with string values
+ * @param reportBuilder - ReportBuilder instance for generating reports
  */
-function createAuditTable(rawData: RawOffering[]) {
+export function createAuditTable(rawData: RawOffering[], reportBuilder: ReportBuilder) {
     log.info(`Starting transformation of ${rawData.length} raw offerings from CSV`);
     
     // Normalize CSV data (string-to-number conversion)
@@ -605,7 +632,7 @@ function createAuditTable(rawData: RawOffering[]) {
     log.info(`Normalized ${normalizedOfferings.length} offerings`);
 
     // Transform to audit rows using core logic
-    const auditData = transformOfferingsToAuditRows(normalizedOfferings);
+    const auditData = transformOfferingsToAuditRows(normalizedOfferings, reportBuilder);
 
     // Sort by group key, then by normalized price (ascending)
     // WHY: Groups comparable products together, cheapest first for easy identification
@@ -617,7 +644,7 @@ function createAuditTable(rawData: RawOffering[]) {
     });
 
     // Generate and save reports
-    generateReports(sortedData);
+    reportBuilder.generateReports(sortedData);
 }
 
 /**
@@ -628,8 +655,9 @@ function createAuditTable(rawData: RawOffering[]) {
  * PIPELINE: DB typed data → Normalized → Transformed → Sorted → Reports
  * 
  * @param enrichedData - Array of enriched offerings from database with typed values
+ * @param reportBuilder - ReportBuilder instance for generating reports
  */
-function createAuditTableFromEnrichedView(enrichedData: OfferingEnrichedView[]) {
+export function createAuditTableFromEnrichedView(enrichedData: OfferingEnrichedView[], reportBuilder: ReportBuilder) {
     log.info(`Starting transformation of ${enrichedData.length} enriched offerings from database`);
     
     // Normalize DB data (direct use, no parsing needed)
@@ -638,7 +666,7 @@ function createAuditTableFromEnrichedView(enrichedData: OfferingEnrichedView[]) 
     log.info(`Normalized ${normalizedOfferings.length} offerings (no parsing required)`);
 
     // Transform to audit rows using core logic
-    const auditData = transformOfferingsToAuditRows(normalizedOfferings);
+    const auditData = transformOfferingsToAuditRows(normalizedOfferings, reportBuilder);
 
     // Sort by group key, then by normalized price (ascending)
     // WHY: Groups comparable products together, cheapest first for easy identification
@@ -650,24 +678,8 @@ function createAuditTableFromEnrichedView(enrichedData: OfferingEnrichedView[]) 
     });
 
     // Generate and save reports
-    generateReports(sortedData);
+    reportBuilder.generateReports(sortedData);
 }
 
-// Script entry point
-// WHY: Execute async function and handle exit properly
-//      If CSV mode is needed, uncomment createAuditTableFromCsv() and comment createAuditTableFromDb()
-(async () => {
-    try {
-        // createAuditTableFromCsv(); // Uncomment for CSV mode
-        await createAuditTableFromDb();
-        
-        // Explicit exit after successful completion
-        // WHY: Ensures Node.js process terminates even if connection pool doesn't close immediately
-        log.info('Analysis complete, exiting...');
-        process.exit(0);
-    } catch (error) {
-        log.error('Fatal error in analysis script', { error });
-        process.exit(1);
-    }
-})();
+// NOTE: Script entry point moved to analyze-wholesaler-main.ts
 

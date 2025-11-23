@@ -21,7 +21,12 @@ import {
     saveReportFile,
     printConsoleSummary
 } from './output.js';
-import { parseMoney } from './parser-utils.js';
+import { 
+    parseMoney, 
+    extractDimensions, 
+    extractWeightKgFromNormalized,
+    validatePackageWeight
+} from './parser-utils.js';
 import { parseCSV } from './parse-csv.js';
 import { loadOfferingsFromEnrichedView } from '$lib/backendQueries/entityOperations/offering.js';
 import { db } from '$lib/backendQueries/db.js';
@@ -56,6 +61,9 @@ interface NormalizedOffering {
     offeringWeightGrams: number | null; // Already parsed/typed (null if missing)
     offeringComment: string | null;
     offeringPackaging: string | null;
+    offeringDimensions: string | null;
+    offeringWeightRange: string | null;
+    offeringPackageWeight: string | null;
     offeringId: number; // Required for identifying problematic DB entries when material/form is missing
 }
 
@@ -111,6 +119,15 @@ function normalizeRawOffering(row: RawOffering): NormalizedOffering {
         offeringPackaging: (row.offeringPackaging && row.offeringPackaging !== 'NULL') 
             ? row.offeringPackaging 
             : null,
+        offeringDimensions: (row.offeringDimensions && row.offeringDimensions !== 'NULL') 
+            ? row.offeringDimensions 
+            : null,
+        offeringWeightRange: (row.offeringWeightRange && row.offeringWeightRange !== 'NULL') 
+            ? row.offeringWeightRange 
+            : null,
+        offeringPackageWeight: (row.offeringPackageWeight && row.offeringPackageWeight !== 'NULL') 
+            ? row.offeringPackageWeight 
+            : null,
         offeringId: offeringId,
     };
 }
@@ -137,6 +154,9 @@ function normalizeEnrichedView(row: OfferingEnrichedView): NormalizedOffering {
         offeringWeightGrams: row.offeringWeightGrams || null, // Already a number or null
         offeringComment: row.offeringComment || null,
         offeringPackaging: row.offeringPackaging || null,
+        offeringDimensions: row.offeringDimensions || null,
+        offeringWeightRange: row.offeringWeightRange || null,
+        offeringPackageWeight: row.offeringPackageWeight || null,
         offeringId: row.offeringId, // Already a number from DB
     };
 }
@@ -159,38 +179,7 @@ function normalizeEnrichedView(row: OfferingEnrichedView): NormalizedOffering {
  * @param row - Normalized offering with numeric weight
  * @returns Weight in kg and source information
  */
-function extractWeightKgFromNormalized(row: NormalizedOffering): { weight: number | null, source: string } {
-    // 1. Priority: Explicit weight field (already in grams, convert to kg)
-    // WHY: Most reliable source - directly from vendor's structured data
-    if (row.offeringWeightGrams !== null && row.offeringWeightGrams > 0) {
-        return { weight: row.offeringWeightGrams / 1000, source: 'Column (g)' };
-    }
-
-    // 2. Priority: Text mining from title/packaging
-    // WHY: Fallback when weight column is empty but weight is mentioned in text
-    const textToScan = ((row.offeringTitle || '') + ' ' + (row.offeringPackaging || '')).toLowerCase();
-
-    // Search for "1.5 kg" or "1,5 kg" patterns
-    const kgMatch = textToScan.match(/(\d+[\.,]?\d*)\s*kg/);
-    if (kgMatch) {
-        return { 
-            weight: parseFloat(kgMatch[1].replace(',', '.')), 
-            source: 'Regex (Title/Pack kg)' 
-        };
-    }
-    
-    // Search for "500 g" patterns (boundary \b important to avoid matching "gold")
-    // WHY: Sometimes weight is given in grams instead of kg
-    const gMatch = textToScan.match(/(\d+)\s*g\b/); 
-    if (gMatch) {
-        return { 
-            weight: parseFloat(gMatch[1]) / 1000, // Convert grams to kg
-            source: 'Regex (Title/Pack g)' 
-        };
-    }
-
-    return { weight: null, source: 'None' };
-}
+// extractWeightKgFromNormalized wurde nach parser-utils.ts verschoben und erweitert
 
 /**
  * Finds the best price by checking for bulk prices in comments.
@@ -370,16 +359,53 @@ export function transformOfferingsToAuditRows(normalizedOfferings: NormalizedOff
             }
 
             // ========================================
-            // C. WEIGHT EXTRACTION & STRATEGY SELECTION
+            // C. DIMENSIONS EXTRACTION
+            // ========================================
+            // WHAT: Extract dimensions (size) for display in reports
+            // PRIORITY: 1) dimensions field, 2) regex from title (with warning)
+            const dimensionsInfo = extractDimensions(row);
+            if (dimensionsInfo.dimensions) {
+                trace.push(`📏 Dimensions: ${dimensionsInfo.dimensions} [${dimensionsInfo.source}]`);
+                if (dimensionsInfo.warning) {
+                    trace.push(`⚠️ WARN: ${dimensionsInfo.warning}`);
+                }
+            } else {
+                trace.push(`📏 Dimensions: - [${dimensionsInfo.source}]`);
+            }
+
+            // ========================================
+            // D. WEIGHT EXTRACTION & STRATEGY SELECTION
             // ========================================
             // WHAT: Determine how to compare prices (by weight or by unit)
             // WHY: Different product types need different comparison methods:
             //      - Raw materials (stones, crystals): Compare per kg
             //      - Finished products (necklaces, pendants): Compare per piece
+            // PRIORITY: 1) weight_range field, 2) weight_grams field, 3) regex from title (with warning)
             const weightInfo = extractWeightKgFromNormalized(row);
             if (weightInfo.source !== 'None') {
-                trace.push(`⚖️ Weight: ${weightInfo.weight}kg [${weightInfo.source}]`);
+                trace.push(`⚖️ Weight: ${weightInfo.display || `${weightInfo.weight}kg`} [${weightInfo.source}]`);
+                if (weightInfo.warning) {
+                    trace.push(`⚠️ WARN: ${weightInfo.warning}`);
+                }
                 log.debug(`Weight extracted: ${weightInfo.weight}kg (source: ${weightInfo.source})`);
+            } else {
+                trace.push(`⚖️ Weight: - [${weightInfo.source}]`);
+            }
+
+            // ========================================
+            // E. PACKAGE WEIGHT VALIDATION
+            // ========================================
+            // WHAT: Validate package_weight against packaging field
+            const packageWeightInfo = validatePackageWeight(row.offeringPackaging, row.offeringPackageWeight);
+            if (packageWeightInfo.packageWeightDisplay) {
+                trace.push(`📦 Package Weight: ${packageWeightInfo.packageWeightDisplay} [Field]`);
+                if (packageWeightInfo.warning) {
+                    trace.push(`⚠️ WARN: ${packageWeightInfo.warning}`);
+                } else {
+                    trace.push(`✓ Matches packaging`);
+                }
+            } else if (packageWeightInfo.warning) {
+                trace.push(`📦 Package Weight: - ⚠️ WARN: ${packageWeightInfo.warning}`);
             }
 
             let strategy: 'WEIGHT' | 'UNIT' = 'UNIT';
@@ -411,7 +437,7 @@ export function transformOfferingsToAuditRows(normalizedOfferings: NormalizedOff
             }
 
             // ========================================
-            // D. NORMALIZATION (Final Comparable Price)
+            // F. NORMALIZATION (Final Comparable Price)
             // ========================================
             // WHAT: Calculate final price in consistent unit (€/kg or €/Stk)
             // WHY: Enables fair comparison across different vendors and packaging
@@ -459,7 +485,7 @@ export function transformOfferingsToAuditRows(normalizedOfferings: NormalizedOff
             }
 
             // ========================================
-            // E. GROUP KEY GENERATION
+            // G. GROUP KEY GENERATION
             // ========================================
             // WHAT: Create grouping key for price comparison (ProductType > Material > Form)
             // WHY: Groups comparable products together for fair price comparison
@@ -477,6 +503,7 @@ export function transformOfferingsToAuditRows(normalizedOfferings: NormalizedOff
             // Build result object
             return {
                 Row_ID: (index + 1).toString(),
+                Offering_ID: row.offeringId,
                 Group_Key: `${row.productTypeName} > ${materialDisplay} > ${formDisplay}`,
                 Wholesaler: row.wholesalerName,
                 Origin_Country: country,
@@ -490,6 +517,15 @@ export function transformOfferingsToAuditRows(normalizedOfferings: NormalizedOff
                 Detected_Bulk_Price: priceInfo.price,
                 Detected_Weight_Kg: weightInfo.weight,
                 Applied_Markup_Pct: markupPct,
+
+                Dimensions: dimensionsInfo.dimensions,
+                Dimensions_Source: dimensionsInfo.source,
+                Dimensions_Warning: dimensionsInfo.warning,
+                Weight_Display: weightInfo.display,
+                Weight_Source: weightInfo.source,
+                Weight_Warning: weightInfo.warning,
+                Package_Weight: packageWeightInfo.packageWeightDisplay,
+                Package_Weight_Warning: packageWeightInfo.warning,
 
                 Final_Normalized_Price: parseFloat(finalNormalizedPrice.toFixed(2)),
                 Unit: unitLabel,
@@ -513,13 +549,15 @@ export function transformOfferingsToAuditRows(normalizedOfferings: NormalizedOff
 // ==========================================
 
 /**
- * Entry point for CSV-based audit table creation.
+ * Entry point for CSV-based offering analysis.
  * Reads CSV file, parses it, normalizes data, transforms to audit rows, and generates reports.
+ * 
+ * PIPELINE: CSV file → Parse → Normalize → Transform → Sort → Generate Reports
  * 
  * USAGE: Useful for offline analysis or when DB access is not available.
  */
-export function createAuditTableFromCsv() {
-    log.info('Starting audit table creation from CSV');
+export function analyzeOfferingsFromCsv() {
+    log.info('Starting offering analysis from CSV');
     
     const filePath = path.isAbsolute(CSV_FILENAME)
         ? CSV_FILENAME
@@ -545,18 +583,20 @@ export function createAuditTableFromCsv() {
     // Create ReportBuilder instance for generating reports
     const reportBuilder = new ReportBuilder();
 
-    // Process data using the refactored function
-    createAuditTable(rawData, reportBuilder);
+    // Process data: normalize, transform, sort, generate reports
+    processAndAnalyzeOfferingsFromCsv(rawData, reportBuilder);
 }
 
 /**
- * Entry point for database-based audit table creation.
+ * Entry point for database-based offering analysis.
  * Loads offerings from enriched view, normalizes data, transforms to audit rows, and generates reports.
+ * 
+ * PIPELINE: Database → Load → Normalize → Transform → Sort → Generate Reports
  * 
  * USAGE: Preferred method - uses live data from database with proper typing.
  */
-export async function createAuditTableFromDb() {
-    log.info('Starting audit table creation from database');
+export async function analyzeOfferingsFromDb() {
+    log.info('Starting offering analysis from database');
     
     const pool = await db;
     const transaction = pool.transaction();
@@ -585,9 +625,9 @@ export async function createAuditTableFromDb() {
         // Create ReportBuilder instance for generating reports
         const reportBuilder = new ReportBuilder();
 
-        // Process data using the new function (outside of transaction context)
+        // Process data: normalize, transform, sort, generate reports (outside of transaction context)
         // WHY: Data processing doesn't need to be inside transaction - data is already loaded
-        createAuditTableFromEnrichedView(rows, reportBuilder);
+        processAndAnalyzeOfferingsFromDb(rows, reportBuilder);
     } catch (error) {
         log.error('Error loading data from database', { error });
         // Only rollback if transaction hasn't been committed
@@ -614,16 +654,16 @@ export async function createAuditTableFromDb() {
 }
 
 /**
- * Creates audit table from RawOffering array (CSV path).
- * This function normalizes CSV data (strings) to NormalizedOffering format,
- * then uses the core transformation logic.
+ * Processes and analyzes offerings from CSV data.
+ * Normalizes CSV data (strings) to NormalizedOffering format, transforms to audit rows,
+ * sorts by group and price, and generates reports.
  * 
- * PIPELINE: CSV strings → Normalized → Transformed → Sorted → Reports
+ * PIPELINE: CSV strings → Normalize → Transform → Sort → Generate Reports
  * 
  * @param rawData - Array of raw offerings from CSV with string values
  * @param reportBuilder - ReportBuilder instance for generating reports
  */
-export function createAuditTable(rawData: RawOffering[], reportBuilder: ReportBuilder) {
+function processAndAnalyzeOfferingsFromCsv(rawData: RawOffering[], reportBuilder: ReportBuilder) {
     log.info(`Starting transformation of ${rawData.length} raw offerings from CSV`);
     
     // Normalize CSV data (string-to-number conversion)
@@ -648,16 +688,16 @@ export function createAuditTable(rawData: RawOffering[], reportBuilder: ReportBu
 }
 
 /**
- * Creates audit table from OfferingEnrichedView array (DB path).
- * This function normalizes DB data (already typed numbers) to NormalizedOffering format,
- * then uses the core transformation logic. No string parsing needed!
+ * Processes and analyzes offerings from database data.
+ * Normalizes DB data (already typed numbers) to NormalizedOffering format, transforms to audit rows,
+ * sorts by group and price, and generates reports. No string parsing needed!
  * 
- * PIPELINE: DB typed data → Normalized → Transformed → Sorted → Reports
+ * PIPELINE: DB typed data → Normalize → Transform → Sort → Generate Reports
  * 
  * @param enrichedData - Array of enriched offerings from database with typed values
  * @param reportBuilder - ReportBuilder instance for generating reports
  */
-export function createAuditTableFromEnrichedView(enrichedData: OfferingEnrichedView[], reportBuilder: ReportBuilder) {
+function processAndAnalyzeOfferingsFromDb(enrichedData: OfferingEnrichedView[], reportBuilder: ReportBuilder) {
     log.info(`Starting transformation of ${enrichedData.length} enriched offerings from database`);
     
     // Normalize DB data (direct use, no parsing needed)

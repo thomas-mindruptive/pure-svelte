@@ -1,7 +1,7 @@
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { log } from '$lib/utils/logger.js';
-import { createAuditTableFromDb, createAuditTableFromCsv } from './analyze-wholesaler.js';
+import { analyzeOfferingsFromDb, analyzeOfferingsFromCsv } from './analyze-wholesaler.js';
 import { ReportBuilder } from './report-builder.js';
 
 // Workaround für __dirname in ESM
@@ -10,11 +10,11 @@ const __dirname = path.dirname(__filename);
 
 // Script entry point
 // WHY: Execute async function and handle exit properly
-//      If CSV mode is needed, uncomment createAuditTableFromCsv() and comment createAuditTableFromDb()
+//      If CSV mode is needed, uncomment analyzeOfferingsFromCsv() and comment analyzeOfferingsFromDb()
 (async () => {
     try {
-        // createAuditTableFromCsv(); // Uncomment for CSV mode
-        await createAuditTableFromDb();
+        // analyzeOfferingsFromCsv(); // Uncomment for CSV mode
+        await analyzeOfferingsFromDb();
         
         // Explicit exit after successful completion
         // WHY: Ensures Node.js process terminates even if connection pool doesn't close immediately

@@ -107,16 +107,25 @@ export class ReportBuilder {
         
         let md = `# 🕵️ Data Audit Log\n`;
         md += `Generiert: ${now} | Einträge: ${data.length}\n\n`;
-        md += `| ID | Händler (Land) | Produkt | Norm. Preis | Trace |\n`;
-        md += `|---|---|---|---|---|\n`;
+        md += `| ID | Offering ID | Händler (Land) | Produkt | Größe | Gewicht | Norm. Preis | Trace |\n`;
+        md += `|---|---|---|---|---|---|---|---|\n`;
         
         data.forEach(row => {
-            const trace = row.Calculation_Trace.replace(/\|/g, '<br>'); 
+            // Pipes in Calculation_Trace sind Trennzeichen zwischen Trace-Einträgen (z.B. "Bulk Found | Comment | Origin")
+            // Diese werden durch <br> ersetzt für visuelle Trennung in der HTML-Ausgabe
+            // ABER: Echte Newlines in commentExcerpt (aus den Kommentaren) müssen auch durch <br> ersetzt werden,
+            // damit die Markdown-Tabelle nicht bricht
+            const trace = row.Calculation_Trace
+                .replace(/[\r\n]+/g, '<br>')  // Echte Newlines aus Kommentaren durch <br> ersetzen
+                .replace(/\|/g, '<br>');      // Pipes als Trennzeichen durch <br> ersetzen
             // WICHTIG: Pipe-Zeichen im Titel ESCAPEN (nicht ersetzen!), damit Markdown-Tabelle nicht bricht
             // Markdown escapt Pipe-Zeichen mit Backslash: | wird zu \|
             const product = row.Product_Title.replace(/\|/g, '\\|');
+            const dimensions = row.Dimensions || '-';
+            const weight = row.Weight_Display || '-';
+            const warningIcon = (row.Dimensions_Warning || row.Weight_Warning || row.Package_Weight_Warning) ? ' ⚠️' : '';
             
-            md += `| ${row.Row_ID} | **${row.Wholesaler}** (${row.Origin_Country}) | ${product} | **${row.Final_Normalized_Price.toFixed(2)}** ${row.Unit} | <small>${trace}</small> |\n`;
+            md += `| ${row.Row_ID} | ${row.Offering_ID} | **${row.Wholesaler}** (${row.Origin_Country}) | ${product} | ${dimensions}${warningIcon} | ${weight}${warningIcon} | **${row.Final_Normalized_Price.toFixed(2)}** ${row.Unit} | <small>${trace}</small> |\n`;
         });
 
         return md;
@@ -209,8 +218,8 @@ export class ReportBuilder {
             md += `*Vergleichsbasis: ${winner.Unit}*\n\n`;
 
             // Tabelle Header
-            md += `| Rang | Händler | Herkunft | Produkt | Preis (Norm.) | vs. Winner | Info |\n`;
-            md += `|:---:|---|:---:|---|---|---|---|\n`;
+            md += `| Rang | Offering ID | Händler | Herkunft | Produkt | Größe | Gewicht | Preis (Norm.) | vs. Winner | Info |\n`;
+            md += `|:---:|:-----------:|---------|:-------:|---------|-------|---------|---------------|------------|------|\n`;
 
             // --- SCHLEIFE ÜBER ALLE ANGEBOTE ---
             candidates.forEach((row, index) => {
@@ -245,8 +254,136 @@ export class ReportBuilder {
                 //        würden die Markdown-Tabelle zerbrechen, da | als Spaltentrenner verwendet wird
                 // LÖSUNG: Escapen mit Backslash - | wird zu \| (wird in Markdown als normales Zeichen angezeigt)
                 const productTitle = row.Product_Title.replace(/\|/g, '\\|');
+                const dimensions = row.Dimensions || '-';
+                const weight = row.Weight_Display || '-';
+                const warningIcon = (row.Dimensions_Warning || row.Weight_Warning || row.Package_Weight_Warning) ? ' ⚠️' : '';
                 
-                md += `| ${rankDisplay} | ${row.Wholesaler} | ${row.Origin_Country} | ${productTitle} | ${priceDisplay} | ${diffStr} | ${info.join(' ')} |\n`;
+                md += `| ${rankDisplay} | ${row.Offering_ID} | ${row.Wholesaler} | ${row.Origin_Country} | ${productTitle} | ${dimensions}${warningIcon} | ${weight}${warningIcon} | ${priceDisplay} | ${diffStr} | ${info.join(' ')} |\n`;
+            });
+
+            md += `\n---\n`;
+        });
+
+        return md;
+    }
+
+    /**
+     * Builds the best-buy report grouped by stone/material only (for quick overview per stone).
+     * Groups all offerings by Material (Stein), then by Form, showing all offerings in a drill-down style table.
+     * @param data - Array of audit rows
+     * @returns Markdown string for best-buy report by stone
+     */
+    buildBestBuyByStoneMarkdown(data: AuditRow[]): string {
+        const now = new Date().toISOString().split('T')[0];
+
+        // Helper function to extract material (stone) from Group_Key
+        // Group_Key format: "ProductType > Material > Form"
+        const extractMaterial = (groupKey: string): string => {
+            const parts = groupKey.split(' > ');
+            return parts.length >= 2 ? parts[1] : groupKey; // Fallback to full key if format unexpected
+        };
+
+        // Helper function to extract form from Group_Key
+        const extractForm = (groupKey: string): string => {
+            const parts = groupKey.split(' > ');
+            return parts.length >= 3 ? parts[2] : '';
+        };
+
+        // Helper function to extract product type from Group_Key
+        const extractProductType = (groupKey: string): string => {
+            const parts = groupKey.split(' > ');
+            return parts.length >= 1 ? parts[0] : '';
+        };
+
+        // 1. Gruppieren nach Material (Stein), dann nach Form
+        const stoneGroups: Record<string, Record<string, AuditRow[]>> = {};
+        data.forEach(row => {
+            // Fehler und irrelevante Preise filtern
+            if (row.Unit === 'ERR' || row.Final_Normalized_Price > 900000) return;
+            
+            const material = extractMaterial(row.Group_Key);
+            const form = extractForm(row.Group_Key);
+            
+            if (!stoneGroups[material]) stoneGroups[material] = {};
+            if (!stoneGroups[material][form]) stoneGroups[material][form] = [];
+            stoneGroups[material][form].push(row);
+        });
+
+        // 2. Header
+        let md = `# 🏆 Best Price Report by Stone (${now})\n\n`;
+        md += `Schnelle Übersicht: Angebote gruppiert nach Stein/Material.\n\n`;
+        md += `> **Hinweis:** Diese Übersicht gruppiert nach Material (Stein). Für detaillierte Vergleiche nach Use-Case siehe \`best_buy_report.md\`.\n\n`;
+
+        // 3. Stein-Gruppen durchgehen (nach Material sortiert)
+        const sortedStones = Object.keys(stoneGroups).sort();
+
+        sortedStones.forEach(stone => {
+            const formGroups = stoneGroups[stone];
+            const sortedForms = Object.keys(formGroups).sort();
+
+            // Start erste Tabelle für diesen Stein
+            md += `## 💎 ${stone}\n\n`;
+
+            // Tabelle Header (nur einmal pro Stein)
+            md += `| Stein | Form | Offering ID | Rang | Händler | Herkunft | Produkttyp | Produkt | Größe | Gewicht | Preis (Norm.) | vs. Winner | Info |\n`;
+            md += `|-------|------|:-----------:|:---:|---------|:-------:|------------|---------|-------|---------|---------------|------------|------|\n`;
+
+            // Durch alle Formen gehen und Zeilen hinzufügen
+            sortedForms.forEach(form => {
+                const candidates = formGroups[form];
+                
+                // Sortieren: Billigster zuerst
+                candidates.sort((a, b) => a.Final_Normalized_Price - b.Final_Normalized_Price);
+                
+                if (candidates.length === 0) return;
+                
+                // Der Gewinner (günstigstes Angebot für diese Form)
+                const winner = candidates[0];
+                
+                // Zeilen für diese Form hinzufügen
+                candidates.forEach((row, index) => {
+                    let rankDisplay = `${index + 1}.`;
+                    if (index === 0) rankDisplay = '🏆 1';
+                    else if (index === 1) rankDisplay = '🥈 2';
+                    else if (index === 2) rankDisplay = '🥉 3';
+                    
+                    // Diff berechnen
+                    let diffStr = '-';
+                    if (index > 0) {
+                        const diffPct = ((row.Final_Normalized_Price - winner.Final_Normalized_Price) / winner.Final_Normalized_Price) * 100;
+                        const indicator = diffPct > 100 ? '🔺' : '+'; 
+                        diffStr = `${indicator}${diffPct.toFixed(0)}%`;
+                    }
+
+                    // Extract ProductType from Group_Key
+                    const productType = extractProductType(row.Group_Key);
+
+                    // Info-Spalte Icons
+                    let info = [];
+                    if (row.Calculation_Trace.includes('Bulk')) info.push('📦 Bulk');
+                    if (row.Calculation_Trace.includes('Regex')) info.push('⚖️ Calc.W.');
+                    if (!['DE', 'AT', 'NL'].includes(row.Origin_Country) && row.Origin_Country !== 'UNKNOWN') {
+                        info.push(`🌍 ${row.Origin_Country}`);
+                    }
+                    const warningIcon = (row.Dimensions_Warning || row.Weight_Warning || row.Package_Weight_Warning) ? ' ⚠️' : '';
+                    if (warningIcon) info.push('⚠️');
+
+                    // Preis Formatierung (Gewinner fett)
+                    const priceDisplay = index === 0 
+                        ? `**${row.Final_Normalized_Price.toFixed(2)}**`
+                        : `${row.Final_Normalized_Price.toFixed(2)}`;
+                    
+                    // Pipe-Zeichen im Titel ESCAPEN
+                    const productTitle = row.Product_Title.replace(/\|/g, '\\|');
+                    const dimensions = row.Dimensions || '-';
+                    const weight = row.Weight_Display || '-';
+                    
+                    // Stein und Form nur in der ersten Zeile einer Gruppe
+                    const showStone = index === 0 ? stone : '';
+                    const showForm = index === 0 ? form : '';
+                    
+                    md += `| ${showStone} | ${showForm} | ${row.Offering_ID} | ${rankDisplay} | ${row.Wholesaler} | ${row.Origin_Country} | ${productType} | ${productTitle} | ${dimensions}${warningIcon} | ${weight}${warningIcon} | ${priceDisplay} | ${diffStr} | ${info.join(' ')} |\n`;
+                });
             });
 
             md += `\n---\n`;
@@ -265,6 +402,7 @@ export class ReportBuilder {
         // Build reports using builder methods
         const auditMarkdown = this.buildAuditMarkdown(sortedData);
         const bestBuyMarkdown = this.buildBestBuyMarkdown(sortedData);
+        const bestBuyByStoneMarkdown = this.buildBestBuyByStoneMarkdown(sortedData);
 
         log.info('Reports generated, saving files...');
 
@@ -274,6 +412,7 @@ export class ReportBuilder {
         // Save report files
         saveReportFile('audit_log.md', auditMarkdown);
         saveReportFile('best_buy_report.md', bestBuyMarkdown);
+        saveReportFile('best_buy_report_by_stone.md', bestBuyByStoneMarkdown);
 
         log.info('Reports saved successfully');
     }

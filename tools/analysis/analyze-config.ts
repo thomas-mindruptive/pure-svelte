@@ -49,14 +49,19 @@ export interface RawOffering {
     offeringWeightGrams: string;
     offeringComment: string;
     offeringSize: string;
-    offeringPackaging: string; 
+    offeringPackaging: string;
+    offeringDimensions?: string;
+    offeringWeightRange?: string;
+    offeringPackageWeight?: string;
+    offeringId?: string;
     // Weitere Felder sind optional, da für Preisberechnung nicht kritisch
-    [key: string]: string; 
+    [key: string]: string | undefined; 
 }
 
 // Das Ergebnis einer einzelnen analysierten Zeile
 export interface AuditRow {
     Row_ID: string;
+    Offering_ID: number;     // Offering ID für direkte Referenz
     Group_Key: string;      // UseCase > Material > Form
     Wholesaler: string;
     Origin_Country: string;
@@ -70,6 +75,16 @@ export interface AuditRow {
     Detected_Bulk_Price: number;
     Detected_Weight_Kg: number | null;
     Applied_Markup_Pct: number; // z.B. 0 oder 25
+    
+    // Größe und Gewicht
+    Dimensions: string | null;      // z.B. "20x50cm", "10-30cm", null
+    Dimensions_Source: string;      // "Field", "Regex (Title)", "None"
+    Dimensions_Warning: string | null; // Warnung wenn nur im Titel gefunden
+    Weight_Display: string | null;  // z.B. "0.25kg", "50-80g", null
+    Weight_Source: string;          // "Weight Range Field", "Weight Grams Field", "Regex (Title/Pack)", "None"
+    Weight_Warning: string | null;  // Warnung wenn nur im Titel gefunden
+    Package_Weight: string | null;  // z.B. "1kg", "500g", null
+    Package_Weight_Warning: string | null; // Warnung bei Mismatch oder fehlendem Feld
     
     // Ergebnis
     Final_Normalized_Price: number;

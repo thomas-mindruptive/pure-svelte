@@ -494,11 +494,11 @@ export function transformOfferingsToAuditRows(normalizedOfferings: NormalizedOff
             // show descriptive message with offering ID so the data issue can be quickly fixed
             const materialDisplay = row.finalMaterialName 
                 ? row.finalMaterialName 
-                : `<no material in product def and offering>[ID:${row.offeringId}]`;
+                : `[no mat]`;
             
             const formDisplay = row.finalFormName 
                 ? row.finalFormName 
-                : `<no form in product def and offering>[ID:${row.offeringId}]`;
+                : `[no form]`;
 
             // Build result object
             return {

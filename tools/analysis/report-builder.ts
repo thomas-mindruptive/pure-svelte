@@ -309,24 +309,24 @@ export class ReportBuilder {
             stoneGroups[material][form].push(row);
         });
 
-        // 2. Header
+        // 2. Header - EINE große Tabelle für alle Steine
         let md = `# 🏆 Best Price Report by Stone (${now})\n\n`;
         md += `Schnelle Übersicht: Angebote gruppiert nach Stein/Material.\n\n`;
         md += `> **Hinweis:** Diese Übersicht gruppiert nach Material (Stein). Für detaillierte Vergleiche nach Use-Case siehe \`best_buy_report.md\`.\n\n`;
 
-        // 3. Stein-Gruppen durchgehen (nach Material sortiert)
+        // 3. EINE Tabelle für alle Steine (Drill-Down-Stil)
+        md += `| Stein | Produkttyp | Form | Offering ID | Rang | Händler | Herkunft | Produkt | Größe | Gewicht | Preis (Norm.) | vs. Winner | Info |\n`;
+        md += `|-------|------------|------|:-----------:|:---:|---------|:-------:|---------|-------|---------|---------------|------------|------|\n`;
+
+        // 4. Stein-Gruppen durchgehen (nach Material sortiert) - ALLE in EINE Tabelle
         const sortedStones = Object.keys(stoneGroups).sort();
+        let lastStone = '';
+        let lastProductType = '';
+        let lastForm = '';
 
         sortedStones.forEach(stone => {
             const formGroups = stoneGroups[stone];
             const sortedForms = Object.keys(formGroups).sort();
-
-            // Start erste Tabelle für diesen Stein
-            md += `## 💎 ${stone}\n\n`;
-
-            // Tabelle Header (nur einmal pro Stein)
-            md += `| Stein | Form | Offering ID | Rang | Händler | Herkunft | Produkttyp | Produkt | Größe | Gewicht | Preis (Norm.) | vs. Winner | Info |\n`;
-            md += `|-------|------|:-----------:|:---:|---------|:-------:|------------|---------|-------|---------|---------------|------------|------|\n`;
 
             // Durch alle Formen gehen und Zeilen hinzufügen
             sortedForms.forEach(form => {
@@ -378,15 +378,24 @@ export class ReportBuilder {
                     const dimensions = row.Dimensions || '-';
                     const weight = row.Weight_Display || '-';
                     
-                    // Stein und Form nur in der ersten Zeile einer Gruppe
-                    const showStone = index === 0 ? stone : '';
-                    const showForm = index === 0 ? form : '';
+                    // Drill-Down: Stein, Produkttyp und Form nur in der ersten Zeile einer neuen Gruppe
+                    const isNewStone = (stone !== lastStone);
+                    const isNewProductType = (productType !== lastProductType || isNewStone);
+                    const isNewForm = (form !== lastForm || isNewStone);
+                    const showStone = (index === 0 && isNewStone) ? stone : '';
+                    const showProductType = (index === 0 && isNewProductType) ? productType : '';
+                    const showForm = (index === 0 && isNewForm) ? form : '';
                     
-                    md += `| ${showStone} | ${showForm} | ${row.Offering_ID} | ${rankDisplay} | ${row.Wholesaler} | ${row.Origin_Country} | ${productType} | ${productTitle} | ${dimensions}${warningIcon} | ${weight}${warningIcon} | ${priceDisplay} | ${diffStr} | ${info.join(' ')} |\n`;
+                    // Update lastStone, lastProductType und lastForm NUR nach der ersten Zeile einer neuen Gruppe
+                    if (index === 0) {
+                        if (isNewStone) lastStone = stone;
+                        if (isNewProductType) lastProductType = productType;
+                        if (isNewForm) lastForm = form;
+                    }
+                    
+                    md += `| ${showStone} | ${showProductType} | ${showForm} | ${row.Offering_ID} | ${rankDisplay} | ${row.Wholesaler} | ${row.Origin_Country} | ${productTitle} | ${dimensions}${warningIcon} | ${weight}${warningIcon} | ${priceDisplay} | ${diffStr} | ${info.join(' ')} |\n`;
                 });
             });
-
-            md += `\n---\n`;
         });
 
         return md;

@@ -4,6 +4,7 @@ import { type AuditRow, OUTPUT_DIR } from './analyze-config.js';
 
 /**
  * Speichert einen beliebigen Text-Inhalt in eine Datei im Report-Ordner.
+ * Überschreibt bestehende Dateien.
  */
 export function saveReportFile(filename: string, content: string) {
     if (!fs.existsSync(OUTPUT_DIR)) {
@@ -11,7 +12,8 @@ export function saveReportFile(filename: string, content: string) {
     }
 
     const fullPath = path.join(OUTPUT_DIR, filename);
-    fs.writeFileSync(fullPath, content, 'utf-8');
+    // Explizit mit 'w' Flag überschreiben (überschreibt bestehende Dateien)
+    fs.writeFileSync(fullPath, content, { encoding: 'utf-8', flag: 'w' });
     
     console.log(`✅ Report gespeichert: ${fullPath}`);
 }

@@ -28,6 +28,7 @@ export const STRATEGY_MAP: Record<string, 'WEIGHT' | 'UNIT' | 'AUTO'> = {
     'Anhänger': 'UNIT',
     'Pendel': 'UNIT',
     'Massagestab/Griffel': 'UNIT',
+    'Ständer': 'UNIT',
     'Halbedelstein': 'AUTO'         
 };
 
@@ -69,6 +70,8 @@ export interface AuditRow {
 
     // Eingabewerte
     Raw_Price_List: number;
+    Offering_Price: number; // Original offering.price from CSV/DB
+    Offering_Price_Per_Piece: number | null; // Original offering.price_per_piece from CSV/DB
     Raw_Weight_Input: string;
 
     // Erkannte / Berechnete Werte
@@ -89,6 +92,10 @@ export interface AuditRow {
     // Ergebnis
     Final_Normalized_Price: number;
     Unit: '€/kg' | '€/Stk' | 'ERR';
+    
+    // Berechnungsmethode für Tooltips
+    Calculation_Method: 'BULK' | 'EXACT' | 'RANGE' | 'CALC' | 'UNIT' | 'ERR';
+    Calculation_Tooltip: string;
 
     // Der Trace String (für Tooltips/Debugging)
     Calculation_Trace: string; 

@@ -107,8 +107,8 @@ export class ReportBuilder {
         
         let md = `# 🕵️ Data Audit Log\n`;
         md += `Generiert: ${now} | Einträge: ${data.length}\n\n`;
-        md += `| ID | Offering ID | Händler (Land) | Produkt | Größe | Gewicht | Norm. Preis | Trace |\n`;
-        md += `|---|---|---|---|---|---|---|---|\n`;
+        md += `| ID | Offering ID | Händler (Land) | Produkt | Größe | Gewicht | Price | Price/Piece | Norm. Preis | Trace |\n`;
+        md += `|---|---|---|---|---|---|---|---|---|---|\n`;
         
         data.forEach(row => {
             // Pipes in Calculation_Trace sind Trennzeichen zwischen Trace-Einträgen (z.B. "Bulk Found | Comment | Origin")
@@ -124,8 +124,10 @@ export class ReportBuilder {
             const dimensions = row.Dimensions || '-';
             const weight = row.Weight_Display || '-';
             const warningIcon = (row.Dimensions_Warning || row.Weight_Warning || row.Package_Weight_Warning) ? ' ⚠️' : '';
+            const offeringPrice = row.Offering_Price.toFixed(2);
+            const offeringPricePerPiece = row.Offering_Price_Per_Piece !== null ? row.Offering_Price_Per_Piece.toFixed(2) : '-';
             
-            md += `| ${row.Row_ID} | ${row.Offering_ID} | **${row.Wholesaler}** (${row.Origin_Country}) | ${product} | ${dimensions}${warningIcon} | ${weight}${warningIcon} | **${row.Final_Normalized_Price.toFixed(2)}** ${row.Unit} | <small>${trace}</small> |\n`;
+            md += `| ${row.Row_ID} | ${row.Offering_ID} | **${row.Wholesaler}** (${row.Origin_Country}) | ${product} | ${dimensions}${warningIcon} | ${weight}${warningIcon} | ${offeringPrice} | ${offeringPricePerPiece} | **${row.Final_Normalized_Price.toFixed(2)}** ${row.Unit} | <small>${trace}</small> |\n`;
         });
 
         return md;
@@ -218,8 +220,8 @@ export class ReportBuilder {
             md += `*Vergleichsbasis: ${winner.Unit}*\n\n`;
 
             // Tabelle Header
-            md += `| Rang | Offering ID | Händler | Herkunft | Produkt | Größe | Gewicht | Preis (Norm.) | vs. Winner | Info |\n`;
-            md += `|:---:|:-----------:|---------|:-------:|---------|-------|---------|---------------|------------|------|\n`;
+            md += `| Rang | Offering ID | Händler | Herkunft | Produkt | Größe | Gewicht | Price | Price/Piece  | Preis (Norm.) | vs. Winner | Info |\n`;
+            md += `|:---:|:-----------:|---------|:-------:|---------|-------|---------|----------------|-------------------------|---------------|------------|------|\n`;
 
             // --- SCHLEIFE ÜBER ALLE ANGEBOTE ---
             candidates.forEach((row, index) => {
@@ -257,8 +259,10 @@ export class ReportBuilder {
                 const dimensions = row.Dimensions || '-';
                 const weight = row.Weight_Display || '-';
                 const warningIcon = (row.Dimensions_Warning || row.Weight_Warning || row.Package_Weight_Warning) ? ' ⚠️' : '';
+                const offeringPrice = row.Offering_Price.toFixed(2);
+                const offeringPricePerPiece = row.Offering_Price_Per_Piece !== null ? row.Offering_Price_Per_Piece.toFixed(2) : '-';
                 
-                md += `| ${rankDisplay} | ${row.Offering_ID} | ${row.Wholesaler} | ${row.Origin_Country} | ${productTitle} | ${dimensions}${warningIcon} | ${weight}${warningIcon} | ${priceDisplay} | ${diffStr} | ${info.join(' ')} |\n`;
+                md += `| ${rankDisplay} | ${row.Offering_ID} | ${row.Wholesaler} | ${row.Origin_Country} | ${productTitle} | ${dimensions}${warningIcon} | ${weight}${warningIcon} | ${offeringPrice} | ${offeringPricePerPiece} | ${priceDisplay} | ${diffStr} | ${info.join(' ')} |\n`;
             });
 
             md += `\n---\n`;
@@ -315,8 +319,8 @@ export class ReportBuilder {
         md += `> **Hinweis:** Diese Übersicht gruppiert nach Material (Stein). Für detaillierte Vergleiche nach Use-Case siehe \`best_buy_report.md\`.\n\n`;
 
         // 3. EINE Tabelle für alle Steine (Drill-Down-Stil)
-        md += `| Stein | Produkttyp | Form | Offering ID | Rang | Händler | Herkunft | Produkt | Größe | Gewicht | Preis (Norm.) | vs. Winner | Info |\n`;
-        md += `|-------|------------|------|:-----------:|:---:|---------|:-------:|---------|-------|---------|---------------|------------|------|\n`;
+        md += `| Stein | Produkttyp | Form | Offering ID | Rang | Händler | Herkunft | Produkt | Größe | Gewicht | Price | Price/Piece  | Preis (Norm.) | vs. Winner | Info |\n`;
+        md += `|-------|------------|------|:-----------:|:---:|---------|:-------:|---------|-------|---------|----------------|-------------------------|---------------|------------|------|\n`;
 
         // 4. Stein-Gruppen durchgehen (nach Material sortiert) - ALLE in EINE Tabelle
         const sortedStones = Object.keys(stoneGroups).sort();
@@ -377,6 +381,8 @@ export class ReportBuilder {
                     const productTitle = row.Product_Title.replace(/\|/g, '\\|');
                     const dimensions = row.Dimensions || '-';
                     const weight = row.Weight_Display || '-';
+                    const offeringPrice = row.Offering_Price.toFixed(2);
+                    const offeringPricePerPiece = row.Offering_Price_Per_Piece !== null ? row.Offering_Price_Per_Piece.toFixed(2) : '-';
                     
                     // Drill-Down: Stein, Produkttyp und Form nur in der ersten Zeile einer neuen Gruppe
                     const isNewStone = (stone !== lastStone);
@@ -393,7 +399,7 @@ export class ReportBuilder {
                         if (isNewForm) lastForm = form;
                     }
                     
-                    md += `| ${showStone} | ${showProductType} | ${showForm} | ${row.Offering_ID} | ${rankDisplay} | ${row.Wholesaler} | ${row.Origin_Country} | ${productTitle} | ${dimensions}${warningIcon} | ${weight}${warningIcon} | ${priceDisplay} | ${diffStr} | ${info.join(' ')} |\n`;
+                    md += `| ${showStone} | ${showProductType} | ${showForm} | ${row.Offering_ID} | ${rankDisplay} | ${row.Wholesaler} | ${row.Origin_Country} | ${productTitle} | ${dimensions}${warningIcon} | ${weight}${warningIcon} | ${offeringPrice} | ${offeringPricePerPiece} | ${priceDisplay} | ${diffStr} | ${info.join(' ')} |\n`;
                 });
             });
         });

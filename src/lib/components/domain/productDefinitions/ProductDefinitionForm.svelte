@@ -123,25 +123,44 @@
   // === BUSINESS LOGIC ===========================================================================
 
   function validate(rawData: Record<string, any>): ValidateResult<ProductDefinition> {
+    log.detdebug(`[ProductDefinitionForm] validate called`, {
+      isCreateMode,
+      hasId: "product_def_id" in rawData,
+    });
+
     //const prodDef = rawData as ProductDefinition;
 
-    // For this entity, Zod's parsing is sufficient.
-    // We can use a more specific schema if needed (e.g., for create vs. update)
-    if (isCreateMode) {
-      delete rawData.product_def_id;
-    }
+    // ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️
+    // Do NOT mutate the rawData object. It is reactive and will trigger infinite loops in FormShell.
+    // if (isCreateMode) {
+    //   log.warn(`[ProductDefinitionForm] MUTATING rawData: deleting product_def_id`);
+    //   delete rawData.product_def_id;
+    // }
+    // END DO NOT MUTATE rawData ---------------------------
+    // ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️ ⚠️
 
     // TODO: All client form validates should validate against schema ("forCreateMode" and "forUpdateMode").
 
-    const result = ProductDefinitionSchema.partial().safeParse(rawData);
+    // Use omit to exclude ID from validation in create mode instead of deleting property
+    let schema = ProductDefinitionSchema.partial();
+    if (isCreateMode) {
+      // Cast to any or specific ZodObject type if TS complains
+      schema = (schema as any).omit({ product_def_id: true });
+    }
+
+    const result = schema.safeParse(rawData);
+
+    //const result = ProductDefinitionSchema.partial().safeParse(rawData);
 
     // In case we need to add more business val errors, add them here:
     const errors: Errors<ProductDefinition> = {};
     // errors.property = ["XYZ"]
 
     if (result.success) {
+      log.detdebug(`[ProductDefinitionForm] validate successful`, { result });
       return { valid: true, errors };
     }
+    log.detdebug(`[ProductDefinitionForm] validate failed`, { result });
     return { valid: false, errors: result.error.flatten().fieldErrors };
   }
 

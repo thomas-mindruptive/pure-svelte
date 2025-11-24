@@ -1646,6 +1646,71 @@ onMount(() => {
 
 **Reference Implementation:** `src/lib/components/grids/Datagrid.svelte:568-582`
 
+#### Real-World Example 3: The Svelte 5 Proxy Mutation Loop (Delete Trap)
+
+**The Scenario:**
+
+You have a parent form component (`FormShell`) that tracks changes to its data object using an `$effect` to trigger validation. A child component (`ProductDefinitionForm`) performs validation logic on this shared data object.
+
+**The Broken Code:**
+
+```typescript
+// ProductDefinitionForm.svelte
+function validate(rawData: Record<string, any>) {
+  // ❌ BAD: Mutating the reactive object directly
+  if (isCreateMode) {
+     // Even if 'product_def_id' does NOT exist, the delete operator on a 
+     // Svelte 5 Proxy triggers reactivity!
+     delete rawData.product_def_id; 
+  }
+  // ... validation logic
+}
+```
+
+```typescript
+// FormShell.svelte
+$effect(() => {
+   // Tracks keys of formState.data because we read them to check for changes
+   const keys = Object.keys(formState.data); 
+   
+   // Calls validate, which mutates the data (via delete)
+   runValidate(); 
+});
+```
+
+**What happens (detailed walkthrough):**
+
+1. **Effect Runs:** `FormShell`'s `$effect` runs for the first time. It tracks `formState.data` because it reads its keys/properties.
+2. **Validation Call:** The effect calls `runValidate()`, which synchronously calls `validate(formState.data)`.
+3. **Mutation:** `validate` executes `delete rawData.product_def_id`.
+4. **Reactivity Trigger (The Trap):** 
+   - In standard JS, `delete` on a non-existent property is a no-op. 
+   - **In Svelte 5 Runes:** Reactive objects (`$state`) are wrapped in Proxies. The `deleteProperty` trap is triggered *regardless* of whether the property exists.
+   - Svelte marks the object as mutated ("dirty") because a delete operation occurred.
+5. **Loop:** The `$effect` sees that `formState.data` has "changed" (received a mutation signal) and re-runs.
+6. **Repeat:** Step 2-5 repeat infinitely, causing the browser to hang or stack overflow.
+
+**The Fix - Copy Before Mutating:**
+
+```typescript
+// ProductDefinitionForm.svelte
+function validate(rawData: Record<string, any>) {
+  // ✅ GOOD: Create a shallow copy first
+  // This breaks the reactivity chain. We mutate a plain object, not the proxy.
+  const dataToValidate = { ...rawData };
+
+  if (isCreateMode) {
+     // Mutate the copy, not the reactive proxy
+     delete dataToValidate.product_def_id; 
+  }
+  // ... validate dataToValidate
+}
+```
+
+**Key Takeaway:**
+
+Never mutate reactive objects (`$state`, props) inside validation functions or derived calculations if those objects are being tracked by an effect that calls the validation. Always work on a copy. **Svelte 5 Proxies are sensitive to `delete` operations even on missing keys.**
+
 ---
 
 ### Part 3: Additional Critical Pitfalls

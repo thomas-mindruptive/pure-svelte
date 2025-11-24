@@ -238,6 +238,8 @@
     const needsUpdate = (initialKeys.length > 0 && formDataKeys.length === 0) || 
                        (initialHasNestedObjects && !formDataHasNestedObjects);
 
+    log.debug(`[FormShell] $effect running. needsUpdate=${needsUpdate}`, { entity });
+
     if (needsUpdate) {
       log.debug(`[FormShell] Updating formState.data from initial prop`, {
         entity,

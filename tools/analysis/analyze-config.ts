@@ -19,6 +19,14 @@ export const EU_ZONE = new Set([
     'LV', 'LT', 'LU', 'MT', 'NL', 'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE'
 ]);
 
+// Wholesaler-IDs, die von der Analyse ausgeschlossen werden sollen
+export const EXCLUDED_WHOLESALER_IDS: number[] = [99]; // z.B. 99 = pureEnergy
+
+// Zusätzliche Filterbedingungen für die WHERE-Clause
+// Beispiel: Nur Wholesaler mit bestimmter Relevance
+export const ALLOWED_WHOLESALER_RELEVANCES: string[] = ['high', 'medium', 'highest'];
+// Leer lassen, um keine Filterung anzuwenden: []
+
 // Strategie-Mapping: Welcher Use-Case erzwingt welche Berechnung?
 export const STRATEGY_MAP: Record<string, 'WEIGHT' | 'UNIT' | 'AUTO'> = {
     'Wasserenergetisierer': 'WEIGHT',
@@ -40,6 +48,7 @@ export const STRATEGY_MAP: Record<string, 'WEIGHT' | 'UNIT' | 'AUTO'> = {
 export interface RawOffering {
     wholesalerName: string;
     wholesalerId: string;
+    wholesalerRelevance: string;
     wholesalerCountry: string; // Wichtig für Zoll
     productTypeName: string;   // Wichtig für Strategie
     finalMaterialName: string;

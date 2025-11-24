@@ -7,6 +7,8 @@ import {
     CSV_FILENAME,
     IMPORT_MARKUP,
     EU_ZONE,
+    EXCLUDED_WHOLESALER_IDS,
+    ALLOWED_WHOLESALER_RELEVANCES,
     STRATEGY_MAP,
     type RawOffering,
     type AuditRow
@@ -33,6 +35,8 @@ import { db } from '$lib/backendQueries/db.js';
 import { rollbackTransaction } from '$lib/backendQueries/transactionWrapper.js';
 import { log } from '$lib/utils/logger.js';
 import type { OfferingEnrichedView } from '$lib/domain/domainTypes.js';
+import { ComparisonOperator, LogicalOperator } from '$lib/backendQueries/queryGrammar.js';
+import type { WhereCondition, WhereConditionGroup } from '$lib/backendQueries/queryGrammar.js';
 
 // Workaround für __dirname in ESM
 const __filename = fileURLToPath(import.meta.url);
@@ -44,6 +48,8 @@ const __dirname = path.dirname(__filename);
 
 interface NormalizedOffering {
     wholesalerName: string;
+    wholesalerId: number;
+    wholesalerRelevance: string | null;
     wholesalerCountry: string | null;
     productTypeName: string;
     finalMaterialName: string | null; 
@@ -85,8 +91,16 @@ function normalizeRawOffering(row: RawOffering): NormalizedOffering {
         ? parseInt(row.offeringId, 10) || 0
         : 0;
 
+    const wholesalerId = row.wholesalerId && row.wholesalerId !== 'NULL'
+        ? parseInt(row.wholesalerId, 10) || 0
+        : 0;
+
     return {
         wholesalerName: row.wholesalerName,
+        wholesalerId: wholesalerId,
+        wholesalerRelevance: (row.wholesalerRelevance && row.wholesalerRelevance !== 'NULL') 
+            ? row.wholesalerRelevance 
+            : null,
         wholesalerCountry: (row.wholesalerCountry && row.wholesalerCountry !== 'NULL') 
             ? row.wholesalerCountry 
             : null,
@@ -119,6 +133,8 @@ function normalizeRawOffering(row: RawOffering): NormalizedOffering {
 function normalizeEnrichedView(row: OfferingEnrichedView): NormalizedOffering {
     return {
         wholesalerName: row.wholesalerName,
+        wholesalerId: row.wholesalerId,
+        wholesalerRelevance: row.wholesalerRelevance || null,
         wholesalerCountry: row.wholesalerCountry || null,
         productTypeName: row.productTypeName,
         finalMaterialName: row.finalMaterialName || null,
@@ -278,7 +294,19 @@ export function transformOfferingsToAuditRows(normalizedOfferings: NormalizedOff
     log.info(`Starting transformation of ${normalizedOfferings.length} offerings`);
 
     const auditData: AuditRow[] = normalizedOfferings
-        .filter(row => row.wholesalerName !== 'pureEnergy')
+        .filter(row => {
+            // Filter out by name (legacy check)
+            if (row.wholesalerName === 'pureEnergy') return false;
+            // Filter out by ID (additional safety net)
+            if (row.wholesalerId > 0 && EXCLUDED_WHOLESALER_IDS.includes(row.wholesalerId)) return false;
+            // Filter by relevance (if configured)
+            if (ALLOWED_WHOLESALER_RELEVANCES.length > 0) {
+                if (!row.wholesalerRelevance || !ALLOWED_WHOLESALER_RELEVANCES.includes(row.wholesalerRelevance)) {
+                    return false;
+                }
+            }
+            return true;
+        })
         .map((row, index) => {
             const trace: string[] = [];
 
@@ -447,6 +475,55 @@ export function analyzeOfferingsFromCsv() {
     processAndAnalyzeOfferingsFromCsv(rawData, reportBuilder);
 }
 
+/**
+ * Erstellt eine kombinierte WHERE-Bedingung aus allen Config-Filtern.
+ */
+function buildWhereCondition(): WhereCondition<OfferingEnrichedView> | WhereConditionGroup<OfferingEnrichedView> | undefined {
+    const conditions: (WhereCondition<OfferingEnrichedView> | WhereConditionGroup<OfferingEnrichedView>)[] = [];
+    
+    // 1. Exclude wholesaler IDs
+    if (EXCLUDED_WHOLESALER_IDS.length > 0) {
+        conditions.push({
+            key: 'wholesalerId',
+            whereCondOp: ComparisonOperator.NOT_IN,
+            val: EXCLUDED_WHOLESALER_IDS
+        });
+    }
+    
+    // 2. Filter by wholesaler relevance (OR-Gruppe)
+    if (ALLOWED_WHOLESALER_RELEVANCES.length > 0) {
+        const relevanceConditions: WhereCondition<OfferingEnrichedView>[] = 
+            ALLOWED_WHOLESALER_RELEVANCES.map(relevance => ({
+                key: 'wholesalerRelevance',
+                whereCondOp: ComparisonOperator.EQUALS,
+                val: relevance
+            }));
+        
+        if (relevanceConditions.length === 1) {
+            // Nur eine Bedingung, keine OR-Gruppe nötig
+            conditions.push(relevanceConditions[0]);
+        } else if (relevanceConditions.length > 1) {
+            // Mehrere Bedingungen, OR-Gruppe erstellen
+            conditions.push({
+                whereCondOp: LogicalOperator.OR,
+                conditions: relevanceConditions
+            });
+        }
+    }
+    
+    // Kombiniere alle Bedingungen mit AND
+    if (conditions.length === 0) {
+        return undefined;
+    } else if (conditions.length === 1) {
+        return conditions[0];
+    } else {
+        return {
+            whereCondOp: LogicalOperator.AND,
+            conditions: conditions
+        };
+    }
+}
+
 export async function analyzeOfferingsFromDb() {
     log.info('Starting offering analysis from database');
     
@@ -457,7 +534,20 @@ export async function analyzeOfferingsFromDb() {
     try {
         await transaction.begin();
         log.info('Loading enriched offerings from database...');
-        const rows = await loadOfferingsFromEnrichedView(transaction);
+        
+        // Create combined WHERE condition from all filters
+        const whereCondition = buildWhereCondition();
+        
+        if (whereCondition) {
+            if (EXCLUDED_WHOLESALER_IDS.length > 0) {
+                log.info(`Excluding wholesaler IDs from analysis: ${EXCLUDED_WHOLESALER_IDS.join(', ')}`);
+            }
+            if (ALLOWED_WHOLESALER_RELEVANCES.length > 0) {
+                log.info(`Filtering by wholesaler relevance: ${ALLOWED_WHOLESALER_RELEVANCES.join(', ')}`);
+            }
+        }
+        
+        const rows = await loadOfferingsFromEnrichedView(transaction, whereCondition);
         log.info(`Loaded ${rows.length} rows from database`);
 
         if (rows.length === 0) {

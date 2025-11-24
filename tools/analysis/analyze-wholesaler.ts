@@ -11,11 +11,11 @@ import {
     ALLOWED_WHOLESALER_RELEVANCES,
     STRATEGY_MAP,
     type RawOffering,
-    type AuditRow
+    type ReportRow
 } from './analyze-config.js';
 
 // 2. IMPORTS: Report Builder & Output
-import { ReportBuilder } from './report-builder.js';
+import { ReportBuilder } from './md-report-builder.js';
 
 import {
     saveReportFile,
@@ -208,7 +208,7 @@ export function getBestPriceFromNormalized(row: NormalizedOffering, listPrice: n
 function determineEffectiveWeight(row: NormalizedOffering): { 
     weightKg: number | null, 
     source: string, 
-    method: AuditRow['Calculation_Method'],
+    method: ReportRow['Calculation_Method'],
     tooltip: string,
     warning?: string
 } {
@@ -290,10 +290,10 @@ function determineEffectiveWeight(row: NormalizedOffering): {
     return { weightKg: null, source: 'None', method: 'ERR', tooltip: 'Kein Gewicht ermittelbar.' };
 }
 
-export function transformOfferingsToAuditRows(normalizedOfferings: NormalizedOffering[], reportBuilder?: ReportBuilder): AuditRow[] {
+export function transformOfferingsToAuditRows(normalizedOfferings: NormalizedOffering[], reportBuilder?: ReportBuilder): ReportRow[] {
     log.info(`Starting transformation of ${normalizedOfferings.length} offerings`);
 
-    const auditData: AuditRow[] = normalizedOfferings
+    const auditData: ReportRow[] = normalizedOfferings
         .filter(row => {
             // Filter out by name (legacy check)
             if (row.wholesalerName === 'pureEnergy') return false;
@@ -376,8 +376,8 @@ export function transformOfferingsToAuditRows(normalizedOfferings: NormalizedOff
             }
 
             let finalNormalizedPrice = 0;
-            let unitLabel: AuditRow['Unit'] = '€/Stk';
-            let calcMethod: AuditRow['Calculation_Method'] = 'UNIT';
+            let unitLabel: ReportRow['Unit'] = '€/Stk';
+            let calcMethod: ReportRow['Calculation_Method'] = 'UNIT';
             let calcTooltip = '';
 
             if (strategy === 'WEIGHT') {

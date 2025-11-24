@@ -2,7 +2,7 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { log } from '$lib/utils/logger.js';
 import { analyzeOfferingsFromDb, analyzeOfferingsFromCsv } from './analyze-wholesaler.js';
-import { ReportBuilder } from './report-builder.js';
+import { ReportBuilder } from './md-report-builder.js';
 
 // Workaround für __dirname in ESM
 const __filename = fileURLToPath(import.meta.url);

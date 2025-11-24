@@ -69,7 +69,7 @@ export interface RawOffering {
 }
 
 // Das Ergebnis einer einzelnen analysierten Zeile
-export interface AuditRow {
+export interface ReportRow {
     Row_ID: string;
     Offering_ID: number;     // Offering ID für direkte Referenz
     Group_Key: string;      // UseCase > Material > Form

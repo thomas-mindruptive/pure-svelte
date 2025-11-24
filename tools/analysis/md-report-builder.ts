@@ -1,6 +1,22 @@
 import { type ReportRow } from './analyze-config.js';
 import { saveReportFile, printConsoleSummary } from './output.js';
 import { log } from '$lib/utils/logger.js';
+import {
+    groupByGroupKey,
+    groupByStone,
+    groupByProductType,
+    calculateRank,
+    calculateDiff,
+    calculateInfo,
+    extractGroupKeyParts,
+    sortCandidatesByPrice,
+    formatCalcForMarkdown
+} from './report-grouping.js';
+import {
+    exportBestBuyReportToCsv,
+    exportBestBuyByStoneToCsv,
+    exportBestBuyByProductTypeToCsv
+} from './csv-report-builder.js';
 
 /**
  * ReportBuilder class for generating markdown reports with legend support.
@@ -142,15 +158,8 @@ export class ReportBuilder {
     buildBestBuyMarkdown(data: ReportRow[]): string {
         const now = new Date().toISOString().split('T')[0];
 
-        // 1. Gruppieren
-        const groups: Record<string, ReportRow[]> = {};
-        data.forEach(row => {
-            // Fehler und irrelevante Preise filtern
-            if (row.Unit === 'ERR' || row.Final_Normalized_Price > 900000) return;
-            
-            if (!groups[row.Group_Key]) groups[row.Group_Key] = [];
-            groups[row.Group_Key].push(row);
-        });
+        // 1. Gruppieren (nutze report-grouping.ts)
+        const { groups, sortedKeys } = groupByGroupKey(data);
 
         // 2. Header
         let md = `# 🏆 Best Price Report (${now})\n\n`;
@@ -202,13 +211,8 @@ export class ReportBuilder {
         }
 
         // 4. Gruppen durchgehen
-        const sortedKeys = Object.keys(groups).sort();
-
         sortedKeys.forEach(key => {
-            const candidates = groups[key];
-            
-            // Sortieren: Billigster zuerst
-            candidates.sort((a, b) => a.Final_Normalized_Price - b.Final_Normalized_Price);
+            const candidates = sortCandidatesByPrice(groups[key]);
             
             if (candidates.length === 0) return;
             
@@ -220,31 +224,14 @@ export class ReportBuilder {
             md += `*Vergleichsbasis: ${winner.Unit}*\n\n`;
 
             // Tabelle Header
-            md += `| Rang | Offering ID | Händler | Herkunft | Produkt | Größe | Gewicht | Price | Price/Piece  | Preis (Norm.) | vs. Winner | Info |\n`;
-            md += `|:---:|:-----------:|---------|:-------:|---------|-------|---------|----------------|-------------------------|---------------|------------|------|\n`;
+            md += `| Rang | Offering ID | Händler | Herkunft | Produkt | Größe | Gewicht | Price | Price/Piece  | Preis (Norm.) | Calc | vs. Winner | Info |\n`;
+            md += `|:---:|:-----------:|---------|:-------:|---------|-------|---------|----------------|-------------------------|---------------|------|------------|------|\n`;
 
             // --- SCHLEIFE ÜBER ALLE ANGEBOTE ---
             candidates.forEach((row, index) => {
-                let rankDisplay = `${index + 1}.`;
-                if (index === 0) rankDisplay = '🏆 1';
-                else if (index === 1) rankDisplay = '🥈 2';
-                else if (index === 2) rankDisplay = '🥉 3';
-                
-                // Diff berechnen
-                let diffStr = '-';
-                if (index > 0) {
-                    const diffPct = ((row.Final_Normalized_Price - winner.Final_Normalized_Price) / winner.Final_Normalized_Price) * 100;
-                    const indicator = diffPct > 100 ? '🔺' : '+'; 
-                    diffStr = `${indicator}${diffPct.toFixed(0)}%`;
-                }
-
-                // Info-Spalte Icons
-                let info = [];
-                if (row.Calculation_Trace.includes('Bulk')) info.push('📦 Bulk');
-                if (row.Calculation_Trace.includes('Regex')) info.push('⚖️ Calc.W.');
-                if (!['DE', 'AT', 'NL'].includes(row.Origin_Country) && row.Origin_Country !== 'UNKNOWN') {
-                    info.push(`🌍 ${row.Origin_Country}`);
-                }
+                const rankDisplay = calculateRank(index);
+                const diffStr = calculateDiff(row, winner, index);
+                const info = calculateInfo(row);
 
                 // Preis Formatierung (Gewinner fett)
                 const priceDisplay = index === 0 
@@ -261,8 +248,9 @@ export class ReportBuilder {
                 const warningIcon = (row.Dimensions_Warning || row.Weight_Warning || row.Package_Weight_Warning) ? ' ⚠️' : '';
                 const offeringPrice = row.Offering_Price.toFixed(2);
                 const offeringPricePerPiece = row.Offering_Price_Per_Piece !== null ? row.Offering_Price_Per_Piece.toFixed(2) : '-';
+                const calcDisplay = formatCalcForMarkdown(row);
                 
-                md += `| ${rankDisplay} | ${row.Offering_ID} | ${row.Wholesaler} | ${row.Origin_Country} | ${productTitle} | ${dimensions}${warningIcon} | ${weight}${warningIcon} | ${offeringPrice} | ${offeringPricePerPiece} | ${priceDisplay} | ${diffStr} | ${info.join(' ')} |\n`;
+                md += `| ${rankDisplay} | ${row.Offering_ID} | ${row.Wholesaler} | ${row.Origin_Country} | ${productTitle} | ${dimensions}${warningIcon} | ${weight}${warningIcon} | ${offeringPrice} | ${offeringPricePerPiece} | ${priceDisplay} | ${calcDisplay} | ${diffStr} | ${info.join(' ')} |\n`;
             });
 
             md += `\n---\n`;
@@ -280,38 +268,8 @@ export class ReportBuilder {
     buildBestBuyByStoneMarkdown(data: ReportRow[]): string {
         const now = new Date().toISOString().split('T')[0];
 
-        // Helper function to extract material (stone) from Group_Key
-        // Group_Key format: "ProductType > Material > Form"
-        const extractMaterial = (groupKey: string): string => {
-            const parts = groupKey.split(' > ');
-            return parts.length >= 2 ? parts[1] : groupKey; // Fallback to full key if format unexpected
-        };
-
-        // Helper function to extract form from Group_Key
-        const extractForm = (groupKey: string): string => {
-            const parts = groupKey.split(' > ');
-            return parts.length >= 3 ? parts[2] : '';
-        };
-
-        // Helper function to extract product type from Group_Key
-        const extractProductType = (groupKey: string): string => {
-            const parts = groupKey.split(' > ');
-            return parts.length >= 1 ? parts[0] : '';
-        };
-
-        // 1. Gruppieren nach Material (Stein), dann nach Form
-        const stoneGroups: Record<string, Record<string, ReportRow[]>> = {};
-        data.forEach(row => {
-            // Fehler und irrelevante Preise filtern
-            if (row.Unit === 'ERR' || row.Final_Normalized_Price > 900000) return;
-            
-            const material = extractMaterial(row.Group_Key);
-            const form = extractForm(row.Group_Key);
-            
-            if (!stoneGroups[material]) stoneGroups[material] = {};
-            if (!stoneGroups[material][form]) stoneGroups[material][form] = [];
-            stoneGroups[material][form].push(row);
-        });
+        // 1. Gruppieren nach Material (Stein), dann nach Form (nutze report-grouping.ts)
+        const { stoneGroups, sortedStones } = groupByStone(data);
 
         // 2. Header - EINE große Tabelle für alle Steine
         let md = `# 🏆 Best Price Report by Stone (${now})\n\n`;
@@ -319,11 +277,10 @@ export class ReportBuilder {
         md += `> **Hinweis:** Diese Übersicht gruppiert nach Material (Stein). Für detaillierte Vergleiche nach Use-Case siehe \`best_buy_report.md\`.\n\n`;
 
         // 3. EINE Tabelle für alle Steine (Drill-Down-Stil)
-        md += `| Stein | Produkttyp | Form | Offering ID | Rang | Händler | Herkunft | Produkt | Größe | Gewicht | Price | Price/Piece  | Preis (Norm.) | vs. Winner | Info |\n`;
-        md += `|-------|------------|------|:-----------:|:---:|---------|:-------:|---------|-------|---------|----------------|-------------------------|---------------|------------|------|\n`;
+        md += `| Stein | Produkttyp | Form | Offering ID | Rang | Händler | Herkunft | Produkt | Größe | Gewicht | Price | Price/Piece  | Preis (Norm.) | Calc | vs. Winner | Info |\n`;
+        md += `|-------|------------|------|:-----------:|:---:|---------|:-------:|---------|-------|---------|----------------|-------------------------|---------------|------|------------|------|\n`;
 
         // 4. Stein-Gruppen durchgehen (nach Material sortiert) - ALLE in EINE Tabelle
-        const sortedStones = Object.keys(stoneGroups).sort();
         let lastStone = '';
         let lastProductType = '';
         let lastForm = '';
@@ -334,10 +291,7 @@ export class ReportBuilder {
 
             // Durch alle Formen gehen und Zeilen hinzufügen
             sortedForms.forEach(form => {
-                const candidates = formGroups[form];
-                
-                // Sortieren: Billigster zuerst
-                candidates.sort((a, b) => a.Final_Normalized_Price - b.Final_Normalized_Price);
+                const candidates = sortCandidatesByPrice(formGroups[form]);
                 
                 if (candidates.length === 0) return;
                 
@@ -346,31 +300,11 @@ export class ReportBuilder {
                 
                 // Zeilen für diese Form hinzufügen
                 candidates.forEach((row, index) => {
-                    let rankDisplay = `${index + 1}.`;
-                    if (index === 0) rankDisplay = '🏆 1';
-                    else if (index === 1) rankDisplay = '🥈 2';
-                    else if (index === 2) rankDisplay = '🥉 3';
-                    
-                    // Diff berechnen
-                    let diffStr = '-';
-                    if (index > 0) {
-                        const diffPct = ((row.Final_Normalized_Price - winner.Final_Normalized_Price) / winner.Final_Normalized_Price) * 100;
-                        const indicator = diffPct > 100 ? '🔺' : '+'; 
-                        diffStr = `${indicator}${diffPct.toFixed(0)}%`;
-                    }
-
-                    // Extract ProductType from Group_Key
-                    const productType = extractProductType(row.Group_Key);
-
-                    // Info-Spalte Icons
-                    let info = [];
-                    if (row.Calculation_Trace.includes('Bulk')) info.push('📦 Bulk');
-                    if (row.Calculation_Trace.includes('Regex')) info.push('⚖️ Calc.W.');
-                    if (!['DE', 'AT', 'NL'].includes(row.Origin_Country) && row.Origin_Country !== 'UNKNOWN') {
-                        info.push(`🌍 ${row.Origin_Country}`);
-                    }
-                    const warningIcon = (row.Dimensions_Warning || row.Weight_Warning || row.Package_Weight_Warning) ? ' ⚠️' : '';
-                    if (warningIcon) info.push('⚠️');
+                    const rankDisplay = calculateRank(index);
+                    const diffStr = calculateDiff(row, winner, index);
+                    const parts = extractGroupKeyParts(row.Group_Key);
+                    const productType = parts.productType;
+                    const info = calculateInfo(row);
 
                     // Preis Formatierung (Gewinner fett)
                     const priceDisplay = index === 0 
@@ -381,8 +315,10 @@ export class ReportBuilder {
                     const productTitle = row.Product_Title.replace(/\|/g, '\\|');
                     const dimensions = row.Dimensions || '-';
                     const weight = row.Weight_Display || '-';
+                    const warningIcon = (row.Dimensions_Warning || row.Weight_Warning || row.Package_Weight_Warning) ? ' ⚠️' : '';
                     const offeringPrice = row.Offering_Price.toFixed(2);
                     const offeringPricePerPiece = row.Offering_Price_Per_Piece !== null ? row.Offering_Price_Per_Piece.toFixed(2) : '-';
+                    const calcDisplay = formatCalcForMarkdown(row);
                     
                     // Drill-Down: Stein, Produkttyp und Form nur in der ersten Zeile einer neuen Gruppe
                     const isNewStone = (stone !== lastStone);
@@ -399,7 +335,94 @@ export class ReportBuilder {
                         if (isNewForm) lastForm = form;
                     }
                     
-                    md += `| ${showStone} | ${showProductType} | ${showForm} | ${row.Offering_ID} | ${rankDisplay} | ${row.Wholesaler} | ${row.Origin_Country} | ${productTitle} | ${dimensions}${warningIcon} | ${weight}${warningIcon} | ${offeringPrice} | ${offeringPricePerPiece} | ${priceDisplay} | ${diffStr} | ${info.join(' ')} |\n`;
+                    md += `| ${showStone} | ${showProductType} | ${showForm} | ${row.Offering_ID} | ${rankDisplay} | ${row.Wholesaler} | ${row.Origin_Country} | ${productTitle} | ${dimensions}${warningIcon} | ${weight}${warningIcon} | ${offeringPrice} | ${offeringPricePerPiece} | ${priceDisplay} | ${calcDisplay} | ${diffStr} | ${info.join(' ')} |\n`;
+                });
+            });
+        });
+
+        return md;
+    }
+
+    /**
+     * Builds the best-buy report grouped by product type (for quick overview per product type).
+     * Groups all offerings by ProductType, then by Material, then by Form, showing all offerings in a drill-down style table.
+     * @param data - Array of report rows
+     * @returns Markdown string for best-buy report by product type
+     */
+    buildBestBuyByProductTypeMarkdown(data: ReportRow[]): string {
+        const now = new Date().toISOString().split('T')[0];
+
+        // 1. Gruppieren nach ProductType, dann nach Material (Stein), dann nach Form (nutze report-grouping.ts)
+        const { productTypeGroups, sortedProductTypes } = groupByProductType(data);
+
+        // 2. Header - EINE große Tabelle für alle ProductTypes
+        let md = `# 🏆 Best Price Report by Product Type (${now})\n\n`;
+        md += `Schnelle Übersicht: Angebote gruppiert nach Produkttyp.\n\n`;
+        md += `> **Hinweis:** Diese Übersicht gruppiert nach Produkttyp. Für detaillierte Vergleiche nach Use-Case siehe \`best_buy_report.md\`.\n\n`;
+
+        // 3. EINE Tabelle für alle ProductTypes (Drill-Down-Stil)
+        md += `| Produkttyp | Stein | Form | Offering ID | Rang | Händler | Herkunft | Produkt | Größe | Gewicht | Price | Price/Piece  | Preis (Norm.) | Calc | vs. Winner | Info |\n`;
+        md += `|------------|-------|------|:-----------:|:---:|---------|:-------:|---------|-------|---------|----------------|-------------------------|---------------|------|------------|------|\n`;
+
+        // 4. ProductType-Gruppen durchgehen (nach ProductType sortiert) - ALLE in EINE Tabelle
+        let lastProductType = '';
+        let lastStone = '';
+        let lastForm = '';
+
+        sortedProductTypes.forEach(productType => {
+            const materialGroups = productTypeGroups[productType];
+            const sortedMaterials = Object.keys(materialGroups).sort();
+
+            sortedMaterials.forEach(stone => {
+                const formGroups = materialGroups[stone];
+                const sortedForms = Object.keys(formGroups).sort();
+
+                // Durch alle Formen gehen und Zeilen hinzufügen
+                sortedForms.forEach(form => {
+                    const candidates = sortCandidatesByPrice(formGroups[form]);
+                    
+                    if (candidates.length === 0) return;
+                    
+                    // Der Gewinner (günstigstes Angebot für diese Form)
+                    const winner = candidates[0];
+                    
+                    // Zeilen für diese Form hinzufügen
+                    candidates.forEach((row, index) => {
+                        const rankDisplay = calculateRank(index);
+                        const diffStr = calculateDiff(row, winner, index);
+                        const info = calculateInfo(row);
+
+                        // Preis Formatierung (Gewinner fett)
+                        const priceDisplay = index === 0 
+                            ? `**${row.Final_Normalized_Price.toFixed(2)}**`
+                            : `${row.Final_Normalized_Price.toFixed(2)}`;
+                        
+                        // Pipe-Zeichen im Titel ESCAPEN
+                        const productTitle = row.Product_Title.replace(/\|/g, '\\|');
+                        const dimensions = row.Dimensions || '-';
+                        const weight = row.Weight_Display || '-';
+                        const warningIcon = (row.Dimensions_Warning || row.Weight_Warning || row.Package_Weight_Warning) ? ' ⚠️' : '';
+                        const offeringPrice = row.Offering_Price.toFixed(2);
+                        const offeringPricePerPiece = row.Offering_Price_Per_Piece !== null ? row.Offering_Price_Per_Piece.toFixed(2) : '-';
+                        const calcDisplay = formatCalcForMarkdown(row);
+                        
+                        // Drill-Down: ProductType, Stein und Form nur in der ersten Zeile einer neuen Gruppe
+                        const isNewProductType = (productType !== lastProductType);
+                        const isNewStone = (stone !== lastStone || isNewProductType);
+                        const isNewForm = (form !== lastForm || isNewProductType || isNewStone);
+                        const showProductType = (index === 0 && isNewProductType) ? productType : '';
+                        const showStone = (index === 0 && isNewStone) ? stone : '';
+                        const showForm = (index === 0 && isNewForm) ? form : '';
+                        
+                        // Update lastProductType, lastStone und lastForm NUR nach der ersten Zeile einer neuen Gruppe
+                        if (index === 0) {
+                            if (isNewProductType) lastProductType = productType;
+                            if (isNewStone) lastStone = stone;
+                            if (isNewForm) lastForm = form;
+                        }
+                        
+                        md += `| ${showProductType} | ${showStone} | ${showForm} | ${row.Offering_ID} | ${rankDisplay} | ${row.Wholesaler} | ${row.Origin_Country} | ${productTitle} | ${dimensions}${warningIcon} | ${weight}${warningIcon} | ${offeringPrice} | ${offeringPricePerPiece} | ${priceDisplay} | ${calcDisplay} | ${diffStr} | ${info.join(' ')} |\n`;
+                    });
                 });
             });
         });
@@ -409,25 +432,37 @@ export class ReportBuilder {
 
     /**
      * Generates and saves audit reports from sorted audit data.
-     * @param sortedData - Audit rows sorted by group and price
+     * @param sortedData - Report rows sorted by group and price
      */
     generateReports(sortedData: ReportRow[]): void {
-        log.info(`Generating reports from ${sortedData.length} audit rows`);
+        log.info(`Generating reports from ${sortedData.length} report rows`);
 
-        // Build reports using builder methods
+        // Build Markdown reports using builder methods
         const auditMarkdown = this.buildAuditMarkdown(sortedData);
         const bestBuyMarkdown = this.buildBestBuyMarkdown(sortedData);
         const bestBuyByStoneMarkdown = this.buildBestBuyByStoneMarkdown(sortedData);
+        const bestBuyByProductTypeMarkdown = this.buildBestBuyByProductTypeMarkdown(sortedData);
+
+        // Build CSV reports using CSV builder
+        const bestBuyCsv = exportBestBuyReportToCsv(sortedData);
+        const bestBuyByStoneCsv = exportBestBuyByStoneToCsv(sortedData);
+        const bestBuyByProductTypeCsv = exportBestBuyByProductTypeToCsv(sortedData);
 
         log.info('Reports generated, saving files...');
 
         // Print console summary
         printConsoleSummary(sortedData);
 
-        // Save report files
+        // Save Markdown report files
         saveReportFile('audit_log.md', auditMarkdown);
         saveReportFile('best_buy_report.md', bestBuyMarkdown);
         saveReportFile('best_buy_report_by_stone.md', bestBuyByStoneMarkdown);
+        saveReportFile('best_buy_report_by_product_type.md', bestBuyByProductTypeMarkdown);
+
+        // Save CSV report files
+        saveReportFile('best_buy_report.csv', bestBuyCsv);
+        saveReportFile('best_buy_report_by_stone.csv', bestBuyByStoneCsv);
+        saveReportFile('best_buy_report_by_product_type.csv', bestBuyByProductTypeCsv);
 
         log.info('Reports saved successfully');
     }

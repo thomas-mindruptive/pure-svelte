@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { type AuditRow, OUTPUT_DIR } from './analyze-config.js';
+import { type ReportRow, OUTPUT_DIR } from './analyze-config.js';
 
 /**
  * Speichert einen beliebigen Text-Inhalt in eine Datei im Report-Ordner.
@@ -21,7 +21,7 @@ export function saveReportFile(filename: string, content: string) {
 /**
  * Konsolen-Output für schnellen Überblick
  */
-export function printConsoleSummary(data: AuditRow[]) {
+export function printConsoleSummary(data: ReportRow[]) {
     console.log('\n📊 AUDIT SUMMARY (Top 10 Entries)');
     
     // Mapping für lesbare Konsolen-Ausgabe

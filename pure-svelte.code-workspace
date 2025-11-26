@@ -8,6 +8,9 @@
 		},
 		{
 			"path": "../pure-shopify"
+		},
+		{
+			"path": "../pure-core"
 		}
 	],
 	"settings": {

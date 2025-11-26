@@ -1,0 +1,21 @@
+{
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"noEmit": false,
+		"outDir": "./dist",
+		"rootDir": "./src",
+		"declaration": true,
+		"declarationMap": true
+	},
+	"include": [
+		"src/lib/backendQueries",
+		"src/lib/utils",
+		"src/lib/domain",
+		"src/app.d.ts"
+	],
+	"exclude": [
+		"node_modules",
+		"src/lib/components"
+	]
+}
+

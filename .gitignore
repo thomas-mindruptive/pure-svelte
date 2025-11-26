@@ -12,6 +12,8 @@ nul
 /src/**/*.js
 /src/**/*.js.map
 
+/dist
+
 # Output
 .output
 .vercel

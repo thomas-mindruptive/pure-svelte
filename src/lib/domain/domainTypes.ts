@@ -254,6 +254,7 @@ const MaterialSchemaBase = z
   .object({
     material_id: z.number().int().positive(),
     name: NameOrTitle,
+    essence_type: z.string().max(200).nullable().optional(),
   })
   .describe("MaterialSchema");
 
@@ -909,6 +910,7 @@ const OfferingEnrichedViewSchemaBase = z.object({
   wholesalerCountry: z.string().max(200).nullable().optional(),
 
   // Product structure
+  productTypeId: z.number().int().positive(),
   productTypeName: z.string().max(200),
   categoryId: z.number().int().positive(),
   categoryName: z.string().max(200),

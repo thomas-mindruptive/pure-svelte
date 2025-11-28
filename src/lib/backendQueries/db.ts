@@ -1,6 +1,7 @@
 import sql, { type ConnectionPool } from 'mssql';
-import { error } from '@sveltejs/kit';
-import { dev } from '$app/environment';
+
+/** Detect dev mode without SvelteKit dependency */
+const dev = process.env.NODE_ENV !== 'production';
 
 // Extend the globalThis type to inform TypeScript about our custom property.
 declare global {
@@ -42,7 +43,7 @@ function createConnectionPool(): Promise<ConnectionPool> {
     return pool;
   }).catch(err => {
     console.error("❌ Database connection failed:", err);
-    throw error(500, "Could not connect to the database.");
+    throw new Error("Could not connect to the database.");
   });
 }
 

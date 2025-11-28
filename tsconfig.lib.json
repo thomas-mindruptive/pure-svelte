@@ -5,7 +5,12 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "declaration": true,
-    "declarationMap": true
+    "declarationMap": true,
+    "baseUrl": ".",
+    "paths": {
+      "$lib": ["./src/lib"],
+      "$lib/*": ["./src/lib/*"]
+    }
   },
   "include": [
     "src/lib/backendQueries",
@@ -18,4 +23,3 @@
     "src/lib/components"
   ]
 }
-

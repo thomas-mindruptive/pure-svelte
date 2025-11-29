@@ -7,11 +7,10 @@ import {
     CSV_FILENAME,
     IMPORT_MARKUP,
     EU_ZONE,
-    EXCLUDED_WHOLESALER_IDS,
-    ALLOWED_WHOLESALER_RELEVANCES,
     STRATEGY_MAP,
     type RawOffering,
-    type ReportRow
+    type ReportRow,
+    analysisOptions
 } from './analyze-config.js';
 
 // 2. IMPORTS: Report Builder & Output
@@ -21,16 +20,16 @@ import {
     saveReportFile,
     printConsoleSummary
 } from './output.js';
-import { 
-    parseMoney, 
-    extractDimensions, 
+import {
+    parseMoney,
+    extractDimensions,
     validatePackageWeight
 } from './parser-utils.js';
 import {
     calculateWeightFromDimensions
 } from './geometry-utils.js';
 import { parseCSV } from './parse-csv.js';
-import { loadOfferingsFromEnrichedView } from '$lib/backendQueries/entityOperations/offering.js';
+import { buildOfferingsWhereCondition, loadOfferingsFromEnrichedView, type LoadOfferingsOptions } from '$lib/backendQueries/entityOperations/offering.js';
 import { db } from '$lib/backendQueries/db.js';
 import { rollbackTransaction } from '$lib/backendQueries/transactionWrapper.js';
 import { log } from '$lib/utils/logger.js';
@@ -52,18 +51,18 @@ interface NormalizedOffering {
     wholesalerRelevance: string | null;
     wholesalerCountry: string | null;
     productTypeName: string;
-    finalMaterialName: string | null; 
-    finalFormName: string | null; 
+    finalMaterialName: string | null;
+    finalFormName: string | null;
     offeringTitle: string;
-    offeringPrice: number; 
-    offeringPricePerPiece: number | null; 
-    offeringWeightGrams: number | null; 
+    offeringPrice: number;
+    offeringPricePerPiece: number | null;
+    offeringWeightGrams: number | null;
     offeringComment: string | null;
     offeringPackaging: string | null;
     offeringDimensions: string | null;
     offeringWeightRange: string | null;
     offeringPackageWeight: string | null;
-    offeringId: number; 
+    offeringId: number;
 }
 
 // ==========================================
@@ -72,19 +71,19 @@ interface NormalizedOffering {
 
 function normalizeRawOffering(row: RawOffering): NormalizedOffering {
     const price = parseMoney(row.offeringPrice);
-    
+
     if (price === 0 && row.offeringPrice && row.offeringPrice !== 'NULL' && row.offeringPrice.trim().length > 0) {
         log.warn(`Invalid price value for offering "${row.offeringTitle}": "${row.offeringPrice}" - possible CSV parsing issue or data quality problem`);
     }
-    
+
     const pricePerPieceStr = row.offeringPricePerPiece;
-    const pricePerPiece = (pricePerPieceStr && pricePerPieceStr !== 'NULL') 
-        ? parseMoney(pricePerPieceStr) 
+    const pricePerPiece = (pricePerPieceStr && pricePerPieceStr !== 'NULL')
+        ? parseMoney(pricePerPieceStr)
         : null;
-    
+
     const weightGramsStr = row.offeringWeightGrams;
-    const weightGrams = (weightGramsStr && weightGramsStr !== 'NULL') 
-        ? parseMoney(weightGramsStr) 
+    const weightGrams = (weightGramsStr && weightGramsStr !== 'NULL')
+        ? parseMoney(weightGramsStr)
         : null;
 
     const offeringId = row.offeringId && row.offeringId !== 'NULL'
@@ -98,11 +97,11 @@ function normalizeRawOffering(row: RawOffering): NormalizedOffering {
     return {
         wholesalerName: row.wholesalerName,
         wholesalerId: wholesalerId,
-        wholesalerRelevance: (row.wholesalerRelevance && row.wholesalerRelevance !== 'NULL') 
-            ? row.wholesalerRelevance 
+        wholesalerRelevance: (row.wholesalerRelevance && row.wholesalerRelevance !== 'NULL')
+            ? row.wholesalerRelevance
             : null,
-        wholesalerCountry: (row.wholesalerCountry && row.wholesalerCountry !== 'NULL') 
-            ? row.wholesalerCountry 
+        wholesalerCountry: (row.wholesalerCountry && row.wholesalerCountry !== 'NULL')
+            ? row.wholesalerCountry
             : null,
         productTypeName: row.productTypeName,
         finalMaterialName: row.finalMaterialName || null,
@@ -111,20 +110,20 @@ function normalizeRawOffering(row: RawOffering): NormalizedOffering {
         offeringPrice: price,
         offeringPricePerPiece: pricePerPiece,
         offeringWeightGrams: weightGrams,
-        offeringComment: (row.offeringComment && row.offeringComment !== 'NULL') 
-            ? row.offeringComment 
+        offeringComment: (row.offeringComment && row.offeringComment !== 'NULL')
+            ? row.offeringComment
             : null,
-        offeringPackaging: (row.offeringPackaging && row.offeringPackaging !== 'NULL') 
-            ? row.offeringPackaging 
+        offeringPackaging: (row.offeringPackaging && row.offeringPackaging !== 'NULL')
+            ? row.offeringPackaging
             : null,
-        offeringDimensions: (row.offeringDimensions && row.offeringDimensions !== 'NULL') 
-            ? row.offeringDimensions 
+        offeringDimensions: (row.offeringDimensions && row.offeringDimensions !== 'NULL')
+            ? row.offeringDimensions
             : null,
-        offeringWeightRange: (row.offeringWeightRange && row.offeringWeightRange !== 'NULL') 
-            ? row.offeringWeightRange 
+        offeringWeightRange: (row.offeringWeightRange && row.offeringWeightRange !== 'NULL')
+            ? row.offeringWeightRange
             : null,
-        offeringPackageWeight: (row.offeringPackageWeight && row.offeringPackageWeight !== 'NULL') 
-            ? row.offeringPackageWeight 
+        offeringPackageWeight: (row.offeringPackageWeight && row.offeringPackageWeight !== 'NULL')
+            ? row.offeringPackageWeight
             : null,
         offeringId: offeringId,
     };
@@ -140,15 +139,15 @@ function normalizeEnrichedView(row: OfferingEnrichedView): NormalizedOffering {
         finalMaterialName: row.finalMaterialName || null,
         finalFormName: row.finalFormName || null,
         offeringTitle: row.offeringTitle,
-        offeringPrice: row.offeringPrice || 0, 
-        offeringPricePerPiece: row.offeringPricePerPiece ?? null, 
-        offeringWeightGrams: row.offeringWeightGrams || null, 
+        offeringPrice: row.offeringPrice || 0,
+        offeringPricePerPiece: row.offeringPricePerPiece ?? null,
+        offeringWeightGrams: row.offeringWeightGrams || null,
         offeringComment: row.offeringComment || null,
         offeringPackaging: row.offeringPackaging || null,
         offeringDimensions: row.offeringDimensions || null,
         offeringWeightRange: row.offeringWeightRange || null,
         offeringPackageWeight: row.offeringPackageWeight || null,
-        offeringId: row.offeringId, 
+        offeringId: row.offeringId,
     };
 }
 
@@ -170,11 +169,11 @@ export function getBestPriceFromNormalized(row: NormalizedOffering, listPrice: n
     }
 
     const matches = row.offeringComment.match(/[\$€]?\s?(\d+[\.,]?\d{0,2})/g);
-    
+
     if (matches) {
         let lowest = listPrice;
         let lowestMatch: string | null = null;
-        
+
         matches.forEach(m => {
             const val = parseFloat(m.replace(/[€$]/g, '').trim().replace(',', '.'));
             if (val < lowest && val > (listPrice * 0.1)) {
@@ -184,16 +183,16 @@ export function getBestPriceFromNormalized(row: NormalizedOffering, listPrice: n
         });
 
         if (lowest < listPrice && lowestMatch !== null) {
-            const commentText = row.offeringComment!; 
-            const matchString: string = lowestMatch; 
+            const commentText = row.offeringComment!;
+            const matchString: string = lowestMatch;
             const matchIndex = commentText.indexOf(matchString);
             const matchLength = matchString.length;
             const start = Math.max(0, matchIndex - 20);
             const end = Math.min(commentText.length, matchIndex + matchLength + 20);
             const excerpt = commentText.substring(start, end).trim();
-            
-            return { 
-                price: lowest, 
+
+            return {
+                price: lowest,
                 source: 'Bulk (Comment)',
                 commentExcerpt: excerpt
             };
@@ -205,9 +204,9 @@ export function getBestPriceFromNormalized(row: NormalizedOffering, listPrice: n
 /**
  * Determines the effective weight in kg based on the cascade logic.
  */
-function determineEffectiveWeight(row: NormalizedOffering): { 
-    weightKg: number | null, 
-    source: string, 
+function determineEffectiveWeight(row: NormalizedOffering): {
+    weightKg: number | null,
+    source: string,
     method: ReportRow['Calculation_Method'],
     tooltip: string,
     warning?: string
@@ -215,11 +214,11 @@ function determineEffectiveWeight(row: NormalizedOffering): {
     // 1. Bulk Packaging Check
     const pkgCheck = validatePackageWeight(row.offeringPackaging, row.offeringPackageWeight);
     if (pkgCheck.packageWeightDisplay && pkgCheck.packageWeightDisplay.toLowerCase().includes('kg')) {
-        const val = parseFloat(pkgCheck.packageWeightDisplay.replace('kg','').trim());
+        const val = parseFloat(pkgCheck.packageWeightDisplay.replace('kg', '').trim());
         if (!isNaN(val)) {
-            return { 
-                weightKg: val, 
-                source: `Bulk Pkg (${pkgCheck.packageWeightDisplay})`, 
+            return {
+                weightKg: val,
+                source: `Bulk Pkg (${pkgCheck.packageWeightDisplay})`,
                 method: 'BULK',
                 tooltip: `Strategie: WEIGHT. Quelle: Bulk-Verpackung '${pkgCheck.packageWeightDisplay}'.`
             };
@@ -257,23 +256,23 @@ function determineEffectiveWeight(row: NormalizedOffering): {
         // Check if single value in range field
         const singleMatch = row.offeringWeightRange.match(/(\d+[\.,]?\d*)\s*g/i);
         if (singleMatch && singleMatch.length === 2) {
-             const grams = parseFloat(singleMatch[1].replace(',', '.'));
-             if (!isNaN(grams)) {
-                 return {
-                     weightKg: grams / 1000,
-                     source: `Range Single (${row.offeringWeightRange})`,
-                     method: 'RANGE',
-                     tooltip: `Strategie: WEIGHT. Quelle: Einzelwert aus Range '${row.offeringWeightRange}' (${grams}g).`
-                 };
-             }
+            const grams = parseFloat(singleMatch[1].replace(',', '.'));
+            if (!isNaN(grams)) {
+                return {
+                    weightKg: grams / 1000,
+                    source: `Range Single (${row.offeringWeightRange})`,
+                    method: 'RANGE',
+                    tooltip: `Strategie: WEIGHT. Quelle: Einzelwert aus Range '${row.offeringWeightRange}' (${grams}g).`
+                };
+            }
         }
     }
 
     // 4. Geometric Calculation
     if (row.offeringDimensions) {
         const calcResult = calculateWeightFromDimensions(
-            row.offeringDimensions, 
-            row.finalMaterialName || '', 
+            row.offeringDimensions,
+            row.finalMaterialName || '',
             row.finalFormName || ''
         );
 
@@ -290,7 +289,9 @@ function determineEffectiveWeight(row: NormalizedOffering): {
     return { weightKg: null, source: 'None', method: 'ERR', tooltip: 'Kein Gewicht ermittelbar.' };
 }
 
-export function transformOfferingsToAuditRows(normalizedOfferings: NormalizedOffering[], reportBuilder?: ReportBuilder): ReportRow[] {
+export function transformOfferingsToAuditRows(normalizedOfferings: NormalizedOffering[],
+    reportBuilder?: ReportBuilder,
+    options?: LoadOfferingsOptions): ReportRow[] {
     log.info(`Starting transformation of ${normalizedOfferings.length} offerings`);
 
     const auditData: ReportRow[] = normalizedOfferings
@@ -298,10 +299,10 @@ export function transformOfferingsToAuditRows(normalizedOfferings: NormalizedOff
             // Filter out by name (legacy check)
             if (row.wholesalerName === 'pureEnergy') return false;
             // Filter out by ID (additional safety net)
-            if (row.wholesalerId > 0 && EXCLUDED_WHOLESALER_IDS.includes(row.wholesalerId)) return false;
+            if (row.wholesalerId > 0 && options?.excludedWholesalerIds?.includes(row.wholesalerId)) return false;
             // Filter by relevance (if configured)
-            if (ALLOWED_WHOLESALER_RELEVANCES.length > 0) {
-                if (!row.wholesalerRelevance || !ALLOWED_WHOLESALER_RELEVANCES.includes(row.wholesalerRelevance)) {
+            if ((options?.allowedWholesalerRelevances?.length ?? 0) > 0) {
+                if (!row.wholesalerRelevance || !options?.allowedWholesalerRelevances?.includes(row.wholesalerRelevance)) {
                     return false;
                 }
             }
@@ -340,7 +341,7 @@ export function transformOfferingsToAuditRows(normalizedOfferings: NormalizedOff
             if (isEu) {
                 trace.push(`🌍 Origin: ${country} (EU - no markup)`);
             } else {
-                markupPct = (IMPORT_MARKUP - 1) * 100; 
+                markupPct = (IMPORT_MARKUP - 1) * 100;
                 effectivePrice = priceInfo.price * IMPORT_MARKUP;
                 trace.push(`✈️ Origin: ${country} (+${markupPct.toFixed(0)}% Markup = ${effectivePrice.toFixed(2)})`);
             }
@@ -355,7 +356,7 @@ export function transformOfferingsToAuditRows(normalizedOfferings: NormalizedOff
 
             // C. STRATEGY & WEIGHT DETERMINATION
             const dimensionsInfo = extractDimensions(row); // Only for display now
-            
+
             // Validate package weight for display
             const packageWeightInfo = validatePackageWeight(row.offeringPackaging, row.offeringPackageWeight);
             if (packageWeightInfo.packageWeightDisplay) {
@@ -389,7 +390,7 @@ export function transformOfferingsToAuditRows(normalizedOfferings: NormalizedOff
                     calcTooltip = `${weightResult.tooltip} Rechnung: ${effectivePrice.toFixed(2)}€ / ${weightResult.weightKg.toFixed(3)}kg`;
                     trace.push(`⚖️ Weight Strat: ${weightResult.method} (${weightResult.weightKg.toFixed(3)}kg)`);
                 } else {
-                    finalNormalizedPrice = 999999; 
+                    finalNormalizedPrice = 999999;
                     unitLabel = 'ERR';
                     calcMethod = 'ERR';
                     calcTooltip = 'Fehler: Strategie WEIGHT gewählt, aber kein Gewicht ermittelbar.';
@@ -451,7 +452,7 @@ export function transformOfferingsToAuditRows(normalizedOfferings: NormalizedOff
 
 export function analyzeOfferingsFromCsv() {
     log.info('Starting offering analysis from CSV');
-    
+
     const filePath = path.isAbsolute(CSV_FILENAME)
         ? CSV_FILENAME
         : path.join(__dirname, CSV_FILENAME);
@@ -473,80 +474,31 @@ export function analyzeOfferingsFromCsv() {
 
     const reportBuilder = new ReportBuilder();
     processAndAnalyzeOfferingsFromCsv(rawData, reportBuilder);
-}
-
-/**
- * Erstellt eine kombinierte WHERE-Bedingung aus allen Config-Filtern.
- */
-function buildWhereCondition(): WhereCondition<OfferingEnrichedView> | WhereConditionGroup<OfferingEnrichedView> | undefined {
-    const conditions: (WhereCondition<OfferingEnrichedView> | WhereConditionGroup<OfferingEnrichedView>)[] = [];
-    
-    // 1. Exclude wholesaler IDs
-    if (EXCLUDED_WHOLESALER_IDS.length > 0) {
-        conditions.push({
-            key: 'wholesalerId',
-            whereCondOp: ComparisonOperator.NOT_IN,
-            val: EXCLUDED_WHOLESALER_IDS
-        });
-    }
-    
-    // 2. Filter by wholesaler relevance (OR-Gruppe)
-    if (ALLOWED_WHOLESALER_RELEVANCES.length > 0) {
-        const relevanceConditions: WhereCondition<OfferingEnrichedView>[] = 
-            ALLOWED_WHOLESALER_RELEVANCES.map(relevance => ({
-                key: 'wholesalerRelevance',
-                whereCondOp: ComparisonOperator.EQUALS,
-                val: relevance
-            }));
-        
-        if (relevanceConditions.length === 1) {
-            // Nur eine Bedingung, keine OR-Gruppe nötig
-            conditions.push(relevanceConditions[0]);
-        } else if (relevanceConditions.length > 1) {
-            // Mehrere Bedingungen, OR-Gruppe erstellen
-            conditions.push({
-                whereCondOp: LogicalOperator.OR,
-                conditions: relevanceConditions
-            });
-        }
-    }
-    
-    // Kombiniere alle Bedingungen mit AND
-    if (conditions.length === 0) {
-        return undefined;
-    } else if (conditions.length === 1) {
-        return conditions[0];
-    } else {
-        return {
-            whereCondOp: LogicalOperator.AND,
-            conditions: conditions
-        };
-    }
-}
+} 
 
 export async function analyzeOfferingsFromDb() {
     log.info('Starting offering analysis from database');
-    
+
     const pool = await db;
     const transaction = pool.transaction();
     let transactionCommitted = false;
-    
+
     try {
         await transaction.begin();
         log.info('Loading enriched offerings from database...');
-        
+
         // Create combined WHERE condition from all filters
-        const whereCondition = buildWhereCondition();
-        
+        const whereCondition = buildOfferingsWhereCondition(analysisOptions);
+
         if (whereCondition) {
-            if (EXCLUDED_WHOLESALER_IDS.length > 0) {
-                log.info(`Excluding wholesaler IDs from analysis: ${EXCLUDED_WHOLESALER_IDS.join(', ')}`);
+            if ((analysisOptions.excludedWholesalerIds?.length ?? 0 )> 0) {
+                log.info(`Excluding wholesaler IDs from analysis: ${analysisOptions.excludedWholesalerIds?.join(', ')}`);
             }
-            if (ALLOWED_WHOLESALER_RELEVANCES.length > 0) {
-                log.info(`Filtering by wholesaler relevance: ${ALLOWED_WHOLESALER_RELEVANCES.join(', ')}`);
+            if ((analysisOptions.allowedWholesalerRelevances?.length ??0 )> 0) {
+                log.info(`Filtering by wholesaler relevance: ${analysisOptions.allowedWholesalerRelevances?.join(', ')}`);
             }
         }
-        
+
         const rows = await loadOfferingsFromEnrichedView(transaction, whereCondition);
         log.info(`Loaded ${rows.length} rows from database`);
 

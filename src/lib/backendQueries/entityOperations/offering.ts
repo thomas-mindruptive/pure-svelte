@@ -2,12 +2,26 @@ import type { WholesalerItemOffering, Wio_PDef_Cat_Supp_Nested_WithLinks, Offeri
 import { WholesalerItemOfferingForCreateSchema } from "$lib/domain/domainTypes";
 import type { Transaction } from "mssql";
 import { buildWhereClause, type BuildContext } from "../queryBuilder";
-import type { WhereCondition, WhereConditionGroup, SortDescriptor } from "../queryGrammar";
+import { type WhereCondition, type WhereConditionGroup, type SortDescriptor, ComparisonOperator, LogicalOperator } from "../queryGrammar";
 import { assertDefined } from "$lib/utils/assertions";
 import { error } from "@sveltejs/kit";
 import { log } from "$lib/utils/logger";
 import { insertRecordWithTransaction } from "../genericEntityOperations";
 import type { z } from "zod";
+
+/**
+ * Shortcut for defining offering load options. Only usef for loadeing from the offering views, see DDL-views.sql.
+ */
+export type LoadOfferingsOptions = {
+  // Only include offerings from these wholesaler IDs (IN clause)
+  allowedWholesalerIds?: number[];
+  // Exclude offerings from these wholesaler IDs (NOT IN clause)
+  excludedWholesalerIds?: number[];
+  // Only include offerings from wholesalers with these relevance values (IN clause)
+  allowedWholesalerRelevances?: string[];
+  // Maximum number of rows to return (SQL TOP clause)
+  limit?: number;
+};
 
 /**
  * Loads a single nested offering by ID using the optimized approach.
@@ -44,7 +58,7 @@ export async function loadNestedOfferingsOptimized(
   customJoinClause?: string,
 ): Promise<Wio_PDef_Cat_Supp_Nested_WithLinks[]> {
   assertDefined(transaction, "transaction");
-  log.debug(`loadNestedOfferingsOptimized`, {aWhere, aOrderBy, aLimit, aOffset, customJoinClause});
+  log.debug(`loadNestedOfferingsOptimized`, { aWhere, aOrderBy, aLimit, aOffset, customJoinClause });
 
   const ctx: BuildContext = {
     parameters: {},
@@ -802,4 +816,67 @@ export async function loadOfferingsFromViewWithLinks(
   });
 
   return offerings;
+}
+
+
+/**************************************************************************************************
+ * HELPERS
+ **************************************************************************************************/
+
+/**
+ * Erstellt eine kombinierte WHERE-Bedingung aus allen Config-Filtern.
+ */
+export function buildOfferingsWhereCondition(options: LoadOfferingsOptions): WhereCondition<OfferingEnrichedView> | WhereConditionGroup<OfferingEnrichedView> | undefined {
+  const conditions: (WhereCondition<OfferingEnrichedView> | WhereConditionGroup<OfferingEnrichedView>)[] = [];
+
+  // Exclude wholesaler IDs
+  if ((options.excludedWholesalerIds?.length ?? 0) > 0) {
+    conditions.push({
+      key: 'wholesalerId',
+      whereCondOp: ComparisonOperator.NOT_IN,
+      val: options.excludedWholesalerIds
+    });
+  }
+
+  // Include wholesaler IDs
+  if ((options.allowedWholesalerIds?.length ?? 0) > 0) {  
+    conditions.push({
+      key: 'wholesalerId',
+      whereCondOp: ComparisonOperator.IN,
+      val: options.allowedWholesalerIds  
+    });
+  }
+
+  // Filter by wholesaler relevance (OR-Gruppe)
+  if ((options.allowedWholesalerRelevances?.length ?? 0) > 0) {
+    const relevanceConditions: WhereCondition<OfferingEnrichedView>[] =
+      options.allowedWholesalerRelevances!.map(relevance => ({  
+        key: 'wholesalerRelevance' as keyof OfferingEnrichedView,
+        whereCondOp: ComparisonOperator.EQUALS,
+        val: relevance
+      }));
+
+    if (relevanceConditions.length === 1) {
+      conditions.push(relevanceConditions[0]);
+    } else if (relevanceConditions.length > 1) {
+      const orGroup: WhereConditionGroup<OfferingEnrichedView> = {
+        whereCondOp: LogicalOperator.OR,
+        conditions: relevanceConditions
+      };
+      conditions.push(orGroup);
+    }
+  }
+
+  // Kombiniere alle Bedingungen mit AND
+  if (conditions.length === 0) {
+    return undefined;
+  } else if (conditions.length === 1) {
+    return conditions[0];
+  } else {
+    const andGroup: WhereConditionGroup<OfferingEnrichedView> = {
+      whereCondOp: LogicalOperator.AND,
+      conditions: conditions
+    };
+    return andGroup;
+  }
 }

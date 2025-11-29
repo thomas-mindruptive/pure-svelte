@@ -1,3 +1,4 @@
+import type { LoadOfferingsOptions } from '$lib/backendQueries/entityOperations/offering';
 import * as path from 'path';
 
 // ==========================================
@@ -19,13 +20,18 @@ export const EU_ZONE = new Set([
     'LV', 'LT', 'LU', 'MT', 'NL', 'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE'
 ]);
 
-// Wholesaler-IDs, die von der Analyse ausgeschlossen werden sollen
-export const EXCLUDED_WHOLESALER_IDS: number[] = [99]; // z.B. 99 = pureEnergy
 
-// Zusätzliche Filterbedingungen für die WHERE-Clause
-// Beispiel: Nur Wholesaler mit bestimmter Relevance
-export const ALLOWED_WHOLESALER_RELEVANCES: string[] = ['high', 'medium', 'highest'];
-// Leer lassen, um keine Filterung anzuwenden: []
+export const analysisOptions: LoadOfferingsOptions = {
+    excludedWholesalerIds: [99],
+    allowedWholesalerRelevances: ['high', 'medium', 'highest']
+}
+// // Wholesaler-IDs, die von der Analyse ausgeschlossen werden sollen
+// export const EXCLUDED_WHOLESALER_IDS: number[] = [99]; // z.B. 99 = pureEnergy
+
+// // Zusätzliche Filterbedingungen für die WHERE-Clause
+// // Beispiel: Nur Wholesaler mit bestimmter Relevance
+// export const ALLOWED_WHOLESALER_RELEVANCES: string[] = ['high', 'medium', 'highest'];
+// // Leer lassen, um keine Filterung anzuwenden: []
 
 // Strategie-Mapping: Welcher Use-Case erzwingt welche Berechnung?
 export const STRATEGY_MAP: Record<string, 'WEIGHT' | 'UNIT' | 'AUTO'> = {

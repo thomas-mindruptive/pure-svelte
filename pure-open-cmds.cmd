@@ -1,6 +1,7 @@
 @echo off
 wt ^
 new-tab -p "Dev" --title "svelte check" cmd /k "cd /d \dev\pure\pure-svelte && npm run check:watch" ; ^
+new-tab -p "Dev" --title "watch  lib" cmd /k "cd /d \dev\pure\pure-svelte && npm run watch:lib" ; ^
 new-tab -p "Dev" --title "dev" cmd /k "cd /d \dev\pure\pure-svelte && npm run dev" ; ^
 new-tab -p "Dev" --title "tools watch" cmd /k "cd /d \dev\pure\pure-svelte && npm run tools:watch" ; ^
 new-tab -p "Dev" --title "shopify watch" cmd /k "cd /d \dev\pure\pure-shopify && npm run watch" ; ^

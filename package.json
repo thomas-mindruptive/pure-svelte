@@ -53,6 +53,7 @@
 	},
 	"devDependencies": {
 		"@fal-ai/serverless-client": "^0.14.3",
+		"@sveltejs/acorn-typescript": "^1.0.7",
 		"@sveltejs/adapter-auto": "^6.0.0",
 		"@sveltejs/eslint-config": "^8.3.4",
 		"@sveltejs/kit": "^2.22.0",

@@ -1,6 +1,6 @@
 import type { WholesalerItemOffering, Wio_PDef_Cat_Supp_Nested_WithLinks, OfferingEnrichedView } from "$lib/domain/domainTypes";
 import { WholesalerItemOfferingForCreateSchema } from "$lib/domain/domainTypes";
-import type { Transaction } from "mssql";
+import { type Transaction } from "mssql";
 import { buildWhereClause, type BuildContext } from "../queryBuilder";
 import { type WhereCondition, type WhereConditionGroup, type SortDescriptor, ComparisonOperator, LogicalOperator } from "../queryGrammar";
 import { assertDefined } from "$lib/utils/assertions";
@@ -8,6 +8,7 @@ import { error } from "@sveltejs/kit";
 import { log } from "$lib/utils/logger";
 import { insertRecordWithTransaction } from "../genericEntityOperations";
 import type { z } from "zod";
+import { TransWrapper } from "../transactionWrapper";
 
 /**
  * Shortcut for defining offering load options. Only usef for loadeing from the offering views, see DDL-views.sql.
@@ -816,6 +817,44 @@ export async function loadOfferingsFromViewWithLinks(
   });
 
   return offerings;
+}
+
+/**
+ * This function queries `dbo.view_offerings_enriched` and applies optional filters
+ * based on wholesaler ID, allowed/excluded IDs, and relevance values. All filters
+ * are combined with AND logic.
+ * 
+ * @param options - Filtering options for the query
+ * @returns Array of enriched offering records matching the filters
+ * @throws {Error} If the database query fails
+ */
+export async function loadOfferingsWithOptions(options: LoadOfferingsOptions = {}, transaction: Transaction | null): Promise<OfferingEnrichedView[]> {
+  // Create combined WHERE condition from all filters
+  const whereCondition = buildOfferingsWhereCondition(options);
+
+  if (whereCondition) {
+    if ((options.excludedWholesalerIds?.length ?? 0) > 0) {
+      log.info(`Excluding wholesaler IDs from analysis: ${options.excludedWholesalerIds?.join(', ')}`);
+    }
+    if ((options.allowedWholesalerIds?.length ?? 0) > 0) {
+      log.info(`Filtering by wholesaler ids: ${options.allowedWholesalerIds?.join(', ')}`);
+    }
+    if ((options.allowedWholesalerRelevances?.length ?? 0) > 0) {
+      log.info(`Filtering by wholesaler relevance: ${options.allowedWholesalerRelevances?.join(', ')}`);
+    }
+  }
+
+  const transWrapper = new TransWrapper(transaction, null);
+
+  try {
+    await transWrapper.begin();
+    const offerings = await loadOfferingsFromEnrichedView(transWrapper.trans, whereCondition);
+    log.info("loadOfferings", `loaded ${offerings.length} offerings`);
+    return offerings;
+  }
+  finally {
+    await transWrapper.rollback();
+  }
 }
 
 

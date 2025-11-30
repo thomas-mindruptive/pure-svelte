@@ -1,6 +1,6 @@
 // File: src/lib/backendQueries/entityOperations/image.ts
 
-import { validateEntityBySchema, genColumnsForJsonPath } from "$lib/domain/domainTypes.utils";
+import { validateEntityBySchema, genColumnsForJsonPath, genTypedQualifiedColumns } from "$lib/domain/domainTypes.utils";
 import {
   ProductDefinitionImage_Image_Schema,
   ImageForCreateSchema,
@@ -31,6 +31,7 @@ import { existsSync } from 'fs';
 import * as crypto from 'crypto';
 import * as mime from 'mime-types';
 import sharp from 'sharp';
+import { queryBuilder } from "..";
 
 // ===== HELPER FUNCTIONS: Image Metadata Enrichment =====
 
@@ -377,6 +378,44 @@ export async function loadProductDefinitionImageWithImageById(
   }
 
   return parsedData[0] as ProductDefinitionImage_Image;
+}
+
+/**
+ * Loads images with their associated image data using QueryPayload.
+ * Server enforces the JOIN, client can specify WHERE, ORDER BY, LIMIT, etc.
+ *
+ * @param transaction - Active database transaction
+ * @param payload - Optional QueryPayload from client (WHERE, LIMIT, ORDER BY, etc.)
+ * @returns JSON string with array of nested objects
+ */
+export async function loadImages(
+  transaction: Transaction,
+  payload?: Partial<QueryPayload<Image>>
+): Promise<Image[]> {
+  log.debug("loadImages", { clientPayload: payload });
+
+  // 1. Define fixed base query with JOIN
+  const basePayload: QueryPayload<Image> = {
+    from: { table: "dbo.images", alias: "img" },
+    select: genTypedQualifiedColumns(ImageSchema, true)
+  };
+
+  // 2. Merge payload (WHERE, LIMIT, custom ORDER BY override base)
+  const mergedPayload: QueryPayload<Image> = {
+    ...basePayload,
+    ...(payload?.where && { where: payload.where }),
+    ...(payload?.limit && { limit: payload.limit }),
+    ...(payload?.offset && { offset: payload.offset }),
+    ...(payload?.orderBy && { orderBy: payload.orderBy }), // Client can override
+  };
+
+  // 3. Build SQL using queryBuilder
+  const { sql, parameters } = buildQuery(mergedPayload, {} as QueryConfig);
+  const result = await queryBuilder.executeQuery(sql, parameters, {transaction});
+
+  log.debug("Images loaded", { resultLength: result.length });
+
+  return result as Image[];
 }
 
 /**

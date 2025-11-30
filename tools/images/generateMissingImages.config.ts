@@ -11,6 +11,16 @@
 
 import type { ImageAnalysisFilters } from "../../src/lib/backendQueries/entityOperations/offering.js";
 import type { ImageMatchConfig } from "../../src/lib/backendQueries/imageMatching.js";
+import { type LoadOfferingsOptions } from '$lib/backendQueries/entityOperations/offering.js';
+
+/**
+ * 
+ */
+export const loadOfferingOptions: LoadOfferingsOptions = {
+  // excludedWholesalerIds: [99],
+  // allowedWholesalerRelevances: ['high', 'medium', 'highest'],
+  allowedWholesalerIds:[99]
+}
 
 /**
  * Complete configuration interface for image generation

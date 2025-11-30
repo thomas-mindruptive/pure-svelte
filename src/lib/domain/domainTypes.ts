@@ -699,6 +699,15 @@ const ImageSchemaBase = z
     shopify_url: z.string().max(500).nullable().optional(),
     shopify_media_id: z.string().max(100).nullable().optional(),
     uploaded_to_shopify_at: z.string().nullable().optional(), // ISO datetime string
+    // Variant matching fields (for image-to-offering matching logic)
+    material_id: z.number().int().positive().nullable().optional(),
+    form_id: z.number().int().positive().nullable().optional(),
+    surface_finish_id: z.number().int().positive().nullable().optional(),
+    construction_type_id: z.number().int().positive().nullable().optional(),
+    // Variant dimensions (optional, for product variations)
+    size_range: z.string().max(50).nullable().optional(),
+    quality_grade: z.string().max(10).nullable().optional(),
+    color_variant: z.string().max(50).nullable().optional(),
     created_at: z.string().optional(),
   })
   .describe("ImageSchema");

@@ -171,6 +171,7 @@ async function processOfferingsWithCache(
     const product_def_id = offering.product_def.product_def_id;
 
     // Validate size range - fail fast on invalid data
+    // E.g. "S-M"
     validateSizeRange(offering.offering.size); // Will throw on invalid size
 
     // Get images from cache or load from DB

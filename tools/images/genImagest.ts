@@ -1,7 +1,7 @@
 import { entityOperations, db as dbNS, transactionWrapper as transWRapperNS } from "@pure/svelte/backend-queries";
 import { log as LogNS } from "@pure/svelte/utils";
 import type { domainTypes } from "@pure/svelte/domain";
-import { defaultConfig, loadOfferingOptions } from './generateMissingImages.config';
+import { defaultConfig, loadOfferingOptions, type Lookups } from './generateMissingImages.config';
 import { initLogFile, closeLogFile } from "./logAndReport";
 import type { Transaction } from "mssql";
 
@@ -30,6 +30,7 @@ async function run() {
             await transaction.begin()
             offerings = await loadOfferings(transaction);
             images = await loadIamges(transaction);
+            const lookups = await loadLookups(transaction);
 
         } catch (e) {
             throw e;
@@ -49,6 +50,56 @@ async function run() {
         closeLogFile();
         process.exit(0);
     }
+}
+
+/**
+ * Load all lookups needed for image generation.
+ * @param transaction 
+ * @returns 
+ */
+async function loadLookups(transaction: Transaction): Promise<Lookups> {
+    // Load base data (German)
+    const forms = await entityOperations.form.loadForms(transaction);
+    const materials = await entityOperations.material.loadMaterials(transaction);
+    const constructionTypes = await entityOperations.constructionType.loadConstructionTypes(transaction);
+    const surfaceFinishes = await entityOperations.surfaceFinish.loadSurfaceFinishes(transaction);
+
+    // Load English translations
+    const formsEN = await entityOperations.form.loadForms(transaction, undefined, 'en');
+    const materialsEN = await entityOperations.material.loadMaterials(transaction, undefined, 'en');
+    const constructionTypesEN = await entityOperations.constructionType.loadConstructionTypes(transaction, undefined, 'en');
+    const surfaceFinishesEN = await entityOperations.surfaceFinish.loadSurfaceFinishes(transaction, undefined, 'en');
+
+    // Generate maps
+    const formsMap = entityOperations.form.generateFormsMap(forms);
+    const materilasMap = entityOperations.material.generateMaterialsMap(materials);
+    const constructionTypesMap = entityOperations.constructionType.generateConstructionTypesMap(constructionTypes);
+    const surfaceFinishesMap = entityOperations.surfaceFinish.generateSurfaceFinishesMap(surfaceFinishes);
+
+    // Generate English maps
+    const formsMapEN = entityOperations.form.generateFormsMap(formsEN);
+    const materilasMapEN = entityOperations.material.generateMaterialsMap(materialsEN);
+    const constructionTypesMapEN = entityOperations.constructionType.generateConstructionTypesMap(constructionTypesEN);
+    const surfaceFinishesMapEN = entityOperations.surfaceFinish.generateSurfaceFinishesMap(surfaceFinishesEN);
+
+    return {
+        forms,
+        materials,
+        constructionTypes,
+        surfaceFinishes,
+        formsMap,
+        materilasMap,
+        constructionTypesMap,
+        surfaceFinishesMap,
+        formsEN,
+        materialsEN,
+        constructionTypesEN,
+        surfaceFinishesEN,
+        formsMapEN,
+        materilasMapEN,
+        constructionTypesMapEN,
+        surfaceFinishesMapEN
+    };
 }
 
 /**

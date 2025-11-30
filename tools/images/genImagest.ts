@@ -4,10 +4,13 @@ import type { domainTypes } from "@pure/svelte/domain";
 import { defaultConfig, loadOfferingOptions, type Lookups } from './generateMissingImages.config';
 import { initLogFile, closeLogFile } from "./logAndReport";
 import type { Transaction } from "mssql";
+import assert from "node:assert";
 
 const offering = entityOperations.offering;
 const image = entityOperations.image;
 const log = LogNS.log;
+
+const GLOBAL_IMAGE_CACHE: Map<number, domainTypes.Image> = new Map();
 
 /**
  * Entry point
@@ -29,9 +32,14 @@ async function run() {
         try {
             await transaction.begin()
             offerings = await loadOfferings(transaction);
+            log.info(`${offerings.length} offerings loaded`);
             images = await loadIamges(transaction);
+            // Populate global image cache
+            for (const img of images) {
+                GLOBAL_IMAGE_CACHE.set(img.image_id, img);
+            }
+            log.info(`${images.length} images loaded and cached`);
             const lookups = await loadLookups(transaction);
-
         } catch (e) {
             throw e;
         } finally {
@@ -60,15 +68,23 @@ async function run() {
 async function loadLookups(transaction: Transaction): Promise<Lookups> {
     // Load base data (German)
     const forms = await entityOperations.form.loadForms(transaction);
+    log.debug(`${forms.length} forms loaded`);
     const materials = await entityOperations.material.loadMaterials(transaction);
+    log.debug(`${materials.length} materials loaded`);
     const constructionTypes = await entityOperations.constructionType.loadConstructionTypes(transaction);
+    log.debug(`${constructionTypes.length} constructionTypes loaded`);
     const surfaceFinishes = await entityOperations.surfaceFinish.loadSurfaceFinishes(transaction);
+    log.debug(`${surfaceFinishes.length} surfaceFinishes loaded`);
 
     // Load English translations
     const formsEN = await entityOperations.form.loadForms(transaction, undefined, 'en');
+    assert.strictEqual(forms.length, formsEN.length, `Forms (${forms.length}) and formsEN (${formsEN.length}) must have the same length`);
     const materialsEN = await entityOperations.material.loadMaterials(transaction, undefined, 'en');
+    assert.strictEqual(materials.length, materialsEN.length, `Materials (${materials.length}) and materialsEN (${materialsEN.length}) must have the same length`);
     const constructionTypesEN = await entityOperations.constructionType.loadConstructionTypes(transaction, undefined, 'en');
+    assert.strictEqual(constructionTypes.length, constructionTypesEN.length, `ConstructionTypes (${constructionTypes.length}) and constructionTypesEN (${constructionTypesEN.length}) must have the same length`);
     const surfaceFinishesEN = await entityOperations.surfaceFinish.loadSurfaceFinishes(transaction, undefined, 'en');
+    assert.strictEqual(surfaceFinishes.length, surfaceFinishesEN.length, `SurfaceFinishes (${surfaceFinishes.length}) and surfaceFinishesEN (${surfaceFinishesEN.length}) must have the same length`);
 
     // Generate maps
     const formsMap = entityOperations.form.generateFormsMap(forms);
@@ -109,7 +125,7 @@ async function loadLookups(transaction: Transaction): Promise<Lookups> {
 async function processOffering(offering: domainTypes.OfferingEnrichedView) {
     // Validate size range - fail fast on invalid data
     // E.g. "S-M"
-    validateSizeRange(offering.offeringSize); // Will throw on invalid size
+    validateSizeRange(offering); // Will throw on invalid size
 }
 
 /**
@@ -133,7 +149,8 @@ async function loadIamges(transaction: Transaction): Promise<domainTypes.Image[]
  * @param size 
  * @returns 
  */
-function validateSizeRange(size: string | null | undefined): string | null {
+function validateSizeRange(offering: domainTypes.OfferingEnrichedView): string | null {
+    const size= offering.offeringSize;
     if (!size) return null;
 
     // Valid values from DB CHECK constraint
@@ -155,8 +172,9 @@ function validateSizeRange(size: string | null | undefined): string | null {
     if (validSizeRanges.includes(size)) {
         return size;
     } else {
+        log.error(`Offering %O`, offering);
         throw new Error(
-            `Invalid size range: "${size}". Must be one of: ${validSizeRanges.join(', ')}`
+            `Invalid size range: offering: ${offering.offeringId} "${size}". Must be one of: ${validSizeRanges.join(', ')}`
         );
     }
 }

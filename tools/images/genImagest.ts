@@ -67,6 +67,8 @@ async function run() {
  */
 async function loadLookups(transaction: Transaction): Promise<Lookups> {
     // Load base data (German)
+    const productTypes = await entityOperations.productType.loadProductTypes(transaction);
+    log.debug(`${productTypes.length} productTypes loaded`);
     const forms = await entityOperations.form.loadForms(transaction);
     log.debug(`${forms.length} forms loaded`);
     const materials = await entityOperations.material.loadMaterials(transaction);
@@ -77,6 +79,8 @@ async function loadLookups(transaction: Transaction): Promise<Lookups> {
     log.debug(`${surfaceFinishes.length} surfaceFinishes loaded`);
 
     // Load English translations
+    const productTypesEN = await entityOperations.productType.loadProductTypes(transaction, undefined, 'en');
+    assert.strictEqual(productTypes.length, productTypesEN.length, `Forms (${productTypes.length}) and formsEN (${productTypesEN.length}) must have the same length`);
     const formsEN = await entityOperations.form.loadForms(transaction, undefined, 'en');
     assert.strictEqual(forms.length, formsEN.length, `Forms (${forms.length}) and formsEN (${formsEN.length}) must have the same length`);
     const materialsEN = await entityOperations.material.loadMaterials(transaction, undefined, 'en');
@@ -87,30 +91,39 @@ async function loadLookups(transaction: Transaction): Promise<Lookups> {
     assert.strictEqual(surfaceFinishes.length, surfaceFinishesEN.length, `SurfaceFinishes (${surfaceFinishes.length}) and surfaceFinishesEN (${surfaceFinishesEN.length}) must have the same length`);
 
     // Generate maps
+    const productTypesMap = entityOperations.productType.generateProductTypesMap(productTypes);
     const formsMap = entityOperations.form.generateFormsMap(forms);
     const materilasMap = entityOperations.material.generateMaterialsMap(materials);
     const constructionTypesMap = entityOperations.constructionType.generateConstructionTypesMap(constructionTypes);
     const surfaceFinishesMap = entityOperations.surfaceFinish.generateSurfaceFinishesMap(surfaceFinishes);
 
     // Generate English maps
+    const productTypesMapEN = entityOperations.productType.generateProductTypesMap(productTypesEN);
     const formsMapEN = entityOperations.form.generateFormsMap(formsEN);
     const materilasMapEN = entityOperations.material.generateMaterialsMap(materialsEN);
     const constructionTypesMapEN = entityOperations.constructionType.generateConstructionTypesMap(constructionTypesEN);
     const surfaceFinishesMapEN = entityOperations.surfaceFinish.generateSurfaceFinishesMap(surfaceFinishesEN);
 
     return {
+        productTypes,
         forms,
         materials,
         constructionTypes,
         surfaceFinishes,
+
+        productTypesMap,
         formsMap,
         materilasMap,
         constructionTypesMap,
         surfaceFinishesMap,
+
+        productTypesEN,
         formsEN,
         materialsEN,
         constructionTypesEN,
         surfaceFinishesEN,
+
+        productTypesMapEN,
         formsMapEN,
         materilasMapEN,
         constructionTypesMapEN,

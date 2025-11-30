@@ -708,6 +708,7 @@ const ImageSchemaBase = z
     size_range: z.string().max(50).nullable().optional(),
     quality_grade: z.string().max(10).nullable().optional(),
     color_variant: z.string().max(50).nullable().optional(),
+    packaging: z.string().max(100).nullable().optional(),
     created_at: z.string().optional(),
   })
   .describe("ImageSchema");

@@ -44,7 +44,7 @@ export type Lookups = {
 }
 
 /**
- * 
+ * Options for loading offerings.
  */
 export const loadOfferingOptions: LoadOfferingsOptions = {
   // excludedWholesalerIds: [99],

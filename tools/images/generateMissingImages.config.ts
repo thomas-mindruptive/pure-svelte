@@ -9,9 +9,39 @@
  * - What style/quality to use (prompt settings)
  */
 
-import type { ImageAnalysisFilters } from "../../src/lib/backendQueries/entityOperations/offering.js";
-import type { ImageMatchConfig } from "../../src/lib/backendQueries/imageMatching.js";
-import { type LoadOfferingsOptions } from '$lib/backendQueries/entityOperations/offering.js';
+import { entityOperations, imageMatching} from "@pure/svelte/backend-queries";
+import { domainTypes } from "@pure/svelte/domain";
+
+
+// Type aliases for namespace types
+// Note: TypeScript doesn't allow namespace type aliases for type access (e.g., OfferingNS.ImageAnalysisFilters),
+// so we must use the full path: entityOperations.offering.ImageAnalysisFilters
+type ImageAnalysisFilters = entityOperations.offering.ImageAnalysisFilters;
+type LoadOfferingsOptions = entityOperations.offering.LoadOfferingsOptions;
+
+
+/**
+ * Lookups needed for creating an image.
+ * We use the Englisch names because AI image gen is better with English.
+ */
+export type Lookups = {
+  forms: domainTypes.Form[];
+  materials: domainTypes.Material[];
+  constructionTypes: domainTypes.ConstructionType[];
+  surfaceFinishes: domainTypes.SurfaceFinish[];
+  formsMap: Map<number, domainTypes.Form>;
+  materilasMap: Map<number, domainTypes.Material>;
+  constructionTypesMap: Map<number, domainTypes.ConstructionType>;
+  surfaceFinishesMap: Map<number, domainTypes.SurfaceFinish>;
+  formsEN: domainTypes.Form[];
+  materialsEN: domainTypes.Material[];
+  constructionTypesEN: domainTypes.ConstructionType[];
+  surfaceFinishesEN: domainTypes.SurfaceFinish[];
+  formsMapEN: Map<number, domainTypes.Form>;
+  materilasMapEN: Map<number, domainTypes.Material>;
+  constructionTypesMapEN: Map<number, domainTypes.ConstructionType>;
+  surfaceFinishesMapEN: Map<number, domainTypes.SurfaceFinish>;
+}
 
 /**
  * 
@@ -50,7 +80,7 @@ export interface ImageGenerationConfig {
   /**
    * Configuration for image matching behavior
    */
-  matching?: Partial<ImageMatchConfig>;
+  matching?: Partial<imageMatching.ImageMatchConfig>;
 
   /**
    * Image generation settings (fal.ai)

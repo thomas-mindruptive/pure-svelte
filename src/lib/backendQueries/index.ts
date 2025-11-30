@@ -8,4 +8,6 @@ export * as rawWhereValidator from "./rawWhereValidator";
 export * as cascadingDeleteOperations from "./cascadingDeleteOperations";
 export * as transactionWrapper from "./transactionWrapper";
 export * as mssqlErrorMapper from "./mssqlErrorMapper";
+export * from "./language";
+export * from "./mapUtils";
 

@@ -10,81 +10,44 @@ import { log } from "$lib/utils/logger";
 import { json } from "@sveltejs/kit";
 import type { Transaction } from "mssql";
 import { type z } from "zod";
+import { buildQuery, executeQuery } from "./queryBuilder";
+import type { QueryPayload } from "./queryGrammar";
+import type { QueryConfig } from "./queryConfig";
 
-type BrandedSchema = z.ZodObject<z.ZodRawShape> & { __brandMeta?: { tableName: string; dbSchema: string } };
+type BrandedSchema = z.ZodObject<z.ZodRawShape> & { __brandMeta?: { tableName: string; dbSchema: string; alias?: string } };
 
-// /**
-//  * Inserts a pre-validated entity record.
-//  */
-// async function insertRecord<S extends BrandedSchema>(schema: S, data: z.output<S>): Promise<Record<string, unknown>> {
-//   log.debug(`insertRecord`);
+/**
+ * Generic function to load data from a database table using QueryPayload.
+ * 
+ * The payload must already contain `from` and `select` clauses.
+ * 
+ * @template T - The type of entity to load
+ * @param transaction - Active database transaction
+ * @param payload - Complete QueryPayload with from, select, and optional WHERE, LIMIT, ORDER BY, etc.
+ * @returns Array of entity records of type T
+ * 
+ * @example
+ * const payload: QueryPayload<Form> = {
+ *   from: { table: "dbo.forms", alias: "f" },
+ *   select: genTypedQualifiedColumns(FormSchema, true),
+ *   where: { ... }
+ * };
+ * const forms = await loadData<Form>(transaction, payload);
+ */
+export async function loadData<T = Record<string, unknown>>(
+  transaction: Transaction,
+  payload: QueryPayload<T>
+): Promise<T[]> {
+  log.debug("loadData", { payload });
 
-//   const meta = schema.__brandMeta!;
-//   if (!meta) {
-//     throw new Error(`Metadata is missing from ${schema.description}`);
-//   }
-//   log.debug(``, { meta });
-//   const fullTableName = `${meta.dbSchema}.${meta.tableName}`;
-//   log.debug(``, { fullTableName });
-//   const keys = Object.keys(data);
-//   log.debug(``, { keys });
+  // Build SQL using queryBuilder
+  const { sql, parameters } = buildQuery(payload, {} as QueryConfig);
+  const result = await executeQuery(sql, parameters, { transaction });
 
-//   const sql = `INSERT INTO ${fullTableName} (${keys.join(", ")}) OUTPUT INSERTED.* VALUES (${keys.map((k) => `@${k}`).join(", ")});`;
+  log.debug(`Data loaded`, { resultLength: result.length });
 
-//   try {
-//     const request = db.request();
-//     for (const key of keys) {
-//       request.input(key, (data as Record<string, unknown>)[key]);
-//     }
-//     const result = await request.query(sql);
-//     if (!result.recordset?.[0]) {
-//       throw new Error("Database did not return the created record.");
-//     }
-//     return result.recordset[0];
-//   } catch (dbError) {
-//     log.error(`[CORE DB] Insert failed for ${fullTableName}`, { error: dbError });
-//     throw dbError;
-//   }
-// }
-
-// /**
-//  * [CORE DB] Updates a pre-validated entity record. Returns null if not found.
-//  */
-// async function updateRecord<S extends BrandedSchema>(
-//   schema: S,
-//   id: number | string,
-//   idColumn: keyof z.infer<S> & string,
-//   data: Partial<z.output<S>>,
-// ): Promise<Record<string, unknown> | null> {
-//   log.debug(`updateRecord`, { id, idColumn });
-
-//   const meta = schema.__brandMeta!;
-//   if (!meta) {
-//     throw new Error(`Metadata is missing from ${schema.description}`);
-//   }
-//   const fullTableName = `${meta.dbSchema}.${meta.tableName}`;
-//   // Filter out the ID column to prevent updating identity columns
-//   const keys = Object.keys(data).filter((k) => k !== idColumn);
-
-//   if (keys.length === 0) {
-//     throw new Error(`No fields to update for ${fullTableName} (ID column was the only field provided)`);
-//   }
-
-//   const sql = `UPDATE ${fullTableName} SET ${keys.map((k) => `${k} = @${k}`).join(", ")} OUTPUT INSERTED.* WHERE ${idColumn} = @id;`;
-
-//   try {
-//     const request = db.request();
-//     for (const key of keys) {
-//       request.input(key, (data as Record<string, unknown>)[key]);
-//     }
-//     request.input("id", id);
-//     const result = await request.query(sql);
-//     return result.recordset?.[0] || null;
-//   } catch (dbError) {
-//     log.error(`[CORE DB] Update failed for ${fullTableName}`, { error: dbError });
-//     throw dbError;
-//   }
-// }
+  return result as T[];
+}
 
 /**
  * Inserts a pre-validated entity record within a transaction.

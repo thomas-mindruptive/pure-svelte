@@ -21,6 +21,7 @@ import { isJoinColCondition, isWhereCondition, isWhereConditionGroup } from "$li
 import type { QueryConfig } from "$lib/backendQueries/queryConfig";
 import type { Transaction } from "mssql";
 import { metaByAlias, schemaByAlias } from "$lib/domain/domainTypes.utils";
+import { LANGUAGE_CODES } from "$lib/backendQueries/language";
 
 // --- TYPE DEFINITIONS for internal use ---
 
@@ -34,6 +35,28 @@ export type BuildContext = {
 };
 
 // --- VALIDATION FUNCTIONS ---
+
+/**
+ * Checks if a table name is a translation table (has a language code suffix).
+ * Translation tables have the same structure as their base table but with a language suffix.
+ * 
+ * @param tableName - The table name to check (e.g., "dbo.materials_en" or "materials_en")
+ * @param expectedTableName - The expected base table name (e.g., "materials")
+ * @returns True if the table name is a valid translation table for the expected table
+ */
+function isTranslationTable(tableName: string, expectedTableName: string): boolean {
+  // Remove schema prefix if present
+  const tableWithoutSchema = tableName.replace(/^dbo\./, "");
+  const expectedWithoutSchema = expectedTableName.replace(/^dbo\./, "");
+  
+  // Check if table name matches expectedTableName + language code
+  for (const langCode of LANGUAGE_CODES) {
+    if (tableWithoutSchema === `${expectedWithoutSchema}_${langCode}`) {
+      return true;
+    }
+  }
+  return false;
+}
 
 /**
  * Validates SELECT columns against branded schema definitions
@@ -312,13 +335,17 @@ export function buildQuery<T>(payload: Partial<QueryPayload<T>> | undefined, con
     }
 
     // SECURITY CHECK 2: The alias must be used for its designated table.
+    // Exception: Translation tables (e.g., materials_en) are allowed if they match the base table structure.
     const expectedFullTableName = `${meta.dbSchema}.${meta.tableName}`;
     const expectedTableName = meta.tableName;
 
     if (table !== expectedFullTableName && table !== expectedTableName) {
-      throw new Error(
-        `Alias '${alias}' is defined in metadata for table '${expectedFullTableName}', ` + `but was incorrectly used for table '${table}'.`,
-      );
+      // Check if this is a translation table (whitelist)
+      if (!isTranslationTable(table, expectedTableName)) {
+        throw new Error(
+          `Alias '${alias}' is defined in metadata for table '${expectedFullTableName}', ` + `but was incorrectly used for table '${table}'.`,
+        );
+      }
     }
 
     // If all checks pass, construct the final FROM clause string for the SQL query.
@@ -354,9 +381,13 @@ export function buildQuery<T>(payload: Partial<QueryPayload<T>> | undefined, con
       }
 
       const expectedFullTableName = `${meta.dbSchema}.${meta.tableName}`;
+      const expectedTableName = meta.tableName;
 
-      if (table !== expectedFullTableName) {
-        throw new Error(`JOIN alias '${alias}' is defined in metadata for table '${expectedFullTableName}', not '${table}'.`);
+      if (table !== expectedFullTableName && table !== expectedTableName) {
+        // Check if this is a translation table (whitelist)
+        if (!isTranslationTable(table, expectedTableName)) {
+          throw new Error(`JOIN alias '${alias}' is defined in metadata for table '${expectedFullTableName}', not '${table}'.`);
+        }
       }
 
       const onClause = buildOnClause(on, ctx);

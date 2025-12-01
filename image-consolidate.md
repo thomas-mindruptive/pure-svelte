@@ -1,288 +1,253 @@
-# Image Tables Consolidation Plan
+# Image Consolidation Plan: Junction Tables + Canonical Images
 
 ## Ziel
 
-Konsolidierung der drei Image-Tabellen (`images`, `offering_images`, `product_definition_images`) in eine einzige Tabelle `images` mit optionalen Foreign Keys (`offering_id`, `product_def_id`). Dies eliminiert:
-- Duplikate von Feldern (material_id, form_id, surface_finish_id, construction_type_id, size_range, quality_grade, color_variant)
-- Das komplexe OOP-Inheritance-Pattern mit separaten Tabellen
-- Die Notwendigkeit, bei jedem Insert/Update beide Tabellen zu aktualisieren
+Umstellung von direkter `offering_id`/`product_def_id` in `images` auf Junction-Tabellen mit expliziten vs. kanonischen Bildern.
 
-## Aktuelle Struktur
+## Architektur-Entscheidungen
 
-### `dbo.images` (Basis-Tabelle)
-- Alle Basis-Felder (filename, filepath, file_hash, etc.)
-- Variant matching fields: `material_id`, `form_id`, `surface_finish_id`, `construction_type_id`
-- Variant dimensions: `size_range`, `quality_grade`, `color_variant`, `packaging`
+### Logik-Regeln
 
-### `dbo.offering_images` (Subklasse)
-- `image_id` (PK+FK)
-- `offering_id` (FK) - **einziger eindeutiger Wert**
-- `image_type`, `sort_order`, `is_primary` - **nicht in Basis-Tabelle**
-- **Duplikate**: material_id, form_id, surface_finish_id, construction_type_id, size_range, quality_grade, color_variant
+1. **Explizite Bilder** (`explicit = true`):
+   - Werden über `ImageDetailPage` gespeichert
+   - Sind offering-spezifisch (z.B. selbstgemachtes Foto)
+   - Werden NIE für andere Offerings verwendet
+   - Mehrere Offerings können explizite Bilder mit gleichem Fingerprint haben
 
-### `dbo.product_definition_images` (Subklasse)
-- `image_id` (PK+FK)
-- `product_def_id` (FK) - **einziger eindeutiger Wert**
-- `image_type`, `sort_order`, `is_primary` - **nicht in Basis-Tabelle**
-- **Duplikate**: material_id, form_id, surface_finish_id, construction_type_id, size_range, quality_grade, color_variant
+2. **Kanonische Bilder** (`explicit = false`):
+   - Werden automatisch generiert (via `tools/images`)
+   - Werden zwischen Offerings mit gleichem Fingerprint geteilt
+   - Nur als "Notfalllösung" wenn kein explizites Bild existiert
 
-## Neue Struktur
+3. **Invariante**:
+   ```
+   explicit = true  → kanonisch = false (immer)
+   explicit = false → kanonisch = true  (immer)
+   ```
 
-### `dbo.images` (Konsolidiert)
-- Alle bestehenden Felder aus `images`
-- **Neue optionale FKs**: `offering_id`, `product_def_id`
-- **Neue Felder**: `image_type`, `sort_order`, `is_primary`
-- **CHECK-Constraint**: Nur einer der beiden FKs darf gesetzt sein (oder beide NULL für standalone images)
+4. **UNIQUE Constraint**:
+   - Nur EIN kanonisches Bild pro `prompt_fingerprint`
+   - Explizite Bilder können denselben Fingerprint haben (kein Constraint)
 
-## Schritt-für-Schritt Umsetzung
+### Tabellenstruktur
 
-### Phase 1: Datenbank-Schema-Änderungen
+#### `dbo.images` (kanonische Bilddaten)
+- `image_id` (PK)
+- `filepath`, `file_hash`, `filename`, etc. (Bilddaten)
+- `material_id`, `form_id`, `surface_finish_id`, `construction_type_id` (Fingerprint-Felder)
+- `size_range`, `quality_grade`, `color_variant`, `packaging`
+- `prompt_fingerprint` (berechnet aus Fingerprint-Feldern)
+- `explicit` (BIT NOT NULL DEFAULT 0) - **Nur diese Spalte, `is_canonical` ist redundant!**
+- UNIQUE Constraint: `(prompt_fingerprint) WHERE explicit = 0`
 
-#### Schritt 1.1: ALTER TABLE Script erstellen
-**Datei:** `pureenergy-schema/ALTER-Consolidate-Image-Tables.sql`
+#### `dbo.offering_images` (Junction-Tabelle)
+- `offering_image_id` (PK)
+- `offering_id` (FK → offerings)
+- `image_id` (FK → images)
+- `is_primary` (BIT)
+- `sort_order` (INT)
+- `created_at` (DATETIME)
 
-```sql
-USE pureenergyworks;
-GO
+**Wichtig:** `explicit` Flag ist nur in `images`, NICHT in Junction-Tabellen (Option A).
 
--- 1. Add new columns to dbo.images
-ALTER TABLE dbo.images
-ADD offering_id INT NULL,
-    product_def_id INT NULL,
-    image_type NVARCHAR(50) NULL,
-    sort_order INT NOT NULL DEFAULT 0,
-    is_primary BIT NOT NULL DEFAULT 0;
-GO
+**Hinweis:** Product Definition Images werden aktuell nicht benötigt und sind aus diesem Plan ausgeschlossen. Falls später benötigt, analog zu Offering Images umsetzen.
 
--- 2. Add CHECK constraint: Only one FK can be set
-ALTER TABLE dbo.images
-ADD CONSTRAINT CK_images_single_parent CHECK (
-    (offering_id IS NULL AND product_def_id IS NOT NULL) OR
-    (offering_id IS NOT NULL AND product_def_id IS NULL) OR
-    (offering_id IS NULL AND product_def_id IS NULL)
-);
-GO
+## Anpassungsliste
 
--- 3. Add Foreign Key constraints
-ALTER TABLE dbo.images
-ADD CONSTRAINT FK_img_offering FOREIGN KEY (offering_id)
-    REFERENCES dbo.wholesaler_item_offerings(offering_id);
+### 1. Domain (Zod Schemas) - `src/lib/domain/domainTypes.ts`
 
-ALTER TABLE dbo.images
-ADD CONSTRAINT FK_img_productdef FOREIGN KEY (product_def_id)
-    REFERENCES dbo.product_definitions(product_def_id);
-GO
+**ImageSchema erweitern:**
+- `explicit: z.boolean().default(false)`
+- `prompt_fingerprint: z.string().max(64).nullable().optional()` (falls noch nicht vorhanden)
 
--- 4. Create indexes
-CREATE INDEX IX_img_offering ON dbo.images(offering_id);
-CREATE INDEX IX_img_productdef ON dbo.images(product_def_id);
-CREATE INDEX IX_img_image_type ON dbo.images(image_type);
-GO
-```
+**Junction-Tabellen-Schemas erstellen:**
+- `OfferingImageJunctionSchema` (offering_images)
+- ~~`ProductDefinitionImageJunctionSchema`~~ (nicht benötigt, siehe Hinweis oben)
 
-#### Schritt 1.2: MIGRATION NICHT BENÖTIGT!
-=> offering_images und product_definition_images sind bereits gedropped!
+**Type-Aliase anpassen:**
+- `OfferingImage_Image` → sollte JOIN mit Junction-Tabelle sein
+- ~~`ProductDefinitionImage_Image`~~ (nicht benötigt)
 
+### 2. DDL - `pureenergy-schema/DDL.sql`
 
-### Phase 2: Domain Types Anpassungen
+**Junction-Tabellen erstellen:**
+- `dbo.offering_images`
+- `dbo.product_definition_images`
 
-#### Schritt 2.1: `ImageSchemaBase` erweitern
-**Datei:** `src/lib/domain/domainTypes.ts` (Zeile 645-670)
+**UNIQUE Constraint auf `images`:**
+- `(prompt_fingerprint) WHERE explicit = 0`
 
-Erweitere `ImageSchemaBase` um:
-```typescript
-offering_id: z.number().int().positive().nullable().optional(),
-product_def_id: z.number().int().positive().nullable().optional(),
-image_type: z.string().max(50).nullable().optional(),
-sort_order: z.number().int().nonnegative().default(0),
-is_primary: z.boolean().default(false),
-```
+### 3. ALTER TABLE Script - `pureenergy-schema/ALTER-Add-Image-Junction-Tables.sql`
 
-#### Schritt 2.2: Subklassen-Schemas entfernen
-**Datei:** `src/lib/domain/domainTypes.ts`
+**Spalten zu `images` hinzufügen:**
+- `explicit BIT NOT NULL DEFAULT 0`
+- `prompt_fingerprint NVARCHAR(64) NULL` (falls noch nicht vorhanden)
 
-- Entferne `ImageSubclassBaseSchema` (Zeile 722-739)
-- Entferne `ProductDefinitionImageSchemaBase` und `ProductDefinitionImage_Schema` (Zeile 741-761)
-- Entferne `OfferingImageSchemaBase` und `OfferingImage_Schema` (Zeile 778-796)
-- Entferne alle `*_Image_Schema` Varianten (Zeile 763-809)
+**Junction-Tabellen erstellen:**
+- `dbo.offering_images`
+- ~~`dbo.product_definition_images`~~ (nicht benötigt)
 
-#### Schritt 2.3: Neue Typ-Aliase erstellen (für Rückwärtskompatibilität)
-**Datei:** `src/lib/domain/domainTypes.ts`
+**Alte Spalten entfernen:**
+- `images.offering_id` → entfernen
+- `images.product_def_id` → entfernen
 
-```typescript
-// Type aliases for backward compatibility during migration
-// WICHTIG: Die tatsächliche Datenstruktur ist flach (Image), keine nested structures mehr!
-// Diese Aliase helfen nur bei der Code-Migration, um bestehende Typ-Referenzen kompatibel zu halten
-export type ProductDefinitionImage = Image;
-export type OfferingImage = Image;
-export type ProductDefinitionImage_Image = Image;  // Flach, nicht { image: Image, ... }
-export type OfferingImage_Image = Image;  // Flach, nicht { image: Image, ... }
-```
+**Hinweis:** Keine Datenmigration nötig, da alle bestehenden Bilder gelöscht werden.
 
-### Phase 3: Entity Operations Anpassungen
+**UNIQUE Constraint erstellen:**
+- `UNIQUE (prompt_fingerprint) WHERE explicit = 0`
 
-#### Schritt 3.1: `image.ts` vereinfachen
-**Datei:** `src/lib/backendQueries/entityOperations/image.ts`
+### 4. Backend Queries - `src/lib/backendQueries/entityOperations/`
 
-**Zu entfernen:**
-- `insertProductDefinitionImageWithImage` (Zeile 135-275)
-- `updateProductDefinitionImageWithImage` (Zeile 286-346)
-- `loadProductDefinitionImageWithImageById` (Zeile 356-381)
-- `loadProductDefinitionImagesWithImage` (Zeile 429-489)
-- `deleteProductDefinitionImageWithImage` (Zeile 501-536)
-- `insertOfferingImageWithImage` (Zeile 820-910)
-- `updateOfferingImageWithImage` (Zeile 916-926)
-- `loadOfferingImageWithImageById` (Zeile 931-941)
-- `loadOfferingImagesWithImage` (Zeile 946-956)
-- `deleteOfferingImageWithImage` (Zeile 961-971)
-- Alle generischen Helper-Funktionen (`updateImageWithSubclass`, `loadImagesWithSubclass`, `loadImageWithSubclassById`, `deleteImageWithSubclass`)
+#### `image.ts`:
+- `insertImage(transaction: Transaction | null, data)`: `explicit = true` setzen, wenn über ImageDetailPage gespeichert
+- `updateImage(transaction: Transaction | null, imageId, data)`: Logik für explizite vs. kanonische Bilder
+- Alle Funktionen erhalten optionale `Transaction | null` als ersten Parameter
+- Verwenden intern `TransWrapper` für Transaction-Handling
+- Neue Funktionen:
+  - `findCanonicalImageByFingerprint(transaction: Transaction | null, fingerprint: string)` → `WHERE explicit = 0 AND prompt_fingerprint = ?`
 
-**Neu zu erstellen:**
-- `insertImage(transaction, data): Promise<Image>` - Einfacher Insert in eine Tabelle
-  - Enthält Coalesce-Logik für `offering_id` und `product_def_id` (siehe Schritt 3.2)
-  - Enthält `enrichImageMetadata` für filepath-basierte Metadaten
-- `updateImage(transaction, imageId, data): Promise<Image>` - Einfacher Update
-  - Enthält Coalesce-Logik für `offering_id` und `product_def_id` (siehe Schritt 3.2)
-- `loadImageById(transaction, imageId): Promise<Image>` - Einfacher Load
-  - Gibt flaches `Image` zurück (keine nested structures)
-- `loadImages(transaction, payload?): Promise<Image[]>` - Bereits vorhanden (Zeile 391-419), anpassen
-  - Gibt `Image[]` zurück (keine JSON-Strings, keine nested structures)
-- `deleteImage(transaction, imageId): Promise<Image>` - Einfacher Delete
-  - Gibt gelöschtes `Image` zurück
+#### Neue Datei: `offeringImage.ts`:
+- **Zentrale Logik für Offering Images** (verwendet `image.ts` intern)
+- Alle Funktionen erhalten optionale `Transaction | null` als ersten Parameter
+- Verwenden intern `TransWrapper` für Transaction-Handling
+- Funktionen:
+  - `loadOfferingImages(transaction: Transaction | null, offeringId, options?: { is_explicit?: boolean })`
+    - Lädt Offering Images via View oder JOIN
+  - `insertOfferingImage(transaction: Transaction | null, data)`
+    - Erstellt Image (via `insertImage()`) + Junction-Eintrag
+    - Setzt `explicit = true` für explizite Bilder
+  - `updateOfferingImage(transaction: Transaction | null, junctionId, data)`
+    - Aktualisiert Junction-Eintrag + ggf. Image
+  - `deleteOfferingImage(transaction: Transaction | null, junctionId)`
+    - Löscht Junction-Eintrag (Image bleibt erhalten)
+  - `loadOfferingImageById(transaction: Transaction | null, junctionId)`
+    - Lädt einzelnes Offering Image via Junction-ID
 
-**Spezielle Logik beibehalten:**
-- `enrichImageMetadata` (Zeile 64-122) - bleibt unverändert, wird in `insertImage` verwendet
-- Coalesce-Logik für Offerings (aus `insertOfferingImageWithImage`) - in `insertImage` integrieren, wenn `offering_id` gesetzt ist
-- Coalesce-Logik für ProductDefinitions (aus `insertProductDefinitionImageWithImage`) - in `insertImage` integrieren, wenn `product_def_id` gesetzt ist
+~~#### Neue Datei: `productDefinitionImage.ts`:~~
+- ~~Analog zu `offeringImage.ts` für ProductDefinition Images~~ (nicht benötigt)
 
-#### Schritt 3.2: Coalesce-Logik in `insertImage` und `updateImage`
+### 5. API Endpoints - `src/routes/api/`
 
-**Wenn `offering_id` gesetzt ist:**
-- Coalesce-Logik aus Offering anwenden (wie bisher bei `insertOfferingImageWithImage`)
-- **Fail-fast**: Wenn Felder für Fingerprint fehlen → API Error Response zurückgeben. orientiere dich an den anderen endpoints und client api. siehe "apiFetchUnion" in "apiClient.ts".
-- Fingerprint-Felder müssen vollständig sein (material_id, form_id, surface_finish_id, construction_type_id, etc.)
+#### `offering-images/`:
+- `+server.ts` (POST): Liste laden (mit JOIN zu images)
+- `[id]/+server.ts` (GET/PUT/DELETE): Einzelne Operationen
+- `new/+server.ts` (POST): Neues explizites Bild erstellen
+  - `explicit = true` setzen
+  - Image + Junction-Eintrag erstellen
 
-**Wenn `product_def_id` gesetzt ist:**
-- Coalesce-Logik aus ProductDefinition anwenden (wenn Variant-Felder NULL sind)
-- Fingerprint aus gesetzten Feldern berechnen
-- **Kein Error**, wenn nicht alle Felder gesetzt sind (optional)
+~~#### `product-definition-images/`:~~
+- ~~Analog zu `offering-images/`~~ (nicht benötigt)
 
-**Implementierung:**
-```typescript
-// In insertImage/updateImage:
-if (data.offering_id) {
-  // Load offering and product def through TWO queries.
+### 6. API Client - `src/lib/api/client/`
 
-  const offering = await loadOffering...
-  const productDef = await loadProductDef...
+#### `offeringImage.ts`:
+- Anpassen: JOIN mit Junction-Tabelle statt direkter `offering_id` in `images`
+- Neue Methoden:
+  - `loadExplicitOfferingImages(offeringId)` → `WHERE explicit = 1`
+  - `loadCanonicalOfferingImages(offeringId)` → `WHERE explicit = 0`
 
-  // Apply coalesce logic
-  data.material_id = data.material_id ?? offering.material_id ?? product_def?.material_id ?? null;
-  // ... etc für alle Fingerprint-Felder
+~~#### `productDefinitionImage.ts`:~~
+- ~~Analog anpassen~~ (nicht benötigt)
 
-  ACHTUNG: Setze hier die felder in das image: data.material_id = ... // und für die anderen felder.
-  ziel: Das image übernimmt beim speichern die felder des offerings.
-  
-  // Fail-fast: Check if all required fingerprint fields are set
-  if (!data.material_id || !data.form_id || !data.surface_finish_id || !data.construction_type_id) {
-    throw error(400, "All fingerprint fields must be set for offering images");
-  }
-}
+### 7. Frontend Components - `src/lib/components/domain/offeringImages/`
 
-if (data.product_def_id) {
-  // Load product_def and apply coalesce logic (optional)
-  const productDef = await loadProductDefinitionById(transaction, data.product_def_id);
-  data.material_id = data.material_id ?? productDef.material_id ?? null;
-  // ... etc
-  // No error if fields are missing - fingerprint will be calculated from available fields
-}
-```
+#### `ImageDetailPage.svelte`:
+- Beim Speichern: `explicit = true` setzen
+- Logik anpassen: Junction-Tabelle statt direkter `offering_id`
 
-### Phase 4: API-Endpunkte Anpassungen
+#### `ImageForm.svelte`:
+- UI-Anpassungen falls nötig (z.B. Anzeige "Explizites Bild")
 
-**WICHTIG:** Die Endpunkte bleiben bestehen, verwenden aber die neuen Methoden aus `image.ts`.
+#### `OfferingDetailPage.svelte`:
+- Bildliste laden: JOIN mit Junction-Tabelle
+- Unterscheidung: Explizite vs. kanonische Bilder anzeigen
 
-**Datenstruktur-Änderung:**
-- **Request**: Endpunkte erwarten jetzt ein **flaches `Image`** (keine nested structures wie `{ image: Image, offering_id: ... }`)
-- **Response**: Endpunkte liefern jetzt ein **flaches `Image`** (keine verschachtelten Strukturen)
-- Das OOP-Inheritance-Pattern mit nested structures wird eliminiert
+### 8. Table Registry - `src/lib/backendQueries/tableRegistry.ts`
 
-**Anzupassende Dateien:**
-- `src/routes/api/offering-images/+server.ts` - Verwendet `loadImages` mit WHERE-Filter auf `offering_id`
-- `src/routes/api/offering-images/new/+server.ts` - Verwendet `insertImage` mit `offering_id` im Request-Body
-- `src/routes/api/offering-images/[id]/+server.ts` - Verwendet `loadImageById`, `updateImage`, `deleteImage`
-- `src/routes/api/product-definition-images/+server.ts` - Verwendet `loadImages` mit WHERE-Filter auf `product_def_id`
-- `src/routes/api/product-definition-images/new/+server.ts` - Verwendet `insertImage` mit `product_def_id` im Request-Body
-- `src/routes/api/product-definition-images/[id]/+server.ts` - Verwendet `loadImageById`, `updateImage`, `deleteImage`
+- Junction-Tabellen hinzufügen:
+  - `offering_images`
+  - ~~`product_definition_images`~~ (nicht benötigt)
 
-**Beispiel für Query-Endpunkt:**
-```typescript
-// Statt loadOfferingImagesWithImage (JSON-String):
-const images = await loadImages(transaction, {
-  where: { key: "offering_id", whereCondOp: ComparisonOperator.EQUALS, val: offeringId }
-});
-// Gibt Image[] zurück, nicht JSON-String
-```
+### 9. Query Config - `src/lib/backendQueries/queryConfig.ts`
 
+- **KEINE JOIN-Konfigurationen nötig** - Views werden stattdessen verwendet (siehe Punkt 11)
 
-### Phase 5: Client API Anpassungen
+### 10. Fingerprint-Berechnung - `src/lib/utils/` oder `src/lib/domain/`
 
-**WICHTIG:** Client API muss angepasst werden, da die Datenstruktur sich ändert!
+- `createFingerprint()` implementieren (siehe `image-fingerprint.md`)
+- `createPromptFingerprint()` für Images
+- Integration in `insertImage()` / `updateImage()`
 
-**Änderungen:**
-- **Request**: Client muss jetzt **flaches `Image`** senden (keine nested structures)
-- **Response**: Client erhält jetzt **flaches `Image`** (keine verschachtelten Strukturen)
-- Die Typ-Aliase (`OfferingImage_Image`, `ProductDefinitionImage_Image`) bleiben für Rückwärtskompatibilität im Code, aber die tatsächliche Datenstruktur ist flach
+### 11. Views - `pureenergy-schema/DDL-Views.sql`
 
-**Anzupassende Dateien:**
-- `src/lib/api/client/offeringImage.ts` - Erwartet/liefert flaches `Image` mit `offering_id`
-- `src/lib/api/client/productDefinitionImage.ts` - Erwartet/liefert flaches `Image` mit `product_def_id`
-- `src/lib/api/client/imageApi.ts` - Kann unverändert bleiben oder erweitert werden
+**Idempotente View erstellen:**
+- `dbo.view_offering_images` (oder ähnlicher Name)
+  - JOIN: `offering_images` → `images`
+  - Enthält alle Felder aus beiden Tabellen
+  - Idempotent: `CREATE OR ALTER VIEW` verwenden
+  - **Zweck**: Ersetzt JOIN-Konfiguration in queryConfig, kann direkt in Queries verwendet werden
 
-**Beispiel:**
-```typescript
-// Vorher (nested):
-const data = { image: { filepath: "...", ... }, offering_id: 123 };
+~~**Analog für ProductDefinition:**~~
+- ~~`dbo.view_product_definition_images`~~ (nicht benötigt)
 
-// Nachher (flach):
-const data = { filepath: "...", offering_id: 123, ... };
-``` 
+**Vorteil:**
+- Keine queryConfig-Einträge nötig
+- Views können direkt in SQL-Queries verwendet werden
+- Einfacher zu warten und zu verstehen
 
+### 12. Dependency Checks - `src/lib/dataModel/dependencyChecks.ts`
 
-### Phase 6: Dependency Checks Anpassungen
+- Prüfen: Hat Image Junction-Einträge?
+- Soft dependencies: Junction-Einträge
+- Hard dependencies: Falls Image noch verwendet wird
 
-#### Schritt 6.1: `dependencyChecks.ts` anpassen
-**Datei:** `src/lib/backendQueries/dependencyChecks.ts`
+### 13. Delete Operations - `src/lib/dataModel/deletes.ts`
 
-- `checkProductDefinitionImageDependencies` (Zeile 480-502) - entfernen oder vereinfachen
-- `checkOfferingImageDependencies` (Zeile 512-534) - entfernen oder vereinfachen
-- Neue generische Funktion: `checkImageDependencies(imageId, transaction)`
+- `deleteImage()`: Prüfen, ob Junction-Einträge existieren
+- `deleteOffering()`: Cascade-Löschen von Junction-Einträgen
+- ~~`deleteProductDefinition()`: Cascade-Löschen von Junction-Einträgen~~ (nicht benötigt)
 
-### Phase 7: Weitere Anpassungen
-KEINE Anpassungen in tools, views, usw. notwendig!
+## Generierungslogik (für tools/images) - **Hinweis für später**
 
-### Phase 8: Migration und Cleanup
+**Hinweis:** Die automatische Bildgenerierung via `tools/images` wird aktuell nicht implementiert, bleibt aber als Architektur-Hinweis für spätere Umsetzung erhalten.
 
-#### Schritt 8.1: Daten-Migration ausführen
-1. ALTER TABLE Script ausführen (Schritt 1.1)
+**Workflow beim Generieren (später umzusetzen):**
 
+1. Prüfe: Hat Offering bereits explizite Bilder? (`explicit = 1`)
+   - Wenn ja: KEINE Generierung, explizite Bilder haben Vorrang
+   - Wenn nein: Weiter zu Schritt 2
 
-#### Schritt 8.2: Code-Migration
-1. Domain Types anpassen (Phase 2)
-2. Entity Operations anpassen (Phase 3)
-3. Dependency Checks anpassen (Phase 6)
+2. Berechne Fingerprint aus Offering (mit Coalesce-Logik)
 
+3. Suche kanonisches Bild mit diesem Fingerprint (`explicit = 0 AND prompt_fingerprint = ?`)
+   - Wenn gefunden: Verwende es (via Junction-Eintrag)
+   - Wenn nicht gefunden: Weiter zu Schritt 4
 
-#### Schritt 8.4: DDL.sql aktualisieren
-**Datei:** `pureenergy-schema/DDL.sql`
+4. Generiere neues Bild via fal.ai
 
-- `CREATE TABLE dbo.offering_images` entfernen (Zeile 532-574)
-- `CREATE TABLE dbo.product_definition_images` entfernen (Zeile 482-523)
-- `CREATE TABLE dbo.images` erweitern um neue Felder (Zeile 433-473)
+5. Speichere als kanonisches Bild (`explicit = 0`)
 
-### Offene Fragen
-1. **Standalone Images**: Sollen Images ohne `offering_id` und `product_def_id` erlaubt sein? (CHECK-Constraint erlaubt das)
-=> JA 
-1. **Rückwärtskompatibilität**: Sollen alte API-Endpunkte beibehalten werden?
-=> JA, siehe oben. Möglichst wenig Änderungen! Die API-Punkte rufen einfach die neuen image.ts funktionen auf. 
+6. Erstelle Junction-Eintrag
 
+## Reihenfolge der Implementierung
+
+1. **Domain** (Schemas) - Grundlage für alles
+2. **ALTER Script** (DDL) - Datenbank-Struktur
+3. **Views** (DDL-Views.sql) - Idempotente Views für JOINs
+4. **Backend Queries** (entityOperations) - Datenzugriff
+   - `offeringImage.ts` (zentrale Logik, verwendet `image.ts`)
+5. **API Endpoints** - Server-API
+6. **API Client** - Client-API
+7. **Frontend Components** - UI
+8. **Table Registry** - Registry-Updates
+9. **Dependency Checks & Deletes** - Cleanup-Logik
+
+## Wichtige Hinweise
+
+- **Nur `explicit` Spalte**: `is_canonical` ist redundant, da `explicit = !canonical` immer gilt
+- **UNIQUE Constraint**: Nur auf kanonische Bilder (`explicit = 0`), nicht auf explizite
+- **Migration**: Keine Migration nötig, da alle bestehenden Bilder gelöscht werden
+- **Generierung**: Tools in `tools/images/` werden aktuell nicht angepasst (siehe "Generierungslogik" Abschnitt)
+- **Transaction-Handling**: Alle entityOperations-Funktionen erhalten optionale `Transaction | null` und verwenden `TransWrapper`
+- **Views statt queryConfig**: Idempotente Views ersetzen JOIN-Konfigurationen in queryConfig
+- **Zentrale Logik**: `offeringImage.ts` kapselt alle Offering-Image-Operationen und verwendet `image.ts` intern

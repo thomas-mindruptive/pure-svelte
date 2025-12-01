@@ -3,7 +3,7 @@
 /**
  * @file Offering Images List API Endpoint
  * @description Provides access to offering image associations with nested image data.
- * Uses entityOperations/image.ts for complex nested operations.
+ * Uses entityOperations/offeringImage.ts for junction table operations.
  */
 
 import { json, type RequestHandler } from '@sveltejs/kit';
@@ -11,14 +11,14 @@ import { log } from '$lib/utils/logger';
 import { buildUnexpectedError } from '$lib/backendQueries/genericEntityOperations';
 import { TransWrapper } from '$lib/backendQueries/transactionWrapper';
 import { db } from '$lib/backendQueries/db';
-import { loadImages } from '$lib/backendQueries/entityOperations/image';
-import type { Image } from '$lib/domain/domainTypes';
-import type { ApiErrorResponse, QueryRequest, QuerySuccessResponse } from '$lib/api/api.types';
+import { loadOfferingImages, type OfferingImageWithJunction } from '$lib/backendQueries/entityOperations/offeringImage';
+import type { ApiErrorResponse, QuerySuccessResponse } from '$lib/api/api.types';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
  * POST /api/offering-images
- * @description Fetches offering images with nested image data based on QueryPayload.
+ * @description Fetches offering images with nested image data.
+ * Expects request body: { offering_id: number, options?: { is_explicit?: boolean } }
  */
 export const POST: RequestHandler = async (event) => {
     const operationId = uuidv4();
@@ -29,54 +29,53 @@ export const POST: RequestHandler = async (event) => {
     const tw = new TransWrapper(null, db);
 
     try {
-        // 1. Parse QueryRequest
-        const requestBody = (await event.request.json()) as QueryRequest<Image>;
-        const clientPayload = requestBody.payload;
+        // 1. Parse request body
+        const requestBody = await event.request.json() as { offering_id: number; options?: { is_explicit?: boolean } };
 
-        if (!clientPayload) {
+        if (!requestBody.offering_id) {
             const errRes: ApiErrorResponse = {
                 success: false,
-                message: 'Request body must be a valid QueryRequest object containing a `payload`.',
+                message: 'Request body must contain `offering_id`.',
                 status_code: 400,
                 error_code: 'BAD_REQUEST',
                 meta: { timestamp: new Date().toISOString() }
             };
-            log.warn(`[${operationId}] FN_FAILURE: Malformed request body.`, { body: requestBody });
+            log.warn(`[${operationId}] FN_FAILURE: Missing offering_id.`, { body: requestBody });
             return json(errRes, { status: 400 });
         }
 
         log.info(`[${operationId}] Parsed request body`, {
-            where: clientPayload.where,
-            limit: clientPayload.limit
+            offering_id: requestBody.offering_id,
+            options: requestBody.options
         });
 
-        // 2. Load with transaction (flat Image[], no nested structures)
+        // 2. Load offering images with junction data
         await tw.begin();
-        const images = await loadImages(tw.trans, clientPayload);
+        const offeringImages = await loadOfferingImages(tw.trans, requestBody.offering_id, requestBody.options);
         await tw.commit();
 
         // 3. Format response
-        const response: QuerySuccessResponse<Image> = {
+        const response: QuerySuccessResponse<OfferingImageWithJunction> = {
             success: true,
             message: 'Offering images retrieved successfully.',
             data: {
-                results: images as Partial<Image>[],
+                results: offeringImages as Partial<OfferingImageWithJunction>[],
                 meta: {
                     retrieved_at: new Date().toISOString(),
-                    result_count: images.length,
+                    result_count: offeringImages.length,
                     columns_selected: ['all'],
-                    has_joins: false,
-                    has_where: !!clientPayload.where,
+                    has_joins: true,
+                    has_where: true,
                     parameter_count: 0,
-                    table_fixed: 'dbo.images',
-                    sql_generated: '(generated via entityOperations/image.ts)'
+                    table_fixed: 'dbo.view_offering_images',
+                    sql_generated: '(generated via entityOperations/offeringImage.ts)'
                 }
             },
             meta: {
                 timestamp: new Date().toISOString()
             }
         };
-        log.info(`[${operationId}] FN_SUCCESS: Returning ${images.length} offering images.`);
+        log.info(`[${operationId}] FN_SUCCESS: Returning ${offeringImages.length} offering images.`);
         return json(response);
     } catch (err: unknown) {
         await tw.rollback();

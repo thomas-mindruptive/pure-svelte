@@ -171,6 +171,8 @@ Einführung eines **schema-gesteuerten Prompt-Fingerprint-Systems**, das:
 
 **Datei:** `src/lib/backendQueries/genericEntityOperations.ts`
 
+**Hinweis:** Diese Integration gilt für **direkte Entity-Inserts/Updates** (z.B. `insertImage` für Images ohne Offering-Kontext). Für Junction-basierte Entities (z.B. `insertOfferingImage`) siehe Schritt 8.3.
+
 1. **Meta auslesen:**
 
    - In beiden Funktionen (`insertRecordWithTransaction`, `updateRecordWithTransaction`) nach dem Laden von `meta`:
@@ -245,7 +247,7 @@ Diese Helfer werden im Save-Flow und für die Coalesce-Logik benötigt.
 
 **Datei:** `src/lib/backendQueries/genericEntityOperations.ts`
 
-### 8.1 Allgemeine Logik
+### 8.1 Allgemeine Logik (für direkte Entity-Operationen)
 
 - In `insertRecordWithTransaction` / `updateRecordWithTransaction`:
 
@@ -256,7 +258,11 @@ Diese Helfer werden im Save-Flow und für die Coalesce-Logik benötigt.
 
 - Da der Client **immer alle Felder** sendet, können wir den Fingerprint bei Insert und Update **immer neu berechnen**, ohne vorherigen SELECT-Merge.
 
+**Hinweis:** Für Junction-basierte Entities (z.B. OfferingImages) siehe Schritt 8.3, da dort Coalesce-Logik erforderlich ist.
+
 ### 8.2 Spezielle Logik für Offerings (Coalesce nach `view_offerings_enriched`)
+
+**Hinweis:** Diese Logik betrifft `wholesaler_item_offerings` (Offerings) direkt, nicht Images. Für Images siehe Schritt 8.3.
 
 - Ziel: Fingerprint soll auf den **finalen, coalesced Werten** basieren, analog zu `view_offerings_enriched`:
   - `finalMaterialId = offering.material_id ?? product_def.material_id`
@@ -285,14 +291,57 @@ Diese Helfer werden im Save-Flow und für die Coalesce-Logik benötigt.
 
 ### 8.3 Logik für Images
 
-- Für `ImageSchema` ist keine Coalesce-Logik nötig:
+**Architektur-Hinweis:** Images verwenden eine Junction-Table-Architektur (`dbo.offering_images`), nicht direkte `offering_id` in `images`. Siehe `image-consolidate.md` für Details.
+
+#### Für `ImageSchema` direkt (ohne Junction)
+
+- Für direkt erstellte Images (z.B. über `insertImage` ohne Offering-Kontext):
   - Fingerprint basiert direkt auf den im Schema definierten Feldern (`material_id`, `form_id`, `surface_finish_id`, `construction_type_id`, `size_range`, `quality_grade`, `color_variant`, `packaging`).
   - Bei Insert/Update wird `prompt_fingerprint` immer neu aus `data` berechnet.
+  - Integration kann in `insertImage` oder `insertRecordWithTransaction` erfolgen.
 
-- Für **OfferingImages** (OOP-Inheritance `offering_images` + `images`):
-  - In den Image-spezifischen Entity-Operationen (falls vorhanden oder später ergänzt):
-    - Das zugehörige Offering via `offering_id` laden (`loadOfferingWithPdefCatSupp`).
-    - Die coalesced Offering-Eigenschaften + image-spezifische Felder (z.B. `image_type`, `size_range`, `color_variant`) in einen kombinierten Fingerprint einfließen lassen.
+#### Für OfferingImages (Junction-basiert)
+
+- **Wichtig:** Die Fingerprint-Berechnung muss in `insertOfferingImage` (nicht in `insertImage`) erfolgen, da dort die Offering-Daten bereits geladen und gemerged werden.
+
+- Vorgehen in `entityOperations/offeringImage.ts`:
+
+  1. **Bereits implementiert:** `insertOfferingImage` lädt Offering-Daten mit COALESCE-Logik (Zeilen 145-167):
+     ```ts
+     SELECT 
+       COALESCE(wio.material_id, pd.material_id) AS material_id,
+       COALESCE(wio.form_id, pd.form_id) AS form_id,
+       ...
+     FROM dbo.wholesaler_item_offerings wio
+     INNER JOIN dbo.product_definitions pd ON wio.product_def_id = pd.product_def_id
+     WHERE wio.offering_id = @offeringId
+     ```
+
+  2. **Bereits implementiert:** Offering-Felder werden in `imageData` gemerged (Zeilen 171-184):
+     ```ts
+     const imageData = {
+       ...inputData,
+       material_id: inputData.material_id ?? offering.material_id,
+       form_id: inputData.form_id ?? offering.form_id,
+       ...
+     };
+     ```
+
+  3. **Zu implementieren:** Fingerprint-Berechnung **nach dem Merge, vor dem Aufruf von `insertImage`**:
+     ```ts
+     // Nach Zeile 184, vor Zeile 185 (insertImage)
+     if (ImageSchema.__brandMeta?.fingerPrintForPromptProps) {
+       const fingerprint = createPromptFingerprint(ImageSchema, imageData as any);
+       if (fingerprint) {
+         imageData.prompt_fingerprint = fingerprint;
+       }
+     }
+     const createdImage = await insertImage(transWrapper.trans, imageData);
+     ```
+
+  4. **View-Unterstützung:** Die View `dbo.view_offering_images` kann für Queries verwendet werden, enthält bereits alle gemerged Felder.
+
+- **Für Updates:** Analog in `updateOfferingImage` - Fingerprint neu berechnen, wenn relevante Felder geändert wurden.
 
 ---
 
@@ -304,6 +353,9 @@ Diese Helfer werden im Save-Flow und für die Coalesce-Logik benötigt.
      npm run build:lib testen
 3. **Schritt 7**: neue Entity-Helfer für ProductDefinitions und Offerings hinzufügen
    npm run build:lib testen
-4. **Schritt 8**: `insertRecordWithTransaction` / `updateRecordWithTransaction` anpassen und Offering-Save-Flow (`insertOffering`/`updateOffering`, API-Routen) refaktorisieren.
+4. **Schritt 8**: 
+   - `insertRecordWithTransaction` / `updateRecordWithTransaction` anpassen (für direkte Entity-Operationen)
+   - `insertOfferingImage` / `updateOfferingImage` erweitern (Fingerprint-Berechnung nach Coalesce-Merge, siehe Schritt 8.3)
+   - Offering-Save-Flow (`insertOffering`/`updateOffering`, API-Routen) refaktorisieren.
      npm run build:lib testen
 

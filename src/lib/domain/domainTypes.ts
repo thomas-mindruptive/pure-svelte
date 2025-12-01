@@ -665,13 +665,11 @@ const ImageSchemaBase = z
     quality_grade: z.string().max(10).nullable().optional(),
     color_variant: z.string().max(50).nullable().optional(),
     packaging: z.string().max(100).nullable().optional(),
-    // Foreign keys for consolidated image tables
-    offering_id: z.number().int().positive().nullable().optional(),
-    product_def_id: z.number().int().positive().nullable().optional(),
+    // Fingerprint and explicit flag for canonical vs explicit images
+    prompt_fingerprint: z.string().max(64).nullable().optional(),
+    explicit: z.boolean().default(false),
     // Image metadata (from former subclass tables)
     image_type: z.string().max(50).nullable().optional(),
-    sort_order: z.number().int().nonnegative().default(0),
-    is_primary: z.boolean().default(false),
     created_at: z.string().optional(),
   })
   .describe("ImageSchema");
@@ -698,6 +696,38 @@ const tempImageForCreate = ImageSchema.omit({
   mime_type: true,
 }).describe("ImageForCreateSchema");
 export const ImageForCreateSchema = copyMetaFrom(ImageSchema, tempImageForCreate);
+
+// ===== OFFERING IMAGE JUNCTION (dbo.offering_images) =====
+
+const OfferingImageJunctionSchemaBase = z
+  .object({
+    offering_image_id: z.number().int().positive(),
+    offering_id: z.number().int().positive(),
+    image_id: z.number().int().positive(),
+    is_primary: z.boolean().default(false),
+    sort_order: z.number().int().nonnegative().default(0),
+    created_at: z.string().optional(),
+  })
+  .describe("OfferingImageJunctionSchema");
+
+export const OfferingImageJunctionSchema = createSchemaWithMeta(OfferingImageJunctionSchemaBase, {
+  alias: "oi",
+  tableName: "offering_images",
+  dbSchema: "dbo",
+} as const);
+
+/**
+ * Schema for creating a new OfferingImage junction entry.
+ * Omits server-generated fields.
+ */
+const tempOfferingImageJunctionForCreate = OfferingImageJunctionSchema.omit({
+  offering_image_id: true,
+  created_at: true,
+}).describe("OfferingImageJunctionForCreateSchema");
+export const OfferingImageJunctionForCreateSchema = copyMetaFrom(
+  OfferingImageJunctionSchema,
+  tempOfferingImageJunctionForCreate
+);
 
 // ===== IMAGE SIZE RANGE ENUM =====
 
@@ -842,6 +872,24 @@ export const OfferingEnrichedViewSchema = createSchemaWithMeta(OfferingEnrichedV
   dbSchema: "dbo",
 } as const);
 
+// ===== VIEW: view_offering_images (dbo.view_offering_images) =====
+// This view joins offering_images (junction) with images table
+
+const OfferingImageViewSchemaBase = ImageSchema.extend({
+  // Junction table fields
+  offering_image_id: z.number().int().positive(),
+  offering_id: z.number().int().positive(),
+  is_primary: z.boolean().default(false),
+  sort_order: z.number().int().nonnegative().default(0),
+  offering_image_created_at: z.string().nullable().optional(), // ISO datetime string
+}).describe("OfferingImageViewSchema");
+
+export const OfferingImageViewSchema = createSchemaWithMeta(OfferingImageViewSchemaBase, {
+  alias: "voi",
+  tableName: "view_offering_images",
+  dbSchema: "dbo",
+} as const);
+
 // ===== SCHEMAS => TYPES  =====
 
 export type Wholesaler = z.infer<typeof WholesalerSchema>;
@@ -883,6 +931,7 @@ export type OrderItem = z.infer<typeof OrderItemSchema>;
 export type OrderItem_ProdDef_Category = z.infer<typeof OrderItem_ProdDef_Category_Schema>;
 
 export type Image = z.infer<typeof ImageSchema>;
+export type OfferingImageJunction = z.infer<typeof OfferingImageJunctionSchema>;
 // Type aliases for backward compatibility during migration
 // WICHTIG: Die tatsächliche Datenstruktur ist flach (Image), keine nested structures mehr!
 export type ProductDefinitionImage = Image;
@@ -904,6 +953,7 @@ export type OfferingReportViewWithLinks = OfferingReportView & {
 };
 
 export type OfferingEnrichedView = z.infer<typeof OfferingEnrichedViewSchema>;
+export type OfferingImageView = z.infer<typeof OfferingImageViewSchema>;
 
 // ===== ALL BRANDED SCHEMAS (= with meta info)  =====
 
@@ -925,6 +975,7 @@ export const AllBrandedSchemas = {
   SurfaceFinishSchema,
   ConstructionTypeSchema,
   ImageSchema,
+  OfferingImageJunctionSchema,
 } as const;
 
 // ===== HELPER EXPORT =====

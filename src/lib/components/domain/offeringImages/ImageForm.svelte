@@ -18,15 +18,14 @@
   import type { ValidationErrorTree } from "$lib/components/validation/validation.types";
   import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
   import {
-    OfferingImage_Image_Schema,
     ImageSizeRange,
-    type OfferingImage_Image,
+    type Image,
     type Material,
     type Form,
     type ConstructionType,
     type SurfaceFinish,
   } from "$lib/domain/domainTypes";
-  import { zodToValidationErrorTree } from "$lib/domain/domainTypes.utils";
+  import type { OfferingImageWithJunction } from "$lib/backendQueries/entityOperations/offeringImage";
   import { assertDefined } from "$lib/utils/assertions";
   import { log } from "$lib/utils/logger";
 
@@ -35,7 +34,7 @@
   // === PROPS ====================================================================================
 
   export type Props = {
-    initial?: OfferingImage_Image | undefined | null;
+    initial?: OfferingImageWithJunction | undefined | null;
     offeringId: number;
     materials: Material[];
     forms: Form[];
@@ -104,26 +103,12 @@
   // === VALIDATE =================================================================================
 
   const { zodErrors, formData } = $derived.by(() => {
-    let err: ValidationErrorTree = {};
-
-    // In create mode, we don't validate against the full schema (missing image_id)
-    // The form data will be validated on submit
-    if (!isCreateMode) {
-      const result = OfferingImage_Image_Schema.nullable().safeParse(initialData);
-      if (result.error) {
-        err.offeringImage = zodToValidationErrorTree(result.error);
-        log.error(`Validation of image to OfferingImage_Image_Schema failed.`, {
-          error: result.error,
-          initial: initialData,
-        });
-      }
-    }
-
+    // No schema validation needed - validation happens on submit
     return {
       validatedData: null,
       formData: initialData,
-      zodErrors: err,
-      isValid: isCreateMode ? true : Object.keys(err).length === 0,
+      zodErrors: {} as ValidationErrorTree,
+      isValid: true,
       initialValidatedData: null,
     };
   });
@@ -132,8 +117,8 @@
 
   // === BUSINESS FUNCTIONALITY ===================================================================
 
-  function validateImage(raw: Record<string, any>): ValidateResult<OfferingImage_Image> {
-    const data = raw as OfferingImage_Image;
+  function validateImage(raw: Record<string, any>): ValidateResult<OfferingImageWithJunction> {
+    const data = raw as OfferingImageWithJunction;
     const errors: Record<string, string[]> = {};
 
     // Validate image fields
@@ -143,14 +128,9 @@
       errors["filepath"] = ["Filepath is required"];
     }
 
-    // Ensure offering_id is set
-    if (!data.offering_id) {
-      errors.offering_id = ["Offering ID is required"];
-    }
-
     return {
       valid: Object.keys(errors).length === 0,
-      errors: errors as Errors<OfferingImage_Image>,
+      errors: errors as Errors<OfferingImageWithJunction>,
     };
   }
 
@@ -158,18 +138,40 @@
 
   async function submitImage(raw: Record<string, any>) {
     log.debug(`Submitting image`, raw);
-    const data = raw as OfferingImage_Image;
-
-    // Ensure offering_id is set from prop
-    data.offering_id = offeringId;
+    const data = raw as OfferingImageWithJunction;
 
     const isUpdate = !isCreateMode;
     try {
       if (isUpdate) {
-        assertDefined(data.image_id, "image_id is required for update");
-        return await imageApi.updateOfferingImage(data.image_id, data);
+        assertDefined(data.offering_image_id, "offering_image_id is required for update");
+        // Extract only the fields that can be updated (image fields + junction fields)
+        const updateData: Partial<Image> & { is_primary?: boolean; sort_order?: number } = {
+          filepath: data.filepath,
+          material_id: data.material_id,
+          form_id: data.form_id,
+          surface_finish_id: data.surface_finish_id,
+          construction_type_id: data.construction_type_id,
+          size_range: data.size_range,
+          quality_grade: data.quality_grade,
+          color_variant: data.color_variant,
+          packaging: data.packaging,
+          image_type: data.image_type,
+          shopify_url: data.shopify_url,
+          shopify_media_id: data.shopify_media_id,
+          uploaded_to_shopify_at: data.uploaded_to_shopify_at,
+          explicit: data.explicit,
+          is_primary: data.is_primary,
+          sort_order: data.sort_order,
+        };
+        return await imageApi.updateOfferingImage(data.offering_image_id, updateData);
       } else {
-        return await imageApi.createOfferingImage(data);
+        // Create: include offering_id in data
+        const createData: Partial<Image> & { offering_id: number; is_primary?: boolean; sort_order?: number } = {
+          ...data,
+          offering_id: offeringId,
+          explicit: data.explicit !== undefined ? data.explicit : true, // Default to explicit
+        };
+        return await imageApi.createOfferingImage(createData);
       }
     } catch (e) {
       log.error("SUBMIT_FAILED", { error: String(e) });
@@ -199,7 +201,7 @@
 <!--
   -- Material combo
   -->
-{#snippet materialCombo(fieldProps: FieldsSnippetProps<OfferingImage_Image>)}
+{#snippet materialCombo(fieldProps: FieldsSnippetProps<OfferingImageWithJunction>)}
   <FormComboBox2
     {fieldProps}
     items={materials}
@@ -217,7 +219,7 @@
 <!--
   -- Form combo
   -->
-{#snippet formCombo(fieldProps: FieldsSnippetProps<OfferingImage_Image>)}
+{#snippet formCombo(fieldProps: FieldsSnippetProps<OfferingImageWithJunction>)}
   <FormComboBox2
     {fieldProps}
     items={forms}
@@ -235,7 +237,7 @@
 <!--
   -- Surface Finish combo
   -->
-{#snippet surfaceFinishCombo(fieldProps: FieldsSnippetProps<OfferingImage_Image>)}
+{#snippet surfaceFinishCombo(fieldProps: FieldsSnippetProps<OfferingImageWithJunction>)}
   <FormComboBox2
     {fieldProps}
     items={surfaceFinishes}
@@ -253,7 +255,7 @@
 <!--
   -- Construction Type combo
   -->
-{#snippet constructionTypeCombo(fieldProps: FieldsSnippetProps<OfferingImage_Image>)}
+{#snippet constructionTypeCombo(fieldProps: FieldsSnippetProps<OfferingImageWithJunction>)}
   <FormComboBox2
     {fieldProps}
     items={constructionTypes}
@@ -273,7 +275,7 @@
 <ValidationWrapper errors={zodErrors}>
   <FormShell
     entity="Image"
-    initial={formData as OfferingImage_Image}
+    initial={formData as OfferingImageWithJunction}
     validate={validateImage}
     submitCbk={submitImage}
     autoValidate="change"
@@ -285,7 +287,7 @@
   >
     <!-- Header ---------------------------------------------------------------------------------->
     {#snippet header({ data, dirty })}
-      {@const image = data as OfferingImage_Image}
+      {@const image = data as OfferingImageWithJunction}
       <div class="form-header">
         <div>
           {#if image?.image_id}
@@ -307,7 +309,7 @@
 
     <!-- Fields ---------------------------------------------------------------------------------->
     {#snippet fields(fieldProps)}
-      {@const image = fieldProps.data as OfferingImage_Image}
+      {@const image = fieldProps.data as OfferingImageWithJunction}
       <div class="form-body">
         <div class="form-row-grid">
           <!-- ===== IMAGE FIELDS ===== -->

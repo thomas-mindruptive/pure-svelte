@@ -1,10 +1,10 @@
 // src/routes/api/offering-images/new/+server.ts
 
 /**
- * @file Create Offering Image API Endpoint (OOP Inheritance Pattern)
+ * @file Create Offering Image API Endpoint (Junction Table Pattern)
  * @description POST /api/offering-images/new
- * Creates a new OfferingImage with nested Image data.
- * Inserts into BOTH tables atomically with the same image_id (OOP inheritance).
+ * Creates a new OfferingImage with Image and junction entry.
+ * Sets explicit = true for explicit images.
  */
 
 import { type RequestHandler } from '@sveltejs/kit';
@@ -12,15 +12,15 @@ import { log } from '$lib/utils/logger';
 import { buildUnexpectedError } from '$lib/backendQueries/genericEntityOperations';
 import { TransWrapper } from '$lib/backendQueries/transactionWrapper';
 import { db } from '$lib/backendQueries/db';
-import { insertImage } from '$lib/backendQueries/entityOperations/image';
-import type { Image } from '$lib/domain/domainTypes';
+import { insertOfferingImage, type OfferingImageWithJunction } from '$lib/backendQueries/entityOperations/offeringImage';
 import type { ApiSuccessResponse } from '$lib/api/api.types';
 import { v4 as uuidv4 } from 'uuid';
 import { json } from '@sveltejs/kit';
 
 /**
  * POST /api/offering-images/new
- * @description Creates a new offering image with nested image data.
+ * @description Creates a new offering image with image and junction entry.
+ * Sets explicit = true by default for explicit images.
  */
 export const POST: RequestHandler = async ({ request }) => {
     const operationId = uuidv4();
@@ -38,17 +38,17 @@ export const POST: RequestHandler = async ({ request }) => {
         });
 
         await tw.begin();
-        const createdRecord = await insertImage(tw.trans, requestData);
+        const createdRecord = await insertOfferingImage(tw.trans, requestData);
         await tw.commit();
 
-        const response: ApiSuccessResponse<{ offeringImage: Image }> = {
+        const response: ApiSuccessResponse<{ offeringImage: OfferingImageWithJunction }> = {
             success: true,
             message: "Offering image created successfully.",
             data: { offeringImage: createdRecord },
             meta: { timestamp: new Date().toISOString() },
         };
 
-        log.info(`[${operationId}] FN_SUCCESS: Offering image created with image_id ${createdRecord.image_id}`);
+        log.info(`[${operationId}] FN_SUCCESS: Offering image created with offering_image_id ${createdRecord.offering_image_id}`);
         return json(response, { status: 201 });
     } catch (err: unknown) {
         await tw.rollback();

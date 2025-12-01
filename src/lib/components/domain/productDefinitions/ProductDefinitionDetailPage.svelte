@@ -4,8 +4,7 @@
   import { goto } from "$app/navigation";
   import { ApiClient } from "$lib/api/client/apiClient";
   import { getOfferingApi } from "$lib/api/client/offering";
-  import { getProductDefinitionImageApi } from "$lib/api/client/productDefinitionImage";
-  import type { ColumnDef, DeleteStrategy, ID, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
+  import type { DeleteStrategy, ID, RowActionStrategy } from "$lib/components/grids/Datagrid.types";
   import {
     FormSchema,
     MaterialSchema,
@@ -23,16 +22,12 @@
     SurfaceFinishSchema,
     ProductCategorySchema,
     type ProductCategory,
-    ProductDefinitionImage_Image_Schema,
-    type ProductDefinitionImage_Image,
-    ProductDefinitionImage_Image_ProductDef_Schema,
   } from "$lib/domain/domainTypes";
   import { addNotification } from "$lib/stores/notifications";
   import { log } from "$lib/utils/logger";
   // Component Imports
   import OfferingGrid from "$lib/components/domain/offerings/OfferingGrid.svelte";
   import ProductDefinitionForm from "./ProductDefinitionForm.svelte";
-  import Datagrid from "$lib/components/grids/Datagrid.svelte";
   // The new form component
   import "$lib/components/styles/detail-page-layout.css";
   import "$lib/components/styles/grid-section.css";
@@ -52,8 +47,7 @@
   import { error } from "@sveltejs/kit";
   import { getContext } from "svelte";
   import { getErrorMessage } from "$lib/api/client/common";
-  import type { SortDescriptor, WhereCondition, WhereConditionGroup, QueryPayload } from "$lib/backendQueries/queryGrammar";
-  import { ComparisonOperator } from "$lib/backendQueries/queryGrammar";
+  import type { SortDescriptor, WhereCondition, WhereConditionGroup } from "$lib/backendQueries/queryGrammar";
   import { getSurfaceFinishApi } from "$lib/api/client/surfaceFinish";
   import { getConstructionTypeApi } from "$lib/api/client/constructionType";
   import { getProductCategoryApi } from "$lib/api/client/productCategory";
@@ -61,7 +55,7 @@
   // === TYPES ====================================================================================
 
   // TODO: Validate through typing, derived from navigationHierarchieConfig.
-  export type ProductDefChildRelationships = "offerings" | "images";
+  export type ProductDefChildRelationships = "offerings";
 
   // === PROPS ====================================================================================
 
@@ -82,13 +76,11 @@
   const allowForceCascadingDelte = $state(true);
   let productDefinition: ProductDefinition | null = $state(null);
   let offerings: Wio_PDef_Cat_Supp_Nested_WithLinks[] = $state([]);
-  let images: ProductDefinitionImage_Image[] = $state([]);
   let constructionTypes: ConstructionType[] = $state([]);
   let surfaceFinishes: SurfaceFinish[] = $state([]);
   let materials: Material[] = $state([]);
   let forms: Form[] = $state([]);
   let categories: ProductCategory[] = $state([]);
-  let allowForceCascadingDelete = $state(true);
 
   // Get page-local loading context from layout
   type PageLoadingContext = { isLoading: boolean };
@@ -104,7 +96,6 @@
   const offeringApi = getOfferingApi(client);
   const materialApi = getMaterialApi(client);
   const formApi = getFormApi(client);
-  const productDefinitionImageApi = getProductDefinitionImageApi(client);
 
   // === LOAD DATA ================================================================================
 
@@ -164,12 +155,6 @@
             errors.offerings = zodToValidationErrorTree(offeringsVal.error);
           }
 
-          images = await productDefinitionImageApi.loadProductDefinitionImagesForProduct(productDefId);
-          if (aborted) return;
-          const imagesVal = safeParseFirstN(ProductDefinitionImage_Image_Schema, images, 3);
-          if (!imagesVal.success) {
-            errors.images = zodToValidationErrorTree(imagesVal.error);
-          }
 
           constructionTypes = await constructionTypeApi.loadConstructionTypes();
           if (aborted) return;
@@ -320,98 +305,6 @@
     doubleClick: handleOfferingSelect,
   };
 
-  // === IMAGES GRID ==============================================================================
-
-  async function reloadImages() {
-    assertDefined(productDefinition, "productDefinition");
-    assertDefined(productDefId, "productDefId");
-
-    log.info(`Re-fetching images for productDefId: ${productDefId}`);
-    const updatedImages = await productDefinitionImageApi.loadProductDefinitionImagesForProduct(productDefId);
-    images = updatedImages;
-    log.info("Local state for images updated.");
-  }
-
-  function handleImageCreate(): void {
-    log.info(`Navigating to create new image.`);
-    goto(buildChildUrl(page.url.pathname, "images", "new"));
-  }
-
-  function handleImageSelect(image: ProductDefinitionImage_Image, options?: { _blankWindow?: boolean }) {
-    log.info(`Selected image: `, image);
-    const { image_id } = image;
-    if (image_id) {
-      const targetUrl = buildChildUrl(page.url.pathname, "images", image_id);
-      if (options?._blankWindow) {
-        log.debug(`Opening in new tab: ${targetUrl}`);
-        window.open(targetUrl, "_blank");
-      } else {
-        log.debug(`Going to: ${targetUrl}`);
-        goto(targetUrl);
-      }
-    } else {
-      log.error("Cannot navigate to image, missing image_id", { image });
-      addNotification("Cannot navigate: image data is incomplete.", "error");
-    }
-  }
-
-  async function handleImageDelete(ids: ID[]): Promise<void> {
-    let dataChanged = false;
-    const idsAsNumber = stringsToNumbers(ids);
-
-    dataChanged = await cascadeDelete(
-      idsAsNumber,
-      productDefinitionImageApi.deleteProductDefinitionImage,
-      {
-        domainObjectName: "Image",
-        softDepInfo: "Image has soft dependencies.",
-        hardDepInfo: "Image has hard dependencies.",
-      },
-      allowForceCascadingDelete,
-    );
-
-    if (dataChanged) {
-      await reloadImages();
-    }
-  }
-
-  async function handleImagesSort(sortState: SortDescriptor<ProductDefinitionImage_Image>[] | null) {
-    try {
-      const query: Partial<QueryPayload<ProductDefinitionImage_Image>> = {
-        where: {
-          key: "pdi.product_def_id" as keyof ProductDefinitionImage_Image,
-          whereCondOp: "=" as ComparisonOperator,
-          val: productDefId,
-        },
-        ...(sortState && { orderBy: sortState }),
-      };
-      images = await productDefinitionImageApi.loadProductDefinitionImages(query);
-    } catch (e: unknown) {
-      addNotification(`Error during sorting API: ${getErrorMessage(e)}`);
-    }
-  }
-
-  const imagesDeleteStrategy: DeleteStrategy<ProductDefinitionImage_Image> = {
-    execute: handleImageDelete,
-  };
-
-  const imagesRowActionStrategy: RowActionStrategy<ProductDefinitionImage_Image> = {
-    click: handleImageSelect,
-    doubleClick: handleImageSelect,
-  };
-
-  const imagesColumns: ColumnDef<typeof ProductDefinitionImage_Image_ProductDef_Schema>[] = [
-    { key: "image_id", header: "ID", accessor: (img) => img.image_id, sortable: true },
-    { key: "filename", header: "Filename", accessor: (img) => img.filename || "—", sortable: true },
-    { key: "image_type", header: "Type", accessor: (img) => img.image_type || "—", sortable: true },
-    { key: "size_range", header: "Size Range", accessor: (img) => img.size_range || "—", sortable: true },
-    { key: "quality_grade", header: "Quality", accessor: (img) => img.quality_grade || "—", sortable: true },
-    { key: "color_variant", header: "Color", accessor: (img) => img.color_variant || "—", sortable: true },
-    { key: "sort_order", header: "Sort", accessor: (img) => img.sort_order, sortable: true },
-    { key: "is_primary", header: "Primary", accessor: (img) => img.is_primary ? "Yes" : "No", sortable: true },
-  ];
-
-  const getImageRowId = (image: ProductDefinitionImage_Image) => image.image_id;
 
   // === FORM EVENT HANDLERS =======================================================================
 
@@ -477,34 +370,6 @@
 {/snippet}
 
 
-{#snippet imagesSection()}
-  <div class="grid-section">
-    {#if !isCreateMode}
-      <h2>Images for this Product</h2>
-      <button
-        class="pc-grid__createbtn"
-        onclick={handleImageCreate}
-        disabled={isLoading}
-      >
-        Create Image
-      </button>
-      <Datagrid
-        rows={images}
-        columns={imagesColumns}
-        getId={getImageRowId}
-        gridId="images"
-        entity="image"
-        deleteStrategy={imagesDeleteStrategy}
-        rowActionStrategy={imagesRowActionStrategy}
-        onSort={handleImagesSort}
-      />
-    {:else}
-      <p>Images will be displayed here after the product definition has been saved.</p>
-    {/if}
-  </div>
-{/snippet}
-
-<!-- Images -------------------------------------------------------------------------------------->
 
 <!------------------------------------------------------------------------------------------------
   TEMPLATE 
@@ -536,11 +401,9 @@
       {#if "offerings" === activeChildPath}
         <!-- Offerings -->
         {@render offeringsSection()}
-      {:else if "images" === activeChildPath}
-        {@render imagesSection()}
       {:else}
         <div class="error-boundary">
-          <p>Wrong active child path, must be "offerings" or "images" but was: {activeChildPath}</p>
+          <p>Wrong active child path, must be "offerings" but was: {activeChildPath}</p>
         </div>
       {/if}
     </div>

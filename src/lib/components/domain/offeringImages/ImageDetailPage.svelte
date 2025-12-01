@@ -8,7 +8,8 @@
   import { getFormApi } from "$lib/api/client/form";
   import { getConstructionTypeApi } from "$lib/api/client/constructionType";
   import { getSurfaceFinishApi } from "$lib/api/client/surfaceFinish";
-  import type { OfferingImage_Image, Material, Form, ConstructionType, SurfaceFinish } from "$lib/domain/domainTypes";
+  import type { Material, Form, ConstructionType, SurfaceFinish } from "$lib/domain/domainTypes";
+  import type { OfferingImageWithJunction } from "$lib/backendQueries/entityOperations/offeringImage";
   import { addNotification } from "$lib/stores/notifications";
   import { log } from "$lib/utils/logger";
   import { browser } from "$app/environment";
@@ -20,7 +21,7 @@
   // === TYPES ====================================================================================
 
   export type ImageDetailPageProps = {
-    imageId: number | "new";
+    imageId: number | "new"; // NOTE: This is now offering_image_id (junction ID), not image_id
     offeringId: number;
     productDefId?: number | undefined;
     categoryId: number;
@@ -34,7 +35,7 @@
   // === STATE ====================================================================================
 
   let isLoading = $state(true);
-  let image: OfferingImage_Image | null = $state(null);
+  let image: OfferingImageWithJunction | null = $state(null);
   let materials: Material[] = $state([]);
   let forms: Form[] = $state([]);
   let constructionTypes: ConstructionType[] = $state([]);
@@ -93,17 +94,15 @@
           log.debug(`Loaded image`, { image });
         } else {
           // Create mode - initialize with empty structure and defaults
-          // NOTE: After consolidation, Image structure is FLAT (no nested image object)
-          // All fields (offering_id, filepath, filename, etc.) are at the top level
+          // NOTE: Using OfferingImageWithJunction (Image + junction fields)
           image = {
+            // Junction fields
+            offering_image_id: 0, // Will be set by server
             offering_id: offeringId,
-            sort_order: 0,
             is_primary: false,
-            image_type: null,
-            size_range: null,
-            quality_grade: null,
-            color_variant: null,
-            // Image fields directly in the object (FLAT structure after consolidation)
+            sort_order: 0,
+            // Image fields
+            image_id: 0, // Will be set by server
             filename: "",
             filepath: "",
             file_hash: null,
@@ -114,7 +113,19 @@
             shopify_url: null,
             shopify_media_id: null,
             uploaded_to_shopify_at: null,
-          } as Partial<OfferingImage_Image> as OfferingImage_Image;
+            material_id: null,
+            form_id: null,
+            surface_finish_id: null,
+            construction_type_id: null,
+            size_range: null,
+            quality_grade: null,
+            color_variant: null,
+            packaging: null,
+            prompt_fingerprint: null,
+            explicit: true, // Default to explicit for manually created images
+            image_type: null,
+            created_at: undefined,
+          } as OfferingImageWithJunction;
         }
       } catch (err: any) {
         if (aborted) return;
@@ -146,18 +157,18 @@
     }
   }
 
-  async function handleFormSubmitted(info: { data: OfferingImage_Image; result: unknown }) {
+  async function handleFormSubmitted(info: { data: OfferingImageWithJunction; result: unknown }) {
     log.info(`Image ${isCreateMode ? "created" : "updated"} successfully`, info.result);
     addNotification(`Image ${isCreateMode ? "created" : "updated"} successfully.`, "success");
 
     if (isCreateMode) {
       // After creating, navigate to the edit page for the new image
-      const createdImage = info.result as OfferingImage_Image;
-      if (createdImage?.image_id) {
+      const createdImage = info.result as OfferingImageWithJunction;
+      if (createdImage?.offering_image_id) {
         if (isSuppliersRoute) {
-          goto(`/suppliers/${supplierId}/categories/${categoryId}/offerings/${offeringId}/images/${createdImage.image_id}`);
+          goto(`/suppliers/${supplierId}/categories/${categoryId}/offerings/${offeringId}/images/${createdImage.offering_image_id}`);
         } else {
-          goto(`/categories/${categoryId}/productdefinitions/${productDefId}/offerings/${offeringId}/images/${createdImage.image_id}`);
+          goto(`/categories/${categoryId}/productdefinitions/${productDefId}/offerings/${offeringId}/images/${createdImage.offering_image_id}`);
         }
       } else {
         addNotification("Could not redirect to edit page, returning to image list.", "error");
@@ -166,17 +177,17 @@
     } else {
       // In edit mode, reload the image to show updated data
       if (typeof imageId === "number") {
-        image = await imageApi.loadOfferingImage(imageId);
+        image = await imageApi.loadOfferingImage(imageId); // imageId is now offering_image_id
       }
     }
   }
 
-  async function handleFormSubmitError(info: { data: OfferingImage_Image; error: unknown }) {
+  async function handleFormSubmitError(info: { data: OfferingImageWithJunction; error: unknown }) {
     log.error(`Image submit error`, info.error);
     addNotification(`Image submit error: ${info.error}`, "error");
   }
 
-  async function handleFormCancelled(info: { data: OfferingImage_Image; reason?: string }) {
+  async function handleFormCancelled(info: { data: OfferingImageWithJunction; reason?: string }) {
     log.debug(`Image form cancelled`);
     addNotification(`Form cancelled.`, "info");
     handleBack();

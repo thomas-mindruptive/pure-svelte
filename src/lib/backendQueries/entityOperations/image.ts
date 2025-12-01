@@ -13,6 +13,8 @@ import { insertRecordWithTransaction, updateRecordWithTransaction } from "../gen
 import { buildQuery } from "../queryBuilder";
 import { type QueryPayload } from "../queryGrammar";
 import type { QueryConfig } from "../queryConfig";
+import { TransWrapper } from "../transactionWrapper";
+import { db } from "../db";
 
 // Node.js modules for file metadata extraction
 import * as path from 'path';
@@ -115,19 +117,23 @@ async function enrichImageMetadata(
 
 /**
  * Inserts a new Image into the database.
- * Applies coalesce logic for offering_id and product_def_id if set.
  * Enriches image metadata from filepath.
  *
- * @param transaction - Active database transaction
+ * @param transaction - Optional database transaction (null = create own transaction)
  * @param data - Unvalidated Image data from client
  * @returns Created Image record with generated image_id
- * @throws Error 400 if validation fails or required fingerprint fields are missing for offering images
+ * @throws Error 400 if validation fails
  */
 export async function insertImage(
-  transaction: Transaction,
+  transaction: Transaction | null,
   data: unknown
 ): Promise<Image> {
   log.debug("insertImage - validating");
+  
+  const transWrapper = new TransWrapper(transaction, db);
+  await transWrapper.begin();
+  
+  try {
 
   // 1. Validate Image data (omit image_id and created_at for create)
   const schemaForCreate = ImageForCreateSchema;
@@ -154,7 +160,7 @@ export async function insertImage(
 
   // 3. Check if Image already exists (UNIQUE constraint on filepath)
   if (sanitized.filepath) {
-    const checkExistingRequest = transaction.request();
+    const checkExistingRequest = transWrapper.request();
     checkExistingRequest.input('filepath', sanitized.filepath);
     const existingResult = await checkExistingRequest.query(
       'SELECT image_id FROM dbo.images WHERE filepath = @filepath'
@@ -164,212 +170,54 @@ export async function insertImage(
       const existingImageId = existingResult.recordset[0].image_id;
       log.debug("Reusing existing image", { image_id: existingImageId, filepath: sanitized.filepath });
 
-      const loadRequest = transaction.request();
+      const loadRequest = transWrapper.request();
       loadRequest.input('id', existingImageId);
       const loadResult = await loadRequest.query('SELECT * FROM dbo.images WHERE image_id = @id');
       const existingImage = loadResult.recordset[0] as Image;
 
-      // If offering_id is provided and existing image doesn't have one (or has a different one), update it
-      if (sanitized.offering_id !== undefined && sanitized.offering_id !== null) {
-        if (existingImage.offering_id === null || existingImage.offering_id !== sanitized.offering_id) {
-          log.debug("Updating offering_id on existing image", {
-            existing_offering_id: existingImage.offering_id,
-            new_offering_id: sanitized.offering_id,
-          });
-          
-          // Apply coalesce logic for offering_id before updating
-          // This ensures fingerprint fields are also updated if needed
-          const offeringRequest = transaction.request();
-          offeringRequest.input('offering_id', sanitized.offering_id);
-          const offeringResult = await offeringRequest.query(`
-            SELECT material_id, form_id, surface_finish_id, construction_type_id, product_def_id
-            FROM dbo.wholesaler_item_offerings
-            WHERE offering_id = @offering_id
-          `);
-
-          let productDef: { material_id: number | null; form_id: number | null; surface_finish_id: number | null; construction_type_id: number | null } | null = null;
-
-          if (offeringResult.recordset.length > 0) {
-            const offering = offeringResult.recordset[0];
-            
-            if (offering.product_def_id) {
-              const productDefRequest = transaction.request();
-              productDefRequest.input('product_def_id', offering.product_def_id);
-              const productDefResult = await productDefRequest.query(`
-                SELECT material_id, form_id, surface_finish_id, construction_type_id
-                FROM dbo.product_definitions
-                WHERE product_def_id = @product_def_id
-              `);
-              
-              if (productDefResult.recordset.length > 0) {
-                productDef = productDefResult.recordset[0];
-              }
-            }
-
-            // Apply coalesce logic: existing ?? data ?? offering ?? product_def ?? null
-            const material_id = existingImage.material_id ?? sanitized.material_id ?? offering.material_id ?? productDef?.material_id ?? null;
-            const form_id = existingImage.form_id ?? sanitized.form_id ?? offering.form_id ?? productDef?.form_id ?? null;
-            const surface_finish_id = existingImage.surface_finish_id ?? sanitized.surface_finish_id ?? offering.surface_finish_id ?? productDef?.surface_finish_id ?? null;
-            const construction_type_id = existingImage.construction_type_id ?? sanitized.construction_type_id ?? offering.construction_type_id ?? productDef?.construction_type_id ?? null;
-
-            // Update with offering_id and coalesced fingerprint fields
-            const updateRequest = transaction.request();
-            updateRequest.input('id', existingImageId);
-            updateRequest.input('offering_id', sanitized.offering_id);
-            updateRequest.input('material_id', material_id);
-            updateRequest.input('form_id', form_id);
-            updateRequest.input('surface_finish_id', surface_finish_id);
-            updateRequest.input('construction_type_id', construction_type_id);
-            const updateResult = await updateRequest.query(
-              `UPDATE dbo.images 
-               SET offering_id = @offering_id, 
-                   material_id = @material_id, 
-                   form_id = @form_id, 
-                   surface_finish_id = @surface_finish_id, 
-                   construction_type_id = @construction_type_id 
-               OUTPUT INSERTED.* 
-               WHERE image_id = @id`
-            );
-            return updateResult.recordset[0] as Image;
-          } else {
-            // Offering not found, just update offering_id
-            const updateRequest = transaction.request();
-            updateRequest.input('id', existingImageId);
-            updateRequest.input('offering_id', sanitized.offering_id);
-            const updateResult = await updateRequest.query(
-              'UPDATE dbo.images SET offering_id = @offering_id OUTPUT INSERTED.* WHERE image_id = @id'
-            );
-            return updateResult.recordset[0] as Image;
-          }
-        }
-      }
-
+      await transWrapper.commit();
       return existingImage;
     }
   }
 
-  // 4. Apply coalesce logic for offering_id
-  if (sanitized.offering_id) {
-    log.debug("Applying coalesce logic for offering", { offering_id: sanitized.offering_id });
-
-    // Load offering (flat)
-    const offeringRequest = transaction.request();
-    offeringRequest.input('offering_id', sanitized.offering_id);
-    const offeringResult = await offeringRequest.query(`
-      SELECT material_id, form_id, surface_finish_id, construction_type_id, product_def_id
-      FROM dbo.wholesaler_item_offerings
-      WHERE offering_id = @offering_id
-    `);
-
-    let productDef: { material_id: number | null; form_id: number | null; surface_finish_id: number | null; construction_type_id: number | null } | null = null;
-
-    if (offeringResult.recordset.length > 0) {
-      const offering = offeringResult.recordset[0];
-      
-      // Load product_def if offering has one
-      if (offering.product_def_id) {
-        const productDefRequest = transaction.request();
-        productDefRequest.input('product_def_id', offering.product_def_id);
-        const productDefResult = await productDefRequest.query(`
-          SELECT material_id, form_id, surface_finish_id, construction_type_id
-          FROM dbo.product_definitions
-          WHERE product_def_id = @product_def_id
-        `);
-        
-        if (productDefResult.recordset.length > 0) {
-          productDef = productDefResult.recordset[0];
-        }
-      }
-
-      // Apply coalesce logic: data ?? offering ?? product_def ?? null
-      sanitized.material_id = sanitized.material_id ?? offering.material_id ?? productDef?.material_id ?? null;
-      sanitized.form_id = sanitized.form_id ?? offering.form_id ?? productDef?.form_id ?? null;
-      sanitized.surface_finish_id = sanitized.surface_finish_id ?? offering.surface_finish_id ?? productDef?.surface_finish_id ?? null;
-      sanitized.construction_type_id = sanitized.construction_type_id ?? offering.construction_type_id ?? productDef?.construction_type_id ?? null;
-
-      log.debug("Coalesced values for offering image", {
-        offering_id: sanitized.offering_id,
-        material_id: sanitized.material_id,
-        form_id: sanitized.form_id,
-        surface_finish_id: sanitized.surface_finish_id,
-        construction_type_id: sanitized.construction_type_id,
-      });
-
-      // Fail-fast: Check if all required fingerprint fields are set
-      if (!sanitized.material_id || !sanitized.form_id || !sanitized.surface_finish_id || !sanitized.construction_type_id) {
-        const errorResponse = {
-          success: false,
-          message: "All fingerprint fields (material_id, form_id, surface_finish_id, construction_type_id) must be set for offering images.",
-          status_code: 400,
-          error_code: "MISSING_FINGERPRINT_FIELDS",
-          meta: { timestamp: new Date().toISOString() },
-        };
-        log.warn("Missing fingerprint fields for offering image", errorResponse);
-        throw error(400, JSON.stringify(errorResponse));
-      }
-    }
-  }
-
-  // 5. Apply coalesce logic for product_def_id (optional, no error if fields missing)
-  if (sanitized.product_def_id && !sanitized.offering_id) {
-    log.debug("Applying coalesce logic for product definition", { product_def_id: sanitized.product_def_id });
-
-    const productDefRequest = transaction.request();
-    productDefRequest.input('product_def_id', sanitized.product_def_id);
-    const productDefResult = await productDefRequest.query(`
-      SELECT material_id, form_id, surface_finish_id, construction_type_id
-      FROM dbo.product_definitions
-      WHERE product_def_id = @product_def_id
-    `);
-
-    if (productDefResult.recordset.length > 0) {
-      const productDef = productDefResult.recordset[0];
-
-      // COALESCE logic: provided value ?? product_def value ?? null
-      sanitized.material_id = sanitized.material_id ?? productDef.material_id ?? null;
-      sanitized.form_id = sanitized.form_id ?? productDef.form_id ?? null;
-      sanitized.surface_finish_id = sanitized.surface_finish_id ?? productDef.surface_finish_id ?? null;
-      sanitized.construction_type_id = sanitized.construction_type_id ?? productDef.construction_type_id ?? null;
-
-      log.debug("Coalesced values for product definition image", {
-        product_def_id: sanitized.product_def_id,
-        material_id: sanitized.material_id,
-        form_id: sanitized.form_id,
-        surface_finish_id: sanitized.surface_finish_id,
-        construction_type_id: sanitized.construction_type_id,
-      });
-    }
-  }
-
-  // 6. Insert Image
+  // 4. Insert Image
   log.debug("Inserting new image", { filename: sanitized.filename });
   const insertedImage = (await insertRecordWithTransaction(
     ImageForCreateSchema,
     sanitized as any,
-    transaction
+    transWrapper.trans
   )) as Image;
 
   log.debug("Image inserted successfully", { image_id: insertedImage.image_id });
+  await transWrapper.commit();
   return insertedImage;
+  } catch (err) {
+    await transWrapper.rollback();
+    throw err;
+  }
 }
 
 /**
  * Updates an existing Image in the database.
- * Applies coalesce logic for offering_id and product_def_id if set.
  * Re-enriches image metadata if filepath changed.
  *
- * @param transaction - Active database transaction
+ * @param transaction - Optional database transaction (null = create own transaction)
  * @param imageId - The image_id to update
  * @param data - Partial Image data from client
  * @returns Updated Image record
- * @throws Error 400 if validation fails or required fingerprint fields are missing for offering images
+ * @throws Error 400 if validation fails
  */
 export async function updateImage(
-  transaction: Transaction,
+  transaction: Transaction | null,
   imageId: number,
   data: unknown
 ): Promise<Image> {
   log.debug("updateImage - validating", { imageId });
+  
+  const transWrapper = new TransWrapper(transaction, db);
+  await transWrapper.begin();
+  
+  try {
 
   // 1. Validate partial Image data
   const schemaForUpdate = ImageSchema.partial();
@@ -394,91 +242,14 @@ export async function updateImage(
     Object.assign(sanitized, enriched);
   }
 
-  // 3. Apply coalesce logic for offering_id (if offering_id is being set/changed)
-  if (sanitized.offering_id !== undefined) {
-    log.debug("Applying coalesce logic for offering", { offering_id: sanitized.offering_id });
-
-    // Load offering (flat)
-    const offeringRequest = transaction.request();
-    offeringRequest.input('offering_id', sanitized.offering_id);
-    const offeringResult = await offeringRequest.query(`
-      SELECT material_id, form_id, surface_finish_id, construction_type_id, product_def_id
-      FROM dbo.wholesaler_item_offerings
-      WHERE offering_id = @offering_id
-    `);
-
-    let productDef: { material_id: number | null; form_id: number | null; surface_finish_id: number | null; construction_type_id: number | null } | null = null;
-
-    if (offeringResult.recordset.length > 0) {
-      const offering = offeringResult.recordset[0];
-      
-      // Load product_def if offering has one
-      if (offering.product_def_id) {
-        const productDefRequest = transaction.request();
-        productDefRequest.input('product_def_id', offering.product_def_id);
-        const productDefResult = await productDefRequest.query(`
-          SELECT material_id, form_id, surface_finish_id, construction_type_id
-          FROM dbo.product_definitions
-          WHERE product_def_id = @product_def_id
-        `);
-        
-        if (productDefResult.recordset.length > 0) {
-          productDef = productDefResult.recordset[0];
-        }
-      }
-
-      // Apply coalesce logic: data ?? offering ?? product_def ?? null
-      sanitized.material_id = sanitized.material_id ?? offering.material_id ?? productDef?.material_id ?? null;
-      sanitized.form_id = sanitized.form_id ?? offering.form_id ?? productDef?.form_id ?? null;
-      sanitized.surface_finish_id = sanitized.surface_finish_id ?? offering.surface_finish_id ?? productDef?.surface_finish_id ?? null;
-      sanitized.construction_type_id = sanitized.construction_type_id ?? offering.construction_type_id ?? productDef?.construction_type_id ?? null;
-
-      // Fail-fast: Check if all required fingerprint fields are set
-      if (!sanitized.material_id || !sanitized.form_id || !sanitized.surface_finish_id || !sanitized.construction_type_id) {
-        const errorResponse = {
-          success: false,
-          message: "All fingerprint fields (material_id, form_id, surface_finish_id, construction_type_id) must be set for offering images.",
-          status_code: 400,
-          error_code: "MISSING_FINGERPRINT_FIELDS",
-          meta: { timestamp: new Date().toISOString() },
-        };
-        log.warn("Missing fingerprint fields for offering image", errorResponse);
-        throw error(400, JSON.stringify(errorResponse));
-      }
-    }
-  }
-
-  // 4. Apply coalesce logic for product_def_id (optional, no error if fields missing)
-  if (sanitized.product_def_id !== undefined && sanitized.offering_id === undefined) {
-    log.debug("Applying coalesce logic for product definition", { product_def_id: sanitized.product_def_id });
-
-    const productDefRequest = transaction.request();
-    productDefRequest.input('product_def_id', sanitized.product_def_id);
-    const productDefResult = await productDefRequest.query(`
-      SELECT material_id, form_id, surface_finish_id, construction_type_id
-      FROM dbo.product_definitions
-      WHERE product_def_id = @product_def_id
-    `);
-
-    if (productDefResult.recordset.length > 0) {
-      const productDef = productDefResult.recordset[0];
-
-      // COALESCE logic: provided value ?? product_def value ?? null
-      sanitized.material_id = sanitized.material_id ?? productDef.material_id ?? null;
-      sanitized.form_id = sanitized.form_id ?? productDef.form_id ?? null;
-      sanitized.surface_finish_id = sanitized.surface_finish_id ?? productDef.surface_finish_id ?? null;
-      sanitized.construction_type_id = sanitized.construction_type_id ?? productDef.construction_type_id ?? null;
-    }
-  }
-
-  // 5. Update Image
+  // 3. Update Image
   log.debug("Updating image", { image_id: imageId });
   const updatedImage = await updateRecordWithTransaction(
     ImageSchema,
     imageId,
     "image_id",
     sanitized,
-    transaction
+    transWrapper.trans
   );
 
   if (!updatedImage) {
@@ -486,96 +257,165 @@ export async function updateImage(
   }
 
   log.debug("Image updated successfully", { image_id: imageId });
+  await transWrapper.commit();
   return updatedImage as Image;
+  } catch (err) {
+    await transWrapper.rollback();
+    throw err;
+  }
 }
 
 /**
  * Loads a single Image by image_id.
  *
- * @param transaction - Active database transaction
+ * @param transaction - Optional database transaction (null = create own transaction)
  * @param imageId - The image_id to load
  * @returns Image record or null if not found
  */
 export async function loadImageById(
-  transaction: Transaction,
+  transaction: Transaction | null,
   imageId: number
 ): Promise<Image | null> {
   log.debug("loadImageById", { imageId });
 
-  const request = transaction.request();
-  request.input('id', imageId);
-  const result = await request.query('SELECT * FROM dbo.images WHERE image_id = @id');
+  const transWrapper = new TransWrapper(transaction, db);
+  await transWrapper.begin();
+  
+  try {
+    const request = transWrapper.request();
+    request.input('id', imageId);
+    const result = await request.query('SELECT * FROM dbo.images WHERE image_id = @id');
 
-  if (result.recordset.length === 0) {
-    return null;
+    await transWrapper.commit();
+    
+    if (result.recordset.length === 0) {
+      return null;
+    }
+
+    return result.recordset[0] as Image;
+  } catch (err) {
+    await transWrapper.rollback();
+    throw err;
   }
-
-  return result.recordset[0] as Image;
 }
 
 /**
  * Loads images from the database using QueryPayload.
  * Returns flat Image[] (no nested structures, no JSON strings).
  *
- * @param transaction - Active database transaction
+ * @param transaction - Optional database transaction (null = create own transaction)
  * @param payload - Optional QueryPayload from client (WHERE, LIMIT, ORDER BY, etc.)
  * @returns Array of Image records
  */
 export async function loadImages(
-  transaction: Transaction,
+  transaction: Transaction | null,
   payload?: Partial<QueryPayload<Image>>
 ): Promise<Image[]> {
   log.debug("loadImages", { clientPayload: payload });
 
-  // 1. Define fixed base query
-  const basePayload: QueryPayload<Image> = {
-    from: { table: "dbo.images", alias: "img" },
-    select: genTypedQualifiedColumns(ImageSchema, true)
-  };
+  const transWrapper = new TransWrapper(transaction, db);
+  await transWrapper.begin();
+  
+  try {
+    // 1. Define fixed base query
+    const basePayload: QueryPayload<Image> = {
+      from: { table: "dbo.images", alias: "img" },
+      select: genTypedQualifiedColumns(ImageSchema, true)
+    };
 
-  // 2. Merge payload (WHERE, LIMIT, custom ORDER BY override base)
-  const mergedPayload: QueryPayload<Image> = {
-    ...basePayload,
-    ...(payload?.where && { where: payload.where }),
-    ...(payload?.limit && { limit: payload.limit }),
-    ...(payload?.offset && { offset: payload.offset }),
-    ...(payload?.orderBy && { orderBy: payload.orderBy }), // Client can override
-  };
+    // 2. Merge payload (WHERE, LIMIT, custom ORDER BY override base)
+    const mergedPayload: QueryPayload<Image> = {
+      ...basePayload,
+      ...(payload?.where && { where: payload.where }),
+      ...(payload?.limit && { limit: payload.limit }),
+      ...(payload?.offset && { offset: payload.offset }),
+      ...(payload?.orderBy && { orderBy: payload.orderBy }), // Client can override
+    };
 
-  // 3. Build SQL using queryBuilder
-  const { sql, parameters } = buildQuery(mergedPayload, {} as QueryConfig);
-  const result = await queryBuilder.executeQuery(sql, parameters, {transaction});
+    // 3. Build SQL using queryBuilder
+    const { sql, parameters } = buildQuery(mergedPayload, {} as QueryConfig);
+    const result = await queryBuilder.executeQuery(sql, parameters, {transaction: transWrapper.trans});
 
-  log.debug("Images loaded", { resultLength: result.length });
-
-  return result as Image[];
+    log.debug("Images loaded", { resultLength: result.length });
+    await transWrapper.commit();
+    return result as Image[];
+  } catch (err) {
+    await transWrapper.rollback();
+    throw err;
+  }
 }
 
 /**
  * Deletes an Image from the database.
  *
- * @param transaction - Active database transaction
+ * @param transaction - Optional database transaction (null = create own transaction)
  * @param imageId - The image_id to delete
  * @returns Deleted Image record
  * @throws Error 404 if image not found
  */
 export async function deleteImage(
-  transaction: Transaction,
+  transaction: Transaction | null,
   imageId: number
 ): Promise<Image> {
   log.debug("deleteImage", { imageId });
 
-  const request = transaction.request();
-  request.input('id', imageId);
-  const result = await request.query('DELETE FROM dbo.images OUTPUT DELETED.* WHERE image_id = @id');
+  const transWrapper = new TransWrapper(transaction, db);
+  await transWrapper.begin();
+  
+  try {
+    const request = transWrapper.request();
+    request.input('id', imageId);
+    const result = await request.query('DELETE FROM dbo.images OUTPUT DELETED.* WHERE image_id = @id');
 
-  if (result.recordset.length === 0) {
-    throw error(404, `Image with ID ${imageId} not found.`);
+    if (result.recordset.length === 0) {
+      throw error(404, `Image with ID ${imageId} not found.`);
+    }
+
+    const deletedImage = result.recordset[0] as Image;
+    log.debug("Image deleted successfully", { image_id: imageId });
+    await transWrapper.commit();
+    return deletedImage;
+  } catch (err) {
+    await transWrapper.rollback();
+    throw err;
   }
+}
 
-  const deletedImage = result.recordset[0] as Image;
-  log.debug("Image deleted successfully", { image_id: imageId });
-  return deletedImage;
+/**
+ * Finds a canonical image by fingerprint.
+ * Only returns images where explicit = 0 (canonical images).
+ *
+ * @param transaction - Optional database transaction (null = create own transaction)
+ * @param fingerprint - The prompt_fingerprint to search for
+ * @returns Image record or null if not found
+ */
+export async function findCanonicalImageByFingerprint(
+  transaction: Transaction | null,
+  fingerprint: string
+): Promise<Image | null> {
+  log.debug("findCanonicalImageByFingerprint", { fingerprint });
+
+  const transWrapper = new TransWrapper(transaction, db);
+  await transWrapper.begin();
+  
+  try {
+    const request = transWrapper.request();
+    request.input('fingerprint', fingerprint);
+    const result = await request.query(
+      'SELECT * FROM dbo.images WHERE explicit = 0 AND prompt_fingerprint = @fingerprint'
+    );
+
+    await transWrapper.commit();
+    
+    if (result.recordset.length === 0) {
+      return null;
+    }
+
+    return result.recordset[0] as Image;
+  } catch (err) {
+    await transWrapper.rollback();
+    throw err;
+  }
 }
 
 

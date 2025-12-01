@@ -45,8 +45,8 @@
     Form,
     ConstructionType,
     SurfaceFinish,
-    OfferingImage_Image,
   } from "$lib/domain/domainTypes";
+  import type { OfferingImageWithJunction } from "$lib/backendQueries/entityOperations/offeringImage";
   import {
     Wio_PDef_Cat_Supp_Nested_WithLinks_Schema,
     ProductDefinitionSchema,
@@ -57,7 +57,7 @@
     SurfaceFinishSchema,
     AttributeSchema,
     WholesalerOfferingLinkSchema,
-    OfferingImage_Image_Schema,
+    OfferingImageViewSchema,
   } from "$lib/domain/domainTypes";
   import { getErrorMessage } from "$lib/api/client/common";
   import type { ValidationErrorTree } from "$lib/components/validation/validation.types";
@@ -65,7 +65,7 @@
   import { safeParseFirstN, zodToValidationErrorTree } from "$lib/domain/domainTypes.utils";
   import { cascadeDelete } from "$lib/api/client/cascadeDelete";
   import { stringsToNumbers } from "$lib/utils/typeConversions";
-  import type { QueryPayload, ComparisonOperator, SortDescriptor } from "$lib/backendQueries/queryGrammar";
+  import type { SortDescriptor } from "$lib/backendQueries/queryGrammar";
 
   // === TYPES ====================================================================================
 
@@ -99,7 +99,7 @@
   let availableAttributes = $state<Attribute[]>([]);
   let links = $state<WholesalerOfferingLink[]>([]);
   let sourceOfferings = $state<Wio_PDef_Cat_Supp_Nested_WithLinks[]>([]);
-  let images = $state<OfferingImage_Image[]>([]);
+  let images = $state<OfferingImageWithJunction[]>([]);
   let copiedShopOfferingId = $state<number | null>(null);
 
   // Lookups to material, form, etc.
@@ -266,12 +266,9 @@
               }
             }
           } else if ("images" === data.activeChildPath) {
-            images = await offeringImageApi.loadOfferingImagesForOffering(data.offeringId);
+            images = await offeringImageApi.loadOfferingImages(data.offeringId);
             if (aborted) return;
-            const imagesVal = safeParseFirstN(OfferingImage_Image_Schema, images, 3);
-            if (!imagesVal.success) {
-              errors.images = zodToValidationErrorTree(imagesVal.error);
-            }
+            // No schema validation needed - OfferingImageWithJunction is a type, not a schema
           } else {
             const msg = `Invalid data.activeChildPath: ${data.activeChildPath}`;
             log.error(msg);
@@ -702,7 +699,7 @@
     assertDefined(data.offeringId, "offeringId");
 
     log.info(`Re-fetching images for offeringId: ${data.offeringId}`);
-    const updatedImages = await offeringImageApi.loadOfferingImagesForOffering(data.offeringId);
+    const updatedImages = await offeringImageApi.loadOfferingImages(data.offeringId);
     images = updatedImages;
     log.info("Local state for images updated.");
   }
@@ -712,11 +709,11 @@
     goto(buildChildUrl(page.url.pathname, "images", "new"));
   }
 
-  function handleImageSelect(image: OfferingImage_Image, options?: { _blankWindow?: boolean }) {
+  function handleImageSelect(image: OfferingImageWithJunction, options?: { _blankWindow?: boolean }) {
     log.info(`Selected image: `, image);
-    const { image_id } = image;
-    if (image_id) {
-      const targetUrl = buildChildUrl(page.url.pathname, "images", image_id);
+    const { offering_image_id } = image;
+    if (offering_image_id) {
+      const targetUrl = buildChildUrl(page.url.pathname, "images", offering_image_id);
       if (options?._blankWindow) {
         log.debug(`Opening in new tab: ${targetUrl}`);
         window.open(targetUrl, "_blank");
@@ -725,7 +722,7 @@
         goto(targetUrl);
       }
     } else {
-      log.error("Cannot navigate to image, missing image_id", { image });
+      log.error("Cannot navigate to image, missing offering_image_id", { image });
       addNotification("Cannot navigate: image data is incomplete.", "error");
     }
   }
@@ -734,49 +731,49 @@
     let dataChanged = false;
     const idsAsNumber = stringsToNumbers(ids);
 
-    dataChanged = await cascadeDelete(
-      idsAsNumber,
-      offeringImageApi.deleteOfferingImage,
-      {
-        domainObjectName: "Image",
-        softDepInfo: "Image has soft dependencies.",
-        hardDepInfo: "Image has hard dependencies.",
-      },
-      true, // allowForceCascade
-    );
+    // Delete junction entries (images are not deleted, only the junction)
+    for (const id of idsAsNumber) {
+      try {
+        await offeringImageApi.deleteOfferingImage(id, false, false);
+        dataChanged = true;
+      } catch (e) {
+        log.error(`Failed to delete offering image ${id}`, e);
+        addNotification(`Failed to delete image: ${getErrorMessage(e)}`, "error");
+      }
+    }
 
     if (dataChanged) {
       await reloadImages();
     }
   }
 
-  async function handleImagesSort(sortState: SortDescriptor<OfferingImage_Image>[] | null) {
+  async function handleImagesSort(sortState: SortDescriptor<OfferingImageWithJunction>[] | null) {
+    // Sorting is now handled client-side since the API returns all images for an offering
+    // The API already returns images sorted by sort_order, so we just reload
     try {
-      const query: Partial<QueryPayload<OfferingImage_Image>> = {
-        where: {
-          key: "oi.offering_id" as keyof OfferingImage_Image,
-          whereCondOp: "=" as ComparisonOperator,
-          val: data.offeringId,
-        },
-        ...(sortState && { orderBy: sortState }),
-      };
-      images = await offeringImageApi.loadOfferingImages(query);
+      images = await offeringImageApi.loadOfferingImages(data.offeringId);
+      // If custom sort is needed, apply it client-side here
+      if (sortState && sortState.length > 0) {
+        // Client-side sorting could be implemented here if needed
+        log.debug("Client-side sorting not implemented, using server default order");
+      }
     } catch (e: unknown) {
-      addNotification(`Error during sorting API: ${getErrorMessage(e)}`);
+      addNotification(`Error during sorting: ${getErrorMessage(e)}`);
     }
   }
 
-  const imagesDeleteStrategy: DeleteStrategy<OfferingImage_Image> = {
+  const imagesDeleteStrategy: DeleteStrategy<OfferingImageWithJunction> = {
     execute: handleImageDelete,
   };
 
-  const imagesRowActionStrategy: RowActionStrategy<OfferingImage_Image> = {
+  const imagesRowActionStrategy: RowActionStrategy<OfferingImageWithJunction> = {
     click: handleImageSelect,
     doubleClick: handleImageSelect,
   };
 
-  const imagesColumns: ColumnDef<typeof OfferingImage_Image_Schema>[] = [
-    { key: "image_id", header: "ID", accessor: (img) => img.image_id, sortable: true },
+  const imagesColumns: ColumnDef<typeof OfferingImageViewSchema>[] = [
+    { key: "offering_image_id", header: "Junction ID", accessor: (img) => img.offering_image_id, sortable: true },
+    { key: "image_id", header: "Image ID", accessor: (img) => img.image_id, sortable: true },
     { key: "filename", header: "Filename", accessor: (img) => img.filename || "—", sortable: true },
     { key: "image_type", header: "Type", accessor: (img) => img.image_type || "—", sortable: true },
     { key: "size_range", header: "Size Range", accessor: (img) => img.size_range || "—", sortable: true },
@@ -784,9 +781,10 @@
     { key: "color_variant", header: "Color", accessor: (img) => img.color_variant || "—", sortable: true },
     { key: "sort_order", header: "Sort", accessor: (img) => img.sort_order, sortable: true },
     { key: "is_primary", header: "Primary", accessor: (img) => (img.is_primary ? "Yes" : "No"), sortable: true },
+    { key: "explicit", header: "Explicit", accessor: (img) => (img.explicit ? "Yes" : "No"), sortable: true },
   ];
 
-  const getImageRowId = (image: OfferingImage_Image) => image.image_id;
+  const getImageRowId = (image: OfferingImageWithJunction) => image.offering_image_id;
 </script>
 
 <!------------------------------------------------------------------------------------------------

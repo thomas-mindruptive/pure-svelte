@@ -167,7 +167,84 @@ export async function insertImage(
       const loadRequest = transaction.request();
       loadRequest.input('id', existingImageId);
       const loadResult = await loadRequest.query('SELECT * FROM dbo.images WHERE image_id = @id');
-      return loadResult.recordset[0] as Image;
+      const existingImage = loadResult.recordset[0] as Image;
+
+      // If offering_id is provided and existing image doesn't have one (or has a different one), update it
+      if (sanitized.offering_id !== undefined && sanitized.offering_id !== null) {
+        if (existingImage.offering_id === null || existingImage.offering_id !== sanitized.offering_id) {
+          log.debug("Updating offering_id on existing image", {
+            existing_offering_id: existingImage.offering_id,
+            new_offering_id: sanitized.offering_id,
+          });
+          
+          // Apply coalesce logic for offering_id before updating
+          // This ensures fingerprint fields are also updated if needed
+          const offeringRequest = transaction.request();
+          offeringRequest.input('offering_id', sanitized.offering_id);
+          const offeringResult = await offeringRequest.query(`
+            SELECT material_id, form_id, surface_finish_id, construction_type_id, product_def_id
+            FROM dbo.wholesaler_item_offerings
+            WHERE offering_id = @offering_id
+          `);
+
+          let productDef: { material_id: number | null; form_id: number | null; surface_finish_id: number | null; construction_type_id: number | null } | null = null;
+
+          if (offeringResult.recordset.length > 0) {
+            const offering = offeringResult.recordset[0];
+            
+            if (offering.product_def_id) {
+              const productDefRequest = transaction.request();
+              productDefRequest.input('product_def_id', offering.product_def_id);
+              const productDefResult = await productDefRequest.query(`
+                SELECT material_id, form_id, surface_finish_id, construction_type_id
+                FROM dbo.product_definitions
+                WHERE product_def_id = @product_def_id
+              `);
+              
+              if (productDefResult.recordset.length > 0) {
+                productDef = productDefResult.recordset[0];
+              }
+            }
+
+            // Apply coalesce logic: existing ?? data ?? offering ?? product_def ?? null
+            const material_id = existingImage.material_id ?? sanitized.material_id ?? offering.material_id ?? productDef?.material_id ?? null;
+            const form_id = existingImage.form_id ?? sanitized.form_id ?? offering.form_id ?? productDef?.form_id ?? null;
+            const surface_finish_id = existingImage.surface_finish_id ?? sanitized.surface_finish_id ?? offering.surface_finish_id ?? productDef?.surface_finish_id ?? null;
+            const construction_type_id = existingImage.construction_type_id ?? sanitized.construction_type_id ?? offering.construction_type_id ?? productDef?.construction_type_id ?? null;
+
+            // Update with offering_id and coalesced fingerprint fields
+            const updateRequest = transaction.request();
+            updateRequest.input('id', existingImageId);
+            updateRequest.input('offering_id', sanitized.offering_id);
+            updateRequest.input('material_id', material_id);
+            updateRequest.input('form_id', form_id);
+            updateRequest.input('surface_finish_id', surface_finish_id);
+            updateRequest.input('construction_type_id', construction_type_id);
+            const updateResult = await updateRequest.query(
+              `UPDATE dbo.images 
+               SET offering_id = @offering_id, 
+                   material_id = @material_id, 
+                   form_id = @form_id, 
+                   surface_finish_id = @surface_finish_id, 
+                   construction_type_id = @construction_type_id 
+               OUTPUT INSERTED.* 
+               WHERE image_id = @id`
+            );
+            return updateResult.recordset[0] as Image;
+          } else {
+            // Offering not found, just update offering_id
+            const updateRequest = transaction.request();
+            updateRequest.input('id', existingImageId);
+            updateRequest.input('offering_id', sanitized.offering_id);
+            const updateResult = await updateRequest.query(
+              'UPDATE dbo.images SET offering_id = @offering_id OUTPUT INSERTED.* WHERE image_id = @id'
+            );
+            return updateResult.recordset[0] as Image;
+          }
+        }
+      }
+
+      return existingImage;
     }
   }
 
@@ -500,6 +577,7 @@ export async function deleteImage(
   log.debug("Image deleted successfully", { image_id: imageId });
   return deletedImage;
 }
+
 
 
 

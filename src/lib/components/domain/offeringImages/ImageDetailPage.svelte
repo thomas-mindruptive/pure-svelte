@@ -93,6 +93,8 @@
           log.debug(`Loaded image`, { image });
         } else {
           // Create mode - initialize with empty structure and defaults
+          // NOTE: After consolidation, Image structure is FLAT (no nested image object)
+          // All fields (offering_id, filepath, filename, etc.) are at the top level
           image = {
             offering_id: offeringId,
             sort_order: 0,
@@ -101,18 +103,17 @@
             size_range: null,
             quality_grade: null,
             color_variant: null,
-            image: {
-              filename: "",
-              filepath: "",
-              file_hash: null,
-              file_size_bytes: null,
-              width_px: null,
-              height_px: null,
-              mime_type: null,
-              shopify_url: null,
-              shopify_media_id: null,
-              uploaded_to_shopify_at: null,
-            },
+            // Image fields directly in the object (FLAT structure after consolidation)
+            filename: "",
+            filepath: "",
+            file_hash: null,
+            file_size_bytes: null,
+            width_px: null,
+            height_px: null,
+            mime_type: null,
+            shopify_url: null,
+            shopify_media_id: null,
+            uploaded_to_shopify_at: null,
           } as Partial<OfferingImage_Image> as OfferingImage_Image;
         }
       } catch (err: any) {

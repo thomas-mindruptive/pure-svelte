@@ -859,7 +859,18 @@
             type="textarea"
             rows={3}
             placeholder="Internal notes about this specific offering..."
-            class="span-4"
+            class="span-3"
+          />
+
+          <!-- imagePromptHint ------------------------------------------------------------------->
+          <Field
+            {fieldProps}
+            path={["imagePromptHint"]}
+            label="Image prompt hint"
+            type="textarea"
+            rows={3}
+            placeholder="Optional hint for AI image generation (e.g., background, mood, composition)"
+            class="span-2"
           />
         </div>
         <!-- end row ----------------------------------------------------------------------------->

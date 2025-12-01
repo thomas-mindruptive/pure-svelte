@@ -451,6 +451,7 @@ const Wio_BaseSchema = z
     origin: z.string().max(255).nullable().optional(),
     currency: z.string().length(3).nullable().optional(),
     comment: z.string().max(4000).nullable().optional(),
+    imagePromptHint: z.string().max(4000).nullable().optional(),
     quality: z.string().max(255).nullable().optional(),
     is_assortment: z.boolean().nullable().optional(),
     override_material: z.boolean().default(false), // Allow material override from ProductDef

@@ -139,10 +139,8 @@
     // Validate image fields
     // NOTE: filename, file_hash, file_size_bytes, width_px, height_px, mime_type are server-calculated
     // Only filepath is required from the user
-    if (data.image) {
-      if (!data.image.filepath?.trim()) {
-        errors["image.filepath"] = ["Filepath is required"];
-      }
+    if (!data.filepath?.trim()) {
+      errors["filepath"] = ["Filepath is required"];
     }
 
     // Ensure offering_id is set
@@ -292,7 +290,7 @@
         <div>
           {#if image?.image_id}
             <h3>
-              {image.image?.filename || "Unnamed Image"}
+              {image.filename || "Unnamed Image"}
               <span class="field-hint">ID: {image.image_id}</span>
             </h3>
           {:else}
@@ -317,7 +315,7 @@
           <!-- Filepath (REQUIRED - user enters) --------------------------------------------->
           <Field
             {fieldProps}
-            path={["image", "filepath"]}
+            path={["filepath"]}
             label="Filepath"
             placeholder="Enter absolute filepath (e.g., C:\images\rose-quartz.jpg)"
             required
@@ -329,14 +327,14 @@
             <!-- Filename (readonly, extracted from filepath) -->
             <StaticFieldValue
               label="Filename"
-              value={image?.image?.filename}
+              value={image?.filename}
               class="span-2"
             />
 
             <!-- File Hash (readonly, SHA-256) -->
             <StaticFieldValue
               label="File Hash (SHA-256)"
-              value={image?.image?.file_hash}
+              value={image?.file_hash}
               formatter={truncateHash}
               hint="Truncated"
               class="span-2"
@@ -345,21 +343,21 @@
             <!-- File Size (readonly, bytes → KB/MB) -->
             <StaticFieldValue
               label="File Size"
-              value={image?.image?.file_size_bytes}
+              value={image?.file_size_bytes}
               formatter={formatFileSize}
             />
 
             <!-- Dimensions (readonly, width x height) -->
             <StaticFieldValue
               label="Dimensions"
-              value={{w: image?.image?.width_px, h: image?.image?.height_px}}
+              value={{w: image?.width_px, h: image?.height_px}}
               formatter={formatDimensions}
             />
 
             <!-- MIME Type (readonly, detected from extension) -->
             <StaticFieldValue
               label="MIME Type"
-              value={image?.image?.mime_type}
+              value={image?.mime_type}
             />
           {/if}
 
@@ -435,7 +433,7 @@
           <!-- Shopify URL -------------------------------------------------------------------->
           <Field
             {fieldProps}
-            path={["image", "shopify_url"]}
+            path={["shopify_url"]}
             label="Shopify URL"
             placeholder="Shopify CDN URL"
             class="span-2"
@@ -444,7 +442,7 @@
           <!-- Shopify Media ID --------------------------------------------------------------->
           <Field
             {fieldProps}
-            path={["image", "shopify_media_id"]}
+            path={["shopify_media_id"]}
             label="Shopify Media ID"
             placeholder="Shopify media identifier"
           />
@@ -452,7 +450,7 @@
           <!-- Uploaded to Shopify At --------------------------------------------------------->
           <Field
             {fieldProps}
-            path={["image", "uploaded_to_shopify_at"]}
+            path={["uploaded_to_shopify_at"]}
             label="Uploaded to Shopify"
             type="date"
           />

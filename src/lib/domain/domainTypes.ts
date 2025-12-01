@@ -202,51 +202,6 @@ const tempProductDefinitionForCreate = ProductDefinitionSchema.omit({
 }).describe("ProductDefinitionForCreateSchema");
 export const ProductDefinitionForCreateSchema = copyMetaFrom(ProductDefinitionSchema, tempProductDefinitionForCreate);
 
-/* <refact01> DEPRECATED: wholesaler_categories table removed - suppliers can create offerings for ANY category
-// ===== WHOLESALER CATEGORY (dbo.wholesaler_categories) =====
-
-const WholesalerCategorySchemaBase = z
-  .object({
-    wholesaler_id: z.number().int().positive(),
-    category_id: z.number().int().positive(),
-    comment: z.string().max(4000).nullable().optional(),
-    link: z.string().url().max(2048).nullable().optional(),
-    created_at: z.string().optional(),
-  })
-  .describe("WholesalerCategorySchema");
-
-export const WholesalerCategorySchema = createSchemaWithMeta(WholesalerCategorySchemaBase, {
-  alias: "wc",
-  tableName: "wholesaler_categories",
-  dbSchema: "dbo",
-} as const);
-
-// Schema for creating a new WholesalerCategory assignment.
-// Client provides foreign keys and data, but not the timestamp.
-const tempWholesalerCategoryForCreate = WholesalerCategorySchema.omit({
-  created_at: true,
-}).describe("WholesalerCategoryForCreateSchema");
-export const WholesalerCategoryForCreateSchema = copyMetaFrom(WholesalerCategorySchema, tempWholesalerCategoryForCreate);
-
-// ===== WHOLESALER CATEGORY including joins (dbo.wholesaler_categories) =====
-
-export const WholesalerCategory_Category_Schema = WholesalerCategorySchema.extend({
-  category_name: NameOrTitle,
-  category_description: z.string().nullable().optional(),
-}).describe("WholesalerCategory_Category_Schema");
-
-const tempWholesalerCategoryNested = WholesalerCategorySchema.extend({
-  category: ProductCategorySchema,
-}).describe("WholesalerCategory_Category_NestedSchema");
-
-export const WholesalerCategory_Category_Nested_Schema = copyMetaFrom(WholesalerCategorySchema, tempWholesalerCategoryNested);
-
-// ===== EXTENDED TYPES FOR MOCK DATA =====
-
-export const WholesalerCategoryWithCountSchema = WholesalerCategory_Category_Schema.extend({
-  offering_count: z.number().int().nonnegative().optional(),
-}).describe("WholesalerCategoryWithCountSchema");
-*/
 
 // ===== MATERIAL (dbo.materials) =====
 
@@ -710,6 +665,13 @@ const ImageSchemaBase = z
     quality_grade: z.string().max(10).nullable().optional(),
     color_variant: z.string().max(50).nullable().optional(),
     packaging: z.string().max(100).nullable().optional(),
+    // Foreign keys for consolidated image tables
+    offering_id: z.number().int().positive().nullable().optional(),
+    product_def_id: z.number().int().positive().nullable().optional(),
+    // Image metadata (from former subclass tables)
+    image_type: z.string().max(50).nullable().optional(),
+    sort_order: z.number().int().nonnegative().default(0),
+    is_primary: z.boolean().default(false),
     created_at: z.string().optional(),
   })
   .describe("ImageSchema");
@@ -760,98 +722,14 @@ export const ImageSizeRangeEnum = z.enum([
   'XS', 'S', 'M', 'L', 'XL', 'S-M', 'M-L', 'L-XL'
 ]);
 
-// ===== IMAGE SUBCLASS BASE SCHEMA =====
-// Common fields for all image subclasses (ProductDefinitionImage, OfferingImage)
-// OOP Inheritance Pattern: All image subclasses extend Image via image_id (PK+FK)
+// ===== TYPE ALIASES FOR BACKWARD COMPATIBILITY =====
+// WICHTIG: Die tatsächliche Datenstruktur ist flach (Image), keine nested structures mehr!
+// Diese Aliase helfen nur bei der Code-Migration, um bestehende Typ-Referenzen kompatibel zu halten
 
-const ImageSubclassBaseSchema = z.object({
-  image_id: z.number().int().positive(), // PK + FK: OOP inheritance pattern
-
-  // Variant Matching Fields (for findBestMatchingImage)
-  material_id: z.number().int().positive().nullable().optional(),
-  form_id: z.number().int().positive().nullable().optional(),
-  surface_finish_id: z.number().int().positive().nullable().optional(),
-  construction_type_id: z.number().int().positive().nullable().optional(),
-
-  // Image Metadata
-  size_range: z.string().max(50).nullable().optional(), // Flexible size range like "XS-L", "S-XL", etc.
-  quality_grade: z.string().max(10).nullable().optional(),
-  color_variant: z.string().max(50).nullable().optional(),
-  image_type: z.string().max(50).nullable().optional(),
-  sort_order: z.number().int().nonnegative().default(0),
-  is_primary: z.boolean().default(false),
-  created_at: z.string().optional(),
-});
-
-// ===== PRODUCT DEFINITION IMAGE (dbo.product_definition_images) =====
-
-const ProductDefinitionImageSchemaBase = ImageSubclassBaseSchema.extend({
-  product_def_id: z.number().int().positive(),
-}).describe("ProductDefinitionImageSchema");
-
-export const ProductDefinitionImage_Schema = createSchemaWithMeta(ProductDefinitionImageSchemaBase, {
-  alias: "pdi",
-  tableName: "product_definition_images",
-  dbSchema: "dbo",
-} as const);
-
-/**
- * Schema for creating a new ProductDefinitionImage.
- * Omits server-generated fields (created_at).
- * NOTE: image_id is required and comes from the parent Image insert.
- */
-const tempProductDefinitionImageForCreate = ProductDefinitionImage_Schema.omit({
-  created_at: true,
-}).describe("ProductDefinitionImageForCreateSchema");
-export const ProductDefinitionImageForCreateSchema = copyMetaFrom(ProductDefinitionImage_Schema, tempProductDefinitionImageForCreate);
-
-// ===== PRODUCT DEFINITION IMAGE with JOINS =====
-
-const tempProductDefinitionImageWithImage = ProductDefinitionImage_Schema.extend({
-  image: ImageSchema,
-});
-export const ProductDefinitionImage_Image_Schema = copyMetaFrom(ProductDefinitionImage_Schema, tempProductDefinitionImageWithImage);
-
-const tempProductDefinitionImageNested = ProductDefinitionImage_Schema.extend({
-  image: ImageSchema,
-  product_def: ProductDefinitionSchema,
-});
-export const ProductDefinitionImage_Image_ProductDef_Schema = copyMetaFrom(ProductDefinitionImage_Schema, tempProductDefinitionImageNested);
-
-// ===== OFFERING IMAGE =====
-
-const OfferingImageSchemaBase = ImageSubclassBaseSchema.extend({
-  offering_id: z.number().int().positive(),
-}).describe("OfferingImageSchema");
-
-export const OfferingImage_Schema = createSchemaWithMeta(OfferingImageSchemaBase, {
-  alias: "oi",
-  tableName: "offering_images",
-  dbSchema: "dbo",
-} as const);
-
-/**
- * Schema for creating a new OfferingImage.
- * Omits server-generated fields (created_at).
- * NOTE: image_id is required and comes from the parent Image insert.
- */
-const tempOfferingImageForCreate = OfferingImage_Schema.omit({
-  created_at: true,
-}).describe("OfferingImageForCreateSchema");
-export const OfferingImageForCreateSchema = copyMetaFrom(OfferingImage_Schema, tempOfferingImageForCreate);
-
-// ===== OFFERING IMAGE with JOINS =====
-
-const tempOfferingImageWithImage = OfferingImage_Schema.extend({
-  image: ImageSchema,
-});
-export const OfferingImage_Image_Schema = copyMetaFrom(OfferingImage_Schema, tempOfferingImageWithImage);
-
-const tempOfferingImageNested = OfferingImage_Schema.extend({
-  image: ImageSchema,
-  offering: Wio_Schema,
-});
-export const OfferingImage_Image_Offering_Schema = copyMetaFrom(OfferingImage_Schema, tempOfferingImageNested);
+// Schema aliases for backward compatibility (components still reference these)
+export const OfferingImage_Image_Schema = ImageSchema;
+export const ProductDefinitionImage_Image_Schema = ImageSchema;
+export const ProductDefinitionImage_Image_ProductDef_Schema = ImageSchema;
 
 // ===== OFFERING REPORT VIEW (dbo.view_offerings_pt_pc_pd) =====
 
@@ -1005,12 +883,15 @@ export type OrderItem = z.infer<typeof OrderItemSchema>;
 export type OrderItem_ProdDef_Category = z.infer<typeof OrderItem_ProdDef_Category_Schema>;
 
 export type Image = z.infer<typeof ImageSchema>;
-export type ProductDefinitionImage = z.infer<typeof ProductDefinitionImage_Schema>;
-export type ProductDefinitionImage_Image = z.infer<typeof ProductDefinitionImage_Image_Schema>;
-export type ProductDefinitionImage_Image_ProductDef = z.infer<typeof ProductDefinitionImage_Image_ProductDef_Schema>;
-export type OfferingImage = z.infer<typeof OfferingImage_Schema>;
-export type OfferingImage_Image = z.infer<typeof OfferingImage_Image_Schema>;
-export type OfferingImage_Image_Offering = z.infer<typeof OfferingImage_Image_Offering_Schema>;
+// Type aliases for backward compatibility during migration
+// WICHTIG: Die tatsächliche Datenstruktur ist flach (Image), keine nested structures mehr!
+export type ProductDefinitionImage = Image;
+export type OfferingImage = Image;
+export type ProductDefinitionImage_Image = Image;  // Flach, nicht { image: Image, ... }
+export type OfferingImage_Image = Image;  // Flach, nicht { image: Image, ... }
+// Legacy types (not used anymore, but kept for compatibility)
+export type ProductDefinitionImage_Image_ProductDef = Image;
+export type OfferingImage_Image_Offering = Image;
 
 export type OfferingReportView = z.infer<typeof OfferingReportViewSchema>;
 
@@ -1044,8 +925,6 @@ export const AllBrandedSchemas = {
   SurfaceFinishSchema,
   ConstructionTypeSchema,
   ImageSchema,
-  ProductDefinitionImageSchema: ProductDefinitionImage_Schema,
-  OfferingImageSchema: OfferingImage_Schema,
 } as const;
 
 // ===== HELPER EXPORT =====

@@ -1,12 +1,5 @@
 // src/routes/api/offerings/new/+server.ts
 
-/**
- * @file Offerings List API Endpoint - FINAL ARCHITECTURE
- * @description POST /api/offerings - Provides type-safe, paginated, and filterable
- * access to the wholesaler_item_offerings list. It strictly follows the "Secure Entity Endpoint"
- * pattern by enforcing the database table name on the server.
- */
-
 import { type RequestHandler } from "@sveltejs/kit";
 import { log } from "$lib/utils/logger";
 import { buildUnexpectedError, validateAndInsertEntity } from "$lib/backendQueries/genericEntityOperations";
@@ -19,7 +12,7 @@ import { v4 as uuidv4 } from "uuid";
  * Foreign key constraints in the database ensure referential integrity:
  * - wholesaler_id, category_id, product_def_id must exist
  *
- * <refact01> CHANGED: wholesaler_categories assignment NO LONGER required
+ * NOTE: wholesaler_categories assignment NO LONGER required
  * Suppliers can now create offerings for ANY category.
  *
  * Business rule validation:

@@ -477,58 +477,38 @@ export async function checkOrderItemDependencies(
  * @param transaction The active database transaction object.
  * @returns An object containing lists of hard and soft dependencies (typically empty).
  */
-export async function checkProductDefinitionImageDependencies(
+/**
+ * Checks for dependencies on an Image (consolidated table).
+ * Images are typically leaf nodes with no dependencies, but this function
+ * is provided for consistency with the dependency checking pattern.
+ * @param imageId The image_id (PK for the consolidated images table)
+ * @param transaction The active database transaction object.
+ * @returns An object containing lists of hard and soft dependencies (typically empty).
+ */
+export async function checkImageDependencies(
   imageId: number,
   transaction: Transaction | null,
 ): Promise<{ hard: string[]; soft: string[] }> {
   log.info(`(dependencyChecks) Checking dependencies for imageId: ${imageId}`);
 
+  const hardDependencies: string[] = [];
+  const softDependencies: string[] = [];
+
   const transWrapper = new TransWrapper(transaction, null);
   transWrapper.begin();
 
   try {
-    // Product definition images are leaf nodes in the data model
+    // Images are leaf nodes in the data model
     // They don't have any dependencies that would prevent deletion
     // This check is here for pattern consistency and future extensibility
+    // If dependencies are added in the future (e.g., references from other tables),
+    // they should be checked here
 
     transWrapper.commit();
   } catch {
     transWrapper.rollback();
   }
 
-  log.info(`(dependencyChecks) Found dependencies for imageId: ${imageId}`, { hard: [], soft: [] });
-  // Images are leaf nodes - no dependencies that would prevent deletion
-  return { hard: [], soft: [] };
-}
-
-/**
- * Checks for dependencies on an OfferingImage.
- * Images are typically leaf nodes with no dependencies, but this function
- * is provided for consistency with the dependency checking pattern.
- * @param imageId The image_id (PK for both images and offering_images tables)
- * @param transaction The active database transaction object.
- * @returns An object containing lists of hard and soft dependencies (typically empty).
- */
-export async function checkOfferingImageDependencies(
-  imageId: number,
-  transaction: Transaction | null,
-): Promise<{ hard: string[]; soft: string[] }> {
-  log.info(`(dependencyChecks) Checking dependencies for offering imageId: ${imageId}`);
-
-  const transWrapper = new TransWrapper(transaction, null);
-  transWrapper.begin();
-
-  try {
-    // Offering images are leaf nodes in the data model
-    // They don't have any dependencies that would prevent deletion
-    // This check is here for pattern consistency and future extensibility
-
-    transWrapper.commit();
-  } catch {
-    transWrapper.rollback();
-  }
-
-  log.info(`(dependencyChecks) Found dependencies for offering imageId: ${imageId}`, { hard: [], soft: [] });
-  // Images are leaf nodes - no dependencies that would prevent deletion
-  return { hard: [], soft: [] };
+  log.info(`(dependencyChecks) Found dependencies for imageId: ${imageId}`, { hard: hardDependencies, soft: softDependencies });
+  return { hard: hardDependencies, soft: softDependencies };
 }

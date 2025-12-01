@@ -11,8 +11,8 @@ import { log } from '$lib/utils/logger';
 import { buildUnexpectedError } from '$lib/backendQueries/genericEntityOperations';
 import { TransWrapper } from '$lib/backendQueries/transactionWrapper';
 import { db } from '$lib/backendQueries/db';
-import { loadProductDefinitionImagesWithImage } from '$lib/backendQueries/entityOperations/image';
-import type { ProductDefinitionImage_Image } from '$lib/domain/domainTypes';
+import { loadImages } from '$lib/backendQueries/entityOperations/image';
+import type { Image } from '$lib/domain/domainTypes';
 import type { ApiErrorResponse, QueryRequest, QuerySuccessResponse } from '$lib/api/api.types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -30,7 +30,7 @@ export const POST: RequestHandler = async (event) => {
 
     try {
         // 1. Parse QueryRequest
-        const requestBody = (await event.request.json()) as QueryRequest<ProductDefinitionImage_Image>;
+        const requestBody = (await event.request.json()) as QueryRequest<Image>;
         const clientPayload = requestBody.payload;
 
         if (!clientPayload) {
@@ -50,27 +50,25 @@ export const POST: RequestHandler = async (event) => {
             limit: clientPayload.limit
         });
 
-        // 2. Load with transaction
+        // 2. Load with transaction (flat Image[], no nested structures)
         await tw.begin();
-        const jsonString = await loadProductDefinitionImagesWithImage(tw.trans, clientPayload);
+        const images = await loadImages(tw.trans, clientPayload);
         await tw.commit();
 
-        const results = JSON.parse(jsonString);
-
         // 3. Format response
-        const response: QuerySuccessResponse<ProductDefinitionImage_Image> = {
+        const response: QuerySuccessResponse<Image> = {
             success: true,
-            message: 'Product definition images with images retrieved successfully.',
+            message: 'Product definition images retrieved successfully.',
             data: {
-                results: results as Partial<ProductDefinitionImage_Image>[],
+                results: images as Partial<Image>[],
                 meta: {
                     retrieved_at: new Date().toISOString(),
-                    result_count: results.length,
+                    result_count: images.length,
                     columns_selected: ['all'],
-                    has_joins: true,
+                    has_joins: false,
                     has_where: !!clientPayload.where,
                     parameter_count: 0,
-                    table_fixed: 'dbo.product_definition_images + dbo.images',
+                    table_fixed: 'dbo.images',
                     sql_generated: '(generated via entityOperations/image.ts)'
                 }
             },
@@ -78,7 +76,7 @@ export const POST: RequestHandler = async (event) => {
                 timestamp: new Date().toISOString()
             }
         };
-        log.info(`[${operationId}] FN_SUCCESS: Returning ${results.length} product definition images.`);
+        log.info(`[${operationId}] FN_SUCCESS: Returning ${images.length} product definition images.`);
         return json(response);
     } catch (err: unknown) {
         await tw.rollback();

@@ -12,8 +12,8 @@ import { log } from '$lib/utils/logger';
 import { buildUnexpectedError } from '$lib/backendQueries/genericEntityOperations';
 import { TransWrapper } from '$lib/backendQueries/transactionWrapper';
 import { db } from '$lib/backendQueries/db';
-import { insertProductDefinitionImageWithImage } from '$lib/backendQueries/entityOperations/image';
-import type { ProductDefinitionImage_Image } from '$lib/domain/domainTypes';
+import { insertImage } from '$lib/backendQueries/entityOperations/image';
+import type { Image } from '$lib/domain/domainTypes';
 import type { ApiSuccessResponse } from '$lib/api/api.types';
 import { v4 as uuidv4 } from 'uuid';
 import { json } from '@sveltejs/kit';
@@ -34,16 +34,16 @@ export const POST: RequestHandler = async ({ request }) => {
         const requestData = await request.json();
         log.info(`[${operationId}] Parsed request body`, {
             fields: Object.keys(requestData),
-            hasNestedImage: !!requestData.image
+            product_def_id: requestData.product_def_id
         });
 
         await tw.begin();
-        const createdRecord = await insertProductDefinitionImageWithImage(tw.trans, requestData);
+        const createdRecord = await insertImage(tw.trans, requestData);
         await tw.commit();
 
-        const response: ApiSuccessResponse<{ productDefinitionImage: ProductDefinitionImage_Image }> = {
+        const response: ApiSuccessResponse<{ productDefinitionImage: Image }> = {
             success: true,
-            message: "Product definition image created successfully (both Image and ProductDefinitionImage records).",
+            message: "Product definition image created successfully.",
             data: { productDefinitionImage: createdRecord },
             meta: { timestamp: new Date().toISOString() },
         };

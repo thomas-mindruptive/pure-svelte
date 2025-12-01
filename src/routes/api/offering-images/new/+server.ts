@@ -12,8 +12,8 @@ import { log } from '$lib/utils/logger';
 import { buildUnexpectedError } from '$lib/backendQueries/genericEntityOperations';
 import { TransWrapper } from '$lib/backendQueries/transactionWrapper';
 import { db } from '$lib/backendQueries/db';
-import { insertOfferingImageWithImage } from '$lib/backendQueries/entityOperations/image';
-import type { OfferingImage_Image } from '$lib/domain/domainTypes';
+import { insertImage } from '$lib/backendQueries/entityOperations/image';
+import type { Image } from '$lib/domain/domainTypes';
 import type { ApiSuccessResponse } from '$lib/api/api.types';
 import { v4 as uuidv4 } from 'uuid';
 import { json } from '@sveltejs/kit';
@@ -34,16 +34,16 @@ export const POST: RequestHandler = async ({ request }) => {
         const requestData = await request.json();
         log.info(`[${operationId}] Parsed request body`, {
             fields: Object.keys(requestData),
-            hasNestedImage: !!requestData.image
+            offering_id: requestData.offering_id
         });
 
         await tw.begin();
-        const createdRecord = await insertOfferingImageWithImage(tw.trans, requestData);
+        const createdRecord = await insertImage(tw.trans, requestData);
         await tw.commit();
 
-        const response: ApiSuccessResponse<{ offeringImage: OfferingImage_Image }> = {
+        const response: ApiSuccessResponse<{ offeringImage: Image }> = {
             success: true,
-            message: "Offering image created successfully (both Image and OfferingImage records).",
+            message: "Offering image created successfully.",
             data: { offeringImage: createdRecord },
             meta: { timestamp: new Date().toISOString() },
         };

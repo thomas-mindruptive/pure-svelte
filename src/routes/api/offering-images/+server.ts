@@ -11,8 +11,8 @@ import { log } from '$lib/utils/logger';
 import { buildUnexpectedError } from '$lib/backendQueries/genericEntityOperations';
 import { TransWrapper } from '$lib/backendQueries/transactionWrapper';
 import { db } from '$lib/backendQueries/db';
-import { loadOfferingImagesWithImage } from '$lib/backendQueries/entityOperations/image';
-import type { OfferingImage_Image } from '$lib/domain/domainTypes';
+import { loadImages } from '$lib/backendQueries/entityOperations/image';
+import type { Image } from '$lib/domain/domainTypes';
 import type { ApiErrorResponse, QueryRequest, QuerySuccessResponse } from '$lib/api/api.types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -30,7 +30,7 @@ export const POST: RequestHandler = async (event) => {
 
     try {
         // 1. Parse QueryRequest
-        const requestBody = (await event.request.json()) as QueryRequest<OfferingImage_Image>;
+        const requestBody = (await event.request.json()) as QueryRequest<Image>;
         const clientPayload = requestBody.payload;
 
         if (!clientPayload) {
@@ -50,27 +50,25 @@ export const POST: RequestHandler = async (event) => {
             limit: clientPayload.limit
         });
 
-        // 2. Load with transaction
+        // 2. Load with transaction (flat Image[], no nested structures)
         await tw.begin();
-        const jsonString = await loadOfferingImagesWithImage(tw.trans, clientPayload);
+        const images = await loadImages(tw.trans, clientPayload);
         await tw.commit();
 
-        const results = JSON.parse(jsonString);
-
         // 3. Format response
-        const response: QuerySuccessResponse<OfferingImage_Image> = {
+        const response: QuerySuccessResponse<Image> = {
             success: true,
-            message: 'Offering images with images retrieved successfully.',
+            message: 'Offering images retrieved successfully.',
             data: {
-                results: results as Partial<OfferingImage_Image>[],
+                results: images as Partial<Image>[],
                 meta: {
                     retrieved_at: new Date().toISOString(),
-                    result_count: results.length,
+                    result_count: images.length,
                     columns_selected: ['all'],
-                    has_joins: true,
+                    has_joins: false,
                     has_where: !!clientPayload.where,
                     parameter_count: 0,
-                    table_fixed: 'dbo.offering_images + dbo.images',
+                    table_fixed: 'dbo.images',
                     sql_generated: '(generated via entityOperations/image.ts)'
                 }
             },
@@ -78,7 +76,7 @@ export const POST: RequestHandler = async (event) => {
                 timestamp: new Date().toISOString()
             }
         };
-        log.info(`[${operationId}] FN_SUCCESS: Returning ${results.length} offering images.`);
+        log.info(`[${operationId}] FN_SUCCESS: Returning ${images.length} offering images.`);
         return json(response);
     } catch (err: unknown) {
         await tw.rollback();

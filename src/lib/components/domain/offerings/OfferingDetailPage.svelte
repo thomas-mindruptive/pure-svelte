@@ -776,14 +776,14 @@
   };
 
   const imagesColumns: ColumnDef<typeof OfferingImage_Image_Schema>[] = [
-    { key: "oi.image_id", header: "ID", accessor: (img) => img.image_id, sortable: true },
-    { key: "img.filename", header: "Filename", accessor: (img) => img.image.filename || "—", sortable: true },
-    { key: "oi.image_type", header: "Type", accessor: (img) => img.image_type || "—", sortable: true },
-    { key: "oi.size_range", header: "Size Range", accessor: (img) => img.size_range || "—", sortable: true },
-    { key: "oi.quality_grade", header: "Quality", accessor: (img) => img.quality_grade || "—", sortable: true },
-    { key: "oi.color_variant", header: "Color", accessor: (img) => img.color_variant || "—", sortable: true },
-    { key: "oi.sort_order", header: "Sort", accessor: (img) => img.sort_order, sortable: true },
-    { key: "oi.is_primary", header: "Primary", accessor: (img) => (img.is_primary ? "Yes" : "No"), sortable: true },
+    { key: "image_id", header: "ID", accessor: (img) => img.image_id, sortable: true },
+    { key: "filename", header: "Filename", accessor: (img) => img.filename || "—", sortable: true },
+    { key: "image_type", header: "Type", accessor: (img) => img.image_type || "—", sortable: true },
+    { key: "size_range", header: "Size Range", accessor: (img) => img.size_range || "—", sortable: true },
+    { key: "quality_grade", header: "Quality", accessor: (img) => img.quality_grade || "—", sortable: true },
+    { key: "color_variant", header: "Color", accessor: (img) => img.color_variant || "—", sortable: true },
+    { key: "sort_order", header: "Sort", accessor: (img) => img.sort_order, sortable: true },
+    { key: "is_primary", header: "Primary", accessor: (img) => (img.is_primary ? "Yes" : "No"), sortable: true },
   ];
 
   const getImageRowId = (image: OfferingImage_Image) => image.image_id;

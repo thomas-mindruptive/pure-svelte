@@ -1,15 +1,15 @@
 // src/lib/api/client/productDefinitionImage.ts
 
 /**
- * @file Product Definition Image API Client (OOP Inheritance Pattern)
+ * @file Product Definition Image API Client (Consolidated Image Table)
  * @description Provides type-safe client functions for ProductDefinitionImage operations.
- * ProductDefinitionImage extends Image using OOP inheritance (same image_id as PK).
+ * Uses consolidated images table with product_def_id FK.
  * This module follows the Factory Pattern to ensure SSR safety.
  */
 
 import { log } from "$lib/utils/logger";
 import type { QueryPayload } from "$lib/backendQueries/queryGrammar";
-import type { ProductDefinitionImage_Image } from "$lib/domain/domainTypes";
+import type { ProductDefinitionImage_Image, Image } from "$lib/domain/domainTypes";
 
 import type { ApiClient } from "./apiClient";
 import { createJsonBody, createJsonAndWrapInPayloadPartial, getErrorMessage } from "./common";
@@ -23,9 +23,10 @@ export const productDefinitionImageLoadingOperations = productDefinitionImageLoa
 
 /**
  * The default query payload used when fetching product definition images.
+ * Note: Using Image type for actual data structure, ProductDefinitionImage_Image is a type alias for backward compatibility.
  */
-export const DEFAULT_PRODUCT_DEFINITION_IMAGE_QUERY: Partial<QueryPayload<ProductDefinitionImage_Image>> = {
-  orderBy: [{ key: "pdi.sort_order" as keyof ProductDefinitionImage_Image, direction: "asc" }],
+export const DEFAULT_PRODUCT_DEFINITION_IMAGE_QUERY: Partial<QueryPayload<Image>> = {
+  orderBy: [{ key: "img.sort_order" as keyof Image, direction: "asc" }],
   limit: 100,
 };
 
@@ -39,20 +40,20 @@ export function getProductDefinitionImageApi(client: ApiClient) {
     // ===== PRODUCT DEFINITION IMAGE CRUD (OOP Inheritance Pattern) =====
 
     /**
-     * Loads a list of product definition images with nested image data.
+     * Loads a list of product definition images (flat Image structure).
      * Can be filtered by product_def_id.
      */
     async loadProductDefinitionImages(
-      query: Partial<QueryPayload<ProductDefinitionImage_Image>> = {}
+      query: Partial<QueryPayload<Image>> = {}
     ): Promise<ProductDefinitionImage_Image[]> {
       const operationId = "loadProductDefinitionImages";
       productDefinitionImageLoadingOperations.start(operationId);
       try {
-        const fullQuery: Partial<QueryPayload<ProductDefinitionImage_Image>> = {
+        const fullQuery: Partial<QueryPayload<Image>> = {
           ...DEFAULT_PRODUCT_DEFINITION_IMAGE_QUERY,
           ...query,
         };
-        const responseData = await client.apiFetch<QueryResponseData<ProductDefinitionImage_Image>>(
+        const responseData = await client.apiFetch<QueryResponseData<Image>>(
           "/api/product-definition-images",
           { method: "POST", body: createJsonAndWrapInPayloadPartial(fullQuery) },
           { context: operationId },
@@ -73,15 +74,15 @@ export function getProductDefinitionImageApi(client: ApiClient) {
       const operationId = `loadProductDefinitionImagesForProduct-${productDefId}`;
       productDefinitionImageLoadingOperations.start(operationId);
       try {
-        const query: Partial<QueryPayload<ProductDefinitionImage_Image>> = {
+        const query: Partial<QueryPayload<Image>> = {
           where: {
-            key: "pdi.product_def_id" as keyof ProductDefinitionImage_Image,
+            key: "img.product_def_id" as keyof Image,
             whereCondOp: "=",
             val: productDefId,
           },
-          orderBy: [{ key: "pdi.sort_order" as keyof ProductDefinitionImage_Image, direction: "asc" }],
+          orderBy: [{ key: "img.sort_order" as keyof Image, direction: "asc" }],
         };
-        const responseData = await client.apiFetch<QueryResponseData<ProductDefinitionImage_Image>>(
+        const responseData = await client.apiFetch<QueryResponseData<Image>>(
           "/api/product-definition-images",
           { method: "POST", body: createJsonAndWrapInPayloadPartial(query) },
           { context: operationId },
@@ -96,18 +97,18 @@ export function getProductDefinitionImageApi(client: ApiClient) {
     },
 
     /**
-     * Loads a single product definition image by its image_id (OOP inheritance: same ID for both tables).
+     * Loads a single product definition image by its image_id.
      */
     async loadProductDefinitionImage(imageId: number): Promise<ProductDefinitionImage_Image> {
       const operationId = `loadProductDefinitionImage-${imageId}`;
       productDefinitionImageLoadingOperations.start(operationId);
       try {
-        const responseData = await client.apiFetch<{ productDefinitionImage: ProductDefinitionImage_Image }>(
+        const responseData = await client.apiFetch<{ productDefinitionImage: Image }>(
           `/api/product-definition-images/${imageId}`,
           { method: "GET" },
           { context: operationId },
         );
-        return responseData.productDefinitionImage;
+        return responseData.productDefinitionImage as ProductDefinitionImage_Image;
       } catch (err) {
         log.error(`[${operationId}] Failed.`, { imageId, error: getErrorMessage(err) });
         throw err;
@@ -117,21 +118,20 @@ export function getProductDefinitionImageApi(client: ApiClient) {
     },
 
     /**
-     * Creates a new product definition image with nested image data.
-     * The server will create records in BOTH tables atomically with the same image_id.
+     * Creates a new product definition image (flat Image structure with product_def_id).
      */
     async createProductDefinitionImage(
-      data: Partial<ProductDefinitionImage_Image>
+      data: Partial<Image>
     ): Promise<ProductDefinitionImage_Image> {
       const operationId = "createProductDefinitionImage";
       productDefinitionImageLoadingOperations.start(operationId);
       try {
-        const responseData = await client.apiFetch<{ productDefinitionImage: ProductDefinitionImage_Image }>(
+        const responseData = await client.apiFetch<{ productDefinitionImage: Image }>(
           "/api/product-definition-images/new",
           { method: "POST", body: createJsonBody(data) },
           { context: operationId },
         );
-        return responseData.productDefinitionImage;
+        return responseData.productDefinitionImage as ProductDefinitionImage_Image;
       } catch (err) {
         log.error(`[${operationId}] Failed.`, { data, error: getErrorMessage(err) });
         throw err;
@@ -141,22 +141,21 @@ export function getProductDefinitionImageApi(client: ApiClient) {
     },
 
     /**
-     * Updates an existing product definition image with nested image data.
-     * Updates BOTH tables atomically using the same image_id (OOP inheritance).
+     * Updates an existing product definition image (flat Image structure).
      */
     async updateProductDefinitionImage(
       imageId: number,
-      updates: Partial<ProductDefinitionImage_Image>
+      updates: Partial<Image>
     ): Promise<ProductDefinitionImage_Image> {
       const operationId = `updateProductDefinitionImage-${imageId}`;
       productDefinitionImageLoadingOperations.start(operationId);
       try {
-        const responseData = await client.apiFetch<{ productDefinitionImage: ProductDefinitionImage_Image }>(
+        const responseData = await client.apiFetch<{ productDefinitionImage: Image }>(
           `/api/product-definition-images/${imageId}`,
           { method: "PUT", body: createJsonBody(updates) },
           { context: operationId },
         );
-        return responseData.productDefinitionImage;
+        return responseData.productDefinitionImage as ProductDefinitionImage_Image;
       } catch (err) {
         log.error(`[${operationId}] Failed.`, { imageId, updates, error: getErrorMessage(err) });
         throw err;
@@ -166,28 +165,25 @@ export function getProductDefinitionImageApi(client: ApiClient) {
     },
 
     /**
-     * Deletes a product definition image completely (OOP inheritance pattern).
-     * Deletes from BOTH tables atomically:
-     * - product_definition_images (subclass)
-     * - images (base class)
+     * Deletes a product definition image.
      */
     async deleteProductDefinitionImage(
       imageId: number,
       cascade = false,
       forceCascade = false
-    ): Promise<DeleteApiResponse<ProductDefinitionImage_Image, string[]>> {
+    ): Promise<DeleteApiResponse<Image, string[]>> {
       assertDefined(imageId, "imageId");
       const operationId = `deleteProductDefinitionImage-${imageId}`;
       productDefinitionImageLoadingOperations.start(operationId);
       try {
-        const deleteRequest: DeleteRequest<ProductDefinitionImage_Image> = {
+        const deleteRequest: DeleteRequest<Image> = {
           id: imageId,
           cascade,
           forceCascade,
         };
         const body = createJsonBody(deleteRequest);
 
-        return await client.apiFetchUnion<DeleteApiResponse<ProductDefinitionImage_Image, string[]>>(
+        return await client.apiFetchUnion<DeleteApiResponse<Image, string[]>>(
           `/api/product-definition-images/${imageId}`,
           { method: "DELETE", body },
           { context: operationId },

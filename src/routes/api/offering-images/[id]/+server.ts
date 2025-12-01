@@ -7,19 +7,19 @@
  * DELETE removes from BOTH tables atomically.
  */
 
-import { json, type RequestHandler } from "@sveltejs/kit";
+import { json, error, type RequestHandler } from "@sveltejs/kit";
 import { db } from "$lib/backendQueries/db";
 import { log } from "$lib/utils/logger";
 import { buildUnexpectedError, validateIdUrlParam } from "$lib/backendQueries/genericEntityOperations";
 import { TransWrapper } from "$lib/backendQueries/transactionWrapper";
 import {
-  loadOfferingImageWithImageById,
-  updateOfferingImageWithImage,
-  loadOfferingImagesWithImage,
-  deleteOfferingImageWithImage,
+  loadImageById,
+  updateImage,
+  loadImages,
+  deleteImage,
 } from "$lib/backendQueries/entityOperations/image";
-import { checkOfferingImageDependencies } from "$lib/backendQueries/dependencyChecks";
-import type { OfferingImage_Image } from "$lib/domain/domainTypes";
+import { checkImageDependencies } from "$lib/backendQueries/dependencyChecks";
+import type { Image, OfferingImage_Image } from "$lib/domain/domainTypes";
 import { v4 as uuidv4 } from "uuid";
 import { ComparisonOperator, LogicalOperator, type QueryPayload } from "$lib/backendQueries/queryGrammar";
 
@@ -51,10 +51,14 @@ export const GET: RequestHandler = async ({ params }) => {
     }
 
     await tw.begin();
-    const offeringImage = await loadOfferingImageWithImageById(tw.trans, id);
+    const offeringImage = await loadImageById(tw.trans, id);
     await tw.commit();
 
-    const response: ApiSuccessResponse<{ offeringImage: OfferingImage_Image }> = {
+    if (!offeringImage) {
+      throw error(404, `Offering image with ID ${id} not found.`);
+    }
+
+    const response: ApiSuccessResponse<{ offeringImage: Image }> = {
       success: true,
       message: "Offering image retrieved successfully.",
       data: { offeringImage },
@@ -90,19 +94,19 @@ export const POST: RequestHandler = async ({ params, request }) => {
       return errorResponse;
     }
 
-    const requestBody = (await request.json()) as QueryRequest<OfferingImage_Image>;
+    const requestBody = (await request.json()) as QueryRequest<Image>;
     const clientPayload = requestBody.payload;
     log.info(`[${operationId}] Parsed request body`, { clientPayload });
 
     // Build WHERE condition for image_id (PK)
     const idCondition = {
-      key: "oi.image_id" as keyof OfferingImage_Image,
+      key: "img.image_id" as keyof Image,
       whereCondOp: ComparisonOperator.EQUALS,
       val: id,
     };
 
     // Merge with client WHERE if provided
-    const mergedPayload: Partial<QueryPayload<OfferingImage_Image>> = {
+    const mergedPayload: Partial<QueryPayload<Image>> = {
       ...clientPayload,
       where: clientPayload?.where
         ? {
@@ -114,31 +118,29 @@ export const POST: RequestHandler = async ({ params, request }) => {
     };
 
     await tw.begin();
-    const jsonString = await loadOfferingImagesWithImage(tw.trans, mergedPayload);
+    const images = await loadImages(tw.trans, mergedPayload);
     await tw.commit();
 
-    const results = JSON.parse(jsonString);
-
-    const response: QuerySuccessResponse<OfferingImage_Image> = {
+    const response: QuerySuccessResponse<Image> = {
       success: true,
       message: "Offering image retrieved successfully.",
       data: {
-        results: results as Partial<OfferingImage_Image>[],
+        results: images as Partial<Image>[],
         meta: {
           retrieved_at: new Date().toISOString(),
-          result_count: results.length,
+          result_count: images.length,
           columns_selected: ['all'],
-          has_joins: true,
+          has_joins: false,
           has_where: true,
           parameter_count: 0,
-          table_fixed: "dbo.offering_images + dbo.images (OOP inheritance)",
+          table_fixed: "dbo.images",
           sql_generated: "(generated via entityOperations/image.ts)",
         },
       },
       meta: { timestamp: new Date().toISOString() },
     };
 
-    log.info(`[${operationId}] FN_SUCCESS: Returning ${results.length} record(s).`);
+    log.info(`[${operationId}] FN_SUCCESS: Returning ${images.length} record(s).`);
     return json(response);
   } catch (err: unknown) {
     await tw.rollback();
@@ -168,14 +170,11 @@ export const PUT: RequestHandler = async ({ params, request }) => {
     const requestData = await request.json();
     log.info(`[${operationId}] Parsed request body`, { fields: Object.keys(requestData) });
 
-    // Ensure image_id is in the data (it's the PK for both tables)
-    requestData.image_id = id;
-
     await tw.begin();
-    const updatedRecord = await updateOfferingImageWithImage(tw.trans, requestData);
+    const updatedRecord = await updateImage(tw.trans, id, requestData);
     await tw.commit();
 
-    const response: ApiSuccessResponse<{ offeringImage: OfferingImage_Image }> = {
+    const response: ApiSuccessResponse<{ offeringImage: Image }> = {
       success: true,
       message: "Offering image updated successfully.",
       data: { offeringImage: updatedRecord },
@@ -220,14 +219,14 @@ export const DELETE: RequestHandler = async ({ params, request }) => {
 
     // === CHECK DEPENDENCIES =====================================================================
 
-    const { hard, soft } = await checkOfferingImageDependencies(id, tw.trans);
-    log.info(`Offering image has dependent objects:`, { hard, soft });
+    const { hard, soft } = await checkImageDependencies(id, tw.trans);
+    log.info(`Image has dependent objects:`, { hard, soft });
 
     if ((soft.length > 0 && !cascade) || (hard.length > 0 && !forceCascade)) {
       await tw.rollback();
       const conflictResponse: DeleteConflictResponse<string[]> = {
         success: false,
-        message: "Cannot delete offering image: It is still in use by other entities.",
+        message: "Cannot delete image: It is still in use by other entities.",
         status_code: 409,
         error_code: "DEPENDENCY_CONFLICT",
         dependencies: { hard, soft },
@@ -243,19 +242,14 @@ export const DELETE: RequestHandler = async ({ params, request }) => {
     const dependenciesCleared = hard.length + soft.length;
     log.info(`[${operationId}] Proceeding with deletion. Dependencies to clear: ${dependenciesCleared}`);
 
-    const { deletedOi, deletedImage } = await deleteOfferingImageWithImage(tw.trans, id);
+    const deletedImage = await deleteImage(tw.trans, id);
     await tw.commit();
 
-    const deletedResource: OfferingImage_Image = {
-      ...deletedOi,
-      image: deletedImage,
-    };
-
-    const response: DeleteSuccessResponse<OfferingImage_Image> = {
+    const response: DeleteSuccessResponse<Image> = {
       success: true,
-      message: `Offering image (ID: ${id}) deleted completely from both tables (OOP inheritance).`,
+      message: `Image (ID: ${id}) deleted successfully.`,
       data: {
-        deleted_resource: deletedResource,
+        deleted_resource: deletedImage,
         cascade_performed: cascade || forceCascade,
         dependencies_cleared: dependenciesCleared,
       },

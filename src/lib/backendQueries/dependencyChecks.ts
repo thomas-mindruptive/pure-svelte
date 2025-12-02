@@ -512,3 +512,96 @@ export async function checkImageDependencies(
   log.info(`(dependencyChecks) Found dependencies for imageId: ${imageId}`, { hard: hardDependencies, soft: softDependencies });
   return { hard: hardDependencies, soft: softDependencies };
 }
+
+/**
+ * Checks for dependencies on an OfferingImage junction entry.
+ * Distinguishes between "hard" dependencies (canonical images used by other offerings)
+ * and "soft" dependencies (explicit/offering-specific images that can be cascaded).
+ * 
+ * Logic:
+ * - If explicit = false (canonical): Image is shared → HARD dependency if used by other offerings
+ * - If explicit = true (offering-specific): Image is specific to this offering → SOFT dependency
+ * 
+ * @param junctionId The offering_image_id (junction PK) to check.
+ * @param transaction The active database transaction object.
+ * @returns An object containing lists of hard and soft dependencies.
+ */
+export async function checkOfferingImageDependencies(
+  junctionId: number,
+  transaction: Transaction | null,
+): Promise<{ hard: string[]; soft: string[] }> {
+  const hardDependencies: string[] = [];
+  const softDependencies: string[] = [];
+  log.info(`(dependencyChecks) Checking dependencies for offering image junction: ${junctionId}`);
+
+  const transWrapper = new TransWrapper(transaction, null);
+  transWrapper.begin();
+
+  try {
+    // 1. Load the junction entry to get image_id and explicit flag
+    const junctionCheck = await transWrapper.request().input("junctionId", junctionId).query`
+      SELECT 
+        oi.image_id,
+        oi.offering_id,
+        img.explicit
+      FROM dbo.offering_images oi
+      INNER JOIN dbo.images img ON oi.image_id = img.image_id
+      WHERE oi.offering_image_id = @junctionId
+    `;
+
+    if (junctionCheck.recordset.length === 0) {
+      transWrapper.commit();
+      log.warn(`(dependencyChecks) Offering image junction ${junctionId} not found`);
+      return { hard: [], soft: [] };
+    }
+
+    const junction = junctionCheck.recordset[0];
+    const imageId = junction.image_id;
+    const offeringId = junction.offering_id;
+    const isExplicit = junction.explicit === 1 || junction.explicit === true;
+
+    // 2. Check if image is used by other offerings
+    const otherOfferingsCheck = await transWrapper.request()
+      .input("imageId", imageId)
+      .input("offeringId", offeringId)
+      .query`
+        SELECT COUNT(*) as count
+        FROM dbo.offering_images
+        WHERE image_id = @imageId AND offering_id != @offeringId
+      `;
+
+    const otherOfferingsCount = otherOfferingsCheck.recordset[0].count;
+
+    // 3. Determine dependencies based on explicit flag
+    if (!isExplicit) {
+      // Canonical image (explicit = false)
+      if (otherOfferingsCount > 0) {
+        // HARD dependency: Canonical image is used by other offerings
+        hardDependencies.push(`Canonical image is used by ${otherOfferingsCount} other offering(s)`);
+      }
+      // If no other offerings use it, it's still canonical but can be deleted (no hard dependency)
+    } else {
+      // Explicit/offering-specific image (explicit = true)
+      // SOFT dependency: Can be cascaded (deleted with the junction)
+      if (otherOfferingsCount > 0) {
+        // This shouldn't happen (explicit images shouldn't be shared), but log it
+        log.warn(`(dependencyChecks) Explicit image ${imageId} is used by other offerings`, { otherOfferingsCount });
+        softDependencies.push(`Explicit image is used by ${otherOfferingsCount} other offering(s) (unexpected)`);
+      } else {
+        softDependencies.push("Offering-specific image (can be deleted)");
+      }
+    }
+
+    transWrapper.commit();
+  } catch (err) {
+    transWrapper.rollback();
+    log.error(`(dependencyChecks) Error checking offering image dependencies`, { junctionId, error: err });
+    throw err;
+  }
+
+  log.info(`(dependencyChecks) Found dependencies for offering image junction ${junctionId}`, {
+    hard: hardDependencies,
+    soft: softDependencies,
+  });
+  return { hard: hardDependencies, soft: softDependencies };
+}

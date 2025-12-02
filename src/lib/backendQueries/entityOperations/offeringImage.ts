@@ -13,7 +13,7 @@ import { log } from "$lib/utils/logger";
 import { insertRecordWithTransaction, updateRecordWithTransaction } from "../genericEntityOperations";
 import { TransWrapper } from "../transactionWrapper";
 import { db } from "../db";
-import { insertImage, loadImageById } from "./image";
+import { insertImage, loadImageById, deleteImage } from "./image";
 
 /**
  * Type for offering image with junction data (from view_offering_images)
@@ -378,35 +378,90 @@ export async function updateOfferingImage(
 
 /**
  * Deletes an offering image junction entry.
- * The associated image is NOT deleted (it may be used by other offerings).
+ * Optionally deletes the associated image based on cascade/forceCascade flags.
+ *
+ * Logic:
+ * - cascade = false: Only delete junction entry (image remains)
+ * - cascade = true: Delete junction + image if explicit = true (soft dependency)
+ * - forceCascade = true: Delete junction + image even if explicit = false (hard dependency)
  *
  * @param transaction - Optional database transaction (null = create own transaction)
  * @param junctionId - The offering_image_id to delete
+ * @param cascade - If true, delete image if explicit = true (soft dependency)
+ * @param forceCascade - If true, delete image even if explicit = false (hard dependency)
  * @returns Deleted OfferingImageJunction record
  * @throws Error 404 if not found
  */
 export async function deleteOfferingImage(
   transaction: Transaction | null,
-  junctionId: number
+  junctionId: number,
+  cascade: boolean = false,
+  forceCascade: boolean = false
 ): Promise<OfferingImageJunction> {
-  log.debug("deleteOfferingImage", { junctionId });
+  log.debug("deleteOfferingImage", { junctionId, cascade, forceCascade });
 
   const transWrapper = new TransWrapper(transaction, db);
   await transWrapper.begin();
 
   try {
-    const request = transWrapper.request();
-    request.input('id', junctionId);
-    const result = await request.query(
-      'DELETE FROM dbo.offering_images OUTPUT DELETED.* WHERE offering_image_id = @id'
-    );
+    // 1. Load junction entry to get image_id and explicit flag before deletion
+    const loadRequest = transWrapper.request();
+    loadRequest.input('id', junctionId);
+    const loadResult = await loadRequest.query(`
+      SELECT 
+        oi.offering_image_id,
+        oi.image_id,
+        oi.offering_id,
+        img.explicit
+      FROM dbo.offering_images oi
+      INNER JOIN dbo.images img ON oi.image_id = img.image_id
+      WHERE oi.offering_image_id = @id
+    `);
 
-    if (result.recordset.length === 0) {
+    if (loadResult.recordset.length === 0) {
       throw error(404, `Offering image with ID ${junctionId} not found.`);
     }
 
-    const deletedJunction = result.recordset[0] as OfferingImageJunction;
-    log.debug("Offering image deleted successfully", { offering_image_id: junctionId });
+    const junctionData = loadResult.recordset[0];
+    const imageId = junctionData.image_id;
+    const isExplicit = junctionData.explicit === 1 || junctionData.explicit === true;
+
+    // 2. Delete junction entry
+    const deleteRequest = transWrapper.request();
+    deleteRequest.input('id', junctionId);
+    const deleteResult = await deleteRequest.query(
+      'DELETE FROM dbo.offering_images OUTPUT DELETED.* WHERE offering_image_id = @id'
+    );
+
+    if (deleteResult.recordset.length === 0) {
+      throw error(404, `Offering image with ID ${junctionId} not found.`);
+    }
+
+    const deletedJunction = deleteResult.recordset[0] as OfferingImageJunction;
+    log.debug("Offering image junction deleted successfully", { offering_image_id: junctionId });
+
+    // 3. Optionally delete the associated image
+    if (cascade || forceCascade) {
+      const shouldDeleteImage = forceCascade || (cascade && isExplicit);
+      
+      if (shouldDeleteImage) {
+        log.debug("Deleting associated image", { 
+          image_id: imageId, 
+          explicit: isExplicit, 
+          cascade, 
+          forceCascade 
+        });
+        
+        await deleteImage(transWrapper.trans, imageId);
+        log.debug("Associated image deleted successfully", { image_id: imageId });
+      } else if (cascade && !isExplicit) {
+        log.debug("Skipping image deletion: canonical image (explicit = false) requires forceCascade", {
+          image_id: imageId,
+          explicit: isExplicit
+        });
+      }
+    }
+
     await transWrapper.commit();
     return deletedJunction;
   } catch (err) {

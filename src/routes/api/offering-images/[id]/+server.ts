@@ -24,7 +24,11 @@ import { v4 as uuidv4 } from "uuid";
 import type {
   ApiSuccessResponse,
   DeleteSuccessResponse,
+  DeleteConflictResponse,
+  DeleteRequest,
 } from "$lib/api/api.types";
+import { checkOfferingImageDependencies } from "$lib/backendQueries/dependencyChecks";
+import { rollbackTransaction } from "$lib/backendQueries/transactionWrapper";
 
 /**
  * GET /api/offering-images/[id]
@@ -113,17 +117,15 @@ export const PUT: RequestHandler = async ({ params, request }) => {
 
 /**
  * DELETE /api/offering-images/[id]
- * Delete OfferingImage junction entry only.
- * The associated image is NOT deleted (it may be used by other offerings).
+ * Delete OfferingImage junction entry with dependency checking and optional cascade delete.
+ * Follows the established pattern for master data deletion with cascade/forceCascade support.
  * Uses offering_image_id (junction ID) as PK.
  */
-export const DELETE: RequestHandler = async ({ params, request }) => {
+export const DELETE: RequestHandler = async ({ params, request }): Promise<Response> => {
   const operationId = uuidv4();
   const info = `DELETE /api/offering-images/${params.id} - ${operationId}`;
   log.infoHeader(info);
   log.info(`[${operationId}] DELETE /offering-images/${params.id}: FN_START`);
-
-  const tw = new TransWrapper(null, db);
 
   try {
     const { id, errorResponse } = validateIdUrlParam(params.id);
@@ -131,32 +133,69 @@ export const DELETE: RequestHandler = async ({ params, request }) => {
       return errorResponse;
     }
 
-    await request.json(); // Parse request body (currently unused, but required by API contract)
-    log.info(`[${operationId}] Delete request for offering image junction`);
+    const body: DeleteRequest<OfferingImageJunction> = await request.json();
+    const cascade = body.cascade || false;
+    const forceCascade = body.forceCascade || false;
+    log.debug(`[${operationId}] Parsed request body`, { id, cascade, forceCascade });
 
-    await tw.begin();
+    const transaction = db.transaction();
+    await transaction.begin();
     log.info(`[${operationId}] Transaction started for offering image junction deletion.`);
 
-    // === DELETE JUNCTION ENTRY ==================================================================
+    try {
+      // === CHECK DEPENDENCIES =====================================================================
 
-    const deletedJunction = await deleteOfferingImage(tw.trans, id);
-    await tw.commit();
+      const { hard, soft } = await checkOfferingImageDependencies(id, transaction);
+      log.info(`[${operationId}] Offering image has dependent objects:`, { hard, soft });
 
-    const response: DeleteSuccessResponse<OfferingImageJunction> = {
-      success: true,
-      message: `Offering image junction (ID: ${id}) deleted successfully. Image remains in database.`,
-      data: {
-        deleted_resource: deletedJunction,
-        cascade_performed: false,
-        dependencies_cleared: 0,
-      },
-      meta: { timestamp: new Date().toISOString() },
-    };
+      let cascade_available = true;
+      if (hard.length > 0) {
+        cascade_available = false;
+      }
 
-    log.info(`[${operationId}] FN_SUCCESS: Offering image junction deleted.`);
-    return json(response);
+      // If we have soft dependencies without cascade
+      // or we have hard dependencies without forceCascade => Return error code.
+      if ((soft.length > 0 && !cascade) || (hard.length > 0 && !forceCascade)) {
+        await rollbackTransaction(transaction);
+        const conflictResponse: DeleteConflictResponse<string[]> = {
+          success: false,
+          message: "Cannot delete offering image: It has dependencies that prevent deletion.",
+          status_code: 409,
+          error_code: "DEPENDENCY_CONFLICT",
+          dependencies: { hard, soft },
+          cascade_available,
+          meta: { timestamp: new Date().toISOString() },
+        };
+        log.warn(`[${operationId}] FN_FAILURE: Deletion blocked by dependencies.`, { dependencies: { hard, soft } });
+        return json(conflictResponse, { status: 409 });
+      }
+
+      // === DELETE =================================================================================
+
+      const deletedJunction = await deleteOfferingImage(transaction, id, cascade || forceCascade, forceCascade);
+      await transaction.commit();
+      log.info(`[${operationId}] Transaction committed.`);
+
+      // === RETURN RESPONSE ========================================================================
+
+      const response: DeleteSuccessResponse<OfferingImageJunction> = {
+        success: true,
+        message: `Offering image junction (ID: ${id}) deleted successfully.`,
+        data: {
+          deleted_resource: deletedJunction,
+          cascade_performed: cascade || forceCascade,
+          dependencies_cleared: hard.length + soft.length,
+        },
+        meta: { timestamp: new Date().toISOString() },
+      };
+      log.info(`[${operationId}] FN_SUCCESS: Offering image junction deleted.`, { responseData: response.data });
+      return json(response);
+    } catch (err) {
+      await rollbackTransaction(transaction);
+      log.error(`[${operationId}] FN_EXCEPTION: Transaction failed, rolling back.`, { error: err });
+      throw err; // Re-throw to be caught by the outer catch block
+    }
   } catch (err: unknown) {
-    await tw.rollback();
     if ((err as { status?: number })?.status === 404) {
       throw err;
     }

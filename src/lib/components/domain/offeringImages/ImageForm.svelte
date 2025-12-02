@@ -361,6 +361,22 @@
               label="MIME Type"
               value={image?.mime_type}
             />
+
+            <!-- Prompt Fingerprint (readonly, calculated from variant fields) -->
+            <StaticFieldValue
+              label="Prompt Fingerprint"
+              value={image?.prompt_fingerprint}
+              formatter={truncateHash}
+              hint="MD5 hash"
+              class="span-2"
+            />
+
+            <!-- Explicit (readonly, true = offering-specific, false = canonical/shared) -->
+            <StaticFieldValue
+              label="Explicit"
+              value={image?.explicit}
+              formatter={(val) => val === true ? "Yes (Offering-specific)" : val === false ? "No (Canonical/Shared)" : "N/A"}
+            />
           {/if}
 
           <!-- ===== VARIANT MATCHING FIELDS (for image matching logic) ===== -->

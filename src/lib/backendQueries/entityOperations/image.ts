@@ -162,10 +162,25 @@ export async function insertImage(
   // 2b. Calculate fingerprint for all images (works for both direct inserts and offering images)
   // For offering images, the fingerprint-relevant fields are already merged in insertOfferingImage
   if (ImageSchema.__brandMeta?.fingerPrintForPromptProps) {
+    log.debug("Calculating fingerprint", { 
+      hasFpKeys: !!ImageSchema.__brandMeta.fingerPrintForPromptProps,
+      fpKeys: ImageSchema.__brandMeta.fingerPrintForPromptProps,
+      sanitizedFields: Object.keys(sanitized),
+      material_id: sanitized.material_id,
+      form_id: sanitized.form_id,
+      size_range: sanitized.size_range,
+      quality_grade: sanitized.quality_grade,
+    });
     const fingerprint = createPromptFingerprint(ImageSchema, sanitized as any);
+    log.debug("Fingerprint calculated", { fingerprint });
     if (fingerprint) {
       sanitized.prompt_fingerprint = fingerprint;
+      log.debug("Fingerprint set in sanitized", { prompt_fingerprint: sanitized.prompt_fingerprint });
+    } else {
+      log.warn("Fingerprint calculation returned null", { sanitized });
     }
+  } else {
+    log.warn("ImageSchema.__brandMeta?.fingerPrintForPromptProps is not set");
   }
 
   // 3. Check if Image already exists (UNIQUE constraint on filepath)
@@ -178,13 +193,82 @@ export async function insertImage(
 
     if (existingResult.recordset.length > 0) {
       const existingImageId = existingResult.recordset[0].image_id;
-      log.debug("Reusing existing image", { image_id: existingImageId, filepath: sanitized.filepath });
+      log.debug("Image already exists", { image_id: existingImageId, filepath: sanitized.filepath });
 
+      // Load existing image to check if fingerprint-relevant fields changed
       const loadRequest = transWrapper.request();
       loadRequest.input('id', existingImageId);
       const loadResult = await loadRequest.query('SELECT * FROM dbo.images WHERE image_id = @id');
       const existingImage = loadResult.recordset[0] as Image;
 
+      // Check if fingerprint-relevant fields changed
+      const fpKeys = ImageSchema.__brandMeta?.fingerPrintForPromptProps as (keyof Image)[] | undefined;
+      if (fpKeys && fpKeys.length > 0) {
+        const fieldsChanged = fpKeys.some(key => {
+          const existingValue = existingImage[key];
+          const newValue = sanitized[key];
+          // Compare values (handle null/undefined)
+          if (existingValue === null || existingValue === undefined) {
+            return newValue !== null && newValue !== undefined;
+          }
+          if (newValue === null || newValue === undefined) {
+            return true;
+          }
+          return existingValue !== newValue;
+        });
+
+        if (fieldsChanged) {
+          log.debug("Fingerprint-relevant fields changed, updating existing image", { 
+            image_id: existingImageId,
+            changedFields: fpKeys.filter(key => {
+              const existingValue = existingImage[key];
+              const newValue = sanitized[key];
+              if (existingValue === null || existingValue === undefined) {
+                return newValue !== null && newValue !== undefined;
+              }
+              if (newValue === null || newValue === undefined) {
+                return true;
+              }
+              return existingValue !== newValue;
+            })
+          });
+
+          // Update the existing image with new fingerprint-relevant fields
+          // Build updateData by picking only the fingerprint-relevant fields that changed
+          // Type-safe: fpKeys are guaranteed to be keys of Image from SchemaMeta
+          const updateData: Partial<Image> = {};
+          for (const key of fpKeys) {
+            const value = sanitized[key];
+            if (value !== undefined) {
+              // Type-safe: key is from fpKeys which are guaranteed to be keys of Image
+              // We know from SchemaMeta that fpKeys are valid Image keys
+              (updateData as any)[key] = value;
+            }
+          }
+
+          // Recalculate fingerprint
+          const mergedData = { ...existingImage, ...updateData };
+          const fingerprint = createPromptFingerprint(ImageSchema, mergedData as any);
+          if (fingerprint) {
+            updateData.prompt_fingerprint = fingerprint;
+          }
+
+          // Update the image
+          const updatedImage = await updateRecordWithTransaction(
+            ImageSchema,
+            existingImageId,
+            "image_id",
+            updateData,
+            transWrapper.trans
+          );
+
+          await transWrapper.commit();
+          return updatedImage as Image;
+        }
+      }
+
+      // No fingerprint-relevant fields changed, return existing image
+      log.debug("Reusing existing image (no fingerprint-relevant changes)", { image_id: existingImageId });
       await transWrapper.commit();
       return existingImage;
     }

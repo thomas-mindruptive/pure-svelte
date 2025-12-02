@@ -1,4 +1,5 @@
 export * as assertions from "./assertions";
+export * from "./createFingerprint";
 export * as debounce from "./debounce";
 export * as delay from "./delay";
 export * as errorUtils from "./errorUtils";

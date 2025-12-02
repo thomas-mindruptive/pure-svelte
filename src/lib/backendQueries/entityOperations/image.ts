@@ -6,6 +6,7 @@ import {
   ImageSchema,
   type Image,
 } from "$lib/domain/domainTypes";
+import { createPromptFingerprint } from "$lib/domain/promptFingerprint";
 import type { Transaction } from "mssql";
 import { error } from "@sveltejs/kit";
 import { log } from "$lib/utils/logger";
@@ -158,6 +159,15 @@ export async function insertImage(
     Object.assign(sanitized, enriched);
   }
 
+  // 2b. Calculate fingerprint for all images (works for both direct inserts and offering images)
+  // For offering images, the fingerprint-relevant fields are already merged in insertOfferingImage
+  if (ImageSchema.__brandMeta?.fingerPrintForPromptProps) {
+    const fingerprint = createPromptFingerprint(ImageSchema, sanitized as any);
+    if (fingerprint) {
+      sanitized.prompt_fingerprint = fingerprint;
+    }
+  }
+
   // 3. Check if Image already exists (UNIQUE constraint on filepath)
   if (sanitized.filepath) {
     const checkExistingRequest = transWrapper.request();
@@ -240,6 +250,19 @@ export async function updateImage(
     log.debug("Filepath changed, re-enriching metadata", { filepath: sanitized.filepath });
     const enriched = await enrichImageMetadata(sanitized);
     Object.assign(sanitized, enriched);
+  }
+
+  // 2b. Recalculate fingerprint if fingerprint-relevant fields are updated
+  const fpKeys = ImageSchema.__brandMeta?.fingerPrintForPromptProps as (keyof Image)[] | undefined;
+  if (fpKeys && fpKeys.length > 0) {
+    // Only recalculate if all fingerprint-relevant fields are in the update
+    const allFpKeysPresent = fpKeys.every(key => key in sanitized);
+    if (allFpKeysPresent) {
+      const fingerprint = createPromptFingerprint(ImageSchema, sanitized as any);
+      if (fingerprint) {
+        sanitized.prompt_fingerprint = fingerprint;
+      }
+    }
   }
 
   // 3. Update Image

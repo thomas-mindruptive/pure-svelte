@@ -11,18 +11,29 @@ export type ExtractSchemaMeta<T> = T extends { readonly __brandMeta: infer M } ?
 export type GetSchemaAlias<T> = ExtractSchemaMeta<T> extends { alias: infer A } ? A : never;
 
 /**
+ * Meta type for branded schemas.
+ * Includes optional fingerprint configuration for prompt generation.
+ */
+export type SchemaMeta<S extends z.ZodObject<any>> = {
+  alias: string;
+  tableName: string;
+  dbSchema: string;
+  fingerPrintForPromptProps?: readonly (keyof z.infer<S>)[];
+};
+
+/**
  * Add metadata to the schema itself (not a copy!) and return the schema.
  * @param schema
  * @param meta
  * @returns
  */
-function createSchemaWithMeta<T extends z.ZodObject<any>, M extends { alias: string; tableName: string; dbSchema: string }>(
-  schema: T,
-  meta: M,
-): WithMeta<T, M> {
+function createSchemaWithMeta<S extends z.ZodObject<any>>(
+  schema: S,
+  meta: SchemaMeta<S>,
+): WithMeta<S, SchemaMeta<S>> {
   (schema as any).__brandMeta = meta;
   log.debug(`Added metadata to ${schema.description} - ${JSON.stringify(meta)}`);
-  return schema as WithMeta<T, M>;
+  return schema as WithMeta<S, SchemaMeta<S>>;
 }
 
 /**
@@ -425,6 +436,10 @@ export const Wio_Schema = createSchemaWithMeta(Wio_BaseSchema, {
   alias: "wio",
   tableName: "wholesaler_item_offerings",
   dbSchema: "dbo",
+  // Note: fingerPrintForPromptProps is not needed here because:
+  // - Fingerprint is only stored in images, not in offerings
+  // - When creating OfferingImages, fingerprint is calculated from coalesced offering data
+  // - We search for images by fingerprint, not for offerings
 } as const);
 
 /**
@@ -678,6 +693,16 @@ export const ImageSchema = createSchemaWithMeta(ImageSchemaBase, {
   alias: "img",
   tableName: "images",
   dbSchema: "dbo",
+  fingerPrintForPromptProps: [
+    "material_id",
+    "form_id",
+    "surface_finish_id",
+    "construction_type_id",
+    "size_range",
+    "quality_grade",
+    "color_variant",
+    "packaging",
+  ] as const,
 } as const);
 
 /**

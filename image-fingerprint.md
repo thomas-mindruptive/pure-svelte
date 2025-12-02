@@ -127,7 +127,7 @@ Einführung eines **schema-gesteuerten Prompt-Fingerprint-Systems**, das:
 
    - Liste später fein-tunen (z.B. `origin`, `imagePromptHint` nur indirekt oder gar nicht).
 
-2. **Optional: `ImageSchema` konfigurieren:**
+2. **`ImageSchema` konfigurieren:**
 
    - Falls du Fingerprints direkt auf `images` brauchst (z.B. für bereits generierte Bilder):
      ```ts

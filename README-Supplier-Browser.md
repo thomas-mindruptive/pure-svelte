@@ -44,6 +44,17 @@ The application's logic is built around hierarchical data model. Understanding t
 - **Purpose**: Links that belong to specific offerings.
 - **API Pattern**: `/api/offering-links` CREATE/UPDATE/DELETE with `CreateChildRequest`.
 
+#### Images (Junction-based Relationship - n:m with Canonical vs. Explicit)
+- **Entities**: `dbo.images` (canonical image data) + `dbo.offering_images` (junction table)
+- **Purpose**: Images associated with offerings, supporting both explicit (offering-specific) and canonical (shared) images.
+- **Key Characteristics**:
+  - **Explicit images** (`explicit = true`): Offering-specific images (e.g., custom photos), never shared between offerings.
+  - **Canonical images** (`explicit = false`): Automatically generated images shared between offerings with the same `prompt_fingerprint`.
+  - Images store fingerprint-relevant fields (`material_id`, `form_id`, `surface_finish_id`, `construction_type_id`, `size_range`, `quality_grade`, `color_variant`, `packaging`) for matching.
+  - Junction table (`dbo.offering_images`) manages the relationship with `is_primary` and `sort_order`.
+- **API Pattern**: `/api/offering-images` for listing, `/api/offering-images/new` for creation, `/api/offering-images/[id]` for individual operations.
+- **Architecture**: Uses Junction-Table pattern with View (`dbo.view_offering_images`) for simplified queries. See `image-consolidate.md` for detailed architecture.
+
 The API patterns mentioned above, such as `AssignmentRequest` and `CreateChildRequest`, utilize a set of universal, type-safe structures. These are defined in detail in the **Generic Type System - FINALIZED ARCHITECTURE** chapter.
 
 ### The User Experience: SvelteKit-Powered 
@@ -216,6 +227,25 @@ POST /api/offering-links
 }
 ```
 
+#### n:m Junction Relationships (Images)
+- `/api/offering-images`: Junction-based relationship between Offerings and Images.
+- **Architecture**: Uses `dbo.offering_images` junction table with `dbo.images` master table.
+- **Special Features**: Supports explicit (offering-specific) vs. canonical (shared) images via `explicit` flag.
+- **View Support**: Queries use `dbo.view_offering_images` for simplified JOINs.
+
+```typescript
+// Example: Create an explicit image for an Offering
+POST /api/offering-images/new
+{
+  "offering_id": 123,
+  "filepath": "C:\\...",
+  "explicit": true,
+  "is_primary": false,
+  "sort_order": 0
+  // Offering fields (material_id, form_id, etc.) are automatically merged from the offering
+}
+```
+
 #### n:m Assignment Relationships (`AssignmentRequest`)
 - `/api/supplier-categories`: Assign a Supplier to a Category.
 - `/api/offering-attributes`: Assign an Attribute to an Offering.
@@ -345,6 +375,12 @@ The client implements a highly robust **Optimistic Delete** pattern managed by a
 | Create | `POST /api/offering-links` | `CreateChildRequest<WholesalerItemOffering, LinkData>` | ✅ | ✅ | |
 | Update | `PUT /api/offering-links` | Update pattern | ✅ | ✅ | |
 | Delete | `DELETE /api/offering-links` | `DeleteRequest<WholesalerOfferingLink>` | ✅ | ✅ | |
+| **OFFERING-IMAGES (Junction - n:m with Canonical/Explicit)** | | | | | |
+| Query List | `POST /api/offering-images` | `QueryRequest<OfferingImageWithJunction>` | ✅ | ✅ | Uses `dbo.view_offering_images` |
+| Read Single | `GET /api/offering-images/[id]` | - | ✅ | ✅ | |
+| Create | `POST /api/offering-images/new` | `OfferingImageWithJunction` (partial) | ✅ | ✅ | Auto-merges offering fields for fingerprint |
+| Update | `PUT /api/offering-images/[id]` | `Partial<OfferingImageWithJunction>` | ✅ | ✅ | |
+| Delete | `DELETE /api/offering-images/[id]` | `DeleteRequest<OfferingImageJunction>` | ✅ | ✅ | Junction deleted, image preserved |
 
 ---
 
@@ -367,6 +403,25 @@ The architectural solution is a context-aware loading pattern implemented in the
     *   **UI:** The `OfferingForm` renders a dropdown list of these suppliers.
 
 This approach simplifies the client-side API, aligns perfectly with the business requirements, and removes complex, misuse-prone queries. This architecture is supported in the data layer by the absence of a restrictive `UNIQUE INDEX` on the `dbo.wholesaler_item_offerings` table, which allows for the creation of multiple offerings for the same product.
+
+### Architectural Decision: Image Management with Junction Tables
+
+Images use a **Junction-Table architecture** (`dbo.offering_images`) instead of direct foreign keys in `dbo.images`. This enables:
+
+- **Explicit vs. Canonical Images**: Images can be offering-specific (`explicit = true`) or shared/canonical (`explicit = false`) based on `prompt_fingerprint`.
+- **Fingerprint-Based Matching**: Images store fingerprint-relevant fields (`material_id`, `form_id`, etc.) that are automatically merged from the offering when creating explicit images.
+- **View-Based Queries**: The `dbo.view_offering_images` view simplifies queries by joining junction and image tables.
+- **Automatic Field Merging**: When creating an offering image via `insertOfferingImage`, offering fields (with COALESCE logic) are automatically merged into the image data before fingerprint calculation.
+
+**Key Implementation Details:**
+- All image operations use `entityOperations/offeringImage.ts` which encapsulates junction logic.
+- Images are never deleted when removing junction entries (images may be shared).
+- **Fingerprint calculation happens in `insertImage`** (central function called by all image creation paths):
+  - For offering images: `insertOfferingImage` merges offering fields (with COALESCE logic) into `imageData`, then calls `insertImage` which calculates the fingerprint.
+  - For direct image inserts (e.g., from `tools/images`): `insertImage` calculates fingerprint directly from the provided data.
+  - Fingerprint is automatically recalculated in `updateImage` when fingerprint-relevant fields are updated.
+
+See `image-consolidate.md` and `image-fingerprint.md` for complete architecture documentation.
 
 ### Future Architectural Enhancements
 

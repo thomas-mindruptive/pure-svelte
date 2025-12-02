@@ -74,6 +74,19 @@ export async function loadOfferingImages(
     await transWrapper.commit();
 
     // Transform result to OfferingImageWithJunction
+    // 
+    // Mapping is necessary for two reasons:
+    // 1. View column aliases: The view (dbo.view_offering_images) returns columns with specific aliases
+    //    to avoid conflicts between junction and image tables:
+    //    - img.image_id AS img_image_id (not image_id) - needed because oi.image_id also exists
+    //    - img.created_at AS image_created_at (not created_at) - to distinguish from offering_image_created_at
+    //    The TypeScript type OfferingImageWithJunction expects the standard field names (image_id, created_at).
+    //
+    // 2. BIT to boolean conversion: SQL Server BIT fields (explicit, is_primary) are returned as 0/1,
+    //    but TypeScript expects boolean values. We convert: row.explicit === 1 || row.explicit === true
+    //
+    // Note: We cannot use SELECT * directly without mapping because the view's aliases don't match
+    // the TypeScript type structure, and BIT fields need explicit conversion.
     const images: OfferingImageWithJunction[] = result.recordset.map((row: any) => ({
       image_id: row.img_image_id,
       filename: row.filename,
@@ -182,6 +195,8 @@ export async function insertOfferingImage(
       packaging: inputData.packaging ?? offering.packaging,
       explicit: inputData.explicit !== undefined ? inputData.explicit : true, // Default to explicit
     };
+    
+    // Note: Fingerprint calculation happens in insertImage (for all images, including direct inserts)
     const createdImage = await insertImage(transWrapper.trans, imageData);
 
     // 2. Create junction entry

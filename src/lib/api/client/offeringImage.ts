@@ -10,11 +10,11 @@
 import { log } from "$lib/utils/logger";
 import type { ApiClient } from "./apiClient";
 import { createJsonBody, getErrorMessage } from "./common";
-import type { 
+import type {
   QueryResponseData,
   ApiResponse,
   DeleteApiResponse,
-  DeleteRequest 
+  DeleteRequest
 } from "$lib/api/api.types";
 import { LoadingState } from "./loadingState";
 import type { OfferingImageWithJunction } from "$lib/backendQueries/entityOperations/offeringImage";
@@ -174,31 +174,24 @@ export function getOfferingImageApi(client: ApiClient) {
      * @param offeringImageId The offering_image_id (junction ID) to delete
      * @param cascade Unused (kept for backward compatibility)
      * @param forceCascade Unused (kept for backward compatibility)
-     * @returns Deleted OfferingImageJunction record
+     * @returns Delete info from backend.
      */
     async deleteOfferingImage(
       offeringImageId: number,
       cascade = false,
       forceCascade = false
-    ): Promise<OfferingImageJunction> {
+    ): Promise<DeleteApiResponse<OfferingImageJunction, string[]>> { 
       const operationId = `deleteOfferingImage-${offeringImageId}`;
       offeringImageLoadingManager.start(operationId);
       try {
-        const response = await client.apiFetchUnion<DeleteApiResponse<OfferingImageJunction, string[]>>(
+        return await client.apiFetchUnion<DeleteApiResponse<OfferingImageJunction, string[]>>(
           `/api/offering-images/${offeringImageId}`,
           {
             method: "DELETE",
             body: createJsonBody({ cascade, forceCascade } as DeleteRequest<OfferingImageJunction>),
           },
           { context: operationId },
-        );
-        if (!response.success) {
-          throw new Error(response.message);
-        }
-        return response.data.deleted_resource;
-      } catch (err) {
-        log.error(`[${operationId}] Failed.`, { offeringImageId, error: getErrorMessage(err) });
-        throw err;
+        );  // ← direkt zurückgeben, nicht auspacken!
       } finally {
         offeringImageLoadingManager.finish(operationId);
       }
@@ -217,14 +210,14 @@ export function getOfferingImageApi(client: ApiClient) {
       try {
         // First, get all images for this offering
         const allImages = await this.loadOfferingImages(offeringId);
-        
+
         // Update all images: set target to primary, others to false
         const updatePromises = allImages.map((img) =>
           this.updateOfferingImage(img.offering_image_id, { is_primary: img.offering_image_id === offeringImageId })
         );
-        
+
         await Promise.all(updatePromises);
-        
+
         // Return the updated primary image
         return this.loadOfferingImage(offeringImageId);
       } catch (err) {

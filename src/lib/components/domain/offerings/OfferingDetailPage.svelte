@@ -116,7 +116,7 @@
 
   // Get page-local loading context from layout
   type PageLoadingContext = { isLoading: boolean };
-  const pageLoading = getContext<PageLoadingContext>('page-loading');
+  const pageLoading = getContext<PageLoadingContext>("page-loading");
 
   // Derived state for button disabled states - disabled during page load OR API operations
   const isAnyOperationInProgress = $derived(isLoading || $offeringLoadingState);
@@ -143,7 +143,7 @@
 
     const processPromises = async () => {
       isLoading = true;
-      pageLoading.isLoading = true;  // Globaler Spinner AN
+      pageLoading.isLoading = true; // Globaler Spinner AN
 
       try {
         // Load offering (not in create mode)
@@ -158,7 +158,6 @@
           if (!offeringVal.success) {
             errors.offering = zodToValidationErrorTree(offeringVal.error);
           }
-
         }
 
         materials = await materialApi.loadMaterials();
@@ -210,7 +209,7 @@
             const productDefApi = getProductDefinitionApi(client);
             const productDef = await productDefApi.loadProductDefinition(data.productDefId);
             if (aborted) return;
-            
+
             // IMPORTANT: Set offering.product_def for validation and title display
             // We create a minimal offering object with only product_def for validation
             // The ForCreate schema allows offering_id to be optional, and wholesaler_id can be set later
@@ -290,7 +289,7 @@
       } finally {
         if (!aborted) {
           isLoading = false;
-          pageLoading.isLoading = false;  // Globaler Spinner AUS
+          pageLoading.isLoading = false; // Globaler Spinner AUS
         }
       }
     };
@@ -315,12 +314,12 @@
     } else {
       // Reload offering after update
       isLoading = true;
-      pageLoading.isLoading = true;  // Globaler Spinner beim Reload
+      pageLoading.isLoading = true; // Globaler Spinner beim Reload
       try {
         offering = await offeringApi.loadOffering(data.offeringId);
       } finally {
         isLoading = false;
-        pageLoading.isLoading = false;  // Globaler Spinner aus
+        pageLoading.isLoading = false; // Globaler Spinner aus
       }
     }
   }
@@ -634,22 +633,19 @@
 
       log.info(`[OfferingDetailPage] Bulk linking ${selectedOfferings.length} source offerings`, {
         shopOfferingId: offering.offering_id,
-        sourceOfferingIds: selectedOfferings.map(o => o.wioId)
+        sourceOfferingIds: selectedOfferings.map((o) => o.wioId),
       });
 
       // Loop through all selected offerings
       for (const sourceOffering of selectedOfferings) {
         try {
-          const result = await offeringApi.addSourceOfferingLink(
-            offering.offering_id,
-            sourceOffering.wioId
-          );
+          const result = await offeringApi.addSourceOfferingLink(offering.offering_id, sourceOffering.wioId);
 
           if (result.success) {
             successCount++;
           } else {
             errorCount++;
-            errors.push(`${sourceOffering.wioTitle}: ${result.message || 'Unknown error'}`);
+            errors.push(`${sourceOffering.wioTitle}: ${result.message || "Unknown error"}`);
           }
         } catch (err) {
           errorCount++;
@@ -661,17 +657,11 @@
 
       // Show notifications based on result
       if (successCount > 0) {
-        addNotification(
-          `Successfully linked ${successCount} source offering${successCount !== 1 ? 's' : ''}`,
-          "success"
-        );
+        addNotification(`Successfully linked ${successCount} source offering${successCount !== 1 ? "s" : ""}`, "success");
       }
 
       if (errorCount > 0) {
-        addNotification(
-          `Failed to link ${errorCount} offering${errorCount !== 1 ? 's' : ''}`,
-          "error"
-        );
+        addNotification(`Failed to link ${errorCount} offering${errorCount !== 1 ? "s" : ""}`, "error");
         log.error("[OfferingDetailPage] Bulk link errors", { errors });
       }
 
@@ -682,7 +672,6 @@
       if (successCount > 0) {
         isSourceOfferingModalOpen = false;
       }
-
     } catch (err) {
       const message = getErrorMessage(err);
       addNotification(`Failed to link source offerings: ${message}`, "error");
@@ -728,19 +717,17 @@
   }
 
   async function handleImageDelete(ids: ID[]): Promise<void> {
-    let dataChanged = false;
     const idsAsNumber = stringsToNumbers(ids);
-
-    // Delete junction entries (images are not deleted, only the junction)
-    for (const id of idsAsNumber) {
-      try {
-        await offeringImageApi.deleteOfferingImage(id, false, false);
-        dataChanged = true;
-      } catch (e) {
-        log.error(`Failed to delete offering image ${id}`, e);
-        addNotification(`Failed to delete image: ${getErrorMessage(e)}`, "error");
-      }
-    }
+    const dataChanged = await cascadeDelete(
+      idsAsNumber,
+      offeringImageApi.deleteOfferingImage, // die API-Delete-Funktion
+      {
+        domainObjectName: "Offering Image",
+        hardDepInfo: "Canonical image used by other offerings. Force delete?",
+        softDepInfo: "Explicit image can be deleted. Proceed?",
+      },
+      true
+    );
 
     if (dataChanged) {
       await reloadImages();
@@ -900,7 +887,7 @@
         <button
           type="button"
           class="pc-grid__createbtn"
-          onclick={() => isSourceOfferingModalOpen = true}
+          onclick={() => (isSourceOfferingModalOpen = true)}
           disabled={linkingSourceOffering}
         >
           + Add Source Offerings
@@ -995,10 +982,10 @@
         bind:isOpen={isSourceOfferingModalOpen}
         shopOfferingId={offering.offering_id}
         productDefId={offering.product_def_id}
-        alreadyLinkedOfferingIds={sourceOfferings.map(so => so.offering_id)}
+        alreadyLinkedOfferingIds={sourceOfferings.map((so) => so.offering_id)}
         fetch={data.loadEventFetch}
         onConfirm={handleBulkLinkSourceOfferings}
-        onCancel={() => isSourceOfferingModalOpen = false}
+        onCancel={() => (isSourceOfferingModalOpen = false)}
       />
     {/if}
   </div>
@@ -1040,7 +1027,10 @@
   <div class="detail-page-layout">
     <!-- Section 1: Offering details form -->
     <div class="form-section">
-      <ValidationWrapper {errors} renderChildrenInCaseOfErrors={true}>
+      <ValidationWrapper
+        {errors}
+        renderChildrenInCaseOfErrors={true}
+      >
         <OfferingForm
           initialLoadedData={{
             offering,

@@ -1,30 +1,29 @@
 // File: src/lib/backendQueries/entityOperations/offeringImage.ts
 
-import { validateEntityBySchema } from "$lib/domain/domainTypes.utils";
 import {
-  OfferingImageJunctionSchema,
   OfferingImageJunctionForCreateSchema,
-  type OfferingImageJunction,
+  OfferingImageJunctionSchema,
   type Image,
+  type OfferingImageJunction,
+  type OfferingImageView
 } from "$lib/domain/domainTypes";
-import type { Transaction } from "mssql";
-import { error } from "@sveltejs/kit";
+import { validateEntityBySchema } from "$lib/domain/domainTypes.utils";
 import { log } from "$lib/utils/logger";
+import { error } from "@sveltejs/kit";
+import type { Transaction } from "mssql";
+import { cascadeDeleteOfferingImage } from "../cascadingDeleteOperations";
+import { db } from "../db";
+import { checkOfferingImageDependencies } from "../dependencyChecks";
 import { insertRecordWithTransaction, updateRecordWithTransaction } from "../genericEntityOperations";
 import { TransWrapper } from "../transactionWrapper";
-import { db } from "../db";
-import { insertImage, loadImageById, deleteImage } from "./image";
+import { DeleteCascadeBlockedError } from "./entityErrors";
+import type { DeleteResult } from "./entityOpsResultTypes";
+import { insertImage, loadImageById } from "./image";
 
 /**
- * Type for offering image with junction data (from view_offering_images)
+ * Cursor is an idiot and created an extra type!
  */
-export type OfferingImageWithJunction = Image & {
-  offering_image_id: number;
-  offering_id: number;
-  is_primary: boolean;
-  sort_order: number;
-  offering_image_created_at?: string;
-};
+export type OfferingImageWithJunction = OfferingImageView;
 
 /**
  * Options for loading offering images
@@ -69,58 +68,11 @@ export async function loadOfferingImages(
 
     query += ` ORDER BY oi.sort_order ASC, oi.offering_image_id ASC`;
 
-    const result = await request.query(query);
-
+    const images = (await request.query(query)).recordset;
     await transWrapper.commit();
-
-    // Transform result to OfferingImageWithJunction
-    // 
-    // Mapping is necessary for two reasons:
-    // 1. View column aliases: The view (dbo.view_offering_images) returns columns with specific aliases
-    //    to avoid conflicts between junction and image tables:
-    //    - img.image_id AS img_image_id (not image_id) - needed because oi.image_id also exists
-    //    - img.created_at AS image_created_at (not created_at) - to distinguish from offering_image_created_at
-    //    The TypeScript type OfferingImageWithJunction expects the standard field names (image_id, created_at).
-    //
-    // 2. BIT to boolean conversion: SQL Server BIT fields (explicit, is_primary) are returned as 0/1,
-    //    but TypeScript expects boolean values. We convert: row.explicit === 1 || row.explicit === true
-    //
-    // Note: We cannot use SELECT * directly without mapping because the view's aliases don't match
-    // the TypeScript type structure, and BIT fields need explicit conversion.
-    const images: OfferingImageWithJunction[] = result.recordset.map((row: any) => ({
-      image_id: row.img_image_id,
-      filename: row.filename,
-      filepath: row.filepath,
-      file_hash: row.file_hash,
-      file_size_bytes: row.file_size_bytes,
-      width_px: row.width_px,
-      height_px: row.height_px,
-      mime_type: row.mime_type,
-      shopify_url: row.shopify_url,
-      shopify_media_id: row.shopify_media_id,
-      uploaded_to_shopify_at: row.uploaded_to_shopify_at,
-      material_id: row.material_id,
-      form_id: row.form_id,
-      surface_finish_id: row.surface_finish_id,
-      construction_type_id: row.construction_type_id,
-      size_range: row.size_range,
-      quality_grade: row.quality_grade,
-      color_variant: row.color_variant,
-      packaging: row.packaging,
-      prompt_fingerprint: row.prompt_fingerprint,
-      explicit: row.explicit === 1 || row.explicit === true,
-      image_type: row.image_type,
-      created_at: row.image_created_at,
-      // Junction fields
-      offering_image_id: row.offering_image_id,
-      offering_id: row.offering_id,
-      is_primary: row.is_primary === 1 || row.is_primary === true,
-      sort_order: row.sort_order,
-      offering_image_created_at: row.offering_image_created_at,
-    }));
-
     log.debug("Offering images loaded", { offeringId, count: images.length });
     return images;
+
   } catch (err) {
     await transWrapper.rollback();
     throw err;
@@ -195,7 +147,7 @@ export async function insertOfferingImage(
       packaging: inputData.packaging ?? offering.packaging,
       explicit: inputData.explicit !== undefined ? inputData.explicit : true, // Default to explicit
     };
-    
+
     // Note: Fingerprint calculation happens in insertImage (for all images, including direct inserts)
     const createdImage = await insertImage(transWrapper.trans, imageData);
 
@@ -287,12 +239,12 @@ export async function updateOfferingImage(
 
     // 2. Update image if image fields are provided
     let updatedImage: Image | null = null;
-    if (inputData.filename || inputData.filepath || inputData.explicit !== undefined || 
-        inputData.material_id !== undefined || inputData.form_id !== undefined ||
-        inputData.surface_finish_id !== undefined || inputData.construction_type_id !== undefined ||
-        inputData.size_range !== undefined || inputData.quality_grade !== undefined ||
-        inputData.color_variant !== undefined || inputData.packaging !== undefined) {
-      
+    if (inputData.filename || inputData.filepath || inputData.explicit !== undefined ||
+      inputData.material_id !== undefined || inputData.form_id !== undefined ||
+      inputData.surface_finish_id !== undefined || inputData.construction_type_id !== undefined ||
+      inputData.size_range !== undefined || inputData.quality_grade !== undefined ||
+      inputData.color_variant !== undefined || inputData.packaging !== undefined) {
+
       const imageUpdateData: Partial<Image> = {};
       if (inputData.filename !== undefined) imageUpdateData.filename = inputData.filename;
       if (inputData.filepath !== undefined) imageUpdateData.filepath = inputData.filepath;
@@ -397,76 +349,58 @@ export async function deleteOfferingImage(
   junctionId: number,
   cascade: boolean = false,
   forceCascade: boolean = false
-): Promise<OfferingImageJunction> {
+): Promise<DeleteResult<Partial<OfferingImageView>>> {
+
   log.debug("deleteOfferingImage", { junctionId, cascade, forceCascade });
 
   const transWrapper = new TransWrapper(transaction, db);
   await transWrapper.begin();
 
+
   try {
-    // 1. Load junction entry to get image_id and explicit flag before deletion
-    const loadRequest = transWrapper.request();
-    loadRequest.input('id', junctionId);
-    const loadResult = await loadRequest.query(`
-      SELECT 
-        oi.offering_image_id,
-        oi.image_id,
-        oi.offering_id,
-        img.explicit
-      FROM dbo.offering_images oi
-      INNER JOIN dbo.images img ON oi.image_id = img.image_id
-      WHERE oi.offering_image_id = @id
-    `);
+    // === CHECK DEPENDENCIES =====================================================================
+    const { hard: hardDependencies, soft: softDependencies } = await checkOfferingImageDependencies(junctionId, transWrapper.trans);
+    log.info(`Offering image dependencies:`, { hard: hardDependencies, soft: softDependencies });
 
-    if (loadResult.recordset.length === 0) {
-      throw error(404, `Offering image with ID ${junctionId} not found.`);
+    let cascade_available = true;
+    if (hardDependencies.length > 0) {
+      cascade_available = false;
+    }
+    // If we have soft dependencies without cascade
+    // or we have hard dependencies without forceCascade => Return error code.
+    if ((softDependencies.length > 0 && !cascade) || (hardDependencies.length > 0 && !forceCascade)) {
+      throw new DeleteCascadeBlockedError(hardDependencies, softDependencies, cascade_available);
+      // Old begin: DO NOT return HTTP specific error codes. --------------------------------
+      // const conflictResponse: DeleteConflictResponse<string[]> = {
+      //   success: false,
+      //   message: "Cannot delete offering image: It is still in use by other entities or uses other entities.",
+      //   status_code: 409,
+      //   error_code: "DEPENDENCY_CONFLICT",
+      //   dependencies: { hard, soft },
+      //   cascade_available,
+      //   meta: { timestamp: new Date().toISOString() },
+      // };
+      // log.warn(`Deletion blocked by hard dependencies.`, { dependencies: hard });
+      // Old end ----------------------------------------------------------------------------
     }
 
-    const junctionData = loadResult.recordset[0];
-    const imageId = junctionData.image_id;
-    const isExplicit = junctionData.explicit === 1 || junctionData.explicit === true;
+    // === DELETE =================================================================================
 
-    // 2. Delete junction entry
-    const deleteRequest = transWrapper.request();
-    deleteRequest.input('id', junctionId);
-    const deleteResult = await deleteRequest.query(
-      'DELETE FROM dbo.offering_images OUTPUT DELETED.* WHERE offering_image_id = @id'
-    );
-
-    if (deleteResult.recordset.length === 0) {
-      throw error(404, `Offering image with ID ${junctionId} not found.`);
-    }
-
-    const deletedJunction = deleteResult.recordset[0] as OfferingImageJunction;
-    log.debug("Offering image junction deleted successfully", { offering_image_id: junctionId });
-
-    // 3. Optionally delete the associated image
-    if (cascade || forceCascade) {
-      const shouldDeleteImage = forceCascade || (cascade && isExplicit);
-      
-      if (shouldDeleteImage) {
-        log.debug("Deleting associated image", { 
-          image_id: imageId, 
-          explicit: isExplicit, 
-          cascade, 
-          forceCascade 
-        });
-        
-        await deleteImage(transWrapper.trans, imageId);
-        log.debug("Associated image deleted successfully", { image_id: imageId });
-      } else if (cascade && !isExplicit) {
-        log.debug("Skipping image deletion: canonical image (explicit = false) requires forceCascade", {
-          image_id: imageId,
-          explicit: isExplicit
-        });
-      }
-    }
-
+    const cascadeDeleteResult = await cascadeDeleteOfferingImage(junctionId, cascade || forceCascade, transWrapper.trans);
+    const deleteResult = {...cascadeDeleteResult, hardDependencies, softDependencies};
+    
     await transWrapper.commit();
-    return deletedJunction;
+    log.info(`Transaction committed.`);
+
+    // === RETURN RESPONSE ========================================================================
+
+    log.info(`Offering image deleted.`, { deletedResult: deleteResult });
+    return deleteResult;
+
   } catch (err) {
-    await transWrapper.rollback();
-    throw err;
+    transWrapper.rollback();
+    log.error(`Transaction failed, rolling back.`, { error: err });
+    throw err; // Re-throw to be caught by the outer catch block
   }
 }
 
@@ -501,39 +435,7 @@ export async function loadOfferingImageById(
       return null;
     }
 
-    const row = result.recordset[0] as any;
-    const offeringImage: OfferingImageWithJunction = {
-      image_id: row.img_image_id,
-      filename: row.filename,
-      filepath: row.filepath,
-      file_hash: row.file_hash,
-      file_size_bytes: row.file_size_bytes,
-      width_px: row.width_px,
-      height_px: row.height_px,
-      mime_type: row.mime_type,
-      shopify_url: row.shopify_url,
-      shopify_media_id: row.shopify_media_id,
-      uploaded_to_shopify_at: row.uploaded_to_shopify_at,
-      material_id: row.material_id,
-      form_id: row.form_id,
-      surface_finish_id: row.surface_finish_id,
-      construction_type_id: row.construction_type_id,
-      size_range: row.size_range,
-      quality_grade: row.quality_grade,
-      color_variant: row.color_variant,
-      packaging: row.packaging,
-      prompt_fingerprint: row.prompt_fingerprint,
-      explicit: row.explicit === 1 || row.explicit === true,
-      image_type: row.image_type,
-      created_at: row.image_created_at,
-      // Junction fields
-      offering_image_id: row.offering_image_id,
-      offering_id: row.offering_id,
-      is_primary: row.is_primary === 1 || row.is_primary === true,
-      sort_order: row.sort_order,
-      offering_image_created_at: row.offering_image_created_at,
-    };
-
+    const offeringImage = result.recordset[0] as OfferingImageWithJunction;
     return offeringImage;
   } catch (err) {
     await transWrapper.rollback();

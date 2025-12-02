@@ -1,18 +1,17 @@
 // in lib/dataModel/cascadingDeletes.ts (oder umbenannt in z.B. `lib/dataModel/productDefinition.ts`)
 
-import { assertDefined } from "$lib/utils/assertions";
-import { log } from "$lib/utils/logger";
-import type { Transaction } from "mssql";
 import type {
   DeletedAttributeData,
   DeletedCategoryData,
   DeletedOfferingData,
   DeletedProductDefinitonData,
   DeletedSupplierData,
-  /* <refact01> DEPRECATED: wholesaler_categories removed
-  DeletedSupplierCategoryData,
-  */
 } from "$lib/api/app/appSpecificTypes";
+import type { OfferingImageView } from "$lib/domain/domainTypes";
+import { assertDefined } from "$lib/utils/assertions";
+import { log } from "$lib/utils/logger";
+import type { Transaction } from "mssql";
+import type { CascadeDeleteResult } from "./entityOperations/entityOpsResultTypes";
 
 /**
  * The shapes of the data returned after a successful deletion.
@@ -942,169 +941,85 @@ export async function deleteOrderItem(
   }
 }
 
-/* <refact01> DEPRECATED: wholesaler_categories removed - no more assignments to delete
-// Deletes a Supplier-Category Assignment, with an option to cascade and delete all dependent offerings.
-// @param wholesalerId The ID of the supplier.
-// @param categoryId The ID of the category.
-// @param cascade If true, performs a cascade delete of all dependent offerings and their children.
-// @param transaction The active MSSQL transaction object.
-// @returns A promise that resolves with the data of the deleted assignment and deletion stats.
-// @throws An error if the assignment with the given IDs is not found.
-export async function deleteSupplierCategoryAssignment(
-  wholesalerId: number,
-  categoryId: number,
+/**
+ * Deletes an OfferingImage junction entry, with optional cascade to delete the associated image.
+ * 
+ * Cascade logic:
+ * - cascade=true: Deletes the image only if explicit=true (offering-specific image)
+ * - forceCascade=true: Always deletes the image, even if explicit=false (canonical image)
+ * - Without cascade: Only deletes the junction entry, keeps the image
+ * 
+ * @param id The offering_image_id (junction ID) to delete.
+ * @param cascade If true, deletes explicit images along with the junction.
+ * @param forceCascade If true, always deletes the image regardless of explicit flag.
+ * @param transaction The active MSSQL transaction object.
+ * @returns A promise that resolves with the deleted junction data and stats.
+ * @throws An error if the offering image junction with the given ID is not found.
+ */
+export async function cascadeDeleteOfferingImage(
+  id: number,
   cascade: boolean,
   transaction: Transaction,
-): Promise<{
-  deleted: DeletedSupplierCategoryData;
-  stats: Record<string, number>;
-}> {
-  assertDefined(wholesalerId, `wholesalerId must be defined for deleteSupplierCategoryAssignment`);
-  assertDefined(categoryId, `categoryId must be defined for deleteSupplierCategoryAssignment`);
-  log.info(`(delete) Preparing to delete Supplier-Category Assignment: Supplier ${wholesalerId}, Category ${categoryId} with cascade=${cascade}`);
+): Promise<CascadeDeleteResult<Partial<OfferingImageView>>> {
+  assertDefined(id, `id must be defined for deleteOfferingImage`);
+  log.info(`(delete) Preparing to delete OfferingImage ID: ${id} with cascade=${cascade}`);
 
-  const wholesalerIdParam = "wholesalerId";
-  const categoryIdParam = "categoryId";
+  const junctionIdParam = "junctionId";
 
   try {
-    // 1) Read assignment first (existence check + data for return)
-    const selectResult = await transaction
-      .request()
-      .input(wholesalerIdParam, wholesalerId)
-      .input(categoryIdParam, categoryId).query<DeletedSupplierCategoryData>(`
-        SELECT
-          wc.wholesaler_id,
-          wc.category_id,
-          pc.name AS category_name
-        FROM dbo.wholesaler_categories wc
-        INNER JOIN dbo.product_categories pc ON wc.category_id = pc.category_id
-        WHERE wc.wholesaler_id = @${wholesalerIdParam} AND wc.category_id = @${categoryIdParam};
-      `);
+    // 1) Delete junction and get deleted data + image info in one query
+    const deleteResult = await transaction.request().input(junctionIdParam, id).query<{
+      offering_image_id: number;
+      image_id: number;
+      explicit: boolean;
+    }>(`
+      DELETE oi
+      OUTPUT DELETED.offering_image_id, DELETED.image_id, img.explicit
+      FROM dbo.offering_images oi
+      INNER JOIN dbo.images img ON oi.image_id = img.image_id
+      WHERE oi.offering_image_id = @${junctionIdParam};
+    `);
 
-    if (selectResult.recordset.length === 0) {
-      throw new Error(`Supplier-Category Assignment (Supplier ${wholesalerId}, Category ${categoryId}) not found.`);
+    if (deleteResult.recordset.length === 0) {
+      throw new Error(`OfferingImage with ID ${id} not found.`);
     }
-    const deletedAssignmentData = selectResult.recordset[0];
-    log.debug(
-      `(delete) Found assignment to delete: Category "${deletedAssignmentData.category_name}" (wholesaler_id: ${deletedAssignmentData.wholesaler_id}, category_id: ${deletedAssignmentData.category_id})`,
-    );
 
-    let stats: Record<string, number> = {};
+    const deletedJunction = deleteResult.recordset[0];
+    const imageId = deletedJunction.image_id;
+    
+    log.debug(`(delete) Deleted offering image junction (ID: ${id}, image_id: ${imageId}`);
 
-    // 2) Execute delete path
+    let stats: Record<string, number> = {
+      deletedJunctions: 1,
+      deletedImages: 0,
+      total: 0,
+    };
+
+    // 2) Optionally delete the associated image
     if (cascade) {
-      log.debug(`(delete) Executing CASCADE delete for Supplier-Category Assignment`);
-
-      const cascadeDeleteQuery = `
-        SET XACT_ABORT ON;
-        SET NOCOUNT ON;
-
-        DECLARE
-          @deletedOrderItems   INT = 0,
-          @deletedAttributes   INT = 0,
-          @deletedLinks        INT = 0,
-          @deletedOfferings    INT = 0,
-          @deletedAssignments  INT = 0;
-
-        -- 1) Delete order_items (indirect via offerings - must come first as leaf nodes)
-        DELETE oi
-        FROM dbo.order_items oi
-        INNER JOIN dbo.wholesaler_item_offerings wio ON oi.offering_id = wio.offering_id
-        WHERE wio.wholesaler_id = @${wholesalerIdParam} AND wio.category_id = @${categoryIdParam};
-        SET @deletedOrderItems = @@ROWCOUNT;
-
-        -- 2) Delete offering_attributes
-        DELETE woa
-        FROM dbo.wholesaler_offering_attributes woa
-        INNER JOIN dbo.wholesaler_item_offerings wio ON woa.offering_id = wio.offering_id
-        WHERE wio.wholesaler_id = @${wholesalerIdParam} AND wio.category_id = @${categoryIdParam};
-        SET @deletedAttributes = @@ROWCOUNT;
-
-        -- 3) Delete offering_links
-        DELETE wol
-        FROM dbo.wholesaler_offering_links wol
-        INNER JOIN dbo.wholesaler_item_offerings wio ON wol.offering_id = wio.offering_id
-        WHERE wio.wholesaler_id = @${wholesalerIdParam} AND wio.category_id = @${categoryIdParam};
-        SET @deletedLinks = @@ROWCOUNT;
-
-        -- 4) Delete offerings
-        DELETE FROM dbo.wholesaler_item_offerings
-        WHERE wholesaler_id = @${wholesalerIdParam} AND category_id = @${categoryIdParam};
-        SET @deletedOfferings = @@ROWCOUNT;
-
-        -- 5) Finally, delete the assignment
-        DELETE FROM dbo.wholesaler_categories
-        WHERE wholesaler_id = @${wholesalerIdParam} AND category_id = @${categoryIdParam};
-        SET @deletedAssignments = @@ROWCOUNT;
-
-        -- Return deletion stats
-        SELECT
-          @deletedOrderItems  AS deletedOrderItems,
-          @deletedAttributes  AS deletedAttributes,
-          @deletedLinks       AS deletedLinks,
-          @deletedOfferings   AS deletedOfferings,
-          @deletedAssignments AS deletedAssignments;
-      `;
-
-      const res = await transaction
-        .request()
-        .input(wholesalerIdParam, wholesalerId)
-        .input(categoryIdParam, categoryId)
-        .query(cascadeDeleteQuery);
-
-      if (res?.recordset?.[0]) {
-        stats = res.recordset[0];
-        stats.total = stats.deletedOrderItems + stats.deletedAttributes + stats.deletedLinks + stats.deletedOfferings;
-      } else {
-        stats = {
-          total: 0,
-          deletedOrderItems: 0,
-          deletedAttributes: 0,
-          deletedLinks: 0,
-          deletedOfferings: 0,
-          deletedAssignments: 0,
-        };
-      }
-
-      log.debug(
-        `(delete) Cascade stats for Supplier-Category Assignment: ` +
-          `orderItems=${stats.deletedOrderItems}, attrs=${stats.deletedAttributes}, ` +
-          `links=${stats.deletedLinks}, offerings=${stats.deletedOfferings}, assignments=${stats.deletedAssignments}`,
-      );
-    } else {
-      log.debug(`(delete) Executing NON-CASCADE delete for Supplier-Category Assignment`);
-      const res = await transaction
-        .request()
-        .input(wholesalerIdParam, wholesalerId)
-        .input(categoryIdParam, categoryId)
-        .query(`
-          DELETE FROM dbo.wholesaler_categories
-          WHERE wholesaler_id = @${wholesalerIdParam} AND category_id = @${categoryIdParam};
+        log.debug(`(delete) Deleting associated image`, { image_id: imageId, cascade });
+        await transaction.request().input("imageId", imageId).query(`
+          DELETE FROM dbo.images WHERE image_id = @imageId;
         `);
-
-      const affected = Array.isArray(res.rowsAffected) ? res.rowsAffected.reduce((a, b) => a + b, 0) : (res.rowsAffected ?? 0);
-      log.debug(`(delete) Non-cascade delete affected rows: ${affected}`);
+        stats.deletedImages = 1;
+        stats.total = 1;
+        log.debug(`(delete) Associated image deleted successfully`, { image_id: imageId });
     }
 
-    log.info(`(delete) Delete operation for Supplier-Category Assignment completed successfully.`);
+    log.info(`(delete) Delete operation for OfferingImage ID: ${id} completed successfully.`);
 
-    // 3) Return the data of the now-deleted resource + stats
-    return { deleted: deletedAssignmentData, stats };
+    return { deleted: { offering_image_id: deletedJunction.offering_image_id, image_id: imageId }, stats };
   } catch (err: any) {
-    // Error 547 is BOTH CHECK constraint AND FK constraint - analyze message to distinguish
     if (err.number === 547) {
-      log.error(`(delete) FK constraint prevented delete of Supplier-Category Assignment (Supplier ${wholesalerId}, Category ${categoryId})`, {
+      log.error(`(delete) FK constraint prevented delete of OfferingImage ${id}`, {
         message: err.message,
-        cascade,
         constraint: err.message?.match(/FK_[\w]+/)?.[0],
       });
     } else {
-      log.error(`(delete) Unexpected error deleting Supplier-Category Assignment (Supplier ${wholesalerId}, Category ${categoryId})`, {
-        error: err,
-        cascade,
-      });
+      log.error(`(delete) Unexpected error deleting OfferingImage ${id}`, { error: err });
     }
     throw err;
   }
 }
-*/
+
+

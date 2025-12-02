@@ -903,10 +903,9 @@ export const OfferingEnrichedViewSchema = createSchemaWithMeta(OfferingEnrichedV
 const OfferingImageViewSchemaBase = ImageSchema.extend({
   // Junction table fields
   offering_image_id: z.number().int().positive(),
-  offering_id: z.number().int().positive(),
+  offering_id: z.number().int().positive(), 
   is_primary: z.boolean().default(false),
-  sort_order: z.number().int().nonnegative().default(0),
-  offering_image_created_at: z.string().nullable().optional(), // ISO datetime string
+  sort_order: z.number().int().nonnegative().default(0)
 }).describe("OfferingImageViewSchema");
 
 export const OfferingImageViewSchema = createSchemaWithMeta(OfferingImageViewSchemaBase, {

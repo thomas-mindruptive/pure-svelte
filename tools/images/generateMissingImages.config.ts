@@ -21,36 +21,6 @@ type LoadOfferingsOptions = entityOperations.offering.LoadOfferingsOptions;
 
 
 /**
- * Lookups needed for creating an image.
- * We use the Englisch names because AI image gen is better with English.
- */
-export type Lookups = {
-  productTypes: domainTypes.ProductType[];
-  forms: domainTypes.Form[];
-  materials: domainTypes.Material[];
-  constructionTypes: domainTypes.ConstructionType[];
-  surfaceFinishes: domainTypes.SurfaceFinish[];
-
-  productTypesMap: Map<number, domainTypes.ProductType>;
-  formsMap: Map<number, domainTypes.Form>;
-  materilasMap: Map<number, domainTypes.Material>;
-  constructionTypesMap: Map<number, domainTypes.ConstructionType>;
-  surfaceFinishesMap: Map<number, domainTypes.SurfaceFinish>;
-
-  productTypesEN: domainTypes.ProductType[];
-  formsEN: domainTypes.Form[];
-  materialsEN: domainTypes.Material[];
-  constructionTypesEN: domainTypes.ConstructionType[];
-  surfaceFinishesEN: domainTypes.SurfaceFinish[];
-
-  productTypesMapEN: Map<number, domainTypes.ProductType>;
-  formsMapEN: Map<number, domainTypes.Form>;
-  materilasMapEN: Map<number, domainTypes.Material>;
-  constructionTypesMapEN: Map<number, domainTypes.ConstructionType>;
-  surfaceFinishesMapEN: Map<number, domainTypes.SurfaceFinish>;
-}
-
-/**
  * Options for loading offerings.
  */
 export const loadOfferingOptions: LoadOfferingsOptions = {

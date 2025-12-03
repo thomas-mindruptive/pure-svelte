@@ -18,8 +18,7 @@ import type {
 } from "$lib/api/api.types";
 import { LoadingState } from "./loadingState";
 import type { OfferingImageWithJunction } from "$lib/backendQueries/entityOperations/offeringImage";
-import type { OfferingImageJunction } from "$lib/domain/domainTypes";
-import type { Image } from "$lib/domain/domainTypes";
+import type { OfferingImageJunction, OfferingImageView } from "$lib/domain/domainTypes";
 
 const offeringImageLoadingManager = new LoadingState();
 export const offeringImageLoadingState = offeringImageLoadingManager.isLoadingStore;
@@ -110,11 +109,11 @@ export function getOfferingImageApi(client: ApiClient) {
      * @returns Created OfferingImageWithJunction record
      * @throws ApiError if validation fails (e.g., missing fingerprint fields)
      */
-    async createOfferingImage(data: Partial<Image> & { offering_id: number; is_primary?: boolean; sort_order?: number }): Promise<OfferingImageWithJunction> {
+    async createOfferingImage(data: Partial<OfferingImageView>): Promise<OfferingImageView> {
       const operationId = "createOfferingImage";
       offeringImageLoadingManager.start(operationId);
       try {
-        const response = await client.apiFetchUnion<ApiResponse<{ offeringImage: OfferingImageWithJunction }>>(
+        const response = await client.apiFetchUnion<ApiResponse<{ offeringImage: OfferingImageView }>>(
           "/api/offering-images/new",
           {
             method: "POST",
@@ -137,13 +136,13 @@ export function getOfferingImageApi(client: ApiClient) {
     /**
      * Updates an existing offering image (junction entry and/or associated image).
      * @param offeringImageId The offering_image_id (junction ID) to update
-     * @param updates Partial data for junction and/or image fields
+     * @param updateOfferingImageData Partial data for junction and/or image fields
      * @returns Updated OfferingImageWithJunction record
      * @throws ApiError if validation fails (e.g., missing fingerprint fields)
      */
     async updateOfferingImage(
       offeringImageId: number,
-      updates: Partial<Image> & { is_primary?: boolean; sort_order?: number }
+      updateOfferingImageData: Partial<OfferingImageView>
     ): Promise<OfferingImageWithJunction> {
       const operationId = `updateOfferingImage-${offeringImageId}`;
       offeringImageLoadingManager.start(operationId);
@@ -152,7 +151,7 @@ export function getOfferingImageApi(client: ApiClient) {
           `/api/offering-images/${offeringImageId}`,
           {
             method: "PUT",
-            body: createJsonBody(updates),
+            body: createJsonBody(updateOfferingImageData),
           },
           { context: operationId },
         );
@@ -161,7 +160,7 @@ export function getOfferingImageApi(client: ApiClient) {
         }
         return response.data.offeringImage;
       } catch (err) {
-        log.error(`[${operationId}] Failed.`, { offeringImageId, updates, error: getErrorMessage(err) });
+        log.error(`[${operationId}] Failed.`, { offeringImageId, updates: updateOfferingImageData, error: getErrorMessage(err) });
         throw err;
       } finally {
         offeringImageLoadingManager.finish(operationId);
@@ -180,7 +179,7 @@ export function getOfferingImageApi(client: ApiClient) {
       offeringImageId: number,
       cascade = false,
       forceCascade = false
-    ): Promise<DeleteApiResponse<OfferingImageJunction, string[]>> { 
+    ): Promise<DeleteApiResponse<OfferingImageJunction, string[]>> {
       const operationId = `deleteOfferingImage-${offeringImageId}`;
       offeringImageLoadingManager.start(operationId);
       try {
@@ -197,58 +196,59 @@ export function getOfferingImageApi(client: ApiClient) {
       }
     },
 
-    /**
-     * Sets the primary image for an offering.
-     * Updates is_primary flag: sets target to true, others to false.
-     * @param offeringId The offering_id
-     * @param offeringImageId The offering_image_id (junction ID) to set as primary
-     * @returns Updated OfferingImageWithJunction record
-     */
-    async setPrimaryImage(offeringId: number, offeringImageId: number): Promise<OfferingImageWithJunction> {
-      const operationId = `setPrimaryImage-${offeringId}-${offeringImageId}`;
-      offeringImageLoadingManager.start(operationId);
-      try {
-        // First, get all images for this offering
-        const allImages = await this.loadOfferingImages(offeringId);
+    // /**
+    //  * Sets the primary image for an offering.
+    //  * Updates is_primary flag: sets target to true, others to false.
+    //  * @param offeringId The offering_id
+    //  * @param offeringImageId The offering_image_id (junction ID) to set as primary
+    //  * @returns Updated OfferingImageWithJunction record
+    //  */
+    // async setPrimaryImage(offeringId: number, offeringImageId: number): Promise<OfferingImageWithJunction> {
+    //   const operationId = `setPrimaryImage-${offeringId}-${offeringImageId}`;
+    //   offeringImageLoadingManager.start(operationId);
+    //   try {
+    //     // First, get all images for this offering
+    //     const allImages = await this.loadOfferingImages(offeringId);
 
-        // Update all images: set target to primary, others to false
-        const updatePromises = allImages.map((img) =>
-          this.updateOfferingImage(img.offering_image_id, { is_primary: img.offering_image_id === offeringImageId })
-        );
+    //     // Update all images: set target to primary, others to false
+    //     const updatePromises = allImages.map((img) =>
+    //       this.updateOfferingImage(img.offering_image_id, { is_primary: img.offering_image_id === offeringImageId })
+    //     );
 
-        await Promise.all(updatePromises);
+    //     await Promise.all(updatePromises);
 
-        // Return the updated primary image
-        return this.loadOfferingImage(offeringImageId);
-      } catch (err) {
-        log.error(`[${operationId}] Failed.`, { offeringId, offeringImageId, error: getErrorMessage(err) });
-        throw err;
-      } finally {
-        offeringImageLoadingManager.finish(operationId);
-      }
-    },
+    //     // Return the updated primary image
+    //     return this.loadOfferingImage(offeringImageId);
+    //   } catch (err) {
+    //     log.error(`[${operationId}] Failed.`, { offeringId, offeringImageId, error: getErrorMessage(err) });
+    //     throw err;
+    //   } finally {
+    //     offeringImageLoadingManager.finish(operationId);
+    //   }
+    // },
 
-    /**
-     * Updates the sort order of multiple offering images at once.
-     * @param updates Array of { offeringImageId: number, sortOrder: number }
-     * @returns Array of updated OfferingImageWithJunction records
-     */
-    async updateImagesSortOrder(
-      updates: Array<{ offeringImageId: number; sortOrder: number }>
-    ): Promise<OfferingImageWithJunction[]> {
-      const operationId = "updateImagesSortOrder";
-      offeringImageLoadingManager.start(operationId);
-      try {
-        const updatePromises = updates.map((update) =>
-          this.updateOfferingImage(update.offeringImageId, { sort_order: update.sortOrder })
-        );
-        return Promise.all(updatePromises);
-      } catch (err) {
-        log.error(`[${operationId}] Failed.`, { updates, error: getErrorMessage(err) });
-        throw err;
-      } finally {
-        offeringImageLoadingManager.finish(operationId);
-      }
-    },
-  };
+    //   /**
+    //    * Updates the sort order of multiple offering images at once.
+    //    * @param updates Array of { offeringImageId: number, sortOrder: number }
+    //    * @returns Array of updated OfferingImageWithJunction records
+    //    */
+    //   async updateImagesSortOrder(
+    //     updates: Array<{ offeringImageId: number; sortOrder: number }>
+    //   ): Promise<OfferingImageWithJunction[]> {
+    //     const operationId = "updateImagesSortOrder";
+    //     offeringImageLoadingManager.start(operationId);
+    //     try {
+    //       const updatePromises = updates.map((update) =>
+    //         this.updateOfferingImage(update.offeringImageId, { sort_order: update.sortOrder })
+    //       );
+    //       return Promise.all(updatePromises);
+    //     } catch (err) {
+    //       log.error(`[${operationId}] Failed.`, { updates, error: getErrorMessage(err) });
+    //       throw err;
+    //     } finally {
+    //       offeringImageLoadingManager.finish(operationId);
+    //     }
+    //   },
+    // };
+  }
 }

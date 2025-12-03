@@ -857,6 +857,48 @@ export async function loadOfferingsWithOptions(options: LoadOfferingsOptions = {
   }
 }
 
+/**
+ * Load the WIO and coalesce the "4 defining fields" from its product_definition.
+ * @param transaction 
+ * @param offeringId 
+ * @returns 
+ */
+export async function loadOfferingCoalesceProdDef(
+  transaction: Transaction | null, 
+  offeringId: number
+): Promise<WholesalerItemOffering> {
+  const transWrapper = new TransWrapper(transaction, null);
+  await transWrapper.begin();
+
+  try {
+    const request = transWrapper.request();
+    request.input('offeringId', offeringId);
+    const result = await request.query(`
+      SELECT 
+        wio.*,
+        -- Override with coalesced values from product definition
+        COALESCE(wio.material_id, pd.material_id) AS material_id,
+        COALESCE(wio.form_id, pd.form_id) AS form_id,
+        COALESCE(wio.surface_finish_id, pd.surface_finish_id) AS surface_finish_id,
+        COALESCE(wio.construction_type_id, pd.construction_type_id) AS construction_type_id
+      FROM dbo.wholesaler_item_offerings wio
+      INNER JOIN dbo.product_definitions pd ON wio.product_def_id = pd.product_def_id
+      WHERE wio.offering_id = @offeringId
+    `);
+
+    await transWrapper.commit();
+
+    if (result.recordset.length === 0) {
+      throw error(404, `Offering with ID ${offeringId} not found.`);
+    }
+
+    return result.recordset[0] as WholesalerItemOffering;
+  } catch (err) {
+    await transWrapper.rollback();
+    throw err;
+  }
+}
+
 
 /**************************************************************************************************
  * HELPERS

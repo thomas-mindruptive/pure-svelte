@@ -459,6 +459,7 @@ export const Wio_PDef_Schema = Wio_Schema.extend({
   product_def_description: z.string().nullable().optional(),
 }).describe("WholesalerItemOffering_ProductDefSchema");
 
+
 // ===== WHOLESALER ITEM OFFERING including joins (dbo.wholesaler_item_offerings) to product_def and category =====
 
 /**
@@ -889,6 +890,8 @@ const OfferingEnrichedViewSchemaBase = z.object({
   offeringWeightRange: z.string().max(50).nullable().optional(),
   offeringPackageWeight: z.string().max(50).nullable().optional(),
   offeringPackaging: z.string().max(200).nullable().optional(),
+  offeringColorVariant: z.string().max(200).nullable().optional(),
+  offeringImagePromptHint: z.string().max(200).nullable().optional(),
 }).describe("OfferingEnrichedViewSchema");
 
 export const OfferingEnrichedViewSchema = createSchemaWithMeta(OfferingEnrichedViewSchemaBase, {

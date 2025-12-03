@@ -16,6 +16,7 @@ import { insertOfferingImage, type OfferingImageWithJunction } from '$lib/backen
 import type { ApiSuccessResponse } from '$lib/api/api.types';
 import { v4 as uuidv4 } from 'uuid';
 import { json } from '@sveltejs/kit';
+import type { OfferingImageView } from '$lib/domain/domainTypes';
 
 /**
  * POST /api/offering-images/new
@@ -31,7 +32,7 @@ export const POST: RequestHandler = async ({ request }) => {
     const tw = new TransWrapper(null, db);
 
     try {
-        const requestData = await request.json();
+        const requestData: Partial<OfferingImageView> = await request.json();
         log.info(`[${operationId}] Parsed request body`, {
             fields: Object.keys(requestData),
             offering_id: requestData.offering_id

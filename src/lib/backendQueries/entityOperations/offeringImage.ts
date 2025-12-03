@@ -19,6 +19,7 @@ import { TransWrapper } from "../transactionWrapper";
 import { DeleteCascadeBlockedError } from "./entityErrors";
 import type { DeleteResult } from "./entityOpsResultTypes";
 import { insertImage, loadImageById } from "./image";
+import { loadOfferingCoalesceProdDef } from "./offering";
 
 /**
  * Cursor is an idiot and created an extra type!
@@ -94,7 +95,7 @@ export async function loadOfferingImages(
  */
 export async function insertOfferingImage(
   transaction: Transaction | null,
-  data: unknown
+  inputData: Partial<OfferingImageView>
 ): Promise<OfferingImageWithJunction> {
   log.debug("insertOfferingImage - validating");
 
@@ -102,37 +103,13 @@ export async function insertOfferingImage(
   await transWrapper.begin();
 
   try {
-    // Extract image data and junction data from input
-    const inputData = data as any;
     const offeringId = inputData.offering_id;
 
     if (!offeringId) {
       throw error(400, "offering_id is required to create an offering image");
     }
 
-    // Load offering to get material_id, form_id, etc. (with COALESCE for overrides)
-    const offeringRequest = transWrapper.request();
-    offeringRequest.input('offeringId', offeringId);
-    const offeringResult = await offeringRequest.query(`
-      SELECT 
-        COALESCE(wio.material_id, pd.material_id) AS material_id,
-        COALESCE(wio.form_id, pd.form_id) AS form_id,
-        COALESCE(wio.surface_finish_id, pd.surface_finish_id) AS surface_finish_id,
-        COALESCE(wio.construction_type_id, pd.construction_type_id) AS construction_type_id,
-        wio.size AS size_range,
-        wio.quality AS quality_grade,
-        NULL AS color_variant,  -- Not in offering table
-        wio.packaging AS packaging
-      FROM dbo.wholesaler_item_offerings wio
-      INNER JOIN dbo.product_definitions pd ON wio.product_def_id = pd.product_def_id
-      WHERE wio.offering_id = @offeringId
-    `);
-
-    if (offeringResult.recordset.length === 0) {
-      throw error(404, `Offering with ID ${offeringId} not found.`);
-    }
-
-    const offering = offeringResult.recordset[0] as any;
+    const offering = await loadOfferingCoalesceProdDef(transWrapper.trans, offeringId);
 
     // 1. Create/insert Image (with explicit = true for explicit images)
     // Merge offering fields with input data (input data takes precedence if provided)
@@ -144,14 +121,15 @@ export async function insertOfferingImage(
       form_id: inputData.form_id ?? offering.form_id,
       surface_finish_id: inputData.surface_finish_id ?? offering.surface_finish_id,
       construction_type_id: inputData.construction_type_id ?? offering.construction_type_id,
-      size_range: inputData.size_range ?? offering.size_range,
-      quality_grade: inputData.quality_grade ?? offering.quality_grade,
+      size_range: inputData.size_range ?? offering.size,
+      quality_grade: inputData.quality_grade ?? offering.quality,
       color_variant: inputData.color_variant ?? offering.color_variant,
       packaging: inputData.packaging ?? offering.packaging,
       explicit: inputData.explicit !== undefined ? inputData.explicit : true, // Default to explicit
     };
 
     // Note: Fingerprint calculation happens in insertImage (for all images, including direct inserts)
+    // TODO: Optimize: Check if image with filehash already exists.
     const createdImage = await insertImage(transWrapper.trans, imageData);
 
     // 2. Create junction entry
@@ -187,8 +165,7 @@ export async function insertOfferingImage(
       offering_image_id: insertedJunction.offering_image_id,
       offering_id: insertedJunction.offering_id,
       is_primary: insertedJunction.is_primary,
-      sort_order: insertedJunction.sort_order,
-      ...(insertedJunction.created_at ? { offering_image_created_at: insertedJunction.created_at } : {}),
+      sort_order: insertedJunction.sort_order
     };
 
     log.debug("Offering image inserted successfully", {
@@ -216,7 +193,7 @@ export async function insertOfferingImage(
 export async function updateOfferingImage(
   transaction: Transaction | null,
   junctionId: number,
-  data: unknown
+  inputData: Partial<OfferingImageView>
 ): Promise<OfferingImageWithJunction> {
   log.debug("updateOfferingImage - validating", { junctionId });
 
@@ -224,8 +201,6 @@ export async function updateOfferingImage(
   await transWrapper.begin();
 
   try {
-    const inputData = data as any;
-
     // 1. Load existing junction entry
     const existingRequest = transWrapper.request();
     existingRequest.input('junctionId', junctionId);

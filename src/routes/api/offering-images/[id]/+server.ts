@@ -92,7 +92,7 @@ export const PUT: RequestHandler = async ({ params, request }) => {
       return errorResponse;
     }
 
-    const requestData = await request.json();
+    const requestData: Partial<OfferingImageView> = await request.json();
     log.info(`[${operationId}] Parsed request body`, { fields: Object.keys(requestData) });
 
     await tw.begin();

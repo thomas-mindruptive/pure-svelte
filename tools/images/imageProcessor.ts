@@ -9,6 +9,9 @@
 import { existsSync } from "fs";
 import * as fs from "fs/promises";
 import * as path from "path";
+import { log as LogNS, assertions } from "@pure/svelte/utils";
+
+const log = LogNS.log;
 
 /**
  * Downloads an image from a URL and saves it to the configured directory
@@ -23,12 +26,16 @@ export async function downloadAndSaveImage(
   filename: string,
   dir: string
 ): Promise<string> {
-  console.log(`  ├─ Downloading image...`);
+   assertions.assertDefined(imageUrl, "imageUrl");
+   assertions.assertDefined(filename, "filename");
+   assertions.assertDefined(dir, "dir");
+
+  log.info(`  ├─ Downloading image...`);
 
   try {
     // Ensure directory exists
     if (!existsSync(dir)) {
-      console.log(`  │  Creating directory: ${dir}`);
+      log.info(`  │  Creating directory: ${dir}`);
       await fs.mkdir(dir, { recursive: true });
     }
 
@@ -49,12 +56,12 @@ export async function downloadAndSaveImage(
     await fs.writeFile(filepath, buffer);
 
     const sizeKB = (buffer.length / 1024).toFixed(1);
-    console.log(`  ├─ Saved to: ${filepath} (${sizeKB} KB)`);
+    log.info(`  ├─ Saved to: ${filepath} (${sizeKB} KB)`);
 
     return filepath;
 
   } catch (error: any) {
-    console.error(`  ✗ Download error: ${error.message || String(error)}`);
+    log.error(`  ✗ Download error: ${error.message || String(error)}`);
     throw new Error(`Failed to download/save image: ${error.message}`);
   }
 }
@@ -68,7 +75,7 @@ export async function verifyImageDirectory(directory: string): Promise<void> {
   try {
     // Create directory if it doesn't exist
     if (!existsSync(directory)) {
-      console.log(`Creating image directory: ${directory}`);
+      log.info(`Creating image directory: ${directory}`);
       await fs.mkdir(directory, { recursive: true });
     }
 
@@ -77,7 +84,7 @@ export async function verifyImageDirectory(directory: string): Promise<void> {
     await fs.writeFile(testFile, "test");
     await fs.unlink(testFile);
 
-    console.log(`✓ Image directory is writable: ${directory}`);
+    log.info(`✓ Image directory is writable: ${directory}`);
   } catch (error: any) {
     throw new Error(
       `Image directory is not writable: ${directory}\n` +

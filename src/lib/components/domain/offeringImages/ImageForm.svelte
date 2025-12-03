@@ -1,31 +1,31 @@
 <script lang="ts">
   import { ApiClient } from "$lib/api/client/apiClient";
   import { getOfferingImageApi } from "$lib/api/client/offeringImage";
+  import type { OfferingImageWithJunction } from "$lib/backendQueries/entityOperations/offeringImage";
   import Field from "$lib/components/forms/Field.svelte";
-  import StaticFieldValue from "$lib/components/forms/StaticFieldValue.svelte";
   import FormComboBox2 from "$lib/components/forms/FormComboBox2.svelte";
   import type {
-    CancelledCallback,
-    ChangedCallback,
-    Errors,
-    SubmitErrorCallback,
-    SubmittedCallback,
-    ValidateResult,
+      CancelledCallback,
+      ChangedCallback,
+      Errors,
+      SubmitErrorCallback,
+      SubmittedCallback,
+      ValidateResult,
   } from "$lib/components/forms/forms.types";
   import FormShell, { type FieldsSnippetProps } from "$lib/components/forms/FormShell.svelte";
+  import StaticFieldValue from "$lib/components/forms/StaticFieldValue.svelte";
   import "$lib/components/styles/form.css";
   import "$lib/components/styles/grid.css";
   import type { ValidationErrorTree } from "$lib/components/validation/validation.types";
   import ValidationWrapper from "$lib/components/validation/ValidationWrapper.svelte";
   import {
-    ImageSizeRange,
-    type Image,
-    type Material,
-    type Form,
-    type ConstructionType,
-    type SurfaceFinish,
+      ImageSizeRange,
+      type ConstructionType,
+      type Form,
+      type Material,
+      type OfferingImageView,
+      type SurfaceFinish
   } from "$lib/domain/domainTypes";
-  import type { OfferingImageWithJunction } from "$lib/backendQueries/entityOperations/offeringImage";
   import { assertDefined } from "$lib/utils/assertions";
   import { log } from "$lib/utils/logger";
 
@@ -145,7 +145,7 @@
       if (isUpdate) {
         assertDefined(data.offering_image_id, "offering_image_id is required for update");
         // Extract only the fields that can be updated (image fields + junction fields)
-        const updateData: Partial<Image> & { is_primary?: boolean; sort_order?: number } = {
+        const updateOfferingImageData: Partial<OfferingImageView> = {
           filepath: data.filepath,
           material_id: data.material_id,
           form_id: data.form_id,
@@ -160,13 +160,13 @@
           shopify_media_id: data.shopify_media_id,
           uploaded_to_shopify_at: data.uploaded_to_shopify_at,
           explicit: data.explicit,
-          is_primary: data.is_primary,
-          sort_order: data.sort_order,
+          is_primary: data.is_primary, 
+          sort_order: data.sort_order
         };
-        return await imageApi.updateOfferingImage(data.offering_image_id, updateData);
+        return await imageApi.updateOfferingImage(data.offering_image_id, updateOfferingImageData);
       } else {
         // Create: include offering_id in data
-        const createData: Partial<Image> & { offering_id: number; is_primary?: boolean; sort_order?: number } = {
+        const createData: Partial<OfferingImageView>  = {
           ...data,
           offering_id: offeringId,
           explicit: data.explicit !== undefined ? data.explicit : true, // Default to explicit

@@ -3,8 +3,8 @@ import type { domainTypes } from "@pure/svelte/domain";
 import { assertions, log as LogNS } from "@pure/svelte/utils";
 import type { Transaction } from "mssql";
 import assert from "node:assert";
-import { loadOfferingOptions, type Lookups } from './generateMissingImages.config';
-import type { OfferingWithGenerationPlan } from "./imageGenTypes";
+import { loadOfferingOptions } from './generateMissingImages.config';
+import type { Lookups, OfferingWithGenerationPlan } from "./imageGenTypes";
 import { assertDefined } from "$lib/utils/assertions";
 
 const offering = entityOperations.offering;

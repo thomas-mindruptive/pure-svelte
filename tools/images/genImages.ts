@@ -1,10 +1,14 @@
-import { db as dbNS, entityOperations, transactionWrapper as transWRapperNS } from "@pure/svelte/backend-queries";
-import type { domainTypes } from "@pure/svelte/domain";
-import { log as LogNS } from "@pure/svelte/utils";
-import { defaultConfig } from './generateMissingImages.config';
+import { db as dbNS, transactionWrapper as transWRapperNS } from "@pure/svelte/backend-queries";
+import { log as LogNS, assertions } from "@pure/svelte/utils";
+import { generateImage } from "./falAiClient";
+import { defaultConfig, type ImageGenerationConfig } from './generateMissingImages.config';
+import type { Lookups, OfferingWithGenerationPlan } from "./imageGenTypes";
+import { buildPromptFingerprintImageMapAndInitFingerprintCache, GLOBAL_PROMPT_FINGERPRINT_CACHE, loadLookups, loadOfferingImagesAndInitImageCache, loadOfferingsAndConvertToOfferingsWithGenerationPlan } from "./loadData";
 import { closeLogFile, initLogFile } from "./logAndReport";
-import { buildPromptFingerprintImageMapAndInitFingerprintCache, GLOBAL_PROMPT_FINGERPRINT_CACHE, loadLookups, loadOfferingImagesAndInitImageCache, loadOfferings, loadOfferingsAndConvertToOfferingsWithGenerationPlan } from "./loadData";
-import type { OfferingWithGenerationPlan, OfferingWithGenPlanAndImage } from "./imageGenTypes";
+import { buildPrompt } from "./promptBuilder";
+import { genAbsImgDirName, generateImageFilename } from "./fileUtils";
+import { downloadAndSaveImage } from "./imageProcessor";
+import * as path from "path";
 
 const log = LogNS.log;
 
@@ -39,18 +43,18 @@ async function run() {
             offerings = await loadOfferingsAndConvertToOfferingsWithGenerationPlan(transaction, images);
             log.info(`${offerings.size} offerings loaded`);
             const lookups = await loadLookups(transaction);
+            for (const offering of offerings.values()) {
+                await processOffering(offering, defaultConfig, lookups);
+            }
+
+            closeLogFile();
+            process.exit(0);
+
         } catch (e) {
             throw e;
         } finally {
             await transWRapperNS.rollbackTransaction(transaction);
         }
-
-        for (const offering of offerings.values()) {
-            await processOffering(offering);
-        }
-
-        closeLogFile();
-        process.exit(0);
     }
     catch (e) {
         log.error(e);
@@ -63,10 +67,44 @@ async function run() {
  * Check and/or generated image(s) for offering.
  * @param offering 
  */
-async function processOffering(offering: OfferingWithGenerationPlan) {
+async function processOffering(offering: OfferingWithGenerationPlan, config: ImageGenerationConfig , lookups: Lookups) {
+    assertions.assertDefined(offering, "offering");
+    assertions.assertDefined(config, "config");
+
     // Validate size range - fail fast on invalid data
     // E.g. "S-M"
     validateSizeRange(offering); // Will throw on invalid size
+
+    if (0 === offering.images?.length) {
+        offering.prompt = buildPrompt(offering, config["prompt"], lookups);
+        offering.imageUrl= await generateImage(offering.prompt, config["generation"]);
+        await generateAndSaveImage(offering, config);
+    }
+}
+
+/**
+ * Generates, downloads and saves the image locally. 
+ * ⚠️  NOTE: Modifies the passed offering and sets filepath etc.
+ * @param offering InOut!
+ * @param config 
+ */
+async function generateAndSaveImage(offering: OfferingWithGenerationPlan, config: ImageGenerationConfig) {
+    assertions.assertDefined(offering, "offering");
+    assertions.assertDefined(offering.imageUrl, "offering.imageUrl");
+    assertions.assertDefined(offering.prompt, "offering.prompt");
+    assertions.assertDefined(config, "config");
+
+    // Download and save image
+    const filename = generateImageFilename(offering);
+    const absImgBaseDir = genAbsImgDirName(config.generation.image_directory, offering);
+    let filepath = "DRY - " + path.join(absImgBaseDir, filename);
+    if (!config.generation.dry_run) {
+      filepath = await downloadAndSaveImage(offering.imageUrl, filename, absImgBaseDir);
+    }
+    log.info(`  ├─ Saved: ${filepath}`);
+    offering.filePath = filepath;
+
+    //const offeringImageForDB = OfferingIm
 }
 
 /**

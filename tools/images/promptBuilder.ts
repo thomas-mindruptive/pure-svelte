@@ -9,19 +9,16 @@
  */
 
 import { assertDefined } from "$lib/utils/assertions.js";
-import type {
-  WholesalerItemOffering,
-  ProductDefinition,
-  Material,
-  Form,
-  SurfaceFinish,
-  ConstructionType,
-  ProductType,
-} from "../../src/lib/domain/domainTypes.js";
 import type { ImageGenerationConfig } from "./generateMissingImages.config.js";
-import type { OfferingWithGenerationPlan } from "./imageGenTypes.js";
+import type { Lookups, OfferingWithGenerationPlan } from "./imageGenTypes.js";
 
-export function buildPrompt(item: OfferingWithGenerationPlan, config: ImageGenerationConfig["prompt"]) {
+/**
+ * Build image gen prompt.
+ * @param item 
+ * @param config 
+ * @returns 
+ */
+export function buildPrompt(item: OfferingWithGenerationPlan, config: ImageGenerationConfig["prompt"], lookups: Lookups) {
   assertDefined(item, "item");
   return _buildPrompt(
     item.offeringId,
@@ -32,8 +29,10 @@ export function buildPrompt(item: OfferingWithGenerationPlan, config: ImageGener
     item.finalSurfaceFinishName,
     item.finalConstructionTypeName,
     item.productTypeName,
-    null,
+    item.offeringColorVariant,
+    item.offeringImagePromptHint,
     config,
+    lookups
   );
 }
 
@@ -50,7 +49,9 @@ function _buildPrompt(
   constructionType: string | null| undefined,
   productType: string | null| undefined,
   color: string | null| undefined,
+  promptHint: string | null| undefined,
   config: ImageGenerationConfig["prompt"],
+  lookups: Lookups
 ): string {
   const parts: string[] = [];
 
@@ -162,7 +163,11 @@ function _buildPrompt(
 
   // 8. Color variant (if specified)
   if (color) {
-    parts.push(`${color.toLowerCase()}`);
+    parts.push(`with color ${color.toLowerCase()}`);
+  }
+
+  if (promptHint) {
+    parts.push(`. ${promptHint}`)
   }
 
   // 9. Background setting

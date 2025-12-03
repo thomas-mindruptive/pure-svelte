@@ -127,7 +127,7 @@ async function enrichImageMetadata(
  */
 export async function insertImage(
   transaction: Transaction | null,
-  data: unknown
+  data: Partial<Image>
 ): Promise<Image> {
   log.debug("insertImage - validating");
   
@@ -138,6 +138,9 @@ export async function insertImage(
 
   // 1. Validate Image data (omit image_id and created_at for create)
   const schemaForCreate = ImageForCreateSchema;
+
+  // ⚠️ ZOD removes the fields not belonging to the schema => We can safely work with validation.sanitized!
+  // Otherwise we would have to manually remove the fields in "data".
   const validation = validateEntityBySchema(schemaForCreate, data);
 
   if (!validation.isValid) {

@@ -4,7 +4,7 @@ import type { domainTypes } from "@pure/svelte/domain";
 import { generateImage } from "./falAiClient";
 import { defaultConfig, type ImageGenerationConfig } from './generateMissingImages.config';
 import type { Lookups, OfferingWithGenerationPlan } from "./imageGenTypes";
-import { buildPromptFingerprintImageMapAndInitFingerprintCache, GLOBAL_PROMPT_FINGERPRINT_CACHE, loadLookups, loadOfferingImagesAndInitImageCache, loadOfferingsAndConvertToOfferingsWithGenerationPlan } from "./loadData";
+import { buildPromptFingerprintImageMapAndInitFingerprintCache, GLOBAL_IMAGE_CACHE, GLOBAL_PROMPT_FINGERPRINT_CACHE, loadLookups, loadOfferingImagesAndInitImageCache, loadOfferingsAndConvertToOfferingsWithGenerationPlan } from "./loadData";
 import { closeLogFile, initLogFile } from "./logAndReport";
 import { buildPrompt } from "./promptBuilder";
 import { genAbsImgDirName, generateImageFilename } from "./fileUtils";
@@ -78,9 +78,14 @@ async function processOffering(offering: OfferingWithGenerationPlan, config: Ima
     validateSizeRange(offering); // Will throw on invalid size
 
     if (0 === offering.images?.length) {
+        offering.images = [];
         offering.prompt = buildPrompt(offering, config["prompt"], lookups);
         offering.imageUrl = await generateImage(offering.prompt, config["generation"]);
-        await generateAndSaveImage(offering, config, transaction);
+        const image = await generateAndSaveImage(offering, config, transaction);
+        offering.images.push(image);
+        GLOBAL_IMAGE_CACHE.set(image.offering_image_id, image);
+        assertions.assertDefined(image.prompt_fingerprint, "image.prompt_fingerprint");
+        GLOBAL_PROMPT_FINGERPRINT_CACHE.set(image.prompt_fingerprint, image);
     }
 }
 
@@ -90,7 +95,11 @@ async function processOffering(offering: OfferingWithGenerationPlan, config: Ima
  * @param offering InOut!
  * @param config 
  */
-async function generateAndSaveImage(offering: OfferingWithGenerationPlan, config: ImageGenerationConfig, transaction: Transaction) {
+async function generateAndSaveImage(
+    offering: OfferingWithGenerationPlan,
+    config: ImageGenerationConfig,
+    transaction: Transaction): Promise<domainTypes.OfferingImageView> {
+
     assertions.assertDefined(offering, "offering");
     assertions.assertDefined(offering.imageUrl, "offering.imageUrl");
     assertions.assertDefined(offering.prompt, "offering.prompt");
@@ -100,18 +109,20 @@ async function generateAndSaveImage(offering: OfferingWithGenerationPlan, config
     const filename = generateImageFilename(offering);
     const absImgBaseDir = genAbsImgDirName(config.generation.image_directory, offering);
     let filepath = "DRY - " + path.join(absImgBaseDir, filename);
-    if (!config.generation.dry_run) {
-        filepath = await downloadAndSaveImage(offering.imageUrl, filename, absImgBaseDir, config.generation.dry_run);
-    }
-    log.info(`  ├─ Saved: ${filepath}`);
+    filepath = await downloadAndSaveImage(offering.imageUrl, filename, absImgBaseDir, config.generation.dry_run);
+    log.info(`Saved: ${filepath}`);
     offering.filePath = filepath;
 
+    // Build image for DB and save it.
     const offeringImageForDB: Partial<domainTypes.OfferingImageView> = {
         offering_id: offering.offeringId,
         filepath: offering.filePath,
         explicit: false  // We generated the new imgage => It is NOT explicit.
     };
 
+    // Build offering from OfferingWithGenerationPlan. Why? Because we pass it directly to 
+    // offeringImage.insertOfferingImageFromOffering instead of using offeringImage.insertOfferingImage, 
+    // which would load offering from DB. Our img gen run hast all infos in memory => No need for DB load.
     const wio: domainTypes.WholesalerItemOffering = {
         // Pflichtfelder
         offering_id: offering.offeringId,
@@ -154,9 +165,17 @@ async function generateAndSaveImage(offering: OfferingWithGenerationPlan, config
         created_at: undefined, // Optional, kann undefined sein
     };
 
+    let offeringImage: domainTypes.OfferingImageView;
+
     if (!config.generation.dry_run) {
-        await entityOperations.offeringImage.insertOfferingImageFromOffering(transaction, offeringImageForDB, wio);
+        offeringImage = await entityOperations.offeringImage.insertOfferingImageFromOffering(transaction, offeringImageForDB, wio);
+    } else {
+        // Generate image in mem with entityOperations.offeringImage.mergeImgageDataFromOffering and createPromptFingerprint
+
     }
+
+    return offeringImage;
+
 }
 
 /**

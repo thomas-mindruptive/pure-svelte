@@ -118,7 +118,10 @@ export async function loadOfferingImagesAndInitImageCache(transaction: Transacti
 }
 
 /**
- * 
+ * Convert the offerings to OfferingWithGenerationPlan.
+ * This will also set "offering.images" for each offering by checking 
+ * offeringImages.offering_id = offering.offeringId.
+ * While generating imgaes, we will update the global caches as well as each offering.images.
  * @param offerings 
  * @param offeringImages 
  * @returns A map of OfferingWithGenerationPlan

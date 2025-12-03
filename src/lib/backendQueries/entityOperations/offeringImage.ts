@@ -1,6 +1,7 @@
 // File: src/lib/backendQueries/entityOperations/offeringImage.ts
 
 import {
+  ImageSchema,
   OfferingImageJunctionForCreateSchema,
   OfferingImageJunctionSchema,
   type Image,
@@ -78,6 +79,16 @@ export async function loadOfferingImages(
   }
 }
 
+/**
+ * Insert a new offering image.
+ * Creates the image (via insertImage) and the junction entry.
+ * Set explicit = true for explicit images.
+ * 
+ * @param transaction 
+ * @param inputData 
+ * @param offering 
+ * @returns 
+ */
 export async function insertOfferingImageFromOffering(
   transaction: Transaction | null,
   inputData: Partial<OfferingImageView>,
@@ -95,22 +106,24 @@ export async function insertOfferingImageFromOffering(
       throw error(400, "offering_id is required to create an offering image");
     }
 
-    // 1. Create/insert Image (with explicit = true for explicit images)
-    // Merge offering fields with input data (input data takes precedence if provided)
-    const imageData = {
-      // Other image fields from input first
-      ...inputData,
-      // Override with offering fields if not provided in input (or if null/undefined)
-      material_id: inputData.material_id ?? offering.material_id,
-      form_id: inputData.form_id ?? offering.form_id,
-      surface_finish_id: inputData.surface_finish_id ?? offering.surface_finish_id,
-      construction_type_id: inputData.construction_type_id ?? offering.construction_type_id,
-      size_range: inputData.size_range ?? offering.size,
-      quality_grade: inputData.quality_grade ?? offering.quality,
-      color_variant: inputData.color_variant ?? offering.color_variant,
-      packaging: inputData.packaging ?? offering.packaging,
-      explicit: inputData.explicit !== undefined ? inputData.explicit : true, // Default to explicit
-    };
+    const imageData = mergeImgageDataFromOffering(inputData, offering);
+
+    // // 1. Create/insert Image (with explicit = true for explicit images)
+    // // Merge offering fields with input data (input data takes precedence if provided)
+    // const imageData = {
+    //   // Other image fields from input first
+    //   ...inputData,
+    //   // Override with offering fields if not provided in input (or if null/undefined)
+    //   material_id: inputData.material_id ?? offering.material_id,
+    //   form_id: inputData.form_id ?? offering.form_id,
+    //   surface_finish_id: inputData.surface_finish_id ?? offering.surface_finish_id,
+    //   construction_type_id: inputData.construction_type_id ?? offering.construction_type_id,
+    //   size_range: inputData.size_range ?? offering.size,
+    //   quality_grade: inputData.quality_grade ?? offering.quality,
+    //   color_variant: inputData.color_variant ?? offering.color_variant,
+    //   packaging: inputData.packaging ?? offering.packaging,
+    //   explicit: inputData.explicit !== undefined ? inputData.explicit : true, // Use inputData.explicit if provided, otherwise default to true
+    // };
 
     // Note: Fingerprint calculation happens in insertImage (for all images, including direct inserts)
     // TODO: Optimize: Check if image with filehash already exists.
@@ -164,6 +177,43 @@ export async function insertOfferingImageFromOffering(
   }
 }
 
+/**
+ * Merge the image data with that from the offering. If fields are not set, use those from offering.
+ * ⚠️ NOTE: We sanitize inputData through validateEntityBySchema(ImageSchema.partial(), imageData).
+ * This removes unwanted fields not belonging to "Image".
+ * 
+ * @param inputData 
+ * @param offering 
+ * @returns a new OfferingImageView object.
+ */
+export function mergeImgageDataFromOffering(
+  inputData: Partial<OfferingImageView>, 
+  offering: WholesalerItemOffering
+): Partial<Image> {
+  const imageData: Partial<Image> = {
+    // Other image fields from input first
+    ...inputData,
+    // Override with offering fields if not provided in input (or if null/undefined)
+    material_id: inputData.material_id ?? offering.material_id,
+    form_id: inputData.form_id ?? offering.form_id,
+    surface_finish_id: inputData.surface_finish_id ?? offering.surface_finish_id,
+    construction_type_id: inputData.construction_type_id ?? offering.construction_type_id,
+    size_range: inputData.size_range ?? offering.size,
+    quality_grade: inputData.quality_grade ?? offering.quality,
+    color_variant: inputData.color_variant ?? offering.color_variant,
+    packaging: inputData.packaging ?? offering.packaging,
+    explicit: inputData.explicit !== undefined ? inputData.explicit : true,
+  };
+
+  // ⚠️ Validate and sanitize to remove Junction fields (E.g. for In-Memory operations that do not use "Image.insertImage")
+  const validation = validateEntityBySchema(ImageSchema.partial(), imageData);
+  if (!validation.isValid) {
+    log.warn("mergeImgageDataFromOffering: Validation failed", validation.errors);
+    // Still return the data, but log the warning
+  }
+  
+  return validation.isValid ? (validation.sanitized as Partial<Image>) : imageData;
+}
 
 /**
  * Insert a new offering image.

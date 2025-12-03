@@ -370,18 +370,6 @@ export async function deleteOfferingImage(
     // or we have hard dependencies without forceCascade => Return error code.
     if ((softDependencies.length > 0 && !cascade) || (hardDependencies.length > 0 && !forceCascade)) {
       throw new DeleteCascadeBlockedError(hardDependencies, softDependencies, cascade_available);
-      // Old begin: DO NOT return HTTP specific error codes. --------------------------------
-      // const conflictResponse: DeleteConflictResponse<string[]> = {
-      //   success: false,
-      //   message: "Cannot delete offering image: It is still in use by other entities or uses other entities.",
-      //   status_code: 409,
-      //   error_code: "DEPENDENCY_CONFLICT",
-      //   dependencies: { hard, soft },
-      //   cascade_available,
-      //   meta: { timestamp: new Date().toISOString() },
-      // };
-      // log.warn(`Deletion blocked by hard dependencies.`, { dependencies: hard });
-      // Old end ----------------------------------------------------------------------------
     }
 
     // === DELETE =================================================================================

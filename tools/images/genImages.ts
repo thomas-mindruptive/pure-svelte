@@ -1,5 +1,6 @@
-import { db as dbNS, transactionWrapper as transWRapperNS } from "@pure/svelte/backend-queries";
+import { db as dbNS, transactionWrapper as transWRapperNS, entityOperations } from "@pure/svelte/backend-queries";
 import { log as LogNS, assertions } from "@pure/svelte/utils";
+import type { domainTypes } from "@pure/svelte/domain";
 import { generateImage } from "./falAiClient";
 import { defaultConfig, type ImageGenerationConfig } from './generateMissingImages.config';
 import type { Lookups, OfferingWithGenerationPlan } from "./imageGenTypes";
@@ -9,6 +10,7 @@ import { buildPrompt } from "./promptBuilder";
 import { genAbsImgDirName, generateImageFilename } from "./fileUtils";
 import { downloadAndSaveImage } from "./imageProcessor";
 import * as path from "path";
+import { Transaction } from "mssql";
 
 const log = LogNS.log;
 
@@ -44,7 +46,7 @@ async function run() {
             log.info(`${offerings.size} offerings loaded`);
             const lookups = await loadLookups(transaction);
             for (const offering of offerings.values()) {
-                await processOffering(offering, defaultConfig, lookups);
+                await processOffering(offering, defaultConfig, lookups, transaction);
             }
 
             closeLogFile();
@@ -67,7 +69,7 @@ async function run() {
  * Check and/or generated image(s) for offering.
  * @param offering 
  */
-async function processOffering(offering: OfferingWithGenerationPlan, config: ImageGenerationConfig , lookups: Lookups) {
+async function processOffering(offering: OfferingWithGenerationPlan, config: ImageGenerationConfig , lookups: Lookups,  transaction: Transaction) {
     assertions.assertDefined(offering, "offering");
     assertions.assertDefined(config, "config");
 
@@ -78,7 +80,7 @@ async function processOffering(offering: OfferingWithGenerationPlan, config: Ima
     if (0 === offering.images?.length) {
         offering.prompt = buildPrompt(offering, config["prompt"], lookups);
         offering.imageUrl= await generateImage(offering.prompt, config["generation"]);
-        await generateAndSaveImage(offering, config);
+        await generateAndSaveImage(offering, config, transaction);
     }
 }
 
@@ -88,7 +90,7 @@ async function processOffering(offering: OfferingWithGenerationPlan, config: Ima
  * @param offering InOut!
  * @param config 
  */
-async function generateAndSaveImage(offering: OfferingWithGenerationPlan, config: ImageGenerationConfig) {
+async function generateAndSaveImage(offering: OfferingWithGenerationPlan, config: ImageGenerationConfig,  transaction: Transaction) {
     assertions.assertDefined(offering, "offering");
     assertions.assertDefined(offering.imageUrl, "offering.imageUrl");
     assertions.assertDefined(offering.prompt, "offering.prompt");
@@ -104,7 +106,54 @@ async function generateAndSaveImage(offering: OfferingWithGenerationPlan, config
     log.info(`  ├─ Saved: ${filepath}`);
     offering.filePath = filepath;
 
-    //const offeringImageForDB = OfferingIm
+    const offeringImageForDB: Partial<domainTypes.OfferingImageView> = {
+        offering_id: offering.offeringId,
+        filepath: offering.filePath,
+        explicit: false  // We generated the new imgage => It is NOT explicit.
+      };
+      
+    const wio: domainTypes.WholesalerItemOffering = {
+        // Pflichtfelder
+        offering_id: offering.offeringId,
+        wholesaler_id: offering.wholesalerId,
+        category_id: offering.categoryId,
+        product_def_id: offering.productDefId,
+        
+        // Gemappte Felder aus OfferingEnrichedView
+        material_id: offering.finalMaterialId ?? null,
+        form_id: offering.finalFormId ?? null,
+        surface_finish_id: offering.finalSurfaceFinishId ?? null,
+        construction_type_id: offering.finalConstructionTypeId ?? null,
+        title: offering.offeringTitle ?? null,
+        size: offering.offeringSize ?? null,
+        dimensions: offering.offeringDimensions ?? null,
+        packaging: offering.offeringPackaging ?? null,
+        price: offering.offeringPrice ?? null,
+        price_per_piece: offering.offeringPricePerPiece ?? null,
+        weight_grams: offering.offeringWeightGrams ?? null,
+        weight_range: offering.offeringWeightRange ?? null,
+        package_weight: offering.offeringPackageWeight ?? null,
+        origin: offering.offeringOrigin ?? null,
+        comment: offering.offeringComment ?? null,
+        imagePromptHint: offering.offeringImagePromptHint ?? null,
+        quality: offering.offeringQuality ?? null,
+        color_variant: offering.offeringColorVariant ?? null,
+        wholesaler_price: offering.offeringWholesalerPrice ?? null,
+        
+        // Felder, die nicht in OfferingEnrichedView vorhanden sind
+        sub_seller: null,
+        wholesaler_article_number: null,
+        currency: null,
+        is_assortment: null,
+        override_material: false, // Default-Wert
+        shopify_product_id: null,
+        shopify_variant_id: null,
+        shopify_sku: null,
+        shopify_price: null,
+        shopify_synced_at: null,
+        created_at: undefined, // Optional, kann undefined sein
+      };
+    await entityOperations.offeringImage.insertOfferingImageFromOffering(transaction, offeringImageForDB, wio);
 }
 
 /**

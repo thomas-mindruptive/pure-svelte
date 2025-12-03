@@ -4,7 +4,8 @@ import {
   OfferingImageJunctionForCreateSchema,
   OfferingImageJunctionSchema,
   type Image,
-  type OfferingImageView
+  type OfferingImageView,
+  type WholesalerItemOffering
 } from "$lib/domain/domainTypes";
 import { validateEntityBySchema } from "$lib/domain/domainTypes.utils";
 import { log } from "$lib/utils/logger";
@@ -54,7 +55,7 @@ export async function loadOfferingImages(
 
     const request = transWrapper.request();
 
-    if(offeringId) {
+    if (offeringId) {
       query += ` WHERE oi.offering_id = @offeringId`;
       request.input('offeringId', offeringId);
     }
@@ -77,19 +78,10 @@ export async function loadOfferingImages(
   }
 }
 
-/**
- * Inserts a new offering image.
- * Creates the image (via insertImage) and the junction entry.
- * Sets explicit = true for explicit images.
- *
- * @param transaction - Optional database transaction (null = create own transaction)
- * @param data - Unvalidated data containing both image and junction fields
- * @returns Created OfferingImageView record
- * @throws Error 400 if validation fails
- */
-export async function insertOfferingImage(
+export async function insertOfferingImageFromOffering(
   transaction: Transaction | null,
-  inputData: Partial<OfferingImageView>
+  inputData: Partial<OfferingImageView>,
+  offering: WholesalerItemOffering
 ): Promise<OfferingImageView> {
   log.debug("insertOfferingImage - validating");
 
@@ -102,8 +94,6 @@ export async function insertOfferingImage(
     if (!offeringId) {
       throw error(400, "offering_id is required to create an offering image");
     }
-
-    const offering = await loadOfferingCoalesceProdDef(transWrapper.trans, offeringId);
 
     // 1. Create/insert Image (with explicit = true for explicit images)
     // Merge offering fields with input data (input data takes precedence if provided)
@@ -174,8 +164,43 @@ export async function insertOfferingImage(
   }
 }
 
+
 /**
- * Updates an existing offering image junction entry.
+ * Insert a new offering image.
+ * Creates the image (via insertImage) and the junction entry.
+ * Sets explicit = true for explicit images.
+ *
+ * @param transaction - Optional database transaction (null = create own transaction)
+ * @param data - Unvalidated data containing both image and junction fields
+ * @returns Created OfferingImageView record
+ * @throws Error 400 if validation fails
+ */
+export async function insertOfferingImage(
+  transaction: Transaction | null,
+  inputData: Partial<OfferingImageView>
+): Promise<OfferingImageView> {
+  log.debug("insertOfferingImage - validating");
+
+  const transWrapper = new TransWrapper(transaction, db);
+  await transWrapper.begin();
+
+  try {
+    const offeringId = inputData.offering_id;
+    if (!offeringId) {
+      throw error(400, "offering_id is required to create an offering image");
+    }
+    const offering = await loadOfferingCoalesceProdDef(transWrapper.trans, offeringId);
+    const offeringImageView = await insertOfferingImageFromOffering(transWrapper.trans, inputData, offering);
+    await transWrapper.commit();
+    return offeringImageView;
+  } catch (err) {
+    await transWrapper.rollback();
+    throw err;
+  }
+}
+
+/**
+ * Update an existing offering image junction entry.
  * Optionally updates the associated image as well.
  *
  * @param transaction - Optional database transaction (null = create own transaction)
@@ -347,8 +372,8 @@ export async function deleteOfferingImage(
     // === DELETE =================================================================================
 
     const cascadeDeleteResult = await cascadeDeleteOfferingImage(junctionId, cascade || forceCascade, transWrapper.trans);
-    const deleteResult = {...cascadeDeleteResult, hardDependencies, softDependencies};
-    
+    const deleteResult = { ...cascadeDeleteResult, hardDependencies, softDependencies };
+
     await transWrapper.commit();
     log.info(`Transaction committed.`);
 

@@ -376,10 +376,10 @@ The client implements a highly robust **Optimistic Delete** pattern managed by a
 | Update | `PUT /api/offering-links` | Update pattern | ✅ | ✅ | |
 | Delete | `DELETE /api/offering-links` | `DeleteRequest<WholesalerOfferingLink>` | ✅ | ✅ | |
 | **OFFERING-IMAGES (Junction - n:m with Canonical/Explicit)** | | | | | |
-| Query List | `POST /api/offering-images` | `QueryRequest<OfferingImageWithJunction>` | ✅ | ✅ | Uses `dbo.view_offering_images` |
+| Query List | `POST /api/offering-images` | `QueryRequest<OfferingImageView>` | ✅ | ✅ | Uses `dbo.view_offering_images` |
 | Read Single | `GET /api/offering-images/[id]` | - | ✅ | ✅ | |
-| Create | `POST /api/offering-images/new` | `OfferingImageWithJunction` (partial) | ✅ | ✅ | Auto-merges offering fields for fingerprint |
-| Update | `PUT /api/offering-images/[id]` | `Partial<OfferingImageWithJunction>` | ✅ | ✅ | |
+| Create | `POST /api/offering-images/new` | `OfferingImageView` (partial) | ✅ | ✅ | Auto-merges offering fields for fingerprint |
+| Update | `PUT /api/offering-images/[id]` | `Partial<OfferingImageView>` | ✅ | ✅ | |
 | Delete | `DELETE /api/offering-images/[id]` | `DeleteRequest<OfferingImageJunction>` | ✅ | ✅ | Junction deleted, image preserved |
 
 ---

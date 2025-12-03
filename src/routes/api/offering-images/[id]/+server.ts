@@ -12,7 +12,6 @@ import {
   deleteOfferingImage,
   loadOfferingImageById,
   updateOfferingImage,
-  type OfferingImageWithJunction,
 } from "$lib/backendQueries/entityOperations/offeringImage";
 import { buildUnexpectedError, validateIdUrlParam } from "$lib/backendQueries/genericEntityOperations";
 import { TransWrapper } from "$lib/backendQueries/transactionWrapper";
@@ -55,7 +54,7 @@ export const GET: RequestHandler = async ({ params }) => {
       throw error(404, `Offering image with ID ${id} not found.`);
     }
 
-    const response: ApiSuccessResponse<{ offeringImage: OfferingImageWithJunction }> = {
+    const response: ApiSuccessResponse<{ offeringImage: OfferingImageView }> = {
       success: true,
       message: "Offering image retrieved successfully.",
       data: { offeringImage },
@@ -99,7 +98,7 @@ export const PUT: RequestHandler = async ({ params, request }) => {
     const updatedRecord = await updateOfferingImage(tw.trans, id, requestData);
     await tw.commit();
 
-    const response: ApiSuccessResponse<{ offeringImage: OfferingImageWithJunction }> = {
+    const response: ApiSuccessResponse<{ offeringImage: OfferingImageView }> = {
       success: true,
       message: "Offering image updated successfully.",
       data: { offeringImage: updatedRecord },

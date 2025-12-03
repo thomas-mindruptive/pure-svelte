@@ -12,7 +12,7 @@ import { log } from '$lib/utils/logger';
 import { buildUnexpectedError } from '$lib/backendQueries/genericEntityOperations';
 import { TransWrapper } from '$lib/backendQueries/transactionWrapper';
 import { db } from '$lib/backendQueries/db';
-import { insertOfferingImage, type OfferingImageWithJunction } from '$lib/backendQueries/entityOperations/offeringImage';
+import { insertOfferingImage } from '$lib/backendQueries/entityOperations/offeringImage';
 import type { ApiSuccessResponse } from '$lib/api/api.types';
 import { v4 as uuidv4 } from 'uuid';
 import { json } from '@sveltejs/kit';
@@ -42,7 +42,7 @@ export const POST: RequestHandler = async ({ request }) => {
         const createdRecord = await insertOfferingImage(tw.trans, requestData);
         await tw.commit();
 
-        const response: ApiSuccessResponse<{ offeringImage: OfferingImageWithJunction }> = {
+        const response: ApiSuccessResponse<{ offeringImage: OfferingImageView }> = {
             success: true,
             message: "Offering image created successfully.",
             data: { offeringImage: createdRecord },

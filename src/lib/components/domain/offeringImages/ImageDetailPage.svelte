@@ -8,8 +8,7 @@
   import { getFormApi } from "$lib/api/client/form";
   import { getConstructionTypeApi } from "$lib/api/client/constructionType";
   import { getSurfaceFinishApi } from "$lib/api/client/surfaceFinish";
-  import type { Material, Form, ConstructionType, SurfaceFinish } from "$lib/domain/domainTypes";
-  import type { OfferingImageWithJunction } from "$lib/backendQueries/entityOperations/offeringImage";
+  import type { Material, Form, ConstructionType, SurfaceFinish, OfferingImageView } from "$lib/domain/domainTypes";
   import { addNotification } from "$lib/stores/notifications";
   import { log } from "$lib/utils/logger";
   import { browser } from "$app/environment";
@@ -35,7 +34,7 @@
   // === STATE ====================================================================================
 
   let isLoading = $state(true);
-  let image: OfferingImageWithJunction | null = $state(null);
+  let image: OfferingImageView | null = $state(null);
   let materials: Material[] = $state([]);
   let forms: Form[] = $state([]);
   let constructionTypes: ConstructionType[] = $state([]);
@@ -94,7 +93,7 @@
           log.debug(`Loaded image`, { image });
         } else {
           // Create mode - initialize with empty structure and defaults
-          // NOTE: Using OfferingImageWithJunction (Image + junction fields)
+          // NOTE: Using OfferingImageView (Image + junction fields)
           image = {
             // Junction fields
             offering_image_id: 0, // Will be set by server
@@ -125,7 +124,7 @@
             explicit: true, // Default to explicit for manually created images
             image_type: null,
             created_at: undefined,
-          } as OfferingImageWithJunction;
+          } as OfferingImageView;
         }
       } catch (err: any) {
         if (aborted) return;
@@ -157,13 +156,13 @@
     }
   }
 
-  async function handleFormSubmitted(info: { data: OfferingImageWithJunction; result: unknown }) {
+  async function handleFormSubmitted(info: { data: OfferingImageView; result: unknown }) {
     log.info(`Image ${isCreateMode ? "created" : "updated"} successfully`, info.result);
     addNotification(`Image ${isCreateMode ? "created" : "updated"} successfully.`, "success");
 
     if (isCreateMode) {
       // After creating, navigate to the edit page for the new image
-      const createdImage = info.result as OfferingImageWithJunction;
+      const createdImage = info.result as OfferingImageView;
       if (createdImage?.offering_image_id) {
         if (isSuppliersRoute) {
           goto(`/suppliers/${supplierId}/categories/${categoryId}/offerings/${offeringId}/images/${createdImage.offering_image_id}`);
@@ -182,12 +181,12 @@
     }
   }
 
-  async function handleFormSubmitError(info: { data: OfferingImageWithJunction; error: unknown }) {
+  async function handleFormSubmitError(info: { data: OfferingImageView; error: unknown }) {
     log.error(`Image submit error`, info.error);
     addNotification(`Image submit error: ${info.error}`, "error");
   }
 
-  async function handleFormCancelled(info: { data: OfferingImageWithJunction; reason?: string }) {
+  async function handleFormCancelled(info: { data: OfferingImageView; reason?: string }) {
     log.debug(`Image form cancelled`);
     addNotification(`Form cancelled.`, "info");
     handleBack();

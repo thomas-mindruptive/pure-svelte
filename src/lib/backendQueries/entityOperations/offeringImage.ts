@@ -4,7 +4,6 @@ import {
   OfferingImageJunctionForCreateSchema,
   OfferingImageJunctionSchema,
   type Image,
-  type OfferingImageJunction,
   type OfferingImageView
 } from "$lib/domain/domainTypes";
 import { validateEntityBySchema } from "$lib/domain/domainTypes.utils";
@@ -22,11 +21,6 @@ import { insertImage, loadImageById } from "./image";
 import { loadOfferingCoalesceProdDef } from "./offering";
 
 /**
- * Cursor is an idiot and created an extra type!
- */
-export type OfferingImageWithJunction = OfferingImageView;
-
-/**
  * Options for loading offering images
  */
 export type LoadOfferingImagesOptions = {
@@ -40,13 +34,13 @@ export type LoadOfferingImagesOptions = {
  * @param transaction - Optional database transaction (null = create own transaction)
  * @param offeringId - The offering_id to load images for or undefined for all
  * @param options - Optional filters (e.g., is_explicit)
- * @returns Array of OfferingImageWithJunction records
+ * @returns Array of OfferingImageView records
  */
 export async function loadOfferingImages(
   transaction: Transaction | null,
   offeringId?: number,
   options?: LoadOfferingImagesOptions
-): Promise<OfferingImageWithJunction[]> {
+): Promise<OfferingImageView[]> {
   log.debug("loadOfferingImages", { offeringId, options });
 
   const transWrapper = new TransWrapper(transaction, db);
@@ -90,13 +84,13 @@ export async function loadOfferingImages(
  *
  * @param transaction - Optional database transaction (null = create own transaction)
  * @param data - Unvalidated data containing both image and junction fields
- * @returns Created OfferingImageWithJunction record
+ * @returns Created OfferingImageView record
  * @throws Error 400 if validation fails
  */
 export async function insertOfferingImage(
   transaction: Transaction | null,
   inputData: Partial<OfferingImageView>
-): Promise<OfferingImageWithJunction> {
+): Promise<OfferingImageView> {
   log.debug("insertOfferingImage - validating");
 
   const transWrapper = new TransWrapper(transaction, db);
@@ -155,12 +149,12 @@ export async function insertOfferingImage(
       OfferingImageJunctionForCreateSchema,
       validation.sanitized as any,
       transWrapper.trans
-    )) as OfferingImageJunction;
+    )) as OfferingImageView;
 
     await transWrapper.commit();
 
     // Combine image and junction data
-    const result: OfferingImageWithJunction = {
+    const result: OfferingImageView = {
       ...createdImage,
       offering_image_id: insertedJunction.offering_image_id,
       offering_id: insertedJunction.offering_id,
@@ -187,14 +181,14 @@ export async function insertOfferingImage(
  * @param transaction - Optional database transaction (null = create own transaction)
  * @param junctionId - The offering_image_id to update
  * @param data - Partial data for junction and/or image
- * @returns Updated OfferingImageWithJunction record
+ * @returns Updated OfferingImageView record
  * @throws Error 400 if validation fails, Error 404 if not found
  */
 export async function updateOfferingImage(
   transaction: Transaction | null,
   junctionId: number,
   inputData: Partial<OfferingImageView>
-): Promise<OfferingImageWithJunction> {
+): Promise<OfferingImageView> {
   log.debug("updateOfferingImage - validating", { junctionId });
 
   const transWrapper = new TransWrapper(transaction, db);
@@ -212,7 +206,7 @@ export async function updateOfferingImage(
       throw error(404, `Offering image with ID ${junctionId} not found.`);
     }
 
-    const existingJunction = existingResult.recordset[0] as OfferingImageJunction;
+    const existingJunction = existingResult.recordset[0] as OfferingImageView;
     const imageId = existingJunction.image_id;
 
     // 2. Update image if image fields are provided
@@ -244,7 +238,7 @@ export async function updateOfferingImage(
 
     // 3. Update junction entry if junction fields are provided
     if (inputData.is_primary !== undefined || inputData.sort_order !== undefined) {
-      const junctionUpdateData: Partial<OfferingImageJunction> = {};
+      const junctionUpdateData: Partial<OfferingImageView> = {};
       if (inputData.is_primary !== undefined) junctionUpdateData.is_primary = inputData.is_primary;
       if (inputData.sort_order !== undefined) junctionUpdateData.sort_order = inputData.sort_order;
 
@@ -259,7 +253,7 @@ export async function updateOfferingImage(
         throw error(400, JSON.stringify(errorResponse));
       }
 
-      const sanitizedUpdate = validation.sanitized as Partial<OfferingImageJunction>;
+      const sanitizedUpdate = validation.sanitized as Partial<OfferingImageView>;
       await updateRecordWithTransaction(
         OfferingImageJunctionSchema,
         junctionId,
@@ -275,7 +269,7 @@ export async function updateOfferingImage(
     const loadResult = await loadRequest.query(
       'SELECT * FROM dbo.offering_images WHERE offering_image_id = @junctionId'
     );
-    const updatedJunction = loadResult.recordset[0] as OfferingImageJunction;
+    const updatedJunction = loadResult.recordset[0] as OfferingImageView;
 
     // 5. Load image (use updated if available, otherwise load fresh)
     const finalImage = updatedImage || await loadImageById(transWrapper.trans, imageId);
@@ -286,7 +280,7 @@ export async function updateOfferingImage(
     await transWrapper.commit();
 
     // Combine image and junction data
-    const result: OfferingImageWithJunction = {
+    const result: OfferingImageView = {
       ...finalImage,
       offering_image_id: updatedJunction.offering_image_id,
       offering_id: updatedJunction.offering_id,
@@ -375,12 +369,12 @@ export async function deleteOfferingImage(
  *
  * @param transaction - Optional database transaction (null = create own transaction)
  * @param junctionId - The offering_image_id to load
- * @returns OfferingImageWithJunction record or null if not found
+ * @returns OfferingImageView record or null if not found
  */
 export async function loadOfferingImageById(
   transaction: Transaction | null,
   junctionId: number
-): Promise<OfferingImageWithJunction | null> {
+): Promise<OfferingImageView | null> {
   log.debug("loadOfferingImageById", { junctionId });
 
   const transWrapper = new TransWrapper(transaction, db);
@@ -401,7 +395,7 @@ export async function loadOfferingImageById(
       return null;
     }
 
-    const offeringImage = result.recordset[0] as OfferingImageWithJunction;
+    const offeringImage = result.recordset[0] as OfferingImageView;
     return offeringImage;
   } catch (err) {
     await transWrapper.rollback();

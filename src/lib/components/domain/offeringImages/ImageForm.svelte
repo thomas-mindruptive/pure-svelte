@@ -1,7 +1,6 @@
 <script lang="ts">
   import { ApiClient } from "$lib/api/client/apiClient";
   import { getOfferingImageApi } from "$lib/api/client/offeringImage";
-  import type { OfferingImageWithJunction } from "$lib/backendQueries/entityOperations/offeringImage";
   import Field from "$lib/components/forms/Field.svelte";
   import FormComboBox2 from "$lib/components/forms/FormComboBox2.svelte";
   import type {
@@ -34,7 +33,7 @@
   // === PROPS ====================================================================================
 
   export type Props = {
-    initial?: OfferingImageWithJunction | undefined | null;
+    initial?: OfferingImageView | undefined | null;
     offeringId: number;
     materials: Material[];
     forms: Form[];
@@ -117,8 +116,8 @@
 
   // === BUSINESS FUNCTIONALITY ===================================================================
 
-  function validateImage(raw: Record<string, any>): ValidateResult<OfferingImageWithJunction> {
-    const data = raw as OfferingImageWithJunction;
+  function validateImage(raw: Record<string, any>): ValidateResult<OfferingImageView> {
+    const data = raw as OfferingImageView;
     const errors: Record<string, string[]> = {};
 
     // Validate image fields
@@ -130,7 +129,7 @@
 
     return {
       valid: Object.keys(errors).length === 0,
-      errors: errors as Errors<OfferingImageWithJunction>,
+      errors: errors as Errors<OfferingImageView>,
     };
   }
 
@@ -138,7 +137,7 @@
 
   async function submitImage(raw: Record<string, any>) {
     log.debug(`Submitting image`, raw);
-    const data = raw as OfferingImageWithJunction;
+    const data = raw as OfferingImageView;
 
     const isUpdate = !isCreateMode;
     try {
@@ -201,7 +200,7 @@
 <!--
   -- Material combo
   -->
-{#snippet materialCombo(fieldProps: FieldsSnippetProps<OfferingImageWithJunction>)}
+{#snippet materialCombo(fieldProps: FieldsSnippetProps<OfferingImageView>)}
   <FormComboBox2
     {fieldProps}
     items={materials}
@@ -219,7 +218,7 @@
 <!--
   -- Form combo
   -->
-{#snippet formCombo(fieldProps: FieldsSnippetProps<OfferingImageWithJunction>)}
+{#snippet formCombo(fieldProps: FieldsSnippetProps<OfferingImageView>)}
   <FormComboBox2
     {fieldProps}
     items={forms}
@@ -237,7 +236,7 @@
 <!--
   -- Surface Finish combo
   -->
-{#snippet surfaceFinishCombo(fieldProps: FieldsSnippetProps<OfferingImageWithJunction>)}
+{#snippet surfaceFinishCombo(fieldProps: FieldsSnippetProps<OfferingImageView>)}
   <FormComboBox2
     {fieldProps}
     items={surfaceFinishes}
@@ -255,7 +254,7 @@
 <!--
   -- Construction Type combo
   -->
-{#snippet constructionTypeCombo(fieldProps: FieldsSnippetProps<OfferingImageWithJunction>)}
+{#snippet constructionTypeCombo(fieldProps: FieldsSnippetProps<OfferingImageView>)}
   <FormComboBox2
     {fieldProps}
     items={constructionTypes}
@@ -275,7 +274,7 @@
 <ValidationWrapper errors={zodErrors}>
   <FormShell
     entity="Image"
-    initial={formData as OfferingImageWithJunction}
+    initial={formData as OfferingImageView}
     validate={validateImage}
     submitCbk={submitImage}
     autoValidate="change"
@@ -287,7 +286,7 @@
   >
     <!-- Header ---------------------------------------------------------------------------------->
     {#snippet header({ data, dirty })}
-      {@const image = data as OfferingImageWithJunction}
+      {@const image = data as OfferingImageView}
       <div class="form-header">
         <div>
           {#if image?.image_id}
@@ -309,7 +308,7 @@
 
     <!-- Fields ---------------------------------------------------------------------------------->
     {#snippet fields(fieldProps)}
-      {@const image = fieldProps.data as OfferingImageWithJunction}
+      {@const image = fieldProps.data as OfferingImageView}
       <div class="form-body">
         <div class="form-row-grid">
           <!-- ===== IMAGE FIELDS ===== -->

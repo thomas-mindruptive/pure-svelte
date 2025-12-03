@@ -17,7 +17,6 @@ import type {
   DeleteRequest
 } from "$lib/api/api.types";
 import { LoadingState } from "./loadingState";
-import type { OfferingImageWithJunction } from "$lib/backendQueries/entityOperations/offeringImage";
 import type { OfferingImageJunction, OfferingImageView } from "$lib/domain/domainTypes";
 
 const offeringImageLoadingManager = new LoadingState();
@@ -35,16 +34,16 @@ export function getOfferingImageApi(client: ApiClient) {
      * Loads all images for a specific offering.
      * @param offeringId The offering_id to load images for
      * @param options Optional filters (e.g., is_explicit)
-     * @returns Array of OfferingImageWithJunction records
+     * @returns Array of OfferingImageView records
      */
     async loadOfferingImages(
       offeringId: number,
       options?: { is_explicit?: boolean }
-    ): Promise<OfferingImageWithJunction[]> {
+    ): Promise<OfferingImageView[]> {
       const operationId = `loadOfferingImages-${offeringId}`;
       offeringImageLoadingManager.start(operationId);
       try {
-        const responseData = await client.apiFetch<QueryResponseData<OfferingImageWithJunction>>(
+        const responseData = await client.apiFetch<QueryResponseData<OfferingImageView>>(
           "/api/offering-images",
           {
             method: "POST",
@@ -52,7 +51,7 @@ export function getOfferingImageApi(client: ApiClient) {
           },
           { context: operationId },
         );
-        return responseData.results as OfferingImageWithJunction[];
+        return responseData.results as OfferingImageView[];
       } catch (err) {
         log.error(`[${operationId}] Failed.`, { offeringId, error: getErrorMessage(err) });
         throw err;
@@ -64,31 +63,31 @@ export function getOfferingImageApi(client: ApiClient) {
     /**
      * Loads explicit offering images (explicit = true).
      * @param offeringId The offering_id to load images for
-     * @returns Array of OfferingImageWithJunction records
+     * @returns Array of OfferingImageView records
      */
-    async loadExplicitOfferingImages(offeringId: number): Promise<OfferingImageWithJunction[]> {
+    async loadExplicitOfferingImages(offeringId: number): Promise<OfferingImageView[]> {
       return this.loadOfferingImages(offeringId, { is_explicit: true });
     },
 
     /**
      * Loads canonical offering images (explicit = false).
      * @param offeringId The offering_id to load images for
-     * @returns Array of OfferingImageWithJunction records
+     * @returns Array of OfferingImageView records
      */
-    async loadCanonicalOfferingImages(offeringId: number): Promise<OfferingImageWithJunction[]> {
+    async loadCanonicalOfferingImages(offeringId: number): Promise<OfferingImageView[]> {
       return this.loadOfferingImages(offeringId, { is_explicit: false });
     },
 
     /**
      * Loads a single offering image by its offering_image_id (junction ID).
      * @param offeringImageId The offering_image_id (junction ID) to load
-     * @returns OfferingImageWithJunction record
+     * @returns OfferingImageView record
      */
-    async loadOfferingImage(offeringImageId: number): Promise<OfferingImageWithJunction> {
+    async loadOfferingImage(offeringImageId: number): Promise<OfferingImageView> {
       const operationId = `loadOfferingImage-${offeringImageId}`;
       offeringImageLoadingManager.start(operationId);
       try {
-        const responseData = await client.apiFetch<{ offeringImage: OfferingImageWithJunction }>(
+        const responseData = await client.apiFetch<{ offeringImage: OfferingImageView }>(
           `/api/offering-images/${offeringImageId}`,
           { method: "GET" },
           { context: operationId },
@@ -106,7 +105,7 @@ export function getOfferingImageApi(client: ApiClient) {
      * Creates a new offering image (Image + Junction entry).
      * Sets explicit = true by default for explicit images.
      * @param data Data containing both image and junction fields (including offering_id)
-     * @returns Created OfferingImageWithJunction record
+     * @returns Created OfferingImageView record
      * @throws ApiError if validation fails (e.g., missing fingerprint fields)
      */
     async createOfferingImage(data: Partial<OfferingImageView>): Promise<OfferingImageView> {
@@ -137,17 +136,17 @@ export function getOfferingImageApi(client: ApiClient) {
      * Updates an existing offering image (junction entry and/or associated image).
      * @param offeringImageId The offering_image_id (junction ID) to update
      * @param updateOfferingImageData Partial data for junction and/or image fields
-     * @returns Updated OfferingImageWithJunction record
+     * @returns Updated OfferingImageView record
      * @throws ApiError if validation fails (e.g., missing fingerprint fields)
      */
     async updateOfferingImage(
       offeringImageId: number,
       updateOfferingImageData: Partial<OfferingImageView>
-    ): Promise<OfferingImageWithJunction> {
+    ): Promise<OfferingImageView> {
       const operationId = `updateOfferingImage-${offeringImageId}`;
       offeringImageLoadingManager.start(operationId);
       try {
-        const response = await client.apiFetchUnion<ApiResponse<{ offeringImage: OfferingImageWithJunction }>>(
+        const response = await client.apiFetchUnion<ApiResponse<{ offeringImage: OfferingImageView }>>(
           `/api/offering-images/${offeringImageId}`,
           {
             method: "PUT",
@@ -201,9 +200,9 @@ export function getOfferingImageApi(client: ApiClient) {
     //  * Updates is_primary flag: sets target to true, others to false.
     //  * @param offeringId The offering_id
     //  * @param offeringImageId The offering_image_id (junction ID) to set as primary
-    //  * @returns Updated OfferingImageWithJunction record
+    //  * @returns Updated OfferingImageView record
     //  */
-    // async setPrimaryImage(offeringId: number, offeringImageId: number): Promise<OfferingImageWithJunction> {
+    // async setPrimaryImage(offeringId: number, offeringImageId: number): Promise<OfferingImageView> {
     //   const operationId = `setPrimaryImage-${offeringId}-${offeringImageId}`;
     //   offeringImageLoadingManager.start(operationId);
     //   try {
@@ -230,11 +229,11 @@ export function getOfferingImageApi(client: ApiClient) {
     //   /**
     //    * Updates the sort order of multiple offering images at once.
     //    * @param updates Array of { offeringImageId: number, sortOrder: number }
-    //    * @returns Array of updated OfferingImageWithJunction records
+    //    * @returns Array of updated OfferingImageView records
     //    */
     //   async updateImagesSortOrder(
     //     updates: Array<{ offeringImageId: number; sortOrder: number }>
-    //   ): Promise<OfferingImageWithJunction[]> {
+    //   ): Promise<OfferingImageView[]> {
     //     const operationId = "updateImagesSortOrder";
     //     offeringImageLoadingManager.start(operationId);
     //     try {

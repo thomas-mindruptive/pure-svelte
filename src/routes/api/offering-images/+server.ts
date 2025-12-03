@@ -11,9 +11,10 @@ import { log } from '$lib/utils/logger';
 import { buildUnexpectedError } from '$lib/backendQueries/genericEntityOperations';
 import { TransWrapper } from '$lib/backendQueries/transactionWrapper';
 import { db } from '$lib/backendQueries/db';
-import { loadOfferingImages, type OfferingImageWithJunction } from '$lib/backendQueries/entityOperations/offeringImage';
+import { loadOfferingImages } from '$lib/backendQueries/entityOperations/offeringImage';
 import type { ApiErrorResponse, QuerySuccessResponse } from '$lib/api/api.types';
 import { v4 as uuidv4 } from 'uuid';
+import type { OfferingImageView } from '$lib/domain/domainTypes';
 
 /**
  * POST /api/offering-images
@@ -55,11 +56,11 @@ export const POST: RequestHandler = async (event) => {
         await tw.commit();
 
         // 3. Format response
-        const response: QuerySuccessResponse<OfferingImageWithJunction> = {
+        const response: QuerySuccessResponse<OfferingImageView> = {
             success: true,
             message: 'Offering images retrieved successfully.',
             data: {
-                results: offeringImages as Partial<OfferingImageWithJunction>[],
+                results: offeringImages as Partial<OfferingImageView>[],
                 meta: {
                     retrieved_at: new Date().toISOString(),
                     result_count: offeringImages.length,

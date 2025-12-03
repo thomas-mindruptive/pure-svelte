@@ -45,8 +45,9 @@
     Form,
     ConstructionType,
     SurfaceFinish,
+    OfferingImageView,
   } from "$lib/domain/domainTypes";
-  import type { OfferingImageWithJunction } from "$lib/backendQueries/entityOperations/offeringImage";
+
   import {
     Wio_PDef_Cat_Supp_Nested_WithLinks_Schema,
     ProductDefinitionSchema,
@@ -99,7 +100,7 @@
   let availableAttributes = $state<Attribute[]>([]);
   let links = $state<WholesalerOfferingLink[]>([]);
   let sourceOfferings = $state<Wio_PDef_Cat_Supp_Nested_WithLinks[]>([]);
-  let images = $state<OfferingImageWithJunction[]>([]);
+  let images = $state<OfferingImageView[]>([]);
   let copiedShopOfferingId = $state<number | null>(null);
 
   // Lookups to material, form, etc.
@@ -267,7 +268,7 @@
           } else if ("images" === data.activeChildPath) {
             images = await offeringImageApi.loadOfferingImages(data.offeringId);
             if (aborted) return;
-            // No schema validation needed - OfferingImageWithJunction is a type, not a schema
+            // No schema validation needed - OfferingImageView is a type, not a schema
           } else {
             const msg = `Invalid data.activeChildPath: ${data.activeChildPath}`;
             log.error(msg);
@@ -698,7 +699,7 @@
     goto(buildChildUrl(page.url.pathname, "images", "new"));
   }
 
-  function handleImageSelect(image: OfferingImageWithJunction, options?: { _blankWindow?: boolean }) {
+  function handleImageSelect(image: OfferingImageView, options?: { _blankWindow?: boolean }) {
     log.info(`Selected image: `, image);
     const { offering_image_id } = image;
     if (offering_image_id) {
@@ -734,7 +735,7 @@
     }
   }
 
-  async function handleImagesSort(sortState: SortDescriptor<OfferingImageWithJunction>[] | null) {
+  async function handleImagesSort(sortState: SortDescriptor<OfferingImageView>[] | null) {
     // Sorting is now handled client-side since the API returns all images for an offering
     // The API already returns images sorted by sort_order, so we just reload
     try {
@@ -749,11 +750,11 @@
     }
   }
 
-  const imagesDeleteStrategy: DeleteStrategy<OfferingImageWithJunction> = {
+  const imagesDeleteStrategy: DeleteStrategy<OfferingImageView> = {
     execute: handleImageDelete,
   };
 
-  const imagesRowActionStrategy: RowActionStrategy<OfferingImageWithJunction> = {
+  const imagesRowActionStrategy: RowActionStrategy<OfferingImageView> = {
     click: handleImageSelect,
     doubleClick: handleImageSelect,
   };
@@ -771,7 +772,7 @@
     { key: "explicit", header: "Explicit", accessor: (img) => (img.explicit ? "Yes" : "No"), sortable: true },
   ];
 
-  const getImageRowId = (image: OfferingImageWithJunction) => image.offering_image_id;
+  const getImageRowId = (image: OfferingImageView) => image.offering_image_id;
 </script>
 
 <!------------------------------------------------------------------------------------------------

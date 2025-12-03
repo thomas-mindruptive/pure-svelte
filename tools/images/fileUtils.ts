@@ -1,7 +1,6 @@
-import { assertDefined } from "$lib/utils/assertions";
-import type { OfferingWithGenerationPlan } from "./generateMissingImages";
-import * as fs from "fs/promises";
 import * as path from "path";
+import type { OfferingWithGenerationPlan } from "./imageGenTypes";
+import { assertions } from "@pure/svelte/utils";
 
 /**
  * Generates a filename for the generated image
@@ -9,48 +8,22 @@ import * as path from "path";
  * Format: {material}_{form}_{size}_{timestamp}.png
  * Example: rose_quartz_sphere_5cm_1704123456.png
  */
-export function generateImageFilename(item: OfferingWithGenerationPlan): string {
+export function generateImageFilename(offering: OfferingWithGenerationPlan): string {
+  assertions.assertDefined(offering, "offering");
+
   const parts: string[] = [];
-
-  const prodType = item.product_type;
-  const offering = item.offering;
-  const material = item.offering.material;
-  const form = item.offering.form;
-  const constructionType = item.construction_type;
-
-  if (prodType) {
-    parts.push(sanitizeForFilename(prodType.name));
-  } else {
-    parts.push("unk-prodType");
-  }
-
-  if (material) {
-    parts.push(sanitizeForFilename(material.name));
-  } else {
-    parts.push("unk-mat");
-  }
-
-  if (form) {
-    parts.push(sanitizeForFilename(form.name));
-  } else {
-    parts.push("unk-form");
-  }
-
-  if (constructionType) {
-    parts.push(sanitizeForFilename(constructionType.name));
-  } else {
-    parts.push("unk-ctype");
-  }
-
-  // Size (if available, sanitized)
-  if (offering.size) {
-    parts.push(sanitizeForFilename(offering.size));
-  }
-
-  // Timestamp for uniqueness
+  assertions.assertDefined(offering.productTypeName, "item.productTypeName")
+  parts.push(sanitizeForFilename(offering.productTypeName));
+  assertions.assertDefined(offering.finalMaterialName, "item.finalMaterialName")
+  parts.push(sanitizeForFilename(offering.finalMaterialName));
+  assertions.assertDefined(offering.finalFormName, "item.finalFormName")
+  parts.push(sanitizeForFilename(offering.finalFormName));
+  assertions.assertDefined(offering.finalConstructionTypeName, "item.finalConstructionTypeName")
+  parts.push(sanitizeForFilename(offering.finalConstructionTypeName));
+  assertions.assertDefined(offering.offeringSize, "item.offeringSize");
+  parts.push(sanitizeForFilename(offering.offeringSize));
   const timestamp = Date.now();
   parts.push(timestamp.toString());
-
   return parts.join("_") + ".png";
 }
 
@@ -60,35 +33,18 @@ export function generateImageFilename(item: OfferingWithGenerationPlan): string 
  * @param item 
  * @returns 
  */
-export function genAbsImgDirName(baseDir: string, item: OfferingWithGenerationPlan) {
-  assertDefined(baseDir, "baseDir");
-  assertDefined(item, "item");
+export function genAbsImgDirName(baseDir: string, offering: OfferingWithGenerationPlan) {
+  assertions.assertDefined(baseDir, "baseDir");
+  assertions.assertDefined(offering, "offering");
 
   const parts: string[] = [];
-  const prodType = item.product_type;
-  const material = item.offering.material;
-  const form = item.offering.form;
-
-  if (prodType) {
-    parts.push(sanitizeForFilename(prodType.name));
-  } else {
-    parts.push("unk-prodType");
-  }
-
-  if (material) {
-    parts.push(sanitizeForFilename(material.name));
-  } else {
-    parts.push("unk-mat");
-  }
-
-  if (form) {
-    parts.push(sanitizeForFilename(form.name));
-  } else {
-    parts.push("unk-form");
-  }
-
+  assertions.assertDefined(offering.productTypeName, "item.productTypeName")
+  parts.push(sanitizeForFilename(offering.productTypeName));
+  assertions.assertDefined(offering.finalMaterialName, "item.finalMaterialName")
+  parts.push(sanitizeForFilename(offering.finalMaterialName));
+  assertions.assertDefined(offering.finalFormName, "item.finalFormName")
   const dir = path.join(baseDir, ...parts);
-  return dir; 
+  return dir;
 }
 
 /**

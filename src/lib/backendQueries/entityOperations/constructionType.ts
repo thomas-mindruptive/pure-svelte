@@ -25,7 +25,7 @@ export async function loadConstructionTypes(
   
   const completePayload: QueryPayload<ConstructionType> = {
     from: { table: tableName as "dbo.construction_types", alias: "ct" },
-    select: genTypedQualifiedColumns(ConstructionTypeSchema, true),
+    select: genTypedQualifiedColumns(ConstructionTypeSchema, false), // IMPORTANT: set second param to false! Otherwise we mus referenece the properties through "ct.prop"!!!
     ...(payload?.where && { where: payload.where }),
     ...(payload?.limit && { limit: payload.limit }),
     ...(payload?.offset && { offset: payload.offset }),

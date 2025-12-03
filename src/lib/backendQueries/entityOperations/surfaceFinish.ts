@@ -25,7 +25,7 @@ export async function loadSurfaceFinishes(
   
   const completePayload: QueryPayload<SurfaceFinish> = {
     from: { table: tableName as "dbo.surface_finishes", alias: "sf" },
-    select: genTypedQualifiedColumns(SurfaceFinishSchema, true),
+    select: genTypedQualifiedColumns(SurfaceFinishSchema, false), // IMPORTANT: set second param to false! Otherwise we mus referenece the properties through "sf.prop"!!!
     ...(payload?.where && { where: payload.where }),
     ...(payload?.limit && { limit: payload.limit }),
     ...(payload?.offset && { offset: payload.offset }),

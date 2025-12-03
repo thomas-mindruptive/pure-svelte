@@ -902,8 +902,9 @@ export const OfferingEnrichedViewSchema = createSchemaWithMeta(OfferingEnrichedV
 
 const OfferingImageViewSchemaBase = ImageSchema.extend({
   // Junction table fields
-  offering_image_id: z.number().int().positive(),
-  offering_id: z.number().int().positive(), 
+  offering_image_id: z.number().int().positive(),   // ID of junction object, dbo.offering_images
+  offering_id: z.number().int().positive(),         // Offering
+  image_id: z.number().int().positive(),            // FK to image, dbo.images
   is_primary: z.boolean().default(false),
   sort_order: z.number().int().nonnegative().default(0)
 }).describe("OfferingImageViewSchema");
@@ -956,12 +957,11 @@ export type OrderItem_ProdDef_Category = z.infer<typeof OrderItem_ProdDef_Catego
 
 export type Image = z.infer<typeof ImageSchema>;
 export type OfferingImageJunction = z.infer<typeof OfferingImageJunctionSchema>;
-// Type aliases for backward compatibility during migration
-// WICHTIG: Die tatsächliche Datenstruktur ist flach (Image), keine nested structures mehr!
 export type ProductDefinitionImage = Image;
-export type OfferingImage = Image;
-export type ProductDefinitionImage_Image = Image;  // Flach, nicht { image: Image, ... }
-export type OfferingImage_Image = Image;  // Flach, nicht { image: Image, ... }
+//export type OfferingImage = Image;
+//export type ProductDefinitionImage_Image = Image;  // Flach, nicht { image: Image, ... }
+//export type OfferingImage_Image = Image;  // Flach, nicht { image: Image, ... }
+
 // Legacy types (not used anymore, but kept for compatibility)
 export type ProductDefinitionImage_Image_ProductDef = Image;
 export type OfferingImage_Image_Offering = Image;

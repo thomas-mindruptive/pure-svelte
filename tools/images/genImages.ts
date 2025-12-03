@@ -1,16 +1,13 @@
-import { entityOperations, db as dbNS, transactionWrapper as transWRapperNS } from "@pure/svelte/backend-queries";
-import { log as LogNS } from "@pure/svelte/utils";
+import { db as dbNS, entityOperations, transactionWrapper as transWRapperNS } from "@pure/svelte/backend-queries";
 import type { domainTypes } from "@pure/svelte/domain";
-import { defaultConfig, loadOfferingOptions, type Lookups } from './generateMissingImages.config';
-import { initLogFile, closeLogFile } from "./logAndReport";
-import type { Transaction } from "mssql";
-import assert from "node:assert";
+import { log as LogNS } from "@pure/svelte/utils";
+import { defaultConfig } from './generateMissingImages.config';
+import { closeLogFile, initLogFile } from "./logAndReport";
+import { buildPromptFingerprintImageMapAndInitFingerprintCache, GLOBAL_PROMPT_FINGERPRINT_CACHE, loadLookups, loadOfferingImagesAndInitImageCache, loadOfferings, loadOfferingsAndConvertToOfferingsWithGenerationPlan } from "./loadData";
+import type { OfferingWithGenerationPlan, OfferingWithGenPlanAndImage } from "./imageGenTypes";
 
-const offering = entityOperations.offering;
-const image = entityOperations.image;
 const log = LogNS.log;
 
-const GLOBAL_IMAGE_CACHE: Map<number, domainTypes.Image> = new Map();
 
 /**
  * Entry point
@@ -31,14 +28,16 @@ async function run() {
         let images;
         try {
             await transaction.begin()
-            offerings = await loadOfferings(transaction);
-            log.info(`${offerings.length} offerings loaded`);
-            images = await loadIamges(transaction);
-            // Populate global image cache
-            for (const img of images) {
-                GLOBAL_IMAGE_CACHE.set(img.image_id, img);
-            }
+            images = await loadOfferingImagesAndInitImageCache(transaction);
             log.info(`${images.length} images loaded and cached`);
+            buildPromptFingerprintImageMapAndInitFingerprintCache(images);
+            log.info(`${GLOBAL_PROMPT_FINGERPRINT_CACHE.size} images are in GLOBAL_PROMPT_FINGERPRINT_CACHE`);
+            if (GLOBAL_PROMPT_FINGERPRINT_CACHE.size !== images.length) {
+                throw new Error(`All images in DB should have prompt fingerprints because it is created during image.ts:insert/update. ` +
+                    `=> GLOBAL_PROMPT_FINGERPRINT_CACHE.size should be same as images.lenght`);
+            }
+            offerings = await loadOfferingsAndConvertToOfferingsWithGenerationPlan(transaction, images);
+            log.info(`${offerings.size} offerings loaded`);
             const lookups = await loadLookups(transaction);
         } catch (e) {
             throw e;
@@ -46,7 +45,7 @@ async function run() {
             await transWRapperNS.rollbackTransaction(transaction);
         }
 
-        for (const offering of offerings) {
+        for (const offering of offerings.values()) {
             await processOffering(offering);
         }
 
@@ -61,109 +60,22 @@ async function run() {
 }
 
 /**
- * Load all lookups needed for image generation.
- * @param transaction 
- * @returns 
- */
-async function loadLookups(transaction: Transaction): Promise<Lookups> {
-    // Load base data (German)
-    const productTypes = await entityOperations.productType.loadProductTypes(transaction);
-    log.debug(`${productTypes.length} productTypes loaded`);
-    const forms = await entityOperations.form.loadForms(transaction);
-    log.debug(`${forms.length} forms loaded`);
-    const materials = await entityOperations.material.loadMaterials(transaction);
-    log.debug(`${materials.length} materials loaded`);
-    const constructionTypes = await entityOperations.constructionType.loadConstructionTypes(transaction);
-    log.debug(`${constructionTypes.length} constructionTypes loaded`);
-    const surfaceFinishes = await entityOperations.surfaceFinish.loadSurfaceFinishes(transaction);
-    log.debug(`${surfaceFinishes.length} surfaceFinishes loaded`);
-
-    // Load English translations
-    const productTypesEN = await entityOperations.productType.loadProductTypes(transaction, undefined, 'en');
-    assert.strictEqual(productTypes.length, productTypesEN.length, `Forms (${productTypes.length}) and formsEN (${productTypesEN.length}) must have the same length`);
-    const formsEN = await entityOperations.form.loadForms(transaction, undefined, 'en');
-    assert.strictEqual(forms.length, formsEN.length, `Forms (${forms.length}) and formsEN (${formsEN.length}) must have the same length`);
-    const materialsEN = await entityOperations.material.loadMaterials(transaction, undefined, 'en');
-    assert.strictEqual(materials.length, materialsEN.length, `Materials (${materials.length}) and materialsEN (${materialsEN.length}) must have the same length`);
-    const constructionTypesEN = await entityOperations.constructionType.loadConstructionTypes(transaction, undefined, 'en');
-    assert.strictEqual(constructionTypes.length, constructionTypesEN.length, `ConstructionTypes (${constructionTypes.length}) and constructionTypesEN (${constructionTypesEN.length}) must have the same length`);
-    const surfaceFinishesEN = await entityOperations.surfaceFinish.loadSurfaceFinishes(transaction, undefined, 'en');
-    assert.strictEqual(surfaceFinishes.length, surfaceFinishesEN.length, `SurfaceFinishes (${surfaceFinishes.length}) and surfaceFinishesEN (${surfaceFinishesEN.length}) must have the same length`);
-
-    // Generate maps
-    const productTypesMap = entityOperations.productType.generateProductTypesMap(productTypes);
-    const formsMap = entityOperations.form.generateFormsMap(forms);
-    const materilasMap = entityOperations.material.generateMaterialsMap(materials);
-    const constructionTypesMap = entityOperations.constructionType.generateConstructionTypesMap(constructionTypes);
-    const surfaceFinishesMap = entityOperations.surfaceFinish.generateSurfaceFinishesMap(surfaceFinishes);
-
-    // Generate English maps
-    const productTypesMapEN = entityOperations.productType.generateProductTypesMap(productTypesEN);
-    const formsMapEN = entityOperations.form.generateFormsMap(formsEN);
-    const materilasMapEN = entityOperations.material.generateMaterialsMap(materialsEN);
-    const constructionTypesMapEN = entityOperations.constructionType.generateConstructionTypesMap(constructionTypesEN);
-    const surfaceFinishesMapEN = entityOperations.surfaceFinish.generateSurfaceFinishesMap(surfaceFinishesEN);
-
-    return {
-        productTypes,
-        forms,
-        materials,
-        constructionTypes,
-        surfaceFinishes,
-
-        productTypesMap,
-        formsMap,
-        materilasMap,
-        constructionTypesMap,
-        surfaceFinishesMap,
-
-        productTypesEN,
-        formsEN,
-        materialsEN,
-        constructionTypesEN,
-        surfaceFinishesEN,
-
-        productTypesMapEN,
-        formsMapEN,
-        materilasMapEN,
-        constructionTypesMapEN,
-        surfaceFinishesMapEN
-    };
-}
-
-/**
  * Check and/or generated image(s) for offering.
  * @param offering 
  */
-async function processOffering(offering: domainTypes.OfferingEnrichedView) {
+async function processOffering(offering: OfferingWithGenerationPlan) {
     // Validate size range - fail fast on invalid data
     // E.g. "S-M"
     validateSizeRange(offering); // Will throw on invalid size
 }
 
 /**
- * Load offerings with config options.
- */
-async function loadOfferings(transaction: Transaction): Promise<domainTypes.OfferingEnrichedView[]> {
-    log.info(`Loading offerings with options: ${JSON.stringify(loadOfferingOptions)}`);
-    const offerings = await offering.loadOfferingsWithOptions(loadOfferingOptions, transaction);
-    return offerings;
-}
-
-async function loadIamges(transaction: Transaction): Promise<domainTypes.Image[]> {
-    log.info(`Loading images`);
-    const images = await image.loadImages(transaction);
-    return images;
-}
-
-
-/**
  * Ensure valid "offering.size".
  * @param size 
  * @returns 
  */
-function validateSizeRange(offering: domainTypes.OfferingEnrichedView): string | null {
-    const size= offering.offeringSize;
+function validateSizeRange(offering: OfferingWithGenerationPlan): string | null {
+    const size = offering.offeringSize;
     if (!size) return null;
 
     // Valid values from DB CHECK constraint

@@ -1,9 +1,9 @@
 import { log } from "$lib/utils/logger";
 import { estimateCost } from "./falAiClient";
-import type { OfferingWithGenPlanAndImage } from "./generateMissingImages";
 import type { ImageGenerationConfig } from "./generateMissingImages.config";
 import * as fs from "fs";
 import * as path from "path";
+import type { OfferingWithGenPlanAndImage } from "./imageGenTypes";
 
 /**
  * Helper: Write to both console and logfile
@@ -81,9 +81,9 @@ export function printRunSummary(processedOfferings: OfferingWithGenPlanAndImage[
   const surfaceWidth = 12;
   const constructionWidth = 12;
   const sizeWith = 7;
-  const dbMatchWidth = 6;    // DB match quality
-  const batchWidth = 7;       // Batch match indicator
-  const scoreWidth = 7;       // Match score column
+  //const dbMatchWidth = 6;    // DB match quality
+  //const batchWidth = 7;       // Batch match indicator
+  //const scoreWidth = 7;       // Match score column
   const imagesWidth = 6;
   const willGenWidth = 8;
   const promptWidth = 200;
@@ -100,9 +100,9 @@ export function printRunSummary(processedOfferings: OfferingWithGenPlanAndImage[
       "│ Surface".padEnd(surfaceWidth + 3) +
       "│ Constr".padEnd(constructionWidth + 3) +
       "│ Size".padEnd(sizeWith + 3) +
-      "│ DB".padEnd(dbMatchWidth + 3) +       // DB match quality
-      "│ Batch".padEnd(batchWidth + 3) +      // Batch match
-      "│ Score".padEnd(scoreWidth + 3) +      // Match score
+      //"│ DB".padEnd(dbMatchWidth + 3) +       // DB match quality
+      //"│ Batch".padEnd(batchWidth + 3) +      // Batch match
+      //"│ Score".padEnd(scoreWidth + 3) +      // Match score
       "│ Imgs".padEnd(imagesWidth + 3) +
       "│ WillGen".padEnd(willGenWidth + 3) +
       "│ Prompt".padEnd(promptWidth + 3) +
@@ -112,49 +112,45 @@ export function printRunSummary(processedOfferings: OfferingWithGenPlanAndImage[
 
   // Print table rows
   for (const item of processedOfferings) {
-    const id = item.offering.offering_id.toString().padEnd(idWidth);
-    const title = (item.offering.title + " - " + item.offering.product_def.title || "Untitled").substring(0, titleWidth).padEnd(titleWidth);
+    const id = item.offeringId.toString().padEnd(idWidth);
+    const title = (item.offeringTitle + " - " + item.productDefTitle || "Untitled").substring(0, titleWidth).padEnd(titleWidth);
 
-    const productTypeFormatted = item.product_type?.name.substring(0, productTypeWith).padEnd(productTypeWith); 
+    const productTypeFormatted = item.productTypeName.substring(0, productTypeWith).padEnd(productTypeWith); 
 
-    // Material with inheritance indicator (*) if inherited from product_def
-    const materialName = item.material?.name || "-";
-    const materialInherited = !item.offering.material && item.material ? "*" : "";
-    const material = (materialName + materialInherited).substring(0, materialWidth).padEnd(materialWidth);
+    // Material 
+    const materialName = item.finalMaterialName || "-";
+    const material = materialName.substring(0, materialWidth).padEnd(materialWidth);
 
-    // Form with inheritance indicator
-    const formName = item.form?.name || "-";
-    const formInherited = !item.offering.form && item.form ? "*" : "";
-    const form = (formName + formInherited).substring(0, formWidth).padEnd(formWidth);
+    // Form 
+    const formName = item.finalFormName || "-";
+    const form = formName.substring(0, formWidth).padEnd(formWidth);
 
-    // Surface Finish with inheritance indicator
-    const surfaceName = item.surface_finish?.name || "-";
-    const surfaceInherited = !item.offering.surface_finish && item.surface_finish ? "*" : "";
-    const surface = (surfaceName + surfaceInherited).substring(0, surfaceWidth).padEnd(surfaceWidth);
+    // Surface 
+    const surfaceName = item.finalSurfaceFinishName || "-";
+    const surface = surfaceName.substring(0, surfaceWidth).padEnd(surfaceWidth);
 
-    // Construction Type with inheritance indicator
-    const constructionName = item.construction_type?.name || "-";
-    const constructionInherited = !item.offering.construction_type && item.construction_type ? "*" : "";
-    const construction = (constructionName + constructionInherited).substring(0, constructionWidth).padEnd(constructionWidth);
+    // Construction Type 
+    const constructionName = item.finalConstructionTypeName || "-";
+    const construction = constructionName.substring(0, constructionWidth).padEnd(constructionWidth);
 
-    let formattedSize = item.offering.size || "-";
+    let formattedSize = item.offeringSize || "-";
     formattedSize = formattedSize.padEnd(sizeWith);
 
-    // DB match quality (from initial DB scan)
-    const dbMatchQuality = item.match_quality === "exact" ? "✅" : item.match_quality === "generic_fallback" ? "🔄" : "❌";
-    const dbMatchFormatted = dbMatchQuality.padEnd(dbMatchWidth);
+    // // DB match quality (from initial DB scan)
+    // const dbMatchQuality = item.match_quality === "exact" ? "✅" : item.match_quality === "generic_fallback" ? "🔄" : "❌";
+    // const dbMatchFormatted = dbMatchQuality.padEnd(dbMatchWidth);
 
-    // Batch match (matched during batch processing - either DB or placeholder)
-    const batchMatch = (!item.willGenerate && item.matchedInBatch) ? "✅" : "-";
-    const batchFormatted = batchMatch.padEnd(batchWidth);
+    // // Batch match (matched during batch processing - either DB or placeholder)
+    // const batchMatch = (!item.willGenerate && item.matchedInBatch) ? "✅" : "-";
+    // const batchFormatted = batchMatch.padEnd(batchWidth);
 
-    // Match score (0.0-1.0, formatted as percentage)
-    const scoreFormatted = item.match_score !== null
-      ? `${(item.match_score * 100).toFixed(0)}%`.padEnd(scoreWidth)
-      : "-".padEnd(scoreWidth);
+    // // Match score (0.0-1.0, formatted as percentage)
+    // const scoreFormatted = item.match_score !== null
+    //   ? `${(item.match_score * 100).toFixed(0)}%`.padEnd(scoreWidth)
+    //   : "-".padEnd(scoreWidth);
 
     // Available images count
-    const imagesCount = item.available_images.length.toString().padEnd(imagesWidth);
+    const imagesCount = item.images?.length.toString().padEnd(imagesWidth);
 
     // Will generate flag
     const willGenIcon = item.willGenerate ? "✅" : "⏭️";
@@ -167,26 +163,19 @@ export function printRunSummary(processedOfferings: OfferingWithGenPlanAndImage[
     const imageUrlFormatted = item.imageUrl.substring(0, imageUrlWidth).padEnd(imageUrlWidth);
 
     logBoth(
-      `│ ${id} │ ${title} │ ${productTypeFormatted} │ ${material} │ ${form} │ ${surface} │ ${construction} │ ${formattedSize} | ${dbMatchFormatted} │ ${batchFormatted} │ ${scoreFormatted} │ ${imagesCount} │ ${willGenFormatted} │ ${promptFormatted} │ ${filePathFormatted} │ ${imageUrlFormatted}`
+      `│ ${id} │ ${title} │ ${productTypeFormatted} │ ${material} │ ${form} │ ${surface} │ ${construction} │ ${formattedSize} | │ ${imagesCount} │ ${willGenFormatted} │ ${promptFormatted} │ ${filePathFormatted} │ ${imageUrlFormatted}`
     );
 
     // Log full details if verbose
     if (config.verbose) {
       log.info(`  Offering Details:`, {
-        offering_id: item.offering.offering_id,
-        product_def: item.product_def.title,
-        material: item.material?.name || "none",
-        material_inherited: !item.offering.material && item.material,
-        form: item.form?.name || "none",
-        form_inherited: !item.offering.form && item.form,
-        surface_finish: item.surface_finish?.name || "none",
-        surface_inherited: !item.offering.surface_finish && item.surface_finish,
-        construction_type: item.construction_type?.name || "none",
-        construction_inherited: !item.offering.construction_type && item.construction_type,
-        db_match_quality: item.match_quality,
-        batch_matched: item.matchedInBatch,
-        match_score: item.match_score !== null ? item.match_score.toFixed(2) : "none",
-        available_images: item.available_images.length,
+        offering_id: item.offeringId,
+        product_def: item.productDefTitle,
+        material: item.finalMaterialName || "none",
+        form: item.finalFormName || "none",
+        surface_finish: item.finalSurfaceFinishName || "none",
+        construction_type: item.finalConstructionTypeName || "none",
+        available_images: item.images?.length,
         full_prompt: prompt,
       });
     }

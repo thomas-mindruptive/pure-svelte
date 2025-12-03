@@ -9,7 +9,7 @@
  * - What style/quality to use (prompt settings)
  */
 
-import { entityOperations, imageMatching} from "@pure/svelte/backend-queries";
+import { entityOperations } from "@pure/svelte/backend-queries";
 import { domainTypes } from "@pure/svelte/domain";
 
 
@@ -83,11 +83,6 @@ export interface ImageGenerationConfig {
      */
     require_exact_match?: boolean;
   };
-
-  /**
-   * Configuration for image matching behavior
-   */
-  matching?: Partial<imageMatching.ImageMatchConfig>;
 
   /**
    * Image generation settings (fal.ai)
@@ -204,38 +199,6 @@ export const defaultConfig: ImageGenerationConfig = {
     require_exact_match: true,
   },
 
-  matching: {
-    // Fields that MUST match exactly (images with different values are unusable)
-    // Note: product_type is NOT a variant field - all images in a product_def share the same type via category
-    required_fields: ["construction_type_id", "material_id", "form_id", "surface_finish_id"],
-
-    // Optional fields with scoring weights (nice-to-have but not critical)
-    optional_fields: {
-      color_variant: 0.6, // Color variant somewhat important ("pink" vs "deep pink")
-      size: 0.4, // Size less important ("5cm" vs "6cm" visually similar)
-    },
-
-    // Need at least 50% match on optional fields
-    min_optional_score: 0.5,
-
-    // NULL handling - strict mode!
-    null_behavior: {
-      image_null_is_wildcard: false, // NULL in image does NOT match everything
-      offering_null_accepts_all: true, // NULL in offering can accept any value
-    },
-
-    // Size matching score configuration
-    size_matching_scores: {
-      exact_match: 1.0,           // "S" == "S" or "S-M" == "S-M" (100%)
-      single_in_range: 0.8,       // "S" in "S-M" (80%)
-      range_fully_covered: 0.9,   // "S-M" fully in "S-L" (90%)
-      range_overlap_high: 0.6,    // >=50% overlap (60%)
-      range_overlap_low: 0.3      // <50% overlap (30%)
-    },
-
-    // Enable verbose matching logs for debugging
-    verbose_logging: false,
-  },
 
   generation: {
     // Save images to this directory (adjust as needed)
@@ -334,10 +297,6 @@ export async function loadConfig(): Promise<ImageGenerationConfig> {
     filters: {
       ...defaultConfig.filters,
       ...cliArgs.filters,
-    },
-    matching: {
-      ...defaultConfig.matching,
-      ...cliArgs.matching,
     },
     generation: {
       ...defaultConfig.generation,

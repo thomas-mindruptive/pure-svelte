@@ -37,13 +37,13 @@ export type LoadOfferingImagesOptions = {
  * Uses the view_offering_images view to join offering_images with images.
  *
  * @param transaction - Optional database transaction (null = create own transaction)
- * @param offeringId - The offering_id to load images for
+ * @param offeringId - The offering_id to load images for or undefined for all
  * @param options - Optional filters (e.g., is_explicit)
  * @returns Array of OfferingImageWithJunction records
  */
 export async function loadOfferingImages(
   transaction: Transaction | null,
-  offeringId: number,
+  offeringId?: number,
   options?: LoadOfferingImagesOptions
 ): Promise<OfferingImageWithJunction[]> {
   log.debug("loadOfferingImages", { offeringId, options });
@@ -55,11 +55,14 @@ export async function loadOfferingImages(
     let query = `
       SELECT *
       FROM dbo.view_offering_images oi
-      WHERE oi.offering_id = @offeringId
     `;
 
     const request = transWrapper.request();
-    request.input('offeringId', offeringId);
+
+    if(offeringId) {
+      query += ` WHERE oi.offering_id = @offeringId`;
+      request.input('offeringId', offeringId);
+    }
 
     if (options?.is_explicit !== undefined) {
       query += ` AND oi.explicit = @isExplicit`;

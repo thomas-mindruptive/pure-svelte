@@ -19,18 +19,20 @@ import type {
   ProductType,
 } from "../../src/lib/domain/domainTypes.js";
 import type { ImageGenerationConfig } from "./generateMissingImages.config.js";
-import type { OfferingWithGenerationPlan, OfferingWithGenPlanAndImage } from "./generateMissingImages.js";
+import type { OfferingWithGenerationPlan } from "./imageGenTypes.js";
 
 export function buildPrompt(item: OfferingWithGenerationPlan, config: ImageGenerationConfig["prompt"]) {
   assertDefined(item, "item");
   return _buildPrompt(
-    item.offering,
+    item.offeringId,
+    item.offeringSize,
     null,
-    item.material,
-    item.form,
-    item.surface_finish,
-    item.construction_type,
-    item.product_type,
+    item.finalMaterialName,
+    item.finalFormName,
+    item.finalSurfaceFinishName,
+    item.finalConstructionTypeName,
+    item.productTypeName,
+    null,
     config,
   );
 }
@@ -39,13 +41,15 @@ export function buildPrompt(item: OfferingWithGenerationPlan, config: ImageGener
  * Builds a fal.ai prompt from offering and lookup data
  */
 function _buildPrompt(
-  offering: WholesalerItemOffering,
-  productDef: ProductDefinition | null,
-  material: Material | null,
-  form: Form | null,
-  surfaceFinish: SurfaceFinish | null,
-  constructionType: ConstructionType | null,
-  productType: ProductType | null,
+  offeringId: number,
+  size: string | null | undefined,
+  productDef: string | null,
+  material: string | null| undefined,
+  form: string | null| undefined,
+  surfaceFinish: string | null| undefined,
+  constructionType: string | null| undefined,
+  productType: string | null| undefined,
+  color: string | null| undefined,
   config: ImageGenerationConfig["prompt"],
 ): string {
   const parts: string[] = [];
@@ -60,24 +64,24 @@ function _buildPrompt(
   }
 
   // 2. Product Type (e.g., "bracelet", "necklace", "pendant")
-  if (productType?.name) {
-    parts.push(productType.name.toLowerCase());
+  if (productType) {
+    parts.push(productType.toLowerCase());
   }
 
   // 3. Material
-  if (material?.name) {
-    const materialText = material.name.toLowerCase();
+  if (material) {
+    const materialText = material.toLowerCase();
     parts.push(materialText);
   }
 
   // 4. Form
-  if (form?.name) {
-    parts.push(form.name.toLowerCase());
+  if (form) {
+    parts.push(form.toLowerCase());
   }
 
   // 5. Size (if available)
-  if (offering?.size) {
-    switch (offering.size) {
+  if (size) {
+    switch (size) {
       case "XS":
         parts.push(`'size extra small'`);
         break;
@@ -142,23 +146,23 @@ function _buildPrompt(
         parts.push(`'size extra large'`);
         break;
       default:
-        throw new Error(`Invalid size in offering: ${offering.offering_id}, ${offering.title}`);
+        throw new Error(`Invalid size in offering: ${offeringId}`);
     }
   }
 
   // 6. Surface finish
-  if (surfaceFinish?.name) {
-    parts.push(surfaceFinish.name.toLowerCase());
+  if (surfaceFinish) {
+    parts.push(surfaceFinish.toLowerCase());
   }
 
   // 7. Construction type (if relevant)
-  if (constructionType?.name) {
-    parts.push(constructionType.name.toLowerCase());
+  if (constructionType) {
+    parts.push(constructionType.toLowerCase());
   }
 
   // 8. Color variant (if specified)
-  if (offering?.color_variant) {
-    parts.push(`${offering.color_variant.toLowerCase()} variant`);
+  if (color) {
+    parts.push(`${color.toLowerCase()}`);
   }
 
   // 9. Background setting

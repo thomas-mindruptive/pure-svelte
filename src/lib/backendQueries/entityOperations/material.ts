@@ -25,7 +25,7 @@ export async function loadMaterials(
   
   const completePayload: QueryPayload<Material> = {
     from: { table: tableName as "dbo.materials", alias: "m" },
-    select: genTypedQualifiedColumns(MaterialSchema, true),
+    select: genTypedQualifiedColumns(MaterialSchema, false),    // // IMPORTANT: set second param to false! Otherwise we mus referenece the properties through "m.prop"!!!
     ...(payload?.where && { where: payload.where }),
     ...(payload?.limit && { limit: payload.limit }),
     ...(payload?.offset && { offset: payload.offset }),

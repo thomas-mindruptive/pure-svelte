@@ -25,7 +25,7 @@ export async function loadForms(
   
   const completePayload: QueryPayload<Form> = {
     from: { table: tableName as "dbo.forms", alias: "f" },
-    select: genTypedQualifiedColumns(FormSchema, true),
+    select: genTypedQualifiedColumns(FormSchema, false), // IMPORTANT: set second param to false! Otherwise we mus referenece the properties through "f.prop"!!!
     ...(payload?.where && { where: payload.where }),
     ...(payload?.limit && { limit: payload.limit }),
     ...(payload?.offset && { offset: payload.offset }),

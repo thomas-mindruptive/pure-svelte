@@ -25,7 +25,7 @@ export async function loadProductTypes(
   
   const completePayload: QueryPayload<ProductType> = {
     from: { table: tableName as "dbo.product_types", alias: "pt" },
-    select: genTypedQualifiedColumns(ProductTypeSchema, true),
+    select: genTypedQualifiedColumns(ProductTypeSchema, false), // IMPORTANT: set second param to false! Otherwise we mus referenece the properties through "pt.prop"!!!
     ...(payload?.where && { where: payload.where }),
     ...(payload?.limit && { limit: payload.limit }),
     ...(payload?.offset && { offset: payload.offset }),

@@ -2,6 +2,8 @@
  * Generic utility functions for creating Maps from arrays.
  */
 
+import { assertDefined } from "$lib/utils/assertions";
+
 /**
  * Generates a Map from an array of data using a key extractor function.
  * 
@@ -9,6 +11,7 @@
  * @param data - Array of items to convert to a Map
  * @param keyExtractor - Function that extracts the numeric key from each item
  * @returns Map with numeric keys and values of type T
+ * @throws Error if key is undefined or null.
  * 
  * @example
  * const materials: Material[] = [...];
@@ -22,6 +25,7 @@ export function generateMapFromData<T>(
   const map = new Map<number, T>();
   for (const item of data) {
     const key = keyExtractor(item);
+    assertDefined(key, "key");
     map.set(key, item);
   }
   return map;

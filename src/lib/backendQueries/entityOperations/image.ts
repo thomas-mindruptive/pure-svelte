@@ -427,7 +427,7 @@ export async function loadImages(
     // 1. Define fixed base query
     const basePayload: QueryPayload<Image> = {
       from: { table: "dbo.images", alias: "img" },
-      select: genTypedQualifiedColumns(ImageSchema, true)
+      select: genTypedQualifiedColumns(ImageSchema, false) // IMPORTANT: set second param to false! Otherwise we mus referenece the properties through "img.prop"!!!
     };
 
     // 2. Merge payload (WHERE, LIMIT, custom ORDER BY override base)

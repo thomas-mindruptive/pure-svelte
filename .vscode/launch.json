@@ -5,7 +5,7 @@
         "type": "node",
         "request": "launch",
         "name": "Generate Images",
-        "program": "${workspaceFolder}/tools/dist/tools/images/genImagest.js",
+        "program": "${workspaceFolder}/tools/dist/tools/images/genImages.js",
         "cwd": "${workspaceFolder}",
         "envFile": "${workspaceFolder}/.env",
         "sourceMaps": true,

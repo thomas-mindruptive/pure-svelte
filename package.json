@@ -38,7 +38,7 @@
 		"scaffold:page": "npm run tools:build && node tools/dist/tools/scaffold-page.js",
 		"parse-ddl": "npm run tools:build && node tools/dist/tools/parse-ddl.js",
 		"/// --- IMAGES ---": "",
-		"img:gen": "cls && node tools/dist/tools/images/genImagest.js",
+		"img:gen": "cls && node tools/dist/tools/images/genImages.js",
 		"img:buildAndGen": "cls && npm run tools:build && node tools/dist/tools/images/generateMissingImages.js",
 		"img:genProd": "npm run img:gen -- --no-dry-run",
 		"// --- ANALYSIS TOOL SCRIPTS ---": "",

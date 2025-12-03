@@ -69,7 +69,7 @@ async function run() {
  * Check and/or generated image(s) for offering.
  * @param offering 
  */
-async function processOffering(offering: OfferingWithGenerationPlan, config: ImageGenerationConfig , lookups: Lookups,  transaction: Transaction) {
+async function processOffering(offering: OfferingWithGenerationPlan, config: ImageGenerationConfig, lookups: Lookups, transaction: Transaction) {
     assertions.assertDefined(offering, "offering");
     assertions.assertDefined(config, "config");
 
@@ -79,7 +79,7 @@ async function processOffering(offering: OfferingWithGenerationPlan, config: Ima
 
     if (0 === offering.images?.length) {
         offering.prompt = buildPrompt(offering, config["prompt"], lookups);
-        offering.imageUrl= await generateImage(offering.prompt, config["generation"]);
+        offering.imageUrl = await generateImage(offering.prompt, config["generation"]);
         await generateAndSaveImage(offering, config, transaction);
     }
 }
@@ -90,7 +90,7 @@ async function processOffering(offering: OfferingWithGenerationPlan, config: Ima
  * @param offering InOut!
  * @param config 
  */
-async function generateAndSaveImage(offering: OfferingWithGenerationPlan, config: ImageGenerationConfig,  transaction: Transaction) {
+async function generateAndSaveImage(offering: OfferingWithGenerationPlan, config: ImageGenerationConfig, transaction: Transaction) {
     assertions.assertDefined(offering, "offering");
     assertions.assertDefined(offering.imageUrl, "offering.imageUrl");
     assertions.assertDefined(offering.prompt, "offering.prompt");
@@ -101,7 +101,7 @@ async function generateAndSaveImage(offering: OfferingWithGenerationPlan, config
     const absImgBaseDir = genAbsImgDirName(config.generation.image_directory, offering);
     let filepath = "DRY - " + path.join(absImgBaseDir, filename);
     if (!config.generation.dry_run) {
-      filepath = await downloadAndSaveImage(offering.imageUrl, filename, absImgBaseDir);
+        filepath = await downloadAndSaveImage(offering.imageUrl, filename, absImgBaseDir, config.generation.dry_run);
     }
     log.info(`  ├─ Saved: ${filepath}`);
     offering.filePath = filepath;
@@ -110,15 +110,15 @@ async function generateAndSaveImage(offering: OfferingWithGenerationPlan, config
         offering_id: offering.offeringId,
         filepath: offering.filePath,
         explicit: false  // We generated the new imgage => It is NOT explicit.
-      };
-      
+    };
+
     const wio: domainTypes.WholesalerItemOffering = {
         // Pflichtfelder
         offering_id: offering.offeringId,
         wholesaler_id: offering.wholesalerId,
         category_id: offering.categoryId,
         product_def_id: offering.productDefId,
-        
+
         // Gemappte Felder aus OfferingEnrichedView
         material_id: offering.finalMaterialId ?? null,
         form_id: offering.finalFormId ?? null,
@@ -139,7 +139,7 @@ async function generateAndSaveImage(offering: OfferingWithGenerationPlan, config
         quality: offering.offeringQuality ?? null,
         color_variant: offering.offeringColorVariant ?? null,
         wholesaler_price: offering.offeringWholesalerPrice ?? null,
-        
+
         // Felder, die nicht in OfferingEnrichedView vorhanden sind
         sub_seller: null,
         wholesaler_article_number: null,
@@ -152,8 +152,11 @@ async function generateAndSaveImage(offering: OfferingWithGenerationPlan, config
         shopify_price: null,
         shopify_synced_at: null,
         created_at: undefined, // Optional, kann undefined sein
-      };
-    await entityOperations.offeringImage.insertOfferingImageFromOffering(transaction, offeringImageForDB, wio);
+    };
+
+    if (!config.generation.dry_run) {
+        await entityOperations.offeringImage.insertOfferingImageFromOffering(transaction, offeringImageForDB, wio);
+    }
 }
 
 /**

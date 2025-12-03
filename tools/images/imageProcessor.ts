@@ -24,11 +24,12 @@ const log = LogNS.log;
 export async function downloadAndSaveImage(
   imageUrl: string,
   filename: string,
-  dir: string
+  dir: string,
+  dryRun = false
 ): Promise<string> {
-   assertions.assertDefined(imageUrl, "imageUrl");
-   assertions.assertDefined(filename, "filename");
-   assertions.assertDefined(dir, "dir");
+  assertions.assertDefined(imageUrl, "imageUrl");
+  assertions.assertDefined(filename, "filename");
+  assertions.assertDefined(dir, "dir");
 
   log.info(`  ├─ Downloading image...`);
 
@@ -40,25 +41,25 @@ export async function downloadAndSaveImage(
     }
 
     // Download image
-    const response = await fetch(imageUrl);
+    const filePath = path.join(dir, filename);
+    if (!dryRun) {
+      const response = await fetch(imageUrl);
 
-    if (!response.ok) {
-      throw new Error(`Failed to download image: HTTP ${response.status}`);
+      if (!response.ok) {
+        throw new Error(`Failed to download image: HTTP ${response.status}`);
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
+      // Save to disk
+      await fs.writeFile(filePath, buffer);
+
+      const sizeKB = (buffer.length / 1024).toFixed(1);
+      log.info(`  ├─ Saved to: ${filePath} (${sizeKB} KB)`);
     }
 
-    const arrayBuffer = await response.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    // Build absolute filepath
-    const filepath = path.join(dir, filename);
-
-    // Save to disk
-    await fs.writeFile(filepath, buffer);
-
-    const sizeKB = (buffer.length / 1024).toFixed(1);
-    log.info(`  ├─ Saved to: ${filepath} (${sizeKB} KB)`);
-
-    return filepath;
+    return filePath;
 
   } catch (error: any) {
     log.error(`  ✗ Download error: ${error.message || String(error)}`);

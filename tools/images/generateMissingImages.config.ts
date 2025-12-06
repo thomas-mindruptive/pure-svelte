@@ -35,6 +35,7 @@ export const loadOfferingWhereConditions: queryGrammar.WhereConditionGroup<domai
   whereCondOp: "AND",
   conditions: [
     { key: "wholesalerId", whereCondOp: "IN", val: [99] },
+    { key: "categoryId", whereCondOp: "NOT IN", val: [26] },
     // { key: "productTypeId", whereCondOp: "IN", val: [11] } // Semi-precious Stone
   ]
 }
@@ -216,7 +217,7 @@ export const defaultConfig: ImageGenerationConfig = {
 
   log: {
     // Path to log file
-    logfile: "C:/dev/pureenergyworks/pure-svelte/log/genImageLog.txt",
+    logfile: "C:/dev/pure/pure-svelte/log/genImageLog.txt",
 
     // Delete log file before each run (fresh log)
     deleteLogfile: true,

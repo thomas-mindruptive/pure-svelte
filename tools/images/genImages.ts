@@ -9,8 +9,8 @@ import { defaultConfig, type ImageGenerationConfig } from './generateMissingImag
 import type { Lookups, OfferingWithGenerationPlan } from "./imageGenTypes";
 import { downloadAndSaveImage } from "./imageProcessor";
 import { buildPromptFingerprintImageMapAndInitFingerprintCache, GLOBAL_IMAGE_CACHE, GLOBAL_PROMPT_FINGERPRINT_CACHE, loadLookups, loadOfferingImagesAndInitImageCache, loadOfferingsAndConvertToOfferingsWithGenerationPlan } from "./loadData";
-import { closeLogFile, initLogFile } from "./logAndReport";
 import { buildPrompt } from "./promptBuilder";
+import { closeLogFile, initLogFile, logBothHeader, printRunSummary } from "./logAndReport";
 
 const log = LogNS.log;
 
@@ -19,6 +19,7 @@ const log = LogNS.log;
  * Entry point
  */
 async function run() {
+    log.infoHeader(`Begin image gen`);
     // Initialize log file
     initLogFile(defaultConfig.log.logfile, defaultConfig.log.deleteLogfile);
 
@@ -34,22 +35,26 @@ async function run() {
         let images;
         try {
             await transaction.begin()
+            logBothHeader(`Loading offering images`);
             images = await loadOfferingImagesAndInitImageCache(transaction);
             log.info(`${images.length} images loaded and cached`);
+            logBothHeader(`Build fingerprint map`);
             buildPromptFingerprintImageMapAndInitFingerprintCache(images);
             log.info(`${GLOBAL_PROMPT_FINGERPRINT_CACHE.size} images are in GLOBAL_PROMPT_FINGERPRINT_CACHE`);
             if (GLOBAL_PROMPT_FINGERPRINT_CACHE.size !== images.length) {
                 throw new Error(`All images in DB should have prompt fingerprints because it is created during image.ts:insert/update. ` +
                     `=> GLOBAL_PROMPT_FINGERPRINT_CACHE.size should be same as images.lenght`);
             }
+            logBothHeader(`Loading offerings`);
             offerings = await loadOfferingsAndConvertToOfferingsWithGenerationPlan(transaction, images);
             log.info(`${offerings.size} offerings loaded`);
             const lookups = await loadLookups(transaction);
+            logBothHeader(`Processing offerings`);
             for (const offering of offerings.values()) {
                 await processOffering(offering, defaultConfig, lookups, transaction);
             }
-
-            closeLogFile();
+            printRunSummary(Array.from(offerings.values()), defaultConfig);
+            await closeLogFile();
             process.exit(0);
 
         } catch (e) {
@@ -60,7 +65,7 @@ async function run() {
     }
     catch (e) {
         log.error(e);
-        closeLogFile();
+        await closeLogFile();
         process.exit(0);
     }
 }
@@ -144,31 +149,6 @@ async function generateAndSaveImage(
     return offeringImage;
 }
 
-// /**
-//  * Create an OfferingImage in memory.
-//  * @param offering 
-//  * @param image 
-//  * @returns 
-//  */
-// function createInMemOfferingImageView(offering: OfferingWithGenerationPlan, image: Partial<domainTypes.Image>): domainTypes.OfferingImageView {
-//     const promptFingerprint = createPromptFingerprint(domainTypes.ImageSchema, image as any);
-//     if (!promptFingerprint) {
-//         log.warn(`Could not calculate fingerprint for offering ${offering.offeringId}`);
-//     }
-//     const offeringImageView = {
-//         ...image,
-//         prompt_fingerprint: promptFingerprint ?? null,
-//         // Junction fields (temporary IDs for in-memory)
-//         offering_image_id: -1, // Temporary ID (not in DB yet)
-//         offering_id: offering.offeringId,
-//         image_id: -1, // Temporary ID (not in DB yet)
-//         is_primary: false,
-//         sort_order: 0,
-//     };
-
-//     return offeringImageView;
-// }
-
 /**
  * Ensure valid "offering.size".
  * @param size 
@@ -213,17 +193,19 @@ export function validateOfferingFields(offering: OfferingWithGenerationPlan) {
     assertions.assertDefined(offering.productTypeName, `offering.productTypeName - ${offeringDescription}`)
     assertions.assertDefined(offering.finalFormName, `offering.finalFormName - ${offeringDescription}`)
     assertions.assertDefined(offering.finalMaterialName, `offering.finalMaterialName - ${offeringDescription}`)
-  
+
     if (1 === offering.productTypeId   // Necklace
-      || 2 === offering.productTypeId) // Bracelet
-      {
+        || 2 === offering.productTypeId) // Bracelet
+    {
         assertions.assertDefined(offering.finalConstructionTypeName, `offering.finalConstructionTypeName - ${offeringDescription}`);
         assertions.assertDefined(offering.finalSurfaceFinishName, `offering.finalSurfaceFinishName - ${offeringDescription}`);
-      }
+    }
 }
 
 /**
  * Start.
  */
 (async () => await run())();
+
+
 

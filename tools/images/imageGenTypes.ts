@@ -8,12 +8,6 @@ export interface OfferingWithGenerationPlan extends domainTypes.OfferingEnriched
     prompt?: string;
 }
 
-export interface OfferingWithGenPlanAndImage extends OfferingWithGenerationPlan {
-    filePath: string;
-    imageUrl: string;
-    prompt: string;
-}
-
 /**
  * Lookups needed for creating an image.
  * We use the Englisch names because AI image gen is better with English.

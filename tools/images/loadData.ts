@@ -105,12 +105,6 @@ export async function loadOfferings(transaction: Transaction): Promise<domainTyp
     return offerings;
 }
 
-// export async function loadIamges(transaction: Transaction): Promise<domainTypes.Image[]> {
-//     log.info(`Loading images`);
-//     const images = await image.loadImages(transaction);
-//     return images;
-// }
-
 export async function loadOfferingImagesAndInitImageCache(transaction: Transaction): Promise<domainTypes.OfferingImageView[]> {
     log.info(`Loading offering images`);
     const images = await offeringImage.loadOfferingImages(transaction);

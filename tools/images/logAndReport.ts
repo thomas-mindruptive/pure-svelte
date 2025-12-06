@@ -3,7 +3,8 @@ import { estimateCost } from "./falAiClient";
 import type { ImageGenerationConfig } from "./generateMissingImages.config";
 import * as fs from "fs";
 import * as path from "path";
-import type { OfferingWithGenPlanAndImage } from "./imageGenTypes";
+import type { OfferingWithGenerationPlan } from "./imageGenTypes";
+
 
 /**
  * Helper: Write to both console and logfile
@@ -41,29 +42,48 @@ export function initLogFile(logfilePath: string, deleteBeforeWrite: boolean): vo
   }
 }
 
-export function closeLogFile(): void {
-  if (logFileStream) {
-    const timestamp = new Date().toISOString();
-    logFileStream.write(`\n${"=".repeat(80)}\n`);
-    logFileStream.write(`Session ended: ${timestamp}\n`);
-    logFileStream.write(`${"=".repeat(80)}\n\n`);
-    logFileStream.end();
-    logFileStream = null;
-  }
+export function closeLogFile(): Promise<void> {
+  return new Promise((resolve) => {
+    if (logFileStream) {
+      const timestamp = new Date().toISOString();
+      logFileStream.write(`\n${"=".repeat(80)}\n`);
+      logFileStream.write(`Session ended: ${timestamp}\n`);
+      logFileStream.write(`${"=".repeat(80)}\n\n`);
+      logFileStream.end(() => {
+        logFileStream = null;
+        resolve();
+      });
+    } else {
+      resolve();
+    }
+  });
 }
 
 
-function logBoth(message: string): void {
-  console.log(message);
-  if (logFileStream) {
-    logFileStream.write(message + "\n");
+export function logBoth(message: string): void {
+  log.info(message);
+  if (logFileStream && logFileStream.writable) {
+    try {
+      logFileStream.write(message + "\n");
+    } catch (error) {
+      log.error(`Failed to write to log file: ${error}`);
+    }
+  } else if (!logFileStream) {
+    throw new Error("logFileStream is null - cannot write to log file");
+  } else if (!logFileStream.writable) {
+    throw new Error("logFileStream is not writable - cannot write to log file");
   }
+}
+
+export function logBothHeader(message: string): void {
+  const sep = `===================================================`;
+  logBoth(`${sep}\n${message}\n${sep}\n`);
 }
 
 /**
  * Print run summary table
  */
-export function printRunSummary(processedOfferings: OfferingWithGenPlanAndImage[], config: ImageGenerationConfig) {
+export function printRunSummary(processedOfferings: OfferingWithGenerationPlan[], config: ImageGenerationConfig) {
   const willGenerate = processedOfferings.filter((o) => o.willGenerate);
   const willSkip = processedOfferings.filter((o) => !o.willGenerate);
 
@@ -93,21 +113,21 @@ export function printRunSummary(processedOfferings: OfferingWithGenPlanAndImage[
   // Print table header
   logBoth(
     "│ ID".padEnd(idWidth + 3) +
-      "│ Title".padEnd(titleWidth + 3) +
-      "│ ProductType".padEnd(productTypeWith + 3) +
-      "│ Material".padEnd(materialWidth + 3) +
-      "│ Form".padEnd(formWidth + 3) +
-      "│ Surface".padEnd(surfaceWidth + 3) +
-      "│ Constr".padEnd(constructionWidth + 3) +
-      "│ Size".padEnd(sizeWith + 3) +
-      //"│ DB".padEnd(dbMatchWidth + 3) +       // DB match quality
-      //"│ Batch".padEnd(batchWidth + 3) +      // Batch match
-      //"│ Score".padEnd(scoreWidth + 3) +      // Match score
-      "│ Imgs".padEnd(imagesWidth + 3) +
-      "│ WillGen".padEnd(willGenWidth + 3) +
-      "│ Prompt".padEnd(promptWidth + 3) +
-      "│ FilePath".padEnd(filePathWidth + 3) +
-      "│ ImageUrl".padEnd(imageUrlWidth + 3)
+    "│ Title".padEnd(titleWidth + 3) +
+    "│ ProductType".padEnd(productTypeWith + 3) +
+    "│ Material".padEnd(materialWidth + 3) +
+    "│ Form".padEnd(formWidth + 3) +
+    "│ Surface".padEnd(surfaceWidth + 3) +
+    "│ Constr".padEnd(constructionWidth + 3) +
+    "│ Size".padEnd(sizeWith + 3) +
+    //"│ DB".padEnd(dbMatchWidth + 3) +       // DB match quality
+    //"│ Batch".padEnd(batchWidth + 3) +      // Batch match
+    //"│ Score".padEnd(scoreWidth + 3) +      // Match score
+    "│ Imgs".padEnd(imagesWidth + 3) +
+    "│ WillGen".padEnd(willGenWidth + 3) +
+    "│ Prompt".padEnd(promptWidth + 3) +
+    "│ FilePath".padEnd(filePathWidth + 3) +
+    "│ ImageUrl".padEnd(imageUrlWidth + 3)
   );
 
   // Print table rows
@@ -115,7 +135,7 @@ export function printRunSummary(processedOfferings: OfferingWithGenPlanAndImage[
     const id = item.offeringId.toString().padEnd(idWidth);
     const title = (item.offeringTitle + " - " + item.productDefTitle || "Untitled").substring(0, titleWidth).padEnd(titleWidth);
 
-    const productTypeFormatted = item.productTypeName.substring(0, productTypeWith).padEnd(productTypeWith); 
+    const productTypeFormatted = item.productTypeName.substring(0, productTypeWith).padEnd(productTypeWith);
 
     // Material 
     const materialName = item.finalMaterialName || "-";
@@ -157,10 +177,10 @@ export function printRunSummary(processedOfferings: OfferingWithGenPlanAndImage[
     const willGenFormatted = willGenIcon.padEnd(willGenWidth);
 
     const prompt = item.prompt;
-    const promptFormatted = prompt.substring(0, promptWidth).padEnd(promptWidth);
+    const promptFormatted = prompt?.substring(0, promptWidth).padEnd(promptWidth);
 
-    const filePathFormatted = item.filePath.substring(0, filePathWidth).padEnd(filePathWidth);
-    const imageUrlFormatted = item.imageUrl.substring(0, imageUrlWidth).padEnd(imageUrlWidth);
+    const filePathFormatted = item.filePath?.substring(0, filePathWidth).padEnd(filePathWidth);
+    const imageUrlFormatted = item.imageUrl?.substring(0, imageUrlWidth).padEnd(imageUrlWidth);
 
     logBoth(
       `│ ${id} │ ${title} │ ${productTypeFormatted} │ ${material} │ ${form} │ ${surface} │ ${construction} │ ${formattedSize} | │ ${imagesCount} │ ${willGenFormatted} │ ${promptFormatted} │ ${filePathFormatted} │ ${imageUrlFormatted}`

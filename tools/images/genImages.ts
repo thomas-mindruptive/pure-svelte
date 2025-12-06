@@ -8,9 +8,9 @@ import { genAbsImgDirName, generateImageFilename } from "./fileUtils";
 import { defaultConfig, type ImageGenerationConfig } from './generateMissingImages.config';
 import type { Lookups, OfferingWithGenerationPlan } from "./imageGenTypes";
 import { downloadAndSaveImage } from "./imageProcessor";
-import { buildPromptFingerprintImageMapAndInitFingerprintCache, GLOBAL_IMAGE_CACHE, GLOBAL_PROMPT_FINGERPRINT_CACHE, loadLookups, loadOfferingImagesAndInitImageCache, loadOfferingsAndConvertToOfferingsWithGenerationPlan } from "./loadData";
+import { buildPromptFingerprintImageMapAndInitFingerprintCache, GLOBAL_IMAGE_CACHE, GLOBAL_PROMPT_FINGERPRINT_CACHE, loadLookups, loadOfferingImagesAndInitImageCache, loadOfferingsAndConvertToOfferingsWithGenerationPlan as loadOfferingsAndConvToOfferingsWithGenPlan } from "./loadData";
 import { buildPrompt } from "./promptBuilder";
-import { closeLogFile, initLogFile, logBothHeader, printRunSummary } from "./logAndReport";
+import { closeLogFile, initLogFile, logBoth, logBothHeader, printRunSummary } from "./logAndReport";
 
 const log = LogNS.log;
 
@@ -46,7 +46,7 @@ async function run() {
                     `=> GLOBAL_PROMPT_FINGERPRINT_CACHE.size should be same as images.lenght`);
             }
             logBothHeader(`Loading offerings`);
-            offerings = await loadOfferingsAndConvertToOfferingsWithGenerationPlan(transaction, images);
+            offerings = await loadOfferingsAndConvToOfferingsWithGenPlan(transaction, images);
             log.info(`${offerings.size} offerings loaded`);
             const lookups = await loadLookups(transaction);
             logBothHeader(`Processing offerings`);
@@ -86,13 +86,17 @@ async function processOffering(offering: OfferingWithGenerationPlan, config: Ima
     validateOfferingFields(offering);
 
     if (0 === offering.images?.length) {
+        logBoth(`Offering ${offering.offeringId} - ${offering.offeringTitle}: 0 === offering.images.length`);
         offering.images = [];
+        offering.willGenerate = true;
         offering.prompt = buildPrompt(offering, config["prompt"], lookups);
         const image = await generateAndSaveImage(offering, config, transaction);
         offering.images.push(image);
         GLOBAL_IMAGE_CACHE.set(image.offering_image_id, image);
         assertions.assertDefined(image.prompt_fingerprint, "image.prompt_fingerprint");
         GLOBAL_PROMPT_FINGERPRINT_CACHE.set(image.prompt_fingerprint, image);
+    } else {
+        logBoth(`Offering ${offering.offeringId} - ${offering.offeringTitle}: ${offering.images?.length} === offering.images.length`);
     }
 }
 
@@ -137,9 +141,7 @@ async function generateAndSaveImage(
     // offeringImage.insertOfferingImageFromOffering instead of using offeringImage.insertOfferingImage, 
     // which would load offering from DB. Our img gen run hast all infos in memory => No need for DB load.
     const wio = domainUtils.wioFromWioCoalesced(offering);
-
     let offeringImage: domainTypes.OfferingImageView;
-
     if (!config.generation.dry_run) {
         offeringImage = await entityOperations.offeringImage.insertOfferingImageFromOffering(transaction, offeringImageForDB, wio);
     } else {

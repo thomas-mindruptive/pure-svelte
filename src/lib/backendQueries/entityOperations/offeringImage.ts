@@ -21,6 +21,8 @@ import { DeleteCascadeBlockedError } from "./entityErrors";
 import type { DeleteResult } from "./entityOpsResultTypes";
 import { insertImage, loadImageById } from "./image";
 import { loadOfferingCoalesceProdDef } from "./offering";
+import { createPromptFingerprint } from "$lib/domain";
+import { assertDefined } from "$lib/utils/assertions";
 
 /**
  * Options for loading offering images
@@ -106,7 +108,7 @@ export async function insertOfferingImageFromOffering(
       throw error(400, "offering_id is required to create an offering image");
     }
 
-    const imageData = mergeImgageDataFromOffering(inputData, offering);
+    const imageData = mergePartialImgageDataFromOffering(inputData, offering);
 
     // // 1. Create/insert Image (with explicit = true for explicit images)
     // // Merge offering fields with input data (input data takes precedence if provided)
@@ -186,10 +188,13 @@ export async function insertOfferingImageFromOffering(
  * @param offering 
  * @returns a new OfferingImageView object.
  */
-export function mergeImgageDataFromOffering(
-  inputData: Partial<OfferingImageView>, 
+export function mergePartialImgageDataFromOffering(
+  inputData: Partial<OfferingImageView> | undefined,
   offering: WholesalerItemOffering
 ): Partial<Image> {
+
+  inputData = inputData || {};
+
   const imageData: Partial<Image> = {
     // Other image fields from input first
     ...inputData,
@@ -211,7 +216,7 @@ export function mergeImgageDataFromOffering(
     log.warn("mergeImgageDataFromOffering: Validation failed", validation.errors);
     // Still return the data, but log the warning
   }
-  
+
   return validation.isValid ? (validation.sanitized as Partial<Image>) : imageData;
 }
 
@@ -476,4 +481,80 @@ export async function loadOfferingImageById(
     await transWrapper.rollback();
     throw err;
   }
+}
+
+/**
+ * Create an in mem OfferingImage. 
+ * Set offering_image_id = -1 because not yet in DB.
+ * 
+ * @param offeringId 
+ * @param imageId - Specifiy "-1" im image does not yet exist in DB.
+ * @param fileName 
+ * @param filePath 
+ * @param explicit 
+ * @param sortOrder 
+ * @returns 
+ */
+export function createInMemOfferingImage(
+  offering: WholesalerItemOffering,
+  imageId: number,
+  fileName: string,
+  filePath: string,
+  explicit: boolean,
+  sortOrder: number
+): OfferingImageView {
+
+  assertDefined(offering, "offering");
+  assertDefined(imageId, "imageId");
+  assertDefined(fileName, "fileName");
+  assertDefined(filePath, "filePath");
+  assertDefined(explicit, "explicit");
+  assertDefined(sortOrder, "sortOrder");
+
+  const imagePartial = mergePartialImgageDataFromOffering(undefined, offering);
+  const promptFingerprint = createPromptFingerprint(ImageSchema, imagePartial as any);
+  if (!promptFingerprint) {
+    throw new Error(`Could not calculate fingerprint for offering ${offering.offering_id}`);
+  }
+
+  // Create OfferingImageView for in-memory operations
+  // Explicitly extract fields from imagePartial to avoid dependency on mergePartialImgageDataFromOffering implementation
+  const offeringImageView: OfferingImageView = {
+    // Image fields from parameters
+    image_id: imageId,
+    filename: fileName,
+    filepath: filePath,
+    explicit: explicit,
+    prompt_fingerprint: promptFingerprint,
+
+    // Merged fields from offering (explicitly extracted from imagePartial)
+    material_id: imagePartial.material_id ?? null,
+    form_id: imagePartial.form_id ?? null,
+    surface_finish_id: imagePartial.surface_finish_id ?? null,
+    construction_type_id: imagePartial.construction_type_id ?? null,
+    size_range: imagePartial.size_range ?? null,
+    quality_grade: imagePartial.quality_grade ?? null,
+    color_variant: imagePartial.color_variant ?? null,
+    packaging: imagePartial.packaging ?? null,
+
+    // File metadata fields (not available in dry-run, will be set when image is actually created)
+    file_hash: null,
+    file_size_bytes: null,
+    width_px: null,
+    height_px: null,
+    mime_type: null,
+    shopify_url: null,
+    shopify_media_id: null,
+    uploaded_to_shopify_at: null,
+    image_type: null,
+    created_at: undefined,
+
+    // Junction fields
+    offering_image_id: -1, // Temporary ID for in-memory (not in DB yet)
+    offering_id: offering.offering_id,
+    is_primary: false,
+    sort_order: sortOrder,
+  };
+
+  return offeringImageView;
 }

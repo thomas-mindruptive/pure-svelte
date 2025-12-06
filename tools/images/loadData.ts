@@ -3,7 +3,7 @@ import type { domainTypes } from "@pure/svelte/domain";
 import { assertions, log as LogNS } from "@pure/svelte/utils";
 import type { Transaction } from "mssql";
 import assert from "node:assert";
-import { loadOfferingOptions } from './generateMissingImages.config';
+import { loadOfferingOptions, loadOfferingWhereConditions } from './generateMissingImages.config';
 import type { Lookups, OfferingWithGenerationPlan } from "./imageGenTypes";
 import { assertDefined } from "$lib/utils/assertions";
 
@@ -100,7 +100,8 @@ export async function loadLookups(transaction: Transaction): Promise<Lookups> {
  */
 export async function loadOfferings(transaction: Transaction): Promise<domainTypes.OfferingEnrichedView[]> {
     log.info(`Loading offerings with options: ${JSON.stringify(loadOfferingOptions)}`);
-    const offerings = await offering.loadOfferingsWithOptions(loadOfferingOptions, transaction);
+    // const offerings = await offering.loadOfferingsWithOptions(loadOfferingOptions, transaction);
+    const offerings = await offering.loadOfferingsFromEnrichedView(transaction, loadOfferingWhereConditions);
     return offerings;
 }
 

@@ -10,7 +10,9 @@
  */
 
 import { entityOperations } from "@pure/svelte/backend-queries";
-import { domainTypes } from "@pure/svelte/domain";
+import { queryGrammar } from "@pure/svelte/backend-queries";
+import type { domainTypes } from "@pure/svelte/domain";
+//import { domainTypes } from "@pure/svelte/domain";
 
 
 // Type aliases for namespace types
@@ -26,7 +28,15 @@ type LoadOfferingsOptions = entityOperations.offering.LoadOfferingsOptions;
 export const loadOfferingOptions: LoadOfferingsOptions = {
   // excludedWholesalerIds: [99],
   // allowedWholesalerRelevances: ['high', 'medium', 'highest'],
-  allowedWholesalerIds:[99]
+  allowedWholesalerIds: [99]
+}
+
+export const loadOfferingWhereConditions: queryGrammar.WhereConditionGroup<domainTypes.OfferingEnrichedView> = {
+  whereCondOp: "AND",
+  conditions: [
+    { key: "wholesalerId", whereCondOp: "IN", val: [99] },
+    // { key: "productTypeId", whereCondOp: "IN", val: [11] } // Semi-precious Stone
+  ]
 }
 
 /**

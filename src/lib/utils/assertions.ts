@@ -32,12 +32,6 @@ export function assertDefined<T, const Paths extends readonly NonEmptyPath<NonNu
   ...paths: Paths
 ): asserts obj is WithDefinedPaths<NonNullable<T>, Paths>;
 
-// export function assertDefined<T, const Paths extends readonly (readonly PropertyKey[])[]>(
-//   obj: T | null | undefined, 
-//   message: string,
-//   ...paths: Paths
-// ): asserts obj is WithDefinedPaths<NonNullable<T>, Paths>;
-
 /**
  * Runtime implementation for both overloads.
  */
@@ -46,7 +40,7 @@ export function assertDefined<T>(
   message: string,
   ...paths: readonly PropertyKey[][]
 ): asserts obj is T {
-  if (!obj) {
+  if (undefined === obj || null === obj) {
     throw new Error(`Validation failed: ${message} (object is null or undefined)`);
   }
   

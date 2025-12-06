@@ -1,6 +1,8 @@
 import * as path from "path";
 import type { OfferingWithGenerationPlan } from "./imageGenTypes";
-import { assertions } from "@pure/svelte/utils";
+import { assertions, log as LogNS } from "@pure/svelte/utils";
+
+const log = LogNS.log;
 
 /**
  * Generates a filename for the generated image
@@ -9,19 +11,23 @@ import { assertions } from "@pure/svelte/utils";
  * Example: rose_quartz_sphere_5cm_1704123456.png
  */
 export function generateImageFilename(offering: OfferingWithGenerationPlan): string {
+  log.debug(`generateImageFilename: offering: ${offering.offeringId}`);
+
   assertions.assertDefined(offering, "offering");
+  
+  const offeringDescription = `${offering.offeringId} - ${offering.offeringTitle}`
 
   const parts: string[] = [];
-  assertions.assertDefined(offering.productTypeName, "item.productTypeName")
+  assertions.assertDefined(offering.productTypeName, `item.productTypeName`)
   parts.push(sanitizeForFilename(offering.productTypeName));
-  assertions.assertDefined(offering.finalMaterialName, "item.finalMaterialName")
+  assertions.assertDefined(offering.finalMaterialName, `item.finalMaterialName`)
   parts.push(sanitizeForFilename(offering.finalMaterialName));
-  assertions.assertDefined(offering.finalFormName, "item.finalFormName")
+  assertions.assertDefined(offering.finalFormName, `item.finalFormName`)
   parts.push(sanitizeForFilename(offering.finalFormName));
-  assertions.assertDefined(offering.finalConstructionTypeName, "item.finalConstructionTypeName")
-  parts.push(sanitizeForFilename(offering.finalConstructionTypeName));
-  assertions.assertDefined(offering.offeringSize, "item.offeringSize");
-  parts.push(sanitizeForFilename(offering.offeringSize));
+
+  // Construction type and size are optional.
+  if (offering.finalConstructionTypeName) parts.push(sanitizeForFilename(offering.finalConstructionTypeName));
+  if (offering.offeringSize) parts.push(sanitizeForFilename(offering.offeringSize));
   const timestamp = Date.now();
   parts.push(timestamp.toString());
   return parts.join("_") + ".png";
@@ -34,6 +40,8 @@ export function generateImageFilename(offering: OfferingWithGenerationPlan): str
  * @returns 
  */
 export function genAbsImgDirName(baseDir: string, offering: OfferingWithGenerationPlan) {
+  log.debug(`genAbsImgDirName: offering: ${offering.offeringId}`);
+
   assertions.assertDefined(baseDir, "baseDir");
   assertions.assertDefined(offering, "offering");
 

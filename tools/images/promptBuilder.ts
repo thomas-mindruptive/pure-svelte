@@ -9,28 +9,42 @@
  */
 
 import { assertDefined } from "$lib/utils/assertions.js";
+import { assertions } from "$lib/utils/index.js";
 import type { ImageGenerationConfig } from "./generateMissingImages.config.js";
 import type { Lookups, OfferingWithGenerationPlan } from "./imageGenTypes.js";
 
 /**
  * Build image gen prompt.
- * @param item 
+ * @param offering 
  * @param config 
  * @returns 
  */
-export function buildPrompt(item: OfferingWithGenerationPlan, config: ImageGenerationConfig["prompt"], lookups: Lookups) {
-  assertDefined(item, "item");
+export function buildPrompt(offering: OfferingWithGenerationPlan, config: ImageGenerationConfig["prompt"], lookups: Lookups) {
+  assertDefined(offering, "item");
+
+  const offeringDescription = `${offering.offeringId} - ${offering.offeringTitle}`
+  assertions.assertDefined(offering.productTypeName, `offering.productTypeName - ${offeringDescription}`)
+  assertions.assertDefined(offering.finalFormName, `offering.finalFormName - ${offeringDescription}`)
+  assertions.assertDefined(offering.finalMaterialName, `offering.finalMaterialName - ${offeringDescription}`)
+
+  if (1 === offering.productTypeId   // Necklace
+    || 2 === offering.productTypeId) // Bracelet
+    {
+      assertions.assertDefined(offering.finalConstructionTypeName, `offering.finalConstructionTypeName - ${offeringDescription}`);
+      assertions.assertDefined(offering.finalSurfaceFinishName, `offering.finalSurfaceFinishName - ${offeringDescription}`);
+    }
+
   return _buildPrompt(
-    item.offeringId,
-    item.offeringSize,
+    offering.offeringId,
+    offering.offeringSize,
     null,
-    item.finalMaterialName,
-    item.finalFormName,
-    item.finalSurfaceFinishName,
-    item.finalConstructionTypeName,
-    item.productTypeName,
-    item.offeringColorVariant,
-    item.offeringImagePromptHint,
+    offering.finalMaterialName,
+    offering.finalFormName,
+    offering.finalSurfaceFinishName,
+    offering.finalConstructionTypeName,
+    offering.productTypeName,
+    offering.offeringColorVariant,
+    offering.offeringImagePromptHint,
     config,
     lookups
   );
@@ -43,13 +57,13 @@ function _buildPrompt(
   offeringId: number,
   size: string | null | undefined,
   productDef: string | null,
-  material: string | null| undefined,
-  form: string | null| undefined,
-  surfaceFinish: string | null| undefined,
-  constructionType: string | null| undefined,
-  productType: string | null| undefined,
-  color: string | null| undefined,
-  promptHint: string | null| undefined,
+  material: string | null | undefined,
+  form: string | null | undefined,
+  surfaceFinish: string | null | undefined,
+  constructionType: string | null | undefined,
+  productType: string | null | undefined,
+  color: string | null | undefined,
+  promptHint: string | null | undefined,
   config: ImageGenerationConfig["prompt"],
   lookups: Lookups
 ): string {
@@ -63,6 +77,8 @@ function _buildPrompt(
   } else if (config.style === "artistic") {
     parts.push("Artistic product visualization");
   }
+
+
 
   // 2. Product Type (e.g., "bracelet", "necklace", "pendant")
   if (productType) {

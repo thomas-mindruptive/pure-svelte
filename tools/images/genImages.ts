@@ -1,16 +1,16 @@
-import { db as dbNS, transactionWrapper as transWRapperNS, entityOperations } from "@pure/svelte/backend-queries";
-import { log as LogNS, assertions } from "@pure/svelte/utils";
-import type { domainTypes } from "@pure/svelte/domain";
+import { db as dbNS, entityOperations, transactionWrapper as transWRapperNS } from "@pure/svelte/backend-queries";
+import { domainTypes, domainUtils } from "@pure/svelte/domain";
+import { assertions, log as LogNS } from "@pure/svelte/utils";
+import { type Transaction } from "mssql";
+import * as path from "path";
 import { generateImage } from "./falAiClient";
+import { genAbsImgDirName, generateImageFilename } from "./fileUtils";
 import { defaultConfig, type ImageGenerationConfig } from './generateMissingImages.config';
 import type { Lookups, OfferingWithGenerationPlan } from "./imageGenTypes";
+import { downloadAndSaveImage } from "./imageProcessor";
 import { buildPromptFingerprintImageMapAndInitFingerprintCache, GLOBAL_IMAGE_CACHE, GLOBAL_PROMPT_FINGERPRINT_CACHE, loadLookups, loadOfferingImagesAndInitImageCache, loadOfferingsAndConvertToOfferingsWithGenerationPlan } from "./loadData";
 import { closeLogFile, initLogFile } from "./logAndReport";
 import { buildPrompt } from "./promptBuilder";
-import { genAbsImgDirName, generateImageFilename } from "./fileUtils";
-import { downloadAndSaveImage } from "./imageProcessor";
-import * as path from "path";
-import { Transaction } from "mssql";
 
 const log = LogNS.log;
 
@@ -77,10 +77,12 @@ async function processOffering(offering: OfferingWithGenerationPlan, config: Ima
     // E.g. "S-M"
     validateSizeRange(offering); // Will throw on invalid size
 
+    // Fail fast if fields are missing.
+    validateOfferingFields(offering);
+
     if (0 === offering.images?.length) {
         offering.images = [];
         offering.prompt = buildPrompt(offering, config["prompt"], lookups);
-        offering.imageUrl = await generateImage(offering.prompt, config["generation"]);
         const image = await generateAndSaveImage(offering, config, transaction);
         offering.images.push(image);
         GLOBAL_IMAGE_CACHE.set(image.offering_image_id, image);
@@ -101,9 +103,15 @@ async function generateAndSaveImage(
     transaction: Transaction): Promise<domainTypes.OfferingImageView> {
 
     assertions.assertDefined(offering, "offering");
-    assertions.assertDefined(offering.imageUrl, "offering.imageUrl");
     assertions.assertDefined(offering.prompt, "offering.prompt");
     assertions.assertDefined(config, "config");
+
+    if (config.generation.dry_run) {
+        offering.imageUrl = "Dryrun";
+    } else {
+        offering.imageUrl = await generateImage(offering.prompt, config["generation"]);
+    }
+
 
     // Download and save image
     const filename = generateImageFilename(offering);
@@ -113,7 +121,7 @@ async function generateAndSaveImage(
     log.info(`Saved: ${filepath}`);
     offering.filePath = filepath;
 
-    // Build image for DB and save it.
+    // Build image for DB.
     const offeringImageForDB: Partial<domainTypes.OfferingImageView> = {
         offering_id: offering.offeringId,
         filepath: offering.filePath,
@@ -123,60 +131,43 @@ async function generateAndSaveImage(
     // Build offering from OfferingWithGenerationPlan. Why? Because we pass it directly to 
     // offeringImage.insertOfferingImageFromOffering instead of using offeringImage.insertOfferingImage, 
     // which would load offering from DB. Our img gen run hast all infos in memory => No need for DB load.
-    const wio: domainTypes.WholesalerItemOffering = {
-        // Pflichtfelder
-        offering_id: offering.offeringId,
-        wholesaler_id: offering.wholesalerId,
-        category_id: offering.categoryId,
-        product_def_id: offering.productDefId,
-
-        // Gemappte Felder aus OfferingEnrichedView
-        material_id: offering.finalMaterialId ?? null,
-        form_id: offering.finalFormId ?? null,
-        surface_finish_id: offering.finalSurfaceFinishId ?? null,
-        construction_type_id: offering.finalConstructionTypeId ?? null,
-        title: offering.offeringTitle ?? null,
-        size: offering.offeringSize ?? null,
-        dimensions: offering.offeringDimensions ?? null,
-        packaging: offering.offeringPackaging ?? null,
-        price: offering.offeringPrice ?? null,
-        price_per_piece: offering.offeringPricePerPiece ?? null,
-        weight_grams: offering.offeringWeightGrams ?? null,
-        weight_range: offering.offeringWeightRange ?? null,
-        package_weight: offering.offeringPackageWeight ?? null,
-        origin: offering.offeringOrigin ?? null,
-        comment: offering.offeringComment ?? null,
-        imagePromptHint: offering.offeringImagePromptHint ?? null,
-        quality: offering.offeringQuality ?? null,
-        color_variant: offering.offeringColorVariant ?? null,
-        wholesaler_price: offering.offeringWholesalerPrice ?? null,
-
-        // Felder, die nicht in OfferingEnrichedView vorhanden sind
-        sub_seller: null,
-        wholesaler_article_number: null,
-        currency: null,
-        is_assortment: null,
-        override_material: false, // Default-Wert
-        shopify_product_id: null,
-        shopify_variant_id: null,
-        shopify_sku: null,
-        shopify_price: null,
-        shopify_synced_at: null,
-        created_at: undefined, // Optional, kann undefined sein
-    };
+    const wio = domainUtils.wioFromWioCoalesced(offering);
 
     let offeringImage: domainTypes.OfferingImageView;
 
     if (!config.generation.dry_run) {
         offeringImage = await entityOperations.offeringImage.insertOfferingImageFromOffering(transaction, offeringImageForDB, wio);
     } else {
-        // Generate image in mem with entityOperations.offeringImage.mergeImgageDataFromOffering and createPromptFingerprint
-
+        offeringImage = entityOperations.offeringImage.createInMemOfferingImage(wio, -1, filename, filepath, false, 0);
     }
 
     return offeringImage;
-
 }
+
+// /**
+//  * Create an OfferingImage in memory.
+//  * @param offering 
+//  * @param image 
+//  * @returns 
+//  */
+// function createInMemOfferingImageView(offering: OfferingWithGenerationPlan, image: Partial<domainTypes.Image>): domainTypes.OfferingImageView {
+//     const promptFingerprint = createPromptFingerprint(domainTypes.ImageSchema, image as any);
+//     if (!promptFingerprint) {
+//         log.warn(`Could not calculate fingerprint for offering ${offering.offeringId}`);
+//     }
+//     const offeringImageView = {
+//         ...image,
+//         prompt_fingerprint: promptFingerprint ?? null,
+//         // Junction fields (temporary IDs for in-memory)
+//         offering_image_id: -1, // Temporary ID (not in DB yet)
+//         offering_id: offering.offeringId,
+//         image_id: -1, // Temporary ID (not in DB yet)
+//         is_primary: false,
+//         sort_order: 0,
+//     };
+
+//     return offeringImageView;
+// }
 
 /**
  * Ensure valid "offering.size".
@@ -211,6 +202,24 @@ function validateSizeRange(offering: OfferingWithGenerationPlan): string | null 
             `Invalid size range: offering: ${offering.offeringId} "${size}". Must be one of: ${validSizeRanges.join(', ')}`
         );
     }
+}
+
+/**
+ * Validate offerings fields that are mandatory for img gen.
+ * @param offering 
+ */
+export function validateOfferingFields(offering: OfferingWithGenerationPlan) {
+    const offeringDescription = `${offering.offeringId} - ${offering.offeringTitle}`
+    assertions.assertDefined(offering.productTypeName, `offering.productTypeName - ${offeringDescription}`)
+    assertions.assertDefined(offering.finalFormName, `offering.finalFormName - ${offeringDescription}`)
+    assertions.assertDefined(offering.finalMaterialName, `offering.finalMaterialName - ${offeringDescription}`)
+  
+    if (1 === offering.productTypeId   // Necklace
+      || 2 === offering.productTypeId) // Bracelet
+      {
+        assertions.assertDefined(offering.finalConstructionTypeName, `offering.finalConstructionTypeName - ${offeringDescription}`);
+        assertions.assertDefined(offering.finalSurfaceFinishName, `offering.finalSurfaceFinishName - ${offeringDescription}`);
+      }
 }
 
 /**

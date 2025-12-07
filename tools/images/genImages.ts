@@ -187,6 +187,7 @@ async function generateAndSaveImage(
     } else {
         // Dry-run: Pass productTypeId from OfferingWithGenerationPlan
         offeringImage = entityOperations.offeringImage.createInMemOfferingImage(wio, -1, filename, filepath, false, 0, offering.productTypeId!);
+        offering.fingerPrint = offeringImage.prompt_fingerprint;
     }
 
     return offeringImage;

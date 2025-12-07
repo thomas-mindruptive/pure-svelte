@@ -110,6 +110,7 @@ export function printRunSummary(processedOfferings: OfferingWithGenerationPlan[]
   const promptWidth = 200;
   const filePathWidth = 120;
   const imageUrlWidth = 30;
+  const fingerPrintWidth = 20;
 
   // Print table header
   logBoth(
@@ -129,7 +130,8 @@ export function printRunSummary(processedOfferings: OfferingWithGenerationPlan[]
     "│ WillGen".padEnd(willGenWidth + 3) +
     "│ Prompt".padEnd(promptWidth + 3) +
     "│ FilePath".padEnd(filePathWidth + 3) +
-    "│ ImageUrl".padEnd(imageUrlWidth + 3)
+    "│ ImageUrl".padEnd(imageUrlWidth + 3) +
+    "│ Fprint".padEnd(fingerPrintWidth + 3)
   );
 
   // Print table rows
@@ -189,8 +191,10 @@ export function printRunSummary(processedOfferings: OfferingWithGenerationPlan[]
     const filePathFormatted = (item.hasExcplicitImgs ? "explicit" : (item.filePath ?? "")).substring(0, filePathWidth).padEnd(filePathWidth);
     const imageUrlFormatted = (item.hasExcplicitImgs ? "explicit" : (item.imageUrl ?? "")).substring(0, imageUrlWidth).padEnd(imageUrlWidth);
 
+    const fPrintFormatted = (item.fingerPrint ?? "").substring(0, fingerPrintWidth).padEnd(fingerPrintWidth);
+
     logBoth(
-      `│ ${id} │ ${title} │ ${productTypeFormatted} │ ${explicitFormatted} | ${material} │ ${form} │ ${surface} │ ${construction} │ ${formattedSize} │ ${imagesCount} │ ${willGenFormatted} │ ${promptFormatted} │ ${filePathFormatted} │ ${imageUrlFormatted}`
+      `│ ${id} │ ${title} │ ${productTypeFormatted} │ ${explicitFormatted} | ${material} │ ${form} │ ${surface} │ ${construction} │ ${formattedSize} │ ${imagesCount} │ ${willGenFormatted} │ ${promptFormatted} │ ${filePathFormatted} │ ${imageUrlFormatted} | ${fPrintFormatted}`
     );
 
     // Log full details if verbose

@@ -14,6 +14,7 @@ export interface OfferingWithGenerationPlan extends domainTypes.OfferingEnriched
     constructionTypeEng?: string;
     surfaceFinishEng?: string;
     productTypeEng?: string;
+    fingerPrint?: string | null
 }
 
 /**

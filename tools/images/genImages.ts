@@ -89,6 +89,7 @@ async function processOffering(offering: OfferingWithGenerationPlan, config: Ima
         logBoth(`Offering ${offering.offeringId} - ${offering.offeringTitle}: 0 === offering.images.length`);
         offering.images = [];
         offering.willGenerate = true;
+        setTranslationsInto(offering, lookups);
         offering.prompt = buildPrompt(offering, config["prompt"], lookups);
         const image = await generateAndSaveImage(offering, config, transaction);
         offering.images.push(image);
@@ -99,6 +100,41 @@ async function processOffering(offering: OfferingWithGenerationPlan, config: Ima
     } else {
         logBoth(`Offering ${offering.offeringId} - ${offering.offeringTitle}: ${offering.images?.length} === offering.images.length`);
         offering.hasExcplicitImgs = true;
+    }
+}
+
+/**
+ * Modifies the oassed offering by setting the translations for the lookups.
+ * @param offering InOut!
+ * @param lookups 
+ */
+function setTranslationsInto(offering: OfferingWithGenerationPlan, lookups: Lookups) {
+    const productTypeEng = lookups.productTypesMapEN.get(offering.productTypeId!);
+    assertions.assertDefined(productTypeEng, `English productTypeEng for ${offering.productTypeId} not found`);
+    offering.productTypeEng = productTypeEng.name;
+
+    const materialEng = lookups.materilasMapEN.get(offering.finalMaterialId!);
+    assertions.assertDefined(materialEng, `English material for ${offering.finalMaterialId} not found`);
+    offering.materialEng = materialEng.name;
+
+    const formEng = lookups.formsMapEN.get(offering.finalFormId!);
+    assertions.assertDefined(formEng, `English form for ${offering.finalMaterialId} not found`);
+    offering.formEng = formEng.name;
+
+    const constructionTypeEng = lookups.constructionTypesMapEN.get(offering.finalConstructionTypeId!);
+    if (isNecklaceOrBracelet(offering)) {
+        assertions.assertDefined(formEng, `English construction type for ${offering.finalMaterialId} not found`);
+    }
+    if (constructionTypeEng) {
+        offering.constructionTypeEng = constructionTypeEng.name;
+    }
+
+    const surfaceFinishEng = lookups.surfaceFinishesMapEN.get(offering.finalSurfaceFinishId!);
+    if (isNecklaceOrBracelet(offering)) {
+        assertions.assertDefined(surfaceFinishEng, `English surface finish for ${offering.finalMaterialId} not found`);
+    }
+    if (surfaceFinishEng) {
+        offering.surfaceFinishEng = surfaceFinishEng.name;
     }
 }
 
@@ -198,12 +234,31 @@ export function validateOfferingFields(offering: OfferingWithGenerationPlan) {
     assertions.assertDefined(offering.finalFormName, `offering.finalFormName - ${offeringDescription}`)
     assertions.assertDefined(offering.finalMaterialName, `offering.finalMaterialName - ${offeringDescription}`)
 
-    if (1 === offering.productTypeId   // Necklace
-        || 2 === offering.productTypeId) // Bracelet
-    {
+    // "Semiprecious stone"/"Halbedelstein" is a placeholder. It must not be used as a material. 
+    // The UX validations prevent it, but we must check it here, too.
+    if (2 === offering.finalMaterialId) {  // "Semiprecious stone"/"Halbedelstein" is a placeholder. It must not be used as a material. 
+        if (!(offering.offeringMaterialMixture && offering.offeringMaterialMixture.length > 0 &&
+            offering.offeringMaterialMixtureEn && offering.offeringMaterialMixtureEn.length)) {
+            throw new Error(`Offering ${offering.offeringId} materialId == 2 (Halbedelstein). This is a generic material. => Must specify offeringMaterialMixture AND offeringMaterialMixtureEn`);
+        }
+    }
+
+    if (isNecklaceOrBracelet(offering)) {
         assertions.assertDefined(offering.finalConstructionTypeName, `offering.finalConstructionTypeName - ${offeringDescription}`);
         assertions.assertDefined(offering.finalSurfaceFinishName, `offering.finalSurfaceFinishName - ${offeringDescription}`);
     }
+}
+
+/**
+ * Check if necklace or bracelet.
+ * @param offering 
+ * @returns 
+ */
+function isNecklaceOrBracelet(offering: OfferingWithGenerationPlan) {
+    const is =
+        (1 === offering.productTypeId   // Necklace
+            || 2 === offering.productTypeId) // Bracelet
+    return is;
 }
 
 /**

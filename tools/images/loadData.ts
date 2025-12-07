@@ -5,7 +5,7 @@ import type { Transaction } from "mssql";
 import assert from "node:assert";
 import { loadOfferingOptions, loadOfferingWhereConditions } from './generateMissingImages.config';
 import type { Lookups, OfferingWithGenerationPlan } from "./imageGenTypes";
-import { assertDefined } from "$lib/utils/assertions";
+
 
 const offering = entityOperations.offering;
 const image = entityOperations.image;
@@ -123,7 +123,7 @@ export async function loadOfferingImagesAndInitImageCache(transaction: Transacti
  */
 export function transformOfferingsToOfferingsWithGenerationPlan(
     offerings: domainTypes.OfferingEnrichedView[],
-    offeringImages: domainTypes.OfferingImageView[]): Map<number, OfferingWithGenerationPlan> {
+    offeringImages: domainTypes.OfferingImageView[],): Map<number, OfferingWithGenerationPlan> {
 
     const offeringsWithGenerationPlanMap = new Map<number, OfferingWithGenerationPlan>();
     for (const offering of offerings) {
@@ -157,11 +157,11 @@ export async function loadOfferingsAndConvertToOfferingsWithGenerationPlan(trans
  * @returns 
  */
 export function buildPromptFingerprintImageMapAndInitFingerprintCache(offeringImages: domainTypes.OfferingImageView[]): Map<string, domainTypes.OfferingImageView> {
-    assertions.assertDefined(offeringImages, "offeringImages"); 
+    assertions.assertDefined(offeringImages, "offeringImages");
 
     const fingerprintImageMap = new Map<string, domainTypes.OfferingImageView>();
-    for(const oi of offeringImages) {
-        assertDefined(oi.prompt_fingerprint, "oi.prompt_fingerprint");
+    for (const oi of offeringImages) {
+        assertions.assertDefined(oi.prompt_fingerprint, "oi.prompt_fingerprint");
         fingerprintImageMap.set(oi.prompt_fingerprint, oi);
     }
     GLOBAL_PROMPT_FINGERPRINT_CACHE = fingerprintImageMap;

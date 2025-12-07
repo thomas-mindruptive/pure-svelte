@@ -378,6 +378,8 @@ const Wio_BaseSchema = z
     construction_type_id: z.number().int().positive().nullable().optional(),
     surface_finish_id: z.number().int().positive().nullable().optional(),
     color_variant: z.string().max(100).nullable().optional(), // For image matching
+    material_mixture: z.string().max(1000).nullable().optional(), // Material mixture description (German)
+    material_mixture_en: z.string().max(1000).nullable().optional(), // Material mixture description (English)
     title: z.string().max(255).nullable().optional(),
     size: z.string().max(50).nullable().optional(),
     dimensions: z.string().max(100).nullable().optional()
@@ -892,6 +894,8 @@ const OfferingEnrichedViewSchemaBase = z.object({
   offeringPackaging: z.string().max(200).nullable().optional(),
   offeringColorVariant: z.string().max(200).nullable().optional(),
   offeringImagePromptHint: z.string().max(200).nullable().optional(),
+  offeringMaterialMixture: z.string().max(1000).nullable().optional(),
+  offeringMaterialMixtureEn: z.string().max(1000).nullable().optional()
 }).describe("OfferingEnrichedViewSchema");
 
 export const OfferingEnrichedViewSchema = createSchemaWithMeta(OfferingEnrichedViewSchemaBase, {

@@ -252,16 +252,19 @@
 
     // Material validation
     // SPECIAL CASE: If ProductDef has material_id = 2 (Halbedelstein), it's a generic placeholder
-    // and the Offering MUST set a specific material (not 2)
+    // and the Offering MUST set a specific material (not 2) OR provide both material_mixture fields
     const productDefMaterialId = data.product_def.material_id;
     const offeringMaterialId = data.material_id;
     
+    // Check if material_mixture fields are both set (alternative to specific material)
+    const hasMaterialMixture = !!(data.material_mixture?.trim() && data.material_mixture_en?.trim());
+    
     // Special case: Material ID 2 (Halbedelstein) is a generic placeholder
-    // If ProductDef has material_id = 2, Offering MUST have a different material
+    // If ProductDef has material_id = 2, Offering MUST have a different material OR both material_mixture fields
     if (productDefMaterialId === 2) {
-      if (!offeringMaterialId || offeringMaterialId === 2) {
+      if ((!offeringMaterialId || offeringMaterialId === 2) && !hasMaterialMixture) {
         if (!errors.material_id) errors.material_id = [];
-        errors.material_id.push('Material is required. The ProductDefinition has "Halbedelstein" as a generic placeholder - you must specify the actual material.');
+        errors.material_id.push('Material is required. The ProductDefinition has "Halbedelstein" as a generic placeholder - you must specify the actual material OR provide both Material Mixture (DE) and Material Mixture (EN).');
       }
     } else if (!productDefMaterialId && !offeringMaterialId) {
       // Normal case: If ProductDef has no material, Offering MUST have material
@@ -720,6 +723,22 @@
             label="override Material"
             type="checkbox"
             class="span-1"
+          />
+
+          <!-- material_mixture (for material mixtures when material_id = 2) -------------------->
+          <Field
+            {fieldProps}
+            path={["material_mixture"]}
+            label="Material Mixture (DE)"
+            placeholder="z.B. Amethyst, Rosenquarz, Bergkristall"
+            class="span-2"
+          />
+          <Field
+            {fieldProps}
+            path={["material_mixture_en"]}
+            label="Material Mixture (EN)"
+            placeholder="e.g. Amethyst, Rose Quartz, Rock Crystal"
+            class="span-2"
           />
 
           <!-- form ------------------------------------------------------------------------------>

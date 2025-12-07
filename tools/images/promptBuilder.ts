@@ -41,11 +41,11 @@ export function buildPrompt(offering: OfferingWithGenerationPlan,
     offering.offeringId,
     offering.offeringSize,
     null,
-    offering.finalMaterialName,
-    offering.finalFormName,
-    offering.finalSurfaceFinishName,
-    offering.finalConstructionTypeName,
-    offering.productTypeName,
+    offering.materialEng,
+    offering.formEng,
+    offering.surfaceFinishEng,
+    offering.constructionTypeEng,
+    offering.productTypeEng,
     offering.offeringColorVariant,
     offering.offeringImagePromptHint,
     config,
@@ -83,23 +83,16 @@ function _buildPrompt(
     parts.push("Artistic product visualization");
   }
 
+  assertions.assertDefined(productType, `productType`);
+  parts.push(productType.toLowerCase());
+
+  assertions.assertDefined(material, `material`);
+  const materialText = material.toLowerCase();
+  parts.push(materialText);
 
 
-  // 2. Product Type (e.g., "bracelet", "necklace", "pendant")
-  if (productType) {
-    parts.push(productType.toLowerCase());
-  }
-
-  // 3. Material
-  if (material) {
-    const materialText = material.toLowerCase();
-    parts.push(materialText);
-  }
-
-  // 4. Form
-  if (form) {
-    parts.push(form.toLowerCase());
-  }
+  assertions.assertDefined(form, `form`);
+  parts.push(form.toLowerCase());
 
   // 5. Size (if available)
   if (size) {
@@ -172,17 +165,16 @@ function _buildPrompt(
     }
   }
 
-  // 6. Surface finish
+  // Surface finish is optional, only mandatory for "genImages.isNecklaceOrBracelet() === true"
   if (surfaceFinish) {
     parts.push(surfaceFinish.toLowerCase());
   }
 
-  // 7. Construction type (if relevant)
+  // Construction type is optional, only mandatory for "genImages.isNecklaceOrBracelet() === true"
   if (constructionType) {
     parts.push(constructionType.toLowerCase());
   }
 
-  // 8. Color variant (if specified)
   if (color) {
     parts.push(`with color ${color.toLowerCase()}`);
   }

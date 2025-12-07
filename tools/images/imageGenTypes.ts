@@ -7,7 +7,13 @@ export interface OfferingWithGenerationPlan extends domainTypes.OfferingEnriched
     imageUrl?: string;
     prompt?: string;
     hasExcplicitImgs?: boolean;
-    comment?: string
+    comment?: string;
+    // Translations
+    formEng?: string;
+    materialEng?: string;
+    constructionTypeEng?: string;
+    surfaceFinishEng?: string;
+    productTypeEng?: string;
 }
 
 /**

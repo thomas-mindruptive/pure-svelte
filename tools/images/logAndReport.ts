@@ -96,6 +96,7 @@ export function printRunSummary(processedOfferings: OfferingWithGenerationPlan[]
   const idWidth = 6;
   const titleWidth = 30;
   const productTypeWith = 20;
+  const explicitWith = 4;
   const materialWidth = 12;
   const formWidth = 12;
   const surfaceWidth = 12;
@@ -115,6 +116,7 @@ export function printRunSummary(processedOfferings: OfferingWithGenerationPlan[]
     "│ ID".padEnd(idWidth + 3) +
     "│ Title".padEnd(titleWidth + 3) +
     "│ ProductType".padEnd(productTypeWith + 3) +
+    "│ Expl.".padEnd(explicitWith + 3) +
     "│ Material".padEnd(materialWidth + 3) +
     "│ Form".padEnd(formWidth + 3) +
     "│ Surface".padEnd(surfaceWidth + 3) +
@@ -135,7 +137,12 @@ export function printRunSummary(processedOfferings: OfferingWithGenerationPlan[]
     const id = item.offeringId.toString().padEnd(idWidth);
     const title = (item.offeringTitle + " - " + item.productDefTitle || "Untitled").substring(0, titleWidth).padEnd(titleWidth);
 
+    // Product type
     const productTypeFormatted = item.productTypeName.substring(0, productTypeWith).padEnd(productTypeWith);
+
+    // Explicit
+    const explicit = item.hasExcplicitImgs? "Y" : "N";
+    const explicitFormatted = explicit.padEnd(explicitWith);
 
     // Material 
     const materialName = item.finalMaterialName || "-";
@@ -173,17 +180,17 @@ export function printRunSummary(processedOfferings: OfferingWithGenerationPlan[]
     const imagesCount = item.images?.length.toString().padEnd(imagesWidth);
 
     // Will generate flag
-    const willGenIcon = item.willGenerate ? "✅" : "⏭️";
+    const willGenIcon = item.willGenerate ? "Y" : "N";
     const willGenFormatted = willGenIcon.padEnd(willGenWidth);
 
-    const prompt = item.prompt;
+    const prompt = item.hasExcplicitImgs? "explicit": item.prompt;
     const promptFormatted = prompt?.substring(0, promptWidth).padEnd(promptWidth);
-
-    const filePathFormatted = item.filePath?.substring(0, filePathWidth).padEnd(filePathWidth);
-    const imageUrlFormatted = item.imageUrl?.substring(0, imageUrlWidth).padEnd(imageUrlWidth);
+    
+    const filePathFormatted = (item.hasExcplicitImgs ? "explicit" : (item.filePath ?? "")).substring(0, filePathWidth).padEnd(filePathWidth);
+    const imageUrlFormatted = (item.hasExcplicitImgs ? "explicit" : (item.imageUrl ?? "")).substring(0, imageUrlWidth).padEnd(imageUrlWidth);
 
     logBoth(
-      `│ ${id} │ ${title} │ ${productTypeFormatted} │ ${material} │ ${form} │ ${surface} │ ${construction} │ ${formattedSize} | │ ${imagesCount} │ ${willGenFormatted} │ ${promptFormatted} │ ${filePathFormatted} │ ${imageUrlFormatted}`
+      `│ ${id} │ ${title} │ ${productTypeFormatted} │ ${explicitFormatted} | ${material} │ ${form} │ ${surface} │ ${construction} │ ${formattedSize} │ ${imagesCount} │ ${willGenFormatted} │ ${promptFormatted} │ ${filePathFormatted} │ ${imageUrlFormatted}`
     );
 
     // Log full details if verbose

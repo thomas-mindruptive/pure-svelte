@@ -95,8 +95,10 @@ async function processOffering(offering: OfferingWithGenerationPlan, config: Ima
         GLOBAL_IMAGE_CACHE.set(image.offering_image_id, image);
         assertions.assertDefined(image.prompt_fingerprint, "image.prompt_fingerprint");
         GLOBAL_PROMPT_FINGERPRINT_CACHE.set(image.prompt_fingerprint, image);
+        offering.hasExcplicitImgs = false;
     } else {
         logBoth(`Offering ${offering.offeringId} - ${offering.offeringTitle}: ${offering.images?.length} === offering.images.length`);
+        offering.hasExcplicitImgs = true;
     }
 }
 

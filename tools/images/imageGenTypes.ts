@@ -6,6 +6,8 @@ export interface OfferingWithGenerationPlan extends domainTypes.OfferingEnriched
     filePath?: string;
     imageUrl?: string;
     prompt?: string;
+    hasExcplicitImgs?: boolean;
+    comment?: string
 }
 
 /**

@@ -19,7 +19,10 @@ import type { Lookups, OfferingWithGenerationPlan } from "./imageGenTypes.js";
  * @param config 
  * @returns 
  */
-export function buildPrompt(offering: OfferingWithGenerationPlan, config: ImageGenerationConfig["prompt"], lookups: Lookups) {
+export function buildPrompt(offering: OfferingWithGenerationPlan,
+  config: ImageGenerationConfig["prompt"],
+  lookups: Lookups) {
+
   assertDefined(offering, "item");
 
   const offeringDescription = `${offering.offeringId} - ${offering.offeringTitle}`
@@ -29,12 +32,12 @@ export function buildPrompt(offering: OfferingWithGenerationPlan, config: ImageG
 
   if (1 === offering.productTypeId   // Necklace
     || 2 === offering.productTypeId) // Bracelet
-    {
-      assertions.assertDefined(offering.finalConstructionTypeName, `offering.finalConstructionTypeName - ${offeringDescription}`);
-      assertions.assertDefined(offering.finalSurfaceFinishName, `offering.finalSurfaceFinishName - ${offeringDescription}`);
-    }
+  {
+    assertions.assertDefined(offering.finalConstructionTypeName, `offering.finalConstructionTypeName - ${offeringDescription}`);
+    assertions.assertDefined(offering.finalSurfaceFinishName, `offering.finalSurfaceFinishName - ${offeringDescription}`);
+  }
 
-  return _buildPrompt(
+  const p = _buildPrompt(
     offering.offeringId,
     offering.offeringSize,
     null,
@@ -48,6 +51,8 @@ export function buildPrompt(offering: OfferingWithGenerationPlan, config: ImageG
     config,
     lookups
   );
+
+  return p;
 }
 
 /**

@@ -156,7 +156,7 @@ async function generateAndSaveImage(
     if (config.generation.dry_run) {
         offering.imageUrl = "Dryrun";
     } else {
-        offering.imageUrl = await generateImage(offering.prompt, config["generation"]);
+        offering.imageUrl = await generateImage(offering.prompt, config["generation"], config.prompt.negative_prompt);
     }
 
 

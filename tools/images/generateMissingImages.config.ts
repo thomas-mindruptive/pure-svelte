@@ -134,6 +134,12 @@ export interface ImageGenerationConfig {
      * Note: May make images more abstract/less product-focused
      */
     include_metaphysical?: boolean;
+
+    /**
+     * Negative prompt - what NOT to include in generated images
+     * Helps avoid common AI artifacts like blurriness, watermarks, distortions
+     */
+    negative_prompt?: string;
   };
 
   /**
@@ -213,6 +219,9 @@ export const defaultConfig: ImageGenerationConfig = {
 
     // Skip metaphysical properties (keep it product-focused)
     include_metaphysical: false,
+
+    // Negative prompt to avoid common AI artifacts
+    negative_prompt: "blurry, out of focus, low quality, watermark, text, logo, distorted, deformed",
   },
 
   log: {

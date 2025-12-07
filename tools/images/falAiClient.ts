@@ -35,14 +35,19 @@ export function initializeFalAi(apiKey?: string) {
  *
  * @param prompt - The image generation prompt
  * @param config - Generation settings (model, size, steps)
+ * @param negativePrompt - Optional negative prompt (what to avoid)
  * @returns URL of the generated image
  */
 export async function generateImage(
   prompt: string,
-  config: ImageGenerationConfig['generation']
+  config: ImageGenerationConfig['generation'],
+  negativePrompt?: string
 ): Promise<string> {
   console.log(`  ├─ Calling fal.ai (${config.model})...`);
   console.log(`  │  Prompt: "${prompt.substring(0, 80)}${prompt.length > 80 ? '...' : ''}"`);
+  if (negativePrompt) {
+    console.log(`  │  Negative: "${negativePrompt.substring(0, 60)}${negativePrompt.length > 60 ? '...' : ''}"`);
+  }
 
   try {
     const startTime = Date.now();
@@ -50,6 +55,7 @@ export async function generateImage(
     const result = await fal.subscribe(config.model, {
       input: {
         prompt: prompt,
+        negative_prompt: negativePrompt,
         image_size: config.image_size,
         num_inference_steps: config.num_inference_steps,
         num_images: 1, // Always generate 1 image per call

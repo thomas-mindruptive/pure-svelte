@@ -153,6 +153,8 @@ async function generateAndSaveImage(
     assertions.assertDefined(offering.prompt, "offering.prompt");
     assertions.assertDefined(config, "config");
 
+    // TODO!!!!!!!!!!!!!!!!!!!!!!!    Use GLOBAL_PROMPT_FINGERPRINT_CACHE to check if image with same properties already exists if  not explicit.
+
     if (config.generation.dry_run) {
         offering.imageUrl = "Dryrun";
     } else {
@@ -183,7 +185,8 @@ async function generateAndSaveImage(
     if (!config.generation.dry_run) {
         offeringImage = await entityOperations.offeringImage.insertOfferingImageFromOffering(transaction, offeringImageForDB, wio);
     } else {
-        offeringImage = entityOperations.offeringImage.createInMemOfferingImage(wio, -1, filename, filepath, false, 0);
+        // Dry-run: Pass productTypeId from OfferingWithGenerationPlan
+        offeringImage = entityOperations.offeringImage.createInMemOfferingImage(wio, -1, filename, filepath, false, 0, offering.productTypeId!);
     }
 
     return offeringImage;

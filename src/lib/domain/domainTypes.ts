@@ -674,13 +674,15 @@ const ImageSchemaBase = z
     shopify_media_id: z.string().max(100).nullable().optional(),
     uploaded_to_shopify_at: z.string().nullable().optional(), // ISO datetime string
     // Variant matching fields (for image-to-offering matching logic)
+    product_type_id: z.number().int().positive().nullable().optional(),
     material_id: z.number().int().positive().nullable().optional(),
+    material_mixture_en: z.string().max(1000).nullable().optional(),
     form_id: z.number().int().positive().nullable().optional(),
     surface_finish_id: z.number().int().positive().nullable().optional(),
     construction_type_id: z.number().int().positive().nullable().optional(),
     // Variant dimensions (optional, for product variations)
-    size_range: z.string().max(50).nullable().optional(),
-    quality_grade: z.string().max(10).nullable().optional(),
+    size: z.string().max(50).nullable().optional(),
+    quality: z.string().max(10).nullable().optional(),
     color_variant: z.string().max(50).nullable().optional(),
     packaging: z.string().max(100).nullable().optional(),
     // Fingerprint and explicit flag for canonical vs explicit images
@@ -697,14 +699,14 @@ export const ImageSchema = createSchemaWithMeta(ImageSchemaBase, {
   tableName: "images",
   dbSchema: "dbo",
   fingerPrintForPromptProps: [
+    "product_type_id",
     "material_id",
+    "material_mixture_en",
     "form_id",
     "surface_finish_id",
     "construction_type_id",
-    "size_range",
-    "quality_grade",
+    "size",
     "color_variant",
-    "packaging",
   ] as const,
 } as const);
 

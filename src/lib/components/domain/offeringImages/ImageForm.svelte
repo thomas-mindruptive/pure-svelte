@@ -150,8 +150,8 @@
           form_id: data.form_id,
           surface_finish_id: data.surface_finish_id,
           construction_type_id: data.construction_type_id,
-          size_range: data.size_range,
-          quality_grade: data.quality_grade,
+          size: data.size,
+          quality: data.quality,
           color_variant: data.color_variant,
           packaging: data.packaging,
           image_type: data.image_type,
@@ -405,10 +405,10 @@
             <label for="size-range-select">Size Range</label>
             <select
               id="size-range-select"
-              value={fieldProps.get(["size_range"]) ?? ""}
+              value={fieldProps.get(["size"]) ?? ""}
               onchange={(e) => {
                 const value = e.currentTarget.value;
-                fieldProps.set(["size_range"], value === "" ? null : value as typeof ImageSizeRange[keyof typeof ImageSizeRange]);
+                fieldProps.set(["size"], value === "" ? null : value as typeof ImageSizeRange[keyof typeof ImageSizeRange]);
               }}
             >
               <option value="">-- No Size Restriction --</option>

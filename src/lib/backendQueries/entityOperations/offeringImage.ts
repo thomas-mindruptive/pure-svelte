@@ -19,10 +19,52 @@ import { insertRecordWithTransaction, updateRecordWithTransaction } from "../gen
 import { TransWrapper } from "../transactionWrapper";
 import { DeleteCascadeBlockedError } from "./entityErrors";
 import type { DeleteResult } from "./entityOpsResultTypes";
-import { insertImage, loadImageById } from "./image";
-import { loadOfferingCoalesceProdDef } from "./offering";
+import { insertImage, loadImageById, validateFingerprintFields } from "./image";
+import { getProductTypeIdForOffering, loadOfferingCoalesceProdDef } from "./offering";
 import { createPromptFingerprint } from "$lib/domain";
 import { assertDefined } from "$lib/utils/assertions";
+
+/**
+ * Extracts all Image fields from source, with optional coalescing from offering.
+ * 
+ * 100% Schema-driven: Uses ImageSchema.shape to determine ALL image fields.
+ * Wartungsfrei: New fields are automatically included!
+ * Junction fields are automatically excluded (not in ImageSchema.shape).
+ * 
+ * @param source - OfferingImageView or Partial<Image>
+ * @param offeringForCoalesce - Optional: Offering to coalesce missing fields from
+ * @returns Partial<Image> with only Image fields (no junction fields)
+ */
+function extractImageFields(
+  source: Partial<OfferingImageView> | Partial<Image>,
+  offeringForCoalesce?: WholesalerItemOffering
+): Partial<Image> {
+  // ⚠️ BLACKLIST: DB-generated fields that must NEVER be extracted from client/offering
+  const blacklist = new Set(['image_id', 'created_at', 'offering_image_id']);
+
+  const imageKeys = Object.keys(ImageSchema.shape) as (keyof Image)[];
+  const result: any = {};
+
+  for (const key of imageKeys) {
+    // Skip blacklisted fields
+    if (blacklist.has(key as string)) {
+      continue;
+    }
+
+    // Priority 1: Take from source if defined
+    if (key in source && (source as any)[key] !== undefined && (source as any)[key] !== null) {
+      result[key] = (source as any)[key];
+    }
+    // Priority 2: Coalesce from offering if available
+    else if (offeringForCoalesce && key in offeringForCoalesce) {
+      result[key] = (offeringForCoalesce as any)[key];
+    }
+  }
+
+  return result as Partial<Image>;
+}
+
+// ===== TYPES =====
 
 /**
  * Options for loading offering images
@@ -108,24 +150,16 @@ export async function insertOfferingImageFromOffering(
       throw error(400, "offering_id is required to create an offering image");
     }
 
-    const imageData = mergePartialImgageDataFromOffering(inputData, offering);
+    // Get product_type_id from offering (via product_def → category)
+    const productTypeId = await getProductTypeIdForOffering(transWrapper.trans, offeringId);
 
-    // // 1. Create/insert Image (with explicit = true for explicit images)
-    // // Merge offering fields with input data (input data takes precedence if provided)
-    // const imageData = {
-    //   // Other image fields from input first
-    //   ...inputData,
-    //   // Override with offering fields if not provided in input (or if null/undefined)
-    //   material_id: inputData.material_id ?? offering.material_id,
-    //   form_id: inputData.form_id ?? offering.form_id,
-    //   surface_finish_id: inputData.surface_finish_id ?? offering.surface_finish_id,
-    //   construction_type_id: inputData.construction_type_id ?? offering.construction_type_id,
-    //   size_range: inputData.size_range ?? offering.size,
-    //   quality_grade: inputData.quality_grade ?? offering.quality,
-    //   color_variant: inputData.color_variant ?? offering.color_variant,
-    //   packaging: inputData.packaging ?? offering.packaging,
-    //   explicit: inputData.explicit !== undefined ? inputData.explicit : true, // Use inputData.explicit if provided, otherwise default to true
-    // };
+    // Set it in inputData BEFORE merge!
+    inputData.product_type_id = productTypeId;
+
+    log.debug(`insertOfferingImageFromOffering ### offering:%O`, offering);
+
+    // NOW merge - validation will work!
+    const imageData = mergePartialImgageDataFromOffering(inputData, offering);
 
     // Note: Fingerprint calculation happens in insertImage (for all images, including direct inserts)
     // TODO: Optimize: Check if image with filehash already exists.
@@ -195,29 +229,32 @@ export function mergePartialImgageDataFromOffering(
 
   inputData = inputData || {};
 
-  const imageData: Partial<Image> = {
-    // Other image fields from input first
-    ...inputData,
-    // Override with offering fields if not provided in input (or if null/undefined)
-    material_id: inputData.material_id ?? offering.material_id,
-    form_id: inputData.form_id ?? offering.form_id,
-    surface_finish_id: inputData.surface_finish_id ?? offering.surface_finish_id,
-    construction_type_id: inputData.construction_type_id ?? offering.construction_type_id,
-    size_range: inputData.size_range ?? offering.size,
-    quality_grade: inputData.quality_grade ?? offering.quality,
-    color_variant: inputData.color_variant ?? offering.color_variant,
-    packaging: inputData.packaging ?? offering.packaging,
-    explicit: inputData.explicit !== undefined ? inputData.explicit : true,
-  };
+  // Remove fields that must NOT be set by client (DB-generated)
+  delete (inputData as any).image_id;
+  delete (inputData as any).created_at;
+  delete (inputData as any).offering_image_id;
+
+  // Schema-driven extraction + coalescing - automatically handles ALL fields!
+  const imageData = extractImageFields(inputData, offering);
+
+  // Override explicit field (special handling for default value)
+  if (inputData.explicit !== undefined) {
+    imageData.explicit = inputData.explicit;
+  } else {
+    imageData.explicit = true;
+  }
 
   // ⚠️ Validate and sanitize to remove Junction fields (E.g. for In-Memory operations that do not use "Image.insertImage")
   const validation = validateEntityBySchema(ImageSchema.partial(), imageData);
   if (!validation.isValid) {
     log.warn("mergeImgageDataFromOffering: Validation failed", validation.errors);
-    // Still return the data, but log the warning
+    throw new Error(`Validation failed: ${JSON.stringify(validation.errors)}`);
   }
 
-  return validation.isValid ? (validation.sanitized as Partial<Image>) : imageData;
+  // Validate fingerprint fields (Fail-Fast)
+  validateFingerprintFields(validation.sanitized as Partial<Image>);
+
+  return validation.sanitized as Partial<Image>;
 }
 
 /**
@@ -290,30 +327,19 @@ export async function updateOfferingImage(
     const imageId = existingJunction.image_id;
 
     // 2. Update image if image fields are provided
+    // Use extractImageFields() to automatically get ALL image fields (wartungsfrei!)
     let updatedImage: Image | null = null;
-    if (inputData.filename || inputData.filepath || inputData.explicit !== undefined ||
-      inputData.material_id !== undefined || inputData.form_id !== undefined ||
-      inputData.surface_finish_id !== undefined || inputData.construction_type_id !== undefined ||
-      inputData.size_range !== undefined || inputData.quality_grade !== undefined ||
-      inputData.color_variant !== undefined || inputData.packaging !== undefined) {
+    const imageUpdateData = extractImageFields(inputData);
 
-      const imageUpdateData: Partial<Image> = {};
-      if (inputData.filename !== undefined) imageUpdateData.filename = inputData.filename;
-      if (inputData.filepath !== undefined) imageUpdateData.filepath = inputData.filepath;
-      if (inputData.explicit !== undefined) imageUpdateData.explicit = inputData.explicit;
-      if (inputData.material_id !== undefined) imageUpdateData.material_id = inputData.material_id;
-      if (inputData.form_id !== undefined) imageUpdateData.form_id = inputData.form_id;
-      if (inputData.surface_finish_id !== undefined) imageUpdateData.surface_finish_id = inputData.surface_finish_id;
-      if (inputData.construction_type_id !== undefined) imageUpdateData.construction_type_id = inputData.construction_type_id;
-      if (inputData.size_range !== undefined) imageUpdateData.size_range = inputData.size_range;
-      if (inputData.quality_grade !== undefined) imageUpdateData.quality_grade = inputData.quality_grade;
-      if (inputData.color_variant !== undefined) imageUpdateData.color_variant = inputData.color_variant;
-      if (inputData.packaging !== undefined) imageUpdateData.packaging = inputData.packaging;
+    // If offering changes, update product_type_id from new offering
+    if (inputData.offering_id !== undefined && inputData.offering_id !== existingJunction.offering_id) {
+      const newProductTypeId = await getProductTypeIdForOffering(transWrapper.trans, inputData.offering_id);
+      imageUpdateData.product_type_id = newProductTypeId;
+    }
 
-      if (Object.keys(imageUpdateData).length > 0) {
-        const { updateImage } = await import("./image");
-        updatedImage = await updateImage(transWrapper.trans, imageId, imageUpdateData);
-      }
+    if (Object.keys(imageUpdateData).length > 0) {
+      const { updateImage } = await import("./image");
+      updatedImage = await updateImage(transWrapper.trans, imageId, imageUpdateData);
     }
 
     // 3. Update junction entry if junction fields are provided
@@ -501,7 +527,8 @@ export function createInMemOfferingImage(
   fileName: string,
   filePath: string,
   explicit: boolean,
-  sortOrder: number
+  sortOrder: number,
+  productTypeId: number
 ): OfferingImageView {
 
   assertDefined(offering, "offering");
@@ -510,34 +537,33 @@ export function createInMemOfferingImage(
   assertDefined(filePath, "filePath");
   assertDefined(explicit, "explicit");
   assertDefined(sortOrder, "sortOrder");
+  assertDefined(productTypeId, "productTypeId");
 
-  const imagePartial = mergePartialImgageDataFromOffering(undefined, offering);
+  // Pass product_type_id in inputData so validation works!
+  const inputData: Partial<OfferingImageView> = {
+    product_type_id: productTypeId
+  };
+
+  const imagePartial = mergePartialImgageDataFromOffering(inputData, offering);
+
   const promptFingerprint = createPromptFingerprint(ImageSchema, imagePartial as any);
   if (!promptFingerprint) {
     throw new Error(`Could not calculate fingerprint for offering ${offering.offering_id}`);
   }
 
   // Create OfferingImageView for in-memory operations
-  // Explicitly extract fields from imagePartial to avoid dependency on mergePartialImgageDataFromOffering implementation
   const offeringImageView: OfferingImageView = {
-    // Image fields from parameters
+    // All Image fields - automatically includes ALL current and future fields!
+    ...extractImageFields(imagePartial),
+
+    // Override specific fields from parameters
     image_id: imageId,
     filename: fileName,
     filepath: filePath,
     explicit: explicit,
     prompt_fingerprint: promptFingerprint,
 
-    // Merged fields from offering (explicitly extracted from imagePartial)
-    material_id: imagePartial.material_id ?? null,
-    form_id: imagePartial.form_id ?? null,
-    surface_finish_id: imagePartial.surface_finish_id ?? null,
-    construction_type_id: imagePartial.construction_type_id ?? null,
-    size_range: imagePartial.size_range ?? null,
-    quality_grade: imagePartial.quality_grade ?? null,
-    color_variant: imagePartial.color_variant ?? null,
-    packaging: imagePartial.packaging ?? null,
-
-    // File metadata fields (not available in dry-run, will be set when image is actually created)
+    // File metadata fields (not available in dry-run)
     file_hash: null,
     file_size_bytes: null,
     width_px: null,

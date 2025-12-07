@@ -863,8 +863,48 @@ export async function loadOfferingsWithOptions(options: LoadOfferingsOptions = {
  * @param offeringId 
  * @returns 
  */
+/**
+ * Get the product_type_id for an offering.
+ * Follows the chain: offering → product_def → category → product_type_id
+ * 
+ * @param transaction - Optional database transaction
+ * @param offeringId - The offering ID
+ * @returns The product_type_id
+ * @throws Error 404 if offering not found
+ */
+export async function getProductTypeIdForOffering(
+  transaction: Transaction | null,
+  offeringId: number
+): Promise<number> {
+  const transWrapper = new TransWrapper(transaction, null);
+  await transWrapper.begin();
+
+  try {
+    const request = transWrapper.request();
+    request.input('offeringId', offeringId);
+    const result = await request.query(`
+      SELECT cat.product_type_id
+      FROM dbo.wholesaler_item_offerings wio
+      INNER JOIN dbo.product_definitions pd ON wio.product_def_id = pd.product_def_id
+      INNER JOIN dbo.product_categories cat ON pd.category_id = cat.category_id
+      WHERE wio.offering_id = @offeringId
+    `);
+
+    await transWrapper.commit();
+
+    if (result.recordset.length === 0) {
+      throw error(404, `Offering with ID ${offeringId} not found.`);
+    }
+
+    return result.recordset[0].product_type_id;
+  } catch (err) {
+    await transWrapper.rollback();
+    throw err;
+  }
+}
+
 export async function loadOfferingCoalesceProdDef(
-  transaction: Transaction | null, 
+  transaction: Transaction | null,
   offeringId: number
 ): Promise<WholesalerItemOffering> {
   const transWrapper = new TransWrapper(transaction, null);
@@ -875,7 +915,38 @@ export async function loadOfferingCoalesceProdDef(
     request.input('offeringId', offeringId);
     const result = await request.query(`
       SELECT 
-        wio.*,
+        wio.offering_id,
+        wio.wholesaler_id,
+        wio.category_id,
+        wio.product_def_id,
+        wio.sub_seller,
+        wio.wholesaler_article_number,
+        wio.color_variant,
+        wio.material_mixture,
+        wio.material_mixture_en,
+        wio.title,
+        wio.size,
+        wio.dimensions,
+        wio.packaging,
+        wio.weight_grams,
+        wio.weight_range,
+        wio.package_weight,
+        wio.price,
+        wio.price_per_piece,
+        wio.wholesaler_price,
+        wio.currency,
+        wio.origin,
+        wio.comment,
+        wio.imagePromptHint,
+        wio.quality,
+        wio.is_assortment,
+        wio.override_material,
+        wio.shopify_product_id,
+        wio.shopify_variant_id,
+        wio.shopify_sku,
+        wio.shopify_price,
+        wio.shopify_synced_at,
+        wio.created_at,
         -- Override with coalesced values from product definition
         COALESCE(wio.material_id, pd.material_id) AS material_id,
         COALESCE(wio.form_id, pd.form_id) AS form_id,
@@ -920,18 +991,18 @@ export function buildOfferingsWhereCondition(options: LoadOfferingsOptions): Whe
   }
 
   // Include wholesaler IDs
-  if ((options.allowedWholesalerIds?.length ?? 0) > 0) {  
+  if ((options.allowedWholesalerIds?.length ?? 0) > 0) {
     conditions.push({
       key: 'wholesalerId',
       whereCondOp: ComparisonOperator.IN,
-      val: options.allowedWholesalerIds  
+      val: options.allowedWholesalerIds
     });
   }
 
   // Filter by wholesaler relevance (OR-Gruppe)
   if ((options.allowedWholesalerRelevances?.length ?? 0) > 0) {
     const relevanceConditions: WhereCondition<OfferingEnrichedView>[] =
-      options.allowedWholesalerRelevances!.map(relevance => ({  
+      options.allowedWholesalerRelevances!.map(relevance => ({
         key: 'wholesalerRelevance' as keyof OfferingEnrichedView,
         whereCondOp: ComparisonOperator.EQUALS,
         val: relevance

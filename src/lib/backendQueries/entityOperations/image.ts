@@ -26,6 +26,54 @@ import * as mime from 'mime-types';
 import sharp from 'sharp';
 import { queryBuilder } from "..";
 
+// ===== VALIDATION =====
+
+/**
+ * Validates that all fingerprint-relevant fields are set in image data.
+ * Based on ImageSchema.fingerPrintForPromptProps.
+ * 
+ * Node.js-compatible: Throws normal Error (not SvelteKit error()).
+ * 
+ * @throws Error if critical fingerprint fields are missing
+ */
+export function validateFingerprintFields(imageData: Partial<Image>): void {
+  const fpKeys = ImageSchema.__brandMeta?.fingerPrintForPromptProps as (keyof Image)[] | undefined;
+  
+  if (!fpKeys || fpKeys.length === 0) {
+    log.warn("ImageSchema.fingerPrintForPromptProps not defined");
+    return;
+  }
+
+  const missingFields: string[] = [];
+  
+  for (const key of fpKeys) {
+    const value = imageData[key];
+    
+    // Optional fields (can be null/undefined)
+    if (key === 'construction_type_id' || key === 'surface_finish_id' || key === 'size' || key === 'color_variant') {
+      continue;
+    }
+    
+    // Special case: material_mixture_en only required if material_id === 2
+    if (key === 'material_mixture_en') {
+      if (imageData.material_id === 2 && (!value || value === '')) {
+        missingFields.push(`${key} (required for Semi-precious Stone)`);
+      }
+      continue;
+    }
+    
+    if (value === null || value === undefined) {
+      missingFields.push(key);
+    }
+  }
+
+  if (missingFields.length > 0) {
+    const errorMsg = `Missing fingerprint-relevant fields for image: ${missingFields.join(', ')}`;
+    log.error(errorMsg, { imageData, missingFields });
+    throw new Error(errorMsg);  // Node.js-compatible (not SvelteKit error())
+  }
+}
+
 // ===== HELPER FUNCTIONS: Image Metadata Enrichment =====
 
 /**
@@ -171,9 +219,12 @@ export async function insertImage(
       sanitizedFields: Object.keys(sanitized),
       material_id: sanitized.material_id,
       form_id: sanitized.form_id,
-      size_range: sanitized.size_range,
-      quality_grade: sanitized.quality_grade,
+      size_range: sanitized.size,
+      quality_grade: sanitized.quality,
     });
+    // Validate fingerprint fields BEFORE calculation (fail-fast!)
+    validateFingerprintFields(sanitized);
+    
     const fingerprint = createPromptFingerprint(ImageSchema, sanitized as any);
     log.debug("Fingerprint calculated", { fingerprint });
     if (fingerprint) {

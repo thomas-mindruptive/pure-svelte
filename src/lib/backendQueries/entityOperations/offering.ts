@@ -913,6 +913,8 @@ export async function loadOfferingCoalesceProdDef(
   try {
     const request = transWrapper.request();
     request.input('offeringId', offeringId);
+    // DO NOT USE wio.*. This would create an array of the coalasced fields, because they
+    // already exist in den "normal" fields.
     const result = await request.query(`
       SELECT 
         wio.offering_id,

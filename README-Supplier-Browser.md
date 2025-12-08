@@ -8,7 +8,7 @@
 
 The SupplierBrowser suppliers/wholesalers. Its primary purpose is to provide a fast and intuitive interface for navigating and editing complex relationships between business entities.
 
-### The 5 Levels of the Hierarchy
+### The Hierarchy Levels
 
 The application's logic is built around hierarchical data model. Understanding the distinction between **Master Data**, **Hierarchical Real Objects**, and **Relationships** is critical.
 
@@ -18,28 +18,23 @@ The application's logic is built around hierarchical data model. Understanding t
 - **API Pattern**: QueryPayload for lists + Standard CRUD for individuals.
 - **Creation**: `/api/suppliers/new` POST with direct entity data.
 
-#### Level 2: Categories (Relationship - Simple Assignment)  
-- **Entity**: `dbo.wholesaler_categories`
-- **Purpose**: Pure n:m relationship between suppliers and global categories.
-- **Properties**: `comment`, `link` (simple metadata).
-- **API Pattern**: `/api/supplier-categories` CREATE/DELETE with `AssignmentRequest`.
-- **Master Data**: Category definitions via `/api/categories/new`.
-
-#### Level 3: Offerings (Attributed n:m Relationship)
+#### Level 2: Offerings (Attributed n:m Relationship)
 - **Entity**: `dbo.wholesaler_item_offerings`
 - **Purpose**: A central master data entity that realizes the n:m relationship between a `Wholesaler` and a `ProductDefinition`, carrying its own attributes like `price` and `size`.
 - **Key Characteristic**: While being a master data entity with its own CRUD endpoints, it is logically dependent on its parents (`Wholesaler`, `ProductCategory`, `ProductDefinition`) for context. A supplier can have multiple offerings for the same product definition (e.g., different sizes or conditions).
 - **API Pattern**: Centralized CRUD via `/api/offerings/[id]`. Creation via `POST /api/offerings/new` with a body containing all required foreign keys (`wholesaler_id`, `category_id`, `product_def_id`).
 - **Master Data**: Product definitions via `/api/product-definitions/new`.
 
-#### Level 4: Attributes (Relationship - Attributed)
+> ⚠️ **Note (refact01):** The former `dbo.wholesaler_categories` assignment table has been removed. Suppliers can now create offerings for ANY category without prior assignment.
+
+#### Level 3: Attributes (Relationship - Attributed)
 - **Entity**: `dbo.wholesaler_offering_attributes`  
 - **Purpose**: n:m relationship between offerings and attributes WITH business data (`value`).
 - **Key Distinction**: Not just a link - stores attribute values (e.g., Color="Red").
 - **API Pattern**: `/api/offering-attributes` CREATE/UPDATE/DELETE with `AssignmentRequest`.
 - **Master Data**: Attribute definitions via `/api/attributes/new`.
 
-#### Level 5: Links (Relationship - 1:n Composition)
+#### Level 4: Links (Relationship - 1:n Composition)
 - **Entity**: `dbo.wholesaler_offering_links`
 - **Purpose**: Links that belong to specific offerings.
 - **API Pattern**: `/api/offering-links` CREATE/UPDATE/DELETE with `CreateChildRequest`.
@@ -163,9 +158,9 @@ The `/api/query` endpoint is a central architectural component that handles all 
 #### Purpose
 - **Complex JOINs**: Multi-table operations that require predefined, optimized query structures.
 - **Named Queries**: Predefined query configurations (see `queryConfig.ts`):
-  - `supplier_categories` - Suppliers with assigned categories
-  - `category_offerings` - Categories with offerings and product definitions
+  - `category_offerings_proddef` - Categories with offerings and product definitions
   - `offering->product_def->category->wholesaler` - Complete offering data with all relations
+  - `product_definition_offerings` - Offerings for a product definition with all joins
   - `order->wholesaler` - Orders with wholesaler information
   - `order->order_items->product_def->category` - Orders with items and product details
   - `offering_attributes`, `offering_links` - Offering relationships
@@ -247,25 +242,25 @@ POST /api/offering-images/new
 ```
 
 #### n:m Assignment Relationships (`AssignmentRequest`)
-- `/api/supplier-categories`: Assign a Supplier to a Category.
 - `/api/offering-attributes`: Assign an Attribute to an Offering.
 
 ```typescript
-// Example: Assign a Category to a Supplier
-POST /api/supplier-categories
+// Example: Assign an Attribute to an Offering
+POST /api/offering-attributes
 {
-  "parent1Id": 1,
-  "parent2Id": 5,
+  "parent1Id": 123,  // offering_id
+  "parent2Id": 5,    // attribute_id
   "data": {
-    "comment": "High priority",
-    "link": "https://..."
+    "value": "Red"
   }
 }
 ```
 
-### Centralized Deletion Logic: `dataModel/deletes.ts`
+> ⚠️ **DEPRECATED (refact01):** `/api/supplier-categories` has been removed. Suppliers can now create offerings for any category without prior assignment.
 
-To ensure consistency, robustness, and transaction safety, all complex deletion logic is centralized in server-side helper functions within `lib/dataModel/deletes.ts`.
+### Centralized Deletion Logic: `backendQueries/cascadingDeleteOperations.ts`
+
+To ensure consistency, robustness, and transaction safety, all complex deletion logic is centralized in server-side helper functions within `lib/backendQueries/cascadingDeleteOperations.ts`.
 
 -   **Pattern:** Each master data entity (e.g., `ProductDefinition`, `Supplier`) has a corresponding `delete...` function (e.g., `deleteProductDefinition`).
 -   **Parameters:** These functions accept the `id` of the entity to delete, a `cascade: boolean` flag, and an active database `Transaction` object.
@@ -292,8 +287,8 @@ try {
 ```
 
 **Reference Examples:**
-- `src/lib/dataModel/dependencyChecks.ts:43` (TransWrapper usage)
-- `src/lib/dataModel/deletes.ts` (All delete functions)
+- `src/lib/backendQueries/dependencyChecks.ts` (TransWrapper usage, dependency checks)
+- `src/lib/backendQueries/cascadingDeleteOperations.ts` (All delete functions)
 
 #### Dependency Check Structure
 All dependency check functions must return: `{ hard: string[], soft: string[] }`
@@ -360,10 +355,10 @@ The client implements a highly robust **Optimistic Delete** pattern managed by a
 | Create | `POST /api/order-items/new` | `Omit<OrderItem, 'order_item_id'>` | ✅ | ✅ | |
 | Update | `PUT /api/order-items/[id]` | `Partial<OrderItem>` | ✅ | ✅ | |
 | Delete | `DELETE /api/order-items/[id]` | `DeleteRequest<OrderItem>` | ✅ | ✅ | |
-| **SUPPLIER-CATEGORIES (Assignment - n:m)** | | | | | |
-| Query via JOINs | `POST /api/query` | `namedQuery: 'supplier_categories'` | ✅ | ✅ | |
-| Create Assignment | `POST /api/supplier-categories` | `AssignmentRequest` | ✅ | ✅ | |
-| Remove Assignment | `DELETE /api/supplier-categories` | `RemoveAssignmentRequest` | ✅ | ✅ | |
+| **~~SUPPLIER-CATEGORIES~~ (DEPRECATED refact01)** | | | | | |
+| Query via JOINs | `POST /api/query` | ~~`namedQuery: 'supplier_categories'`~~ | ❌ | ❌ | Removed |
+| Create Assignment | ~~`POST /api/supplier-categories`~~ | ~~`AssignmentRequest`~~ | ❌ | ❌ | Removed |
+| Remove Assignment | ~~`DELETE /api/supplier-categories`~~ | ~~`RemoveAssignmentRequest`~~ | ❌ | ❌ | Removed |
 | **OFFERING-ATTRIBUTES (Assignment - n:m Attributed)** | | | | | |
 | Query via JOINs | `POST /api/query` | `namedQuery: 'offering_attributes'` | ✅ | ✅ | |
 | Create Assignment | `POST /api/offering-attributes` | `AssignmentRequest` | ✅ | ✅ | |
@@ -399,7 +394,7 @@ The architectural solution is a context-aware loading pattern implemented in the
 
 2.  **Product Context (`/categories/.../productdefinitions/.../offerings/new`):**
     *   When a user creates an offering for a specific product, the UI must present a choice of all possible suppliers.
-    *   **Action:** The `load` function calls the `categoryApi.loadSuppliersForCategory()` function to fetch **all** `Wholesalers` assigned to the `ProductCategory` of the current `ProductDefinition`.
+    *   **Action:** The `load` function calls `categoryApi.loadSuppliersForCategory()` which fetches **all** `Wholesalers` (since refact01, any supplier can create offerings for any category).
     *   **UI:** The `OfferingForm` renders a dropdown list of these suppliers.
 
 This approach simplifies the client-side API, aligns perfectly with the business requirements, and removes complex, misuse-prone queries. This architecture is supported in the data layer by the absence of a restrictive `UNIQUE INDEX` on the `dbo.wholesaler_item_offerings` table, which allows for the creation of multiple offerings for the same product.
@@ -414,14 +409,91 @@ Images use a **Junction-Table architecture** (`dbo.offering_images`) instead of 
 - **Automatic Field Merging**: When creating an offering image via `insertOfferingImage`, offering fields (with COALESCE logic) are automatically merged into the image data before fingerprint calculation.
 
 **Key Implementation Details:**
-- All image operations use `entityOperations/offeringImage.ts` which encapsulates junction logic.
-- Images are never deleted when removing junction entries (images may be shared).
-- **Fingerprint calculation happens in `insertImage`** (central function called by all image creation paths):
-  - For offering images: `insertOfferingImage` merges offering fields (with COALESCE logic) into `imageData`, then calls `insertImage` which calculates the fingerprint.
-  - For direct image inserts (e.g., from `tools/images`): `insertImage` calculates fingerprint directly from the provided data.
-  - Fingerprint is automatically recalculated in `updateImage` when fingerprint-relevant fields are updated.
+
+| Function | Location | Purpose |
+|----------|----------|---------|
+| `insertImage()` | `entityOperations/image.ts` | Central image insert with fingerprint calculation, metadata enrichment (hash, dimensions, mime type) |
+| `insertOfferingImage()` | `entityOperations/offeringImage.ts` | Creates junction entry + image with auto-merged offering fields |
+| `mergePartialImgageDataFromOffering()` | `entityOperations/offeringImage.ts` | Schema-driven field merging from offering to image (maintenance-free!) |
+| `validateFingerprintFields()` | `entityOperations/image.ts` | Fail-fast validation of required fingerprint fields |
+| `loadOfferingImages()` | `entityOperations/offeringImage.ts` | Query via `view_offering_images` with optional filters |
+
+**Image Creation Flow:**
+1. `insertOfferingImage()` receives partial image data + offering_id
+2. Calls `loadOfferingCoalesceProdDef()` to get offering with COALESCED fields from product_def
+3. `mergePartialImgageDataFromOffering()` merges offering fields into image data (schema-driven!)
+4. `validateFingerprintFields()` validates all required fingerprint fields (fail-fast)
+5. `insertImage()` enriches metadata (hash, size, dimensions) and calculates fingerprint
+6. Junction entry created in `dbo.offering_images`
+
+**Important:** Images are never deleted when removing junction entries (images may be shared via fingerprint).
 
 See `image-consolidate.md` and `image-fingerprint.md` for complete architecture documentation.
+
+### The entityOperations Layer
+
+The `src/lib/backendQueries/entityOperations/` directory encapsulates complex database logic between API endpoints and the database. This layer provides reusable functions for both API endpoints AND standalone tools (e.g., image generation scripts).
+
+#### Purpose
+- **Centralized Transaction Handling**: All functions use `TransWrapper` for consistent transaction management
+- **Schema-Driven Validation**: Leverages Zod schemas for type-safe data validation
+- **Business Logic Encapsulation**: Keeps API endpoints thin by moving complex logic into reusable modules
+- **Tool Support**: Functions can be called from CLI tools (e.g., `tools/images/genImages.ts`) without HTTP overhead
+
+#### Available Modules
+
+| Module | Purpose | Key Functions |
+|--------|---------|---------------|
+| `offering.ts` | Load offerings with various join patterns | `loadNestedOfferingsOptimized`, `loadOfferingsFromEnrichedView`, `loadOfferingsFromViewWithLinks`, `copyOffering` |
+| `image.ts` | CRUD for images with fingerprint & metadata | `insertImage`, `updateImage`, `loadImageById`, `findCanonicalImageByFingerprint` |
+| `offeringImage.ts` | Junction table operations with auto-merging | `insertOfferingImage`, `mergePartialImgageDataFromOffering`, `loadOfferingImages` |
+| `material.ts` | Load materials with language support | `loadMaterials`, `generateMaterialsMap` |
+| `form.ts` | Load forms with language support | `loadForms`, `generateFormsMap` |
+| `surfaceFinish.ts` | Load surface finishes | `loadSurfaceFinishes`, `generateSurfaceFinishesMap` |
+| `constructionType.ts` | Load construction types | `loadConstructionTypes`, `generateConstructionTypesMap` |
+| `productType.ts` | Load product types | `loadProductTypes`, `generateProductTypesMap` |
+
+#### Usage Pattern
+
+```typescript
+// API Endpoint uses entityOperations
+import { insertOfferingImage } from '$lib/backendQueries/entityOperations/offeringImage';
+
+export const POST: RequestHandler = async ({ request }) => {
+  const tw = new TransWrapper(null, db);
+  await tw.begin();
+  
+  const createdRecord = await insertOfferingImage(tw.trans, requestData);
+  await tw.commit();
+  
+  return json({ success: true, data: createdRecord });
+};
+```
+
+```typescript
+// CLI Tool uses same entityOperations
+import { insertOfferingImageFromOffering } from '$lib/backendQueries/entityOperations/offeringImage';
+import { loadOfferingsWithOptions } from '$lib/backendQueries/entityOperations/offering';
+
+// No HTTP - direct database access with same validation
+const offerings = await loadOfferingsWithOptions({ allowedWholesalerRelevances: ['A'] }, null);
+for (const offering of offerings) {
+  await insertOfferingImageFromOffering(transaction, imageData, offering);
+}
+```
+
+#### Key Design Principle: Schema-Driven Field Extraction
+
+The `extractImageFields()` function in `offeringImage.ts` demonstrates a **schema-driven, maintenance-free** approach:
+
+```typescript
+// Automatically extracts ALL Image fields from source using ImageSchema.shape
+// New fields added to ImageSchema are automatically included!
+function extractImageFields(source: Partial<OfferingImageView>, offeringForCoalesce?: WholesalerItemOffering): Partial<Image> {
+  const imageKeys = Object.keys(ImageSchema.shape) as (keyof Image)[];
+  // ... coalesce logic
+}
+```
 
 ### Future Architectural Enhancements
 
@@ -471,99 +543,60 @@ This payload is sent from the client to a server endpoint (e.g., `/api/suppliers
 
 Zod is the sole source of truth for the **shape** and **rules** of data throughout the system, on both the frontend and backend. The schemas defined in `src/lib/domain/domainTypes.ts` are used directly in API endpoints for robust server-side validation.
 
-#### Implemented: Schema-based Table Registry System
+#### Branded Schemas with Metadata
 
-**Challenge Solved:** The previous queryConfig system required duplicate column maintenance - once in Zod schemas and again in hardcoded column lists.
-
-**Implemented Solution:** A **Table Registry System** that eliminates code duplication:
+Instead of a separate Table Registry, the system uses **Branded Zod Schemas** with embedded metadata. Each schema carries its own table information:
 
 ```typescript
-// Implemented: src/lib/backendQueries/tableRegistry.ts
-export interface TableDefinition {
-  schema: z.ZodObject<any>;  // Direct reference to Zod schema
-  tableName: string;         // e.g., "orders"
-  dbSchema: string;          // e.g., "dbo"
-  alias: string;             // e.g., "ord"
-}
+// In src/lib/domain/domainTypes.ts - Branded Schemas
+export const WholesalerSchema = createSchemaWithMeta(
+  z.object({
+    wholesaler_id: z.number(),
+    name: z.string(),
+    // ... other fields
+  }),
+  { alias: "w", tableName: "wholesalers", dbSchema: "dbo" }
+);
 
-export const TableRegistry = {
-  "wholesalers": {
-    schema: WholesalerSchema,
-    tableName: "wholesalers",
-    dbSchema: "dbo",
-    alias: "w"
-  },
-  "orders": {
-    schema: OrderSchema,      // Single source of truth
-    tableName: "orders",
-    dbSchema: "dbo",
-    alias: "ord"
-  },
-  // ... all entities implemented
-} as const satisfies Record<string, TableDefinition>;
-
-// Automatic type generation from schemas
-type ExtractSchemaKeys<T extends z.ZodObject<any>> = Extract<keyof z.infer<T>, string>;
-
-export type AllQualifiedColumns = {
-  [K in keyof typeof TableRegistry]: `${(typeof TableRegistry)[K]["alias"]}.${ExtractSchemaKeys<(typeof TableRegistry)[K]["schema"]>}`;
-}[keyof typeof TableRegistry];
-
-// Runtime column validation using Zod 4.x API
-export function validateJoinSelectColumns(selectColumns: string[]): void {
-  for (const column of selectColumns) {
-    if (column.includes('.')) {
-      const [alias, columnName] = column.split('.');
-      const tableConfig = getTableConfigByAlias(alias);
-      if (tableConfig) {
-        const allowedColumns = tableConfig.schema.keyof().options;
-        if (!allowedColumns.includes(cleanColumn)) {
-          throw new Error(`Column '${cleanColumn}' not found in schema for alias '${alias}'`);
-        }
-      }
-    }
-  }
-}
+// AllBrandedSchemas exports all schemas for type generation
+export const AllBrandedSchemas = {
+  WholesalerSchema,
+  ProductCategorySchema,
+  // ... all schemas
+};
 ```
 
-#### Current Query Config Pattern (Updated)
-QueryConfig now focuses purely on JOIN configurations, with table security handled by Table Registry:
+**Key Implementation:** `src/lib/domain/domainTypes.utils.ts` provides:
+- `genTypedQualifiedColumns()` - Generates qualified column names from branded schemas
+- `schemaByAlias` Map - Lookup schemas by their alias
+- `AllQualifiedColumns` type - Union of all valid qualified column names
+
+#### Current Query Config Pattern
+
+QueryConfig provides predefined JOIN configurations for complex queries:
 
 ```typescript
-// In src/lib/backendQueries/queryConfig.ts - Updated Architecture
+// In src/lib/backendQueries/queryConfig.ts
 export interface QueryConfig {
-  joinConfigurations: {
-    [viewName: string]: {
-      from: ValidFromClause;
-      joins: JoinClause[];
-      exampleQuery?: QueryPayload<unknown>;
-    };
-  };
+  predefinedQueryies: { [viewName: string]: QueryConfigEntry };
 }
 
-export const supplierQueryConfig: QueryConfig = {
-  joinConfigurations: {
-    supplier_categories: {
-      from: { table: "dbo.wholesalers", alias: "w" },
+export const queryConfig: QueryConfig = {
+  predefinedQueryies: {
+    "offering->product_def->category->wholesaler": {
+      from: { table: "dbo.wholesaler_item_offerings", alias: "wio" },
       joins: [
-        {
-          type: JoinType.INNER,
-          table: "dbo.wholesaler_categories",
-          alias: "wc",
-          on: {
-            joinCondOp: LogicalOperator.AND,
-            conditions: [{ columnA: "w.wholesaler_id", op: ComparisonOperator.EQUALS, columnB: "wc.wholesaler_id" }],
-          },
-        },
-        // ... more joins
+        { type: JoinType.INNER, table: "dbo.product_definitions", alias: "pd", ... },
+        { type: JoinType.INNER, table: "dbo.product_categories", alias: "pc", ... },
+        { type: JoinType.INNER, table: "dbo.wholesalers", alias: "w", ... },
       ],
     },
-    // ... other JOIN configurations
+    // ... other predefined queries
   },
 };
 ```
 
-**Security is now handled by the Table Registry system - no more hardcoded column lists needed.**
+**Security is enforced by branded schemas - only columns defined in schemas can be queried.**
 
 #### Enhanced QueryPayload Type Safety
 
@@ -587,7 +620,7 @@ export interface QueryPayload<T> {
 - **✅ Qualified Columns:** `AllQualifiedColumns` for aliased columns like `"w.name"`, `"pc.category_id"`
 - **✅ Aliased Columns:** `AllAliasedColumns` for AS clauses like `"w.name AS supplier_name"`
 - **✅ Auto-Completion:** Perfect IntelliSense for all valid column combinations
-- **✅ Runtime Validation:** `validateJoinSelectColumns()` ensures query safety
+- **✅ Schema-Driven Security:** Only columns defined in branded schemas can be queried
 
 **Example Usage:**
 ```typescript
@@ -996,8 +1029,8 @@ When adding or modifying fields in existing entities (e.g., `wholesaler_item_off
 - [ ] `DELETE /api/entity/[id]` - Delete with cascade support
 
 ### 4. Deletion & Dependencies
-- [ ] Add dependency check function to `src/lib/dataModel/dependencyChecks.ts`
-- [ ] Add deletion function to `src/lib/dataModel/deletes.ts`
+- [ ] Add dependency check function to `src/lib/backendQueries/dependencyChecks.ts`
+- [ ] Add deletion function to `src/lib/backendQueries/cascadingDeleteOperations.ts`
 - [ ] Use TransWrapper pattern for all database operations
 - [ ] Return `{ hard: string[], soft: string[] }` from dependency checks
 

@@ -2,13 +2,14 @@ import { type ReportRow } from './analyze-config.js';
 import { saveReportFile, printConsoleSummary } from './output.js';
 import { log } from '$lib/utils/logger.js';
 import {
-    groupByGroupKey,
-    groupByStone,
-    groupByProductType,
+    groupBy_ProductType_Material_Form_Key,
+    groupBy_Material_Form,
+    groupBy_ProductType_Material_Form,
     calculateRank,
     calculateDiff,
     calculateInfo,
     sortCandidatesByPrice,
+    sortCandidatesByWeight,
     formatUnitForMarkdown,
     formatWeightForMarkdown
 } from './report-grouping.js';
@@ -153,13 +154,17 @@ export class ReportBuilder {
      * Builds the best-buy report markdown (grouped & ranked).
      * Includes legend section at the top.
      * @param data - Array of audit rows
+     * @param sortLeaves - Optional callback to sort leaf nodes (defaults to price sorting)
      * @returns Markdown string for best-buy report
      */
-    buildBestBuyMarkdown(data: ReportRow[]): string {
+    buildBestBuyMarkdown(
+        data: ReportRow[], 
+        sortLeaves: (candidates: ReportRow[]) => ReportRow[] = sortCandidatesByPrice
+    ): string {
         const now = new Date().toISOString().split('T')[0];
 
         // 1. Gruppieren (nutze report-grouping.ts)
-        const { groups, sortedKeys } = groupByGroupKey(data);
+        const { groups, sortedKeys } = groupBy_ProductType_Material_Form_Key(data);
 
         // 2. Header
         let md = `# 🏆 Best Price Report (${now})\n\n`;
@@ -212,7 +217,7 @@ export class ReportBuilder {
 
         // 4. Gruppen durchgehen
         sortedKeys.forEach(key => {
-            const candidates = sortCandidatesByPrice(groups[key]);
+            const candidates = sortLeaves(groups[key]);
             
             if (candidates.length === 0) return;
             
@@ -266,16 +271,19 @@ export class ReportBuilder {
      * @param data - Array of audit rows
      * @returns Markdown string for best-buy report by stone
      */
-    buildBestBuyByStoneMarkdown(data: ReportRow[]): string {
+    buildBestBuyByStoneMarkdown(
+        data: ReportRow[], 
+        sortLeaves: (candidates: ReportRow[]) => ReportRow[] = sortCandidatesByPrice
+    ): string {
         const now = new Date().toISOString().split('T')[0];
 
         // 1. Gruppieren nach Material (Stein), dann nach Form (nutze report-grouping.ts)
-        const { stoneGroups, sortedStones } = groupByStone(data);
+        const { stoneGroups, sortedStones } = groupBy_Material_Form(data);
 
         // 2. Header - EINE große Tabelle für alle Steine
         let md = `# 🏆 Best Price Report by Stone (${now})\n\n`;
         md += `Schnelle Übersicht: Angebote gruppiert nach Stein/Material.\n\n`;
-        md += `> **Hinweis:** Diese Übersicht gruppiert nach Material (Stein). Für detaillierte Vergleiche nach Use-Case siehe \`best_buy_report.md\`.\n\n`;
+        md += `> **Hinweis:** Diese Übersicht gruppiert nach Material (Stein). Für detaillierte Vergleiche nach Use-Case siehe \`report.md\`.\n\n`;
 
         // 3. Single table for all stones (drill-down style)
         // "Gewicht" shows effective weight, "Einheit" shows €/kg or €/Stk with tooltip
@@ -293,7 +301,7 @@ export class ReportBuilder {
 
             // Durch alle Formen gehen und Zeilen hinzufügen
             sortedForms.forEach(form => {
-                const candidates = sortCandidatesByPrice(formGroups[form]);
+                const candidates = sortLeaves(formGroups[form]);
                 
                 if (candidates.length === 0) return;
                 
@@ -351,18 +359,22 @@ export class ReportBuilder {
      * Builds the best-buy report grouped by product type (for quick overview per product type).
      * Groups all offerings by ProductType, then by Material, then by Form, showing all offerings in a drill-down style table.
      * @param data - Array of report rows
+     * @param sortLeaves - Optional callback to sort leaf nodes (defaults to price sorting)
      * @returns Markdown string for best-buy report by product type
      */
-    buildBestBuyByProductTypeMarkdown(data: ReportRow[]): string {
+    buildBestBuyByProductTypeMarkdown(
+        data: ReportRow[], 
+        sortLeaves: (candidates: ReportRow[]) => ReportRow[] = sortCandidatesByPrice
+    ): string {
         const now = new Date().toISOString().split('T')[0];
 
         // 1. Gruppieren nach ProductType, dann nach Material (Stein), dann nach Form (nutze report-grouping.ts)
-        const { productTypeGroups, sortedProductTypes } = groupByProductType(data);
+        const { productTypeGroups, sortedProductTypes } = groupBy_ProductType_Material_Form(data);
 
         // 2. Header - EINE große Tabelle für alle ProductTypes
         let md = `# 🏆 Best Price Report by Product Type (${now})\n\n`;
         md += `Schnelle Übersicht: Angebote gruppiert nach Produkttyp.\n\n`;
-        md += `> **Hinweis:** Diese Übersicht gruppiert nach Produkttyp. Für detaillierte Vergleiche nach Use-Case siehe \`best_buy_report.md\`.\n\n`;
+        md += `> **Hinweis:** Diese Übersicht gruppiert nach Produkttyp. Für detaillierte Vergleiche nach Use-Case siehe \`report.md\`.\n\n`;
 
         // 3. Single table for all product types (drill-down style)
         // "Gewicht" shows effective weight, "Einheit" shows €/kg or €/Stk with tooltip
@@ -384,7 +396,7 @@ export class ReportBuilder {
 
                 // Durch alle Formen gehen und Zeilen hinzufügen
                 sortedForms.forEach(form => {
-                    const candidates = sortCandidatesByPrice(formGroups[form]);
+                    const candidates = sortLeaves(formGroups[form]);
                     
                     if (candidates.length === 0) return;
                     
@@ -444,32 +456,52 @@ export class ReportBuilder {
     generateReports(sortedData: ReportRow[]): void {
         log.info(`Generating reports from ${sortedData.length} report rows`);
 
-        // Build Markdown reports using builder methods
+        // Build Markdown reports using builder methods (price-sorted)
         const auditMarkdown = this.buildAuditMarkdown(sortedData);
         const bestBuyMarkdown = this.buildBestBuyMarkdown(sortedData);
         const bestBuyByStoneMarkdown = this.buildBestBuyByStoneMarkdown(sortedData);
         const bestBuyByProductTypeMarkdown = this.buildBestBuyByProductTypeMarkdown(sortedData);
 
-        // Build CSV reports using CSV builder
+        // Build Markdown reports (size-sorted)
+        const bestBuyMarkdownBySize = this.buildBestBuyMarkdown(sortedData, sortCandidatesByWeight);
+        const bestBuyByStoneMarkdownBySize = this.buildBestBuyByStoneMarkdown(sortedData, sortCandidatesByWeight);
+        const bestBuyByProductTypeMarkdownBySize = this.buildBestBuyByProductTypeMarkdown(sortedData, sortCandidatesByWeight);
+
+        // Build CSV reports using CSV builder (price-sorted)
         const bestBuyCsv = exportBestBuyReportToCsv(sortedData);
         const bestBuyByStoneCsv = exportBestBuyByStoneToCsv(sortedData);
         const bestBuyByProductTypeCsv = exportBestBuyByProductTypeToCsv(sortedData);
+
+        // Build CSV reports (size-sorted)
+        const bestBuyCsvBySize = exportBestBuyReportToCsv(sortedData, sortCandidatesByWeight);
+        const bestBuyByStoneCsvBySize = exportBestBuyByStoneToCsv(sortedData, sortCandidatesByWeight);
+        const bestBuyByProductTypeCsvBySize = exportBestBuyByProductTypeToCsv(sortedData, sortCandidatesByWeight);
 
         log.info('Reports generated, saving files...');
 
         // Print console summary
         printConsoleSummary(sortedData);
 
-        // Save Markdown report files
+        // Save Markdown report files (price-sorted)
         saveReportFile('audit_log.md', auditMarkdown);
-        saveReportFile('best_buy_report.md', bestBuyMarkdown);
-        saveReportFile('best_buy_report_by_stone.md', bestBuyByStoneMarkdown);
-        saveReportFile('best_buy_report_by_product_type.md', bestBuyByProductTypeMarkdown);
+        saveReportFile('report.md', bestBuyMarkdown);
+        saveReportFile('report_by_stone.md', bestBuyByStoneMarkdown);
+        saveReportFile('report_by_product_type.md', bestBuyByProductTypeMarkdown);
 
-        // Save CSV report files
-        saveReportFile('best_buy_report.csv', bestBuyCsv);
-        saveReportFile('best_buy_report_by_stone.csv', bestBuyByStoneCsv);
-        saveReportFile('best_buy_report_by_product_type.csv', bestBuyByProductTypeCsv);
+        // Save Markdown report files (size-sorted)
+        saveReportFile('report_by_size.md', bestBuyMarkdownBySize);
+        saveReportFile('report_by_stone_by_size.md', bestBuyByStoneMarkdownBySize);
+        saveReportFile('report_by_product_type_by_size.md', bestBuyByProductTypeMarkdownBySize);
+
+        // Save CSV report files (price-sorted)
+        saveReportFile('report.csv', bestBuyCsv);
+        saveReportFile('report_by_stone.csv', bestBuyByStoneCsv);
+        saveReportFile('report_by_product_type.csv', bestBuyByProductTypeCsv);
+
+        // Save CSV report files (size-sorted)
+        saveReportFile('report_by_size.csv', bestBuyCsvBySize);
+        saveReportFile('report_by_stone_by_size.csv', bestBuyByStoneCsvBySize);
+        saveReportFile('report_by_product_type_by_size.csv', bestBuyByProductTypeCsvBySize);
 
         log.info('Reports saved successfully');
     }

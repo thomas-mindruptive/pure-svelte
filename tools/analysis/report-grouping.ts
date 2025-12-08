@@ -28,7 +28,7 @@ export interface GroupedData {
  * Result of grouping offerings by material (stone), then by form.
  * Structure: { "Amethyst": { "Kugel": [row1, row2, ...], "Herz": [...] } }
  */
-export interface StoneGroupedData {
+export interface MaterialFormGroupedData {
     stoneGroups: Record<string, Record<string, ReportRow[]>>;
     sortedStones: string[];
 }
@@ -37,19 +37,9 @@ export interface StoneGroupedData {
  * Result of grouping offerings by product type, then material, then form.
  * Structure: { "Anhänger": { "Amethyst": { "Kugel": [...] } } }
  */
-export interface ProductTypeGroupedData {
+export interface ProductTypeMaterialFormGroupedData {
     productTypeGroups: Record<string, Record<string, Record<string, ReportRow[]>>>;
     sortedProductTypes: string[];
-}
-
-/**
- * Parsed components of a Group_Key string.
- * Group_Key format: "ProductType > Material > Form"
- */
-export interface GroupKeyParts {
-    productType: string;
-    material: string;
-    form: string;
 }
 
 // ==========================================
@@ -63,7 +53,7 @@ export interface GroupKeyParts {
  * @param row - Report row with Product_Type, Material_Name, Form_Name
  * @returns Composite group key string
  */
-export function buildGroupKey(row: ReportRow): string {
+export function build_ProductType_Material_Form_Key(row: ReportRow): string {
     return `${row.Product_Type} > ${row.Material_Name} > ${row.Form_Name}`;
 }
 
@@ -89,28 +79,6 @@ export function filterValidRows(data: ReportRow[]): ReportRow[] {
 // GROUP KEY PARSING
 // ==========================================
 
-/**
- * Parses a Group_Key string into its component parts.
- * 
- * @deprecated Use row.Product_Type, row.Material_Name, row.Form_Name instead.
- * This function is kept for backward compatibility only.
- * 
- * @param groupKey - Group key string (format: "ProductType > Material > Form")
- * @returns Object with productType, material, and form
- * 
- * @example
- * extractGroupKeyParts("Anhänger > Amethyst > Kugel")
- * // → { productType: "Anhänger", material: "Amethyst", form: "Kugel" }
- */
-export function extractGroupKeyParts(groupKey: string): GroupKeyParts {
-    const parts = groupKey.split(' > ');
-    return {
-        productType: parts.length >= 1 ? parts[0] : '',
-        material: parts.length >= 2 ? parts[1] : groupKey, // Fallback to full key
-        form: parts.length >= 3 ? parts[2] : ''
-    };
-}
-
 // ==========================================
 // GROUPING FUNCTIONS
 // ==========================================
@@ -122,12 +90,12 @@ export function extractGroupKeyParts(groupKey: string): GroupKeyParts {
  * @param data - Array of report rows to group
  * @returns Object with groups and sorted keys
  */
-export function groupByGroupKey(data: ReportRow[]): GroupedData {
+export function groupBy_ProductType_Material_Form_Key(data: ReportRow[]): GroupedData {
     const groups: Record<string, ReportRow[]> = {};
     const validRows = filterValidRows(data);
     
     validRows.forEach(row => {
-        const groupKey = buildGroupKey(row);
+        const groupKey = build_ProductType_Material_Form_Key(row);
         if (!groups[groupKey]) {
             groups[groupKey] = [];
         }
@@ -146,7 +114,7 @@ export function groupByGroupKey(data: ReportRow[]): GroupedData {
  * @param data - Array of report rows to group
  * @returns Object with nested groups and sorted stone names
  */
-export function groupByStone(data: ReportRow[]): StoneGroupedData {
+export function groupBy_Material_Form(data: ReportRow[]): MaterialFormGroupedData {
     const stoneGroups: Record<string, Record<string, ReportRow[]>> = {};
     const validRows = filterValidRows(data);
     
@@ -177,7 +145,7 @@ export function groupByStone(data: ReportRow[]): StoneGroupedData {
  * @param data - Array of report rows to group
  * @returns Object with triple-nested groups and sorted product types
  */
-export function groupByProductType(data: ReportRow[]): ProductTypeGroupedData {
+export function groupBy_ProductType_Material_Form(data: ReportRow[]): ProductTypeMaterialFormGroupedData {
     const productTypeGroups: Record<string, Record<string, Record<string, ReportRow[]>>> = {};
     const validRows = filterValidRows(data);
     
@@ -296,6 +264,43 @@ export function sortCandidatesByPrice(candidates: ReportRow[]): ReportRow[] {
     return [...candidates].sort((a, b) => a.Final_Normalized_Price - b.Final_Normalized_Price);
 }
 
+/**
+ * Sorts candidate offerings by size/weight (smallest first).
+ * Creates a new array without modifying the original.
+ * 
+ * SORTING LOGIC:
+ * - Primary: Sort by Detected_Weight_Kg (ascending: small to large)
+ * - Items without weight (null) are sorted to the end (999999)
+ * 
+ * USE CASE:
+ * Enables size-sorted reports (e.g., "Show me all Amethyst spheres from small to large")
+ * Weight includes:
+ * - BULK: Package weight (e.g., "1kg Trommelsteine")
+ * - EXACT: Individual piece weight (e.g., "50g pendant")
+ * - RANGE: Average weight (e.g., "30-50g")
+ * - CALC: Geometrically calculated weight
+ * 
+ * @param candidates - Array of offerings to sort
+ * @returns New sorted array ordered by weight (ascending)
+ * 
+ * @example
+ * // Rosenquarz Kugel group sorted by size:
+ * // - 30g (small)
+ * // - 50g (medium)
+ * // - 80g (large)
+ * // - Items without weight (at end)
+ */
+export function sortCandidatesByWeight(candidates: ReportRow[]): ReportRow[] {
+    return [...candidates].sort((a, b) => {
+        // Get weights, use 999999 for items without weight (sorts them to end)
+        const weightA = a.Detected_Weight_Kg ?? 999999;
+        const weightB = b.Detected_Weight_Kg ?? 999999;
+        
+        // Sort ascending: smallest to largest
+        return weightA - weightB;
+    });
+}
+
 // ==========================================
 // FORMATTING FUNCTIONS
 // ==========================================
@@ -346,18 +351,7 @@ export function formatUnitForCsv(row: ReportRow): string {
  * @returns Formatted weight string (e.g., "229g", "1.25kg", "-")
  */
 export function formatWeightForMarkdown(row: ReportRow): string {
-    // No weight display for unit-based pricing
-    if (row.Unit === '€/Stk' || row.Detected_Weight_Kg === null) {
-        return '-';
-    }
-    
-    const weightKg = row.Detected_Weight_Kg;
-    
-    // Use grams for weights under 1kg for better readability
-    if (weightKg < 1) {
-        const grams = Math.round(weightKg * 1000);
-        return `${grams}g`;
-    } else {
-        return `${weightKg.toFixed(2)}kg`;
-    }
+    // Weight is already formatted in buildReportRow as Weight_Display
+    // Just return it directly instead of re-formatting
+    return row.Weight_Display || '-';
 }

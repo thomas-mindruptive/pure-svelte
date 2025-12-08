@@ -425,34 +425,42 @@ export function transformOfferingsToAuditRows(normalizedOfferings: NormalizedOff
             );
             allTraces.push(...landedCostResult.trace);
 
-            // STEP C: Determine pricing strategy (WEIGHT vs UNIT)
-            const strategyResult = determinePricingStrategy(row, determineEffectiveWeight);
+            // STEP C: Calculate weight ALWAYS (for all strategies, enables size-sorted reports)
+            const weightResult = determineEffectiveWeight(row);
+            if (weightResult.weightKg) {
+                allTraces.push(`📊 Weight: ${weightResult.method} (${weightResult.weightKg.toFixed(3)}kg)`);
+            }
+
+            // STEP D: Determine pricing strategy (WEIGHT vs UNIT) using weight result
+            const strategyResult = determinePricingStrategy(row, weightResult);
             allTraces.push(...strategyResult.trace);
 
-            // STEP D: Calculate normalized price
+            // STEP E: Calculate normalized price
             const normalizedPriceResult = calculateNormalizedPrice(
                 landedCostResult.effectivePrice,
                 strategyResult.strategy,
                 row,
-                determineEffectiveWeight
+                weightResult
             );
             allTraces.push(...normalizedPriceResult.trace);
 
-            // STEP E: Extract metadata (dimensions, package weight)
+            // STEP F: Extract metadata (dimensions, package weight)
             const metadataResult = extractMetadata(row);
             allTraces.push(...metadataResult.trace);
 
-            // STEP F: Build report row from all pipeline results
-            return buildReportRow(
+            // STEP G: Build report row from all pipeline results
+            const reportRow = buildReportRow(
                 index,
                 row,
                 listPrice,
                 priceResult,
                 landedCostResult,
                 normalizedPriceResult,
+                weightResult,        // Weight as separate parameter (decoupled from pricing)
                 metadataResult,
                 allTraces
             );
+            return reportRow;
         });
 
     log.info(`Transformation complete: ${auditData.length} audit rows generated`);

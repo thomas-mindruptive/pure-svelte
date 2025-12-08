@@ -11,9 +11,9 @@
  * 
  * OUTPUT:
  * Reports are saved to: C:/dev/pure/pureenergy-schema/reports/
- * - best_buy_report.md          (grouped by use case)
- * - best_buy_report_by_stone.md (grouped by material)
- * - best_buy_report_by_product_type.md (grouped by product type)
+ * - report.md          (grouped by use case)
+ * - report_by_stone.md (grouped by material)
+ * - report_by_product_type.md (grouped by product type)
  * - audit_log.md                (detailed audit trail)
  * - *.csv versions of each report
  */

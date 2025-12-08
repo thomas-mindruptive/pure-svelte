@@ -299,7 +299,7 @@ export class ReportBuilder {
         // 2. Header - EINE große Tabelle für alle Steine
         let md = `# 🏆 Best Price Report by Stone (${now})\n\n`;
         md += `Schnelle Übersicht: Angebote gruppiert nach Stein/Material.\n\n`;
-        md += `> **Hinweis:** Diese Übersicht gruppiert nach Material (Stein). Für detaillierte Vergleiche nach Use-Case siehe \`best_buy_report.md\`.\n\n`;
+        md += `> **Hinweis:** Diese Übersicht gruppiert nach Material (Stein). Für detaillierte Vergleiche nach Use-Case siehe \`report.md\`.\n\n`;
 
         // 3. EINE Tabelle für alle Steine (Drill-Down-Stil)
         md += `| Stein | Produkttyp | Form | Offering ID | Rang | Händler | Herkunft | Produkt | Größe | Gewicht | Price | Price/Piece  | Preis (Norm.) | vs. Winner | Info |\n`;
@@ -409,8 +409,8 @@ export class ReportBuilder {
 
         // Save report files
         saveReportFile('audit_log.md', auditMarkdown);
-        saveReportFile('best_buy_report.md', bestBuyMarkdown);
-        saveReportFile('best_buy_report_by_stone.md', bestBuyByStoneMarkdown);
+        saveReportFile('report.md', bestBuyMarkdown);
+        saveReportFile('report_by_stone.md', bestBuyByStoneMarkdown);
 
         log.info('Reports saved successfully');
     }

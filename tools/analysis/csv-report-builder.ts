@@ -1,12 +1,13 @@
 import { type ReportRow } from './analyze-config.js';
 import {
-    groupByGroupKey,
-    groupByStone,
-    groupByProductType,
+    groupBy_ProductType_Material_Form_Key,
+    groupBy_Material_Form,
+    groupBy_ProductType_Material_Form,
     calculateRank,
     calculateDiff,
     calculateInfo,
     sortCandidatesByPrice,
+    sortCandidatesByWeight,
     formatUnitForCsv,
     formatWeightForMarkdown
 } from './report-grouping.js';
@@ -46,14 +47,18 @@ function formatCsvRow(values: (string | number | null)[]): string {
 // ==========================================
 
 /**
- * Exports best_buy_report as CSV.
+ * Exports report as CSV.
  * Groups offerings by Group_Key (ProductType > Material > Form).
  * 
  * @param data - Array of report rows to export
+ * @param sortLeaves - Optional callback to sort leaf nodes (defaults to price sorting)
  * @returns CSV formatted string
  */
-export function exportBestBuyReportToCsv(data: ReportRow[]): string {
-    const { groups, sortedKeys } = groupByGroupKey(data);
+export function exportBestBuyReportToCsv(
+    data: ReportRow[], 
+    sortLeaves: (candidates: ReportRow[]) => ReportRow[] = sortCandidatesByPrice
+): string {
+    const { groups, sortedKeys } = groupBy_ProductType_Material_Form_Key(data);
     
     // Header row - "Einheit" shows €/kg or €/Stk, "Gewicht" shows effective weight
     const headers = [
@@ -76,7 +81,7 @@ export function exportBestBuyReportToCsv(data: ReportRow[]): string {
     
     // Process each group
     sortedKeys.forEach(key => {
-        const candidates = sortCandidatesByPrice(groups[key]);
+        const candidates = sortLeaves(groups[key]);
         
         if (candidates.length === 0) return;
         
@@ -126,14 +131,18 @@ export function exportBestBuyReportToCsv(data: ReportRow[]): string {
 }
 
 /**
- * Exports best_buy_report_by_stone as CSV.
+ * Exports report_by_stone as CSV.
  * Groups offerings by Material (Stone) > Form in drill-down style.
  * 
  * @param data - Array of report rows to export
+ * @param sortLeaves - Optional callback to sort leaf nodes (defaults to price sorting)
  * @returns CSV formatted string
  */
-export function exportBestBuyByStoneToCsv(data: ReportRow[]): string {
-    const { stoneGroups, sortedStones } = groupByStone(data);
+export function exportBestBuyByStoneToCsv(
+    data: ReportRow[], 
+    sortLeaves: (candidates: ReportRow[]) => ReportRow[] = sortCandidatesByPrice
+): string {
+    const { stoneGroups, sortedStones } = groupBy_Material_Form(data);
     
     // Header row - "Einheit" shows €/kg or €/Stk, "Gewicht" shows effective weight
     const headers = [
@@ -167,7 +176,7 @@ export function exportBestBuyByStoneToCsv(data: ReportRow[]): string {
         const sortedForms = Object.keys(formGroups).sort();
         
         sortedForms.forEach(form => {
-            const candidates = sortCandidatesByPrice(formGroups[form]);
+            const candidates = sortLeaves(formGroups[form]);
             
             if (candidates.length === 0) return;
             
@@ -234,14 +243,18 @@ export function exportBestBuyByStoneToCsv(data: ReportRow[]): string {
 }
 
 /**
- * Exports best_buy_report_by_product_type as CSV.
+ * Exports report_by_product_type as CSV.
  * Groups offerings by ProductType > Material (Stone) > Form in drill-down style.
  * 
  * @param data - Array of report rows to export
+ * @param sortLeaves - Optional callback to sort leaf nodes (defaults to price sorting)
  * @returns CSV string with all product type grouped offerings
  */
-export function exportBestBuyByProductTypeToCsv(data: ReportRow[]): string {
-    const { productTypeGroups, sortedProductTypes } = groupByProductType(data);
+export function exportBestBuyByProductTypeToCsv(
+    data: ReportRow[], 
+    sortLeaves: (candidates: ReportRow[]) => ReportRow[] = sortCandidatesByPrice
+): string {
+    const { productTypeGroups, sortedProductTypes } = groupBy_ProductType_Material_Form(data);
     
     // Header row - "Einheit" shows €/kg or €/Stk, "Gewicht" shows effective weight
     const headers = [
@@ -279,7 +292,7 @@ export function exportBestBuyByProductTypeToCsv(data: ReportRow[]): string {
             const sortedForms = Object.keys(formGroups).sort();
             
             sortedForms.forEach(form => {
-                const candidates = sortCandidatesByPrice(formGroups[form]);
+                const candidates = sortLeaves(formGroups[form]);
                 
                 if (candidates.length === 0) return;
                 

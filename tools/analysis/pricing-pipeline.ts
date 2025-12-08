@@ -407,7 +407,7 @@ export function calculateLandedCost(
  */
 export function determinePricingStrategy(
     offering: NormalizedOffering,
-    determineWeightFn: (offering: NormalizedOffering) => { weightKg: number | null }
+    weightResult: { weightKg: number | null }
 ): PricingStrategyResult {
     const trace: string[] = [];
     
@@ -425,11 +425,8 @@ export function determinePricingStrategy(
     } 
     // CASE 3: AUTO preset (decide based on weight availability)
     else {
-        // Try to determine if weight data is available
-        const weightCheck = determineWeightFn(offering);
-        
         // If we can determine weight → use WEIGHT strategy, otherwise UNIT strategy
-        const strategy = weightCheck.weightKg !== null ? 'WEIGHT' : 'UNIT';
+        const strategy = weightResult.weightKg !== null ? 'WEIGHT' : 'UNIT';
         return { strategy, trace };
     }
 }
@@ -500,7 +497,7 @@ export function calculateNormalizedPrice(
     effectivePrice: number,
     strategy: 'WEIGHT' | 'UNIT',
     offering: NormalizedOffering,
-    determineWeightFn: (offering: NormalizedOffering) => {
+    weightResult: {
         weightKg: number | null;
         source: string;
         method: ReportRow['Calculation_Method'];
@@ -511,10 +508,6 @@ export function calculateNormalizedPrice(
 
     if (strategy === 'WEIGHT') {
         // WEIGHT STRATEGY: Calculate price per kilogram
-        
-        // Call the weight determination function (from analyze-wholesaler.ts)
-        // This tries EXACT → RANGE → BULK → CALC methods in priority order
-        const weightResult = determineWeightFn(offering);
         
         if (weightResult.weightKg && weightResult.weightKg > 0) {
             // SUCCESS: We have a valid weight, calculate €/kg
@@ -554,16 +547,23 @@ export function calculateNormalizedPrice(
             };
         }
     } else {
-        // UNIT STRATEGY: Price per piece (no weight needed)
+        // UNIT STRATEGY: Price per piece
+        
+        // Weight is stored for sorting purposes, even though not used for pricing
+        // This enables size-sorted reports for unit-priced items (e.g., pendants, jewelry)
+        // Bulk items (e.g., "1kg Trommelsteine") will have weight from package
+        if (weightResult.weightKg) {
+            trace.push(`📊 Weight determined for sorting: ${weightResult.method} (${weightResult.weightKg.toFixed(3)}kg)`);
+        }
         
         // The effective price is already in €/piece, so use it directly
-        // No division or calculation needed
+        // No division or calculation needed for price
         return {
             normalizedPrice: effectivePrice,              // Same as effective price
             unit: '€/Stk',
             calcMethod: 'UNIT',
             calcTooltip: `Strategy: UNIT. Price per piece. Calc: ${effectivePrice.toFixed(2)}€ / 1 pc`,
-            weightKg: null,                               // Weight not applicable for UNIT strategy
+            weightKg: weightResult.weightKg,              // Store weight for size-sorted reports!
             trace
         };
     }
@@ -681,6 +681,12 @@ export function buildReportRow(
         calcTooltip: string;
         weightKg: number | null;
     },
+    weightResult: {
+        weightKg: number | null;
+        source: string;
+        method: ReportRow['Calculation_Method'];
+        tooltip: string;
+    },
     metadataResult: {
         dimensions: string | null;
         dimensionsSource: string;
@@ -717,7 +723,7 @@ export function buildReportRow(
         // === CALCULATED INTERMEDIATE VALUES ===
         // Results from pipeline steps
         Detected_Bulk_Price: priceResult.price,             // Best price found (may be bulk discount)
-        Detected_Weight_Kg: normalizedPriceResult.weightKg, // Determined weight in kg
+        Detected_Weight_Kg: weightResult.weightKg,          // Determined weight in kg (from separate weight pipeline step)
         Applied_Markup_Pct: landedCostResult.markupPct,    // Import markup percentage (0 for EU, 25 for non-EU)
 
         // === DIMENSIONS & WEIGHT METADATA ===
@@ -727,13 +733,13 @@ export function buildReportRow(
         Dimensions_Warning: metadataResult.dimensionsWarning, // Warning if dimensions are problematic
         
         // Format weight for display: grams if < 1kg, otherwise kg
-        Weight_Display: normalizedPriceResult.weightKg 
-            ? (normalizedPriceResult.weightKg < 1 
-                ? `${Math.round(normalizedPriceResult.weightKg * 1000)}g`  // Show as grams (e.g., "50g")
-                : `${normalizedPriceResult.weightKg.toFixed(2)}kg`)        // Show as kg (e.g., "1.25kg")
+        Weight_Display: weightResult.weightKg 
+            ? (weightResult.weightKg < 1 
+                ? `${Math.round(weightResult.weightKg * 1000)}g`  // Show as grams (e.g., "50g")
+                : `${weightResult.weightKg.toFixed(2)}kg`)        // Show as kg (e.g., "1.25kg")
             : '-',                                          // No weight available
         
-        Weight_Source: normalizedPriceResult.calcMethod,    // How weight was determined (EXACT, CALC, RANGE, etc.)
+        Weight_Source: weightResult.method,                 // How weight was determined (EXACT, CALC, RANGE, BULK)
         Weight_Warning: null,                               // Currently unused (reserved for future warnings)
         Package_Weight: metadataResult.packageWeight,       // Bulk package weight if available
         Package_Weight_Warning: metadataResult.packageWeightWarning, // Warning if package weight is problematic

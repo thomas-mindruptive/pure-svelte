@@ -19,7 +19,7 @@ import { type ReportRow, OUTPUT_DIR } from './analyze-config.js';
  * Creates the directory if it doesn't exist.
  * Overwrites existing files with the same name.
  * 
- * @param filename - Name of the file to create (e.g., "best_buy_report.md")
+ * @param filename - Name of the file to create (e.g., "report.md")
  * @param content - Content to write to the file
  * 
  * @example

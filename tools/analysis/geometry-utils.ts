@@ -2,7 +2,7 @@
  * Geometry utilities for estimating weight from dimensions.
  * 
  * This module provides functions to:
- * - Parse dimension strings (e.g., "50mm", "10x20x30cm")
+ * - Parse dimension strings (e.g., "50mm", "10x20x30cm", "[30mm][3mm]")
  * - Calculate bounding box volume
  * - Estimate weight using material density and form factor
  * 
@@ -11,6 +11,7 @@
  */
 
 import { getDensity, getFormFactor } from './material-densities';
+import { parseDimensions } from '$lib/utils/parseUtils.js';
 
 // ==========================================
 // TYPE DEFINITIONS
@@ -38,61 +39,162 @@ interface ParsedDimensions {
  * - Single value: "50mm", "5cm" → Cube (L=B=H)
  * - Two values: "10x20cm" → L×B with H=min(L,B)
  * - Three values: "10x20x30mm" → L×B×H
+ * - Bracket notation: "[30mm][3mm]" → Uses first aspect only (e.g., pendant size, ignores hole size)
+ * 
+ * BRACKET NOTATION:
+ * Brackets represent different aspects/components of a product:
+ * - Pendant: [30mm][3mm] → [stone size][hole size] → Only first aspect used for weight
+ * - Necklace: [45cm][5mm][2mm] → [length][bead size][hole] → Only first aspect used
  * 
  * UNIT HANDLING:
  * - mm (default): No conversion
  * - cm: Multiplied by 10
  * - m: Multiplied by 1000
  * 
+ * FAIL FAST:
+ * Throws Error if dimension format is invalid (indicates data quality issue in database)
+ * 
  * @param dimStr - Dimension string to parse
  * @returns Parsed dimensions with volume, or null if parsing fails
+ * @throws Error if dimension format is invalid
  * 
  * @example
  * parseDimensionsToVolume("50mm")      // → 50×50×50mm, 125cm³
  * parseDimensionsToVolume("10x20cm")   // → 100×200×100mm, 2000cm³
  * parseDimensionsToVolume("5x10x15mm") // → 5×10×15mm, 0.75cm³
+ * parseDimensionsToVolume("[30mm][3mm]") // → 30×30×30mm, 27cm³ (only first aspect)
  */
 export function parseDimensionsToVolume(dimStr: string): ParsedDimensions | null {
     if (!dimStr) return null;
 
-    // Normalize: comma to dot, lowercase for unit matching
-    const s = dimStr.toLowerCase().replace(/,/g, '.');
+    // Use validated parsing from parseUtils (supports bracket notation)
+    const parsed = parseDimensions(dimStr);
     
-    // Extract all numeric values from the string
-    const numbers = s.match(/(\d+(\.\d+)?)/g);
+    // FAIL FAST: Invalid format indicates data quality issue
+    if (!parsed.valid) {
+        throw new Error(
+            `Invalid dimension format in database: "${dimStr}". ` +
+            `Validation error: ${parsed.error || 'Unknown error'}`
+        );
+    }
     
-    if (!numbers || numbers.length === 0) return null;
+    if (!parsed.data) {
+        throw new Error(
+            `parseDimensions returned valid=true but no data for: "${dimStr}"`
+        );
+    }
     
-    const vals = numbers.map(n => parseFloat(n));
+    const { data } = parsed;
     
-    // Determine unit conversion factor (default: mm)
+    // Determine unit conversion factor (convert to mm)
     let factor = 1.0;
-    if (s.includes('cm')) {
+    if (data.unit === 'cm') {
         factor = 10.0;  // cm → mm
-    } else if (s.includes('m') && !s.includes('mm') && !s.includes('cm')) {
+    } else if (data.unit === 'm') {
         factor = 1000.0;  // m → mm
     }
     
     let L = 0, B = 0, H = 0;
     
-    if (vals.length >= 3) {
-        // Three dimensions: L × B × H
-        L = vals[0] * factor;
-        B = vals[1] * factor;
-        H = vals[2] * factor;
-    } else if (vals.length === 2) {
-        // Two dimensions: L × B, estimate H as min(L, B)
-        // This is a reasonable assumption for flat stones
-        L = vals[0] * factor;
-        B = vals[1] * factor;
-        H = Math.min(L, B); 
-    } else if (vals.length === 1) {
-        // Single dimension: Assume cubic/spherical (L = B = H)
-        L = vals[0] * factor;
-        B = vals[0] * factor;
-        H = vals[0] * factor;
+    // BRACKET NOTATION: Use only first aspect for weight calculation
+    // Example: [30mm][3mm] → pendant size is 30mm, hole size 3mm (ignore hole)
+    if (data.aspects && data.aspects.length > 0) {
+        const firstAspect = data.aspects[0];
+        
+        // Convert first aspect's unit to mm
+        const aspectFactor = firstAspect.unit === 'cm' ? 10.0 : firstAspect.unit === 'm' ? 1000.0 : 1.0;
+        
+        if (firstAspect.values && firstAspect.values.length > 0) {
+            // Single value or multi-dimensional in first aspect
+            const vals = firstAspect.values.map(v => v * aspectFactor);
+            
+            if (vals.length >= 3) {
+                L = vals[0];
+                B = vals[1];
+                H = vals[2];
+            } else if (vals.length === 2) {
+                L = vals[0];
+                B = vals[1];
+                H = Math.min(L, B);
+            } else {
+                // Single value: assume cubic/spherical
+                L = vals[0];
+                B = vals[0];
+                H = vals[0];
+            }
+        } else if (firstAspect.range) {
+            // Range in first aspect: use average
+            const avg = ((firstAspect.range.min + firstAspect.range.max) / 2) * aspectFactor;
+            L = avg;
+            B = avg;
+            H = avg;
+        } else if (firstAspect.multiDimRange) {
+            // Multi-dimensional range: use average of each dimension
+            const { min, max } = firstAspect.multiDimRange;
+            const vals = min.map((minVal, i) => ((minVal + max[i]) / 2) * aspectFactor);
+            
+            if (vals.length >= 3) {
+                L = vals[0];
+                B = vals[1];
+                H = vals[2];
+            } else if (vals.length === 2) {
+                L = vals[0];
+                B = vals[1];
+                H = Math.min(L, B);
+            } else {
+                L = vals[0];
+                B = vals[0];
+                H = vals[0];
+            }
+        }
+    }
+    // NORMAL NOTATION: "10x5x3mm" or "5-10mm"
+    else if (data.values && data.values.length > 0) {
+        const vals = data.values.map(v => v * factor);
+        
+        if (vals.length >= 3) {
+            L = vals[0];
+            B = vals[1];
+            H = vals[2];
+        } else if (vals.length === 2) {
+            L = vals[0];
+            B = vals[1];
+            H = Math.min(L, B);
+        } else {
+            L = vals[0];
+            B = vals[0];
+            H = vals[0];
+        }
+    }
+    // RANGE: "5-10mm"
+    else if (data.range) {
+        const avg = ((data.range.min + data.range.max) / 2) * factor;
+        L = avg;
+        B = avg;
+        H = avg;
+    }
+    // MULTI-DIMENSIONAL RANGE: "10-20mm x 5-8mm"
+    else if (data.multiDimRange) {
+        const { min, max } = data.multiDimRange;
+        const vals = min.map((minVal, i) => ((minVal + max[i]) / 2) * factor);
+        
+        if (vals.length >= 3) {
+            L = vals[0];
+            B = vals[1];
+            H = vals[2];
+        } else if (vals.length === 2) {
+            L = vals[0];
+            B = vals[1];
+            H = Math.min(L, B);
+        } else {
+            L = vals[0];
+            B = vals[0];
+            H = vals[0];
+        }
     } else {
-        return null;
+        throw new Error(
+            `Unable to extract dimensions from parsed data: "${dimStr}"`
+        );
     }
     
     // Calculate volume in cm³

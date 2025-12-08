@@ -48,9 +48,9 @@ npm run an:ws-price
 
 Reports are saved to `tools/analysis/reports/`:
 
-- `best_buy_report.md` - Main comparison report
-- `best_buy_by_stone.md` - Grouped by material
-- `best_buy_by_product_type.md` - Grouped by product type
+- `report.md` - Main comparison report
+- `report_by_stone.md` - Grouped by material
+- `report_by_product_type.md` - Grouped by product type
 - `*.csv` - CSV versions of all reports
 
 ---
@@ -419,15 +419,15 @@ weight_kg = 12.48 / 1000 = 0.01248 kg
 
 ### Report Types
 
-1. **Best Buy Report** (`best_buy_report.md`)
+1. **Best Buy Report** (`report.md`)
    - All offerings sorted by normalized price
    - Includes all fields, full transparency
 
-2. **Best Buy by Stone** (`best_buy_by_stone.md`)
+2. **Report by Stone** (`report_by_stone.md`)
    - Grouped by material (e.g., Amethyst, Bergkristall)
    - Shows best offers per material
 
-3. **Best Buy by Product Type** (`best_buy_by_product_type.md`)
+3. **Report by Product Type** (`report_by_product_type.md`)
    - Grouped by Product Type > Material > Form
    - Hierarchical drill-down structure
 
@@ -488,9 +488,9 @@ tools/analysis/
 ├── output.ts                       ← File saving, console output
 │
 └── reports/                        ← Generated reports (output)
-    ├── best_buy_report.md
-    ├── best_buy_by_stone.md
-    ├── best_buy_by_product_type.md
+    ├── report.md
+    ├── report_by_stone.md
+    ├── report_by_product_type.md
     └── *.csv
 ```
 

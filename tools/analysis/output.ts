@@ -70,8 +70,8 @@ export function printConsoleSummary(data: ReportRow[]) {
     
     // Transform data for readable console output
     const displayTable = data.slice(0, 10).map(r => ({
-        // Truncate long group keys to fit in console
-        'Grp': r.Group_Key.length > 20 ? r.Group_Key.substring(0, 17) + '...' : r.Group_Key,
+        // Build composite group key for display
+        'Grp': `${r.Product_Type} > ${r.Material_Name}`.substring(0, 20),
         // Truncate long wholesaler names
         'Händler': r.Wholesaler.substring(0, 15),
         // Country code

@@ -6,7 +6,6 @@ import {
     calculateRank,
     calculateDiff,
     calculateInfo,
-    extractGroupKeyParts,
     sortCandidatesByPrice,
     formatUnitForCsv,
     formatWeightForMarkdown
@@ -177,8 +176,8 @@ export function exportBestBuyByStoneToCsv(data: ReportRow[]): string {
             candidates.forEach((row, index) => {
                 const rankDisplay = calculateRank(index);
                 const diffStr = calculateDiff(row, winner, index);
-                const parts = extractGroupKeyParts(row.Group_Key);
-                const productType = parts.productType;
+                // Use direct field instead of parsing Group_Key
+                const productType = row.Product_Type;
                 const info = calculateInfo(row);
                 
                 const productTitle = row.Product_Title;

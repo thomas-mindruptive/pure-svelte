@@ -35,7 +35,7 @@ import {
 } from './analyze-config.js';
 
 // === REPORT GENERATION ===
-import { ReportBuilder } from './md-report-builder.js';
+import { ReportBuilder } from './report-builder.js';
 
 import {
     saveReportFile,
@@ -52,6 +52,15 @@ import {
     calculateWeightFromDimensions
 } from './geometry-utils.js';
 import { parseCSV } from './parse-csv.js';
+import {
+    type NormalizedOffering as PipelineNormalizedOffering,
+    detectBestPrice,
+    calculateLandedCost,
+    determinePricingStrategy,
+    calculateNormalizedPrice,
+    extractMetadata,
+    buildReportRow
+} from './pricing-pipeline.js';
 
 // === DATABASE ACCESS ===
 import { buildOfferingsWhereCondition, loadOfferingsFromEnrichedView, type LoadOfferingsOptions } from '$lib/backendQueries/entityOperations/offering.js';
@@ -396,165 +405,54 @@ export function transformOfferingsToAuditRows(normalizedOfferings: NormalizedOff
     reportBuilder?: ReportBuilder): ReportRow[] {
     log.info(`Starting transformation of ${normalizedOfferings.length} offerings`);
 
-
     const auditData: ReportRow[] = normalizedOfferings
         .map((row, index) => {
-            // Trace collects human-readable steps for debugging and tooltips
-            const trace: string[] = [];
-
-            // ========================================
-            // STEP A: BASE PRICE DETECTION
-            // Search for bulk/volume discounts in comment field
-            // ========================================
             log.debug(`Processing offering ${index + 1}: ${row.offeringTitle}`);
+            
+            // Collect trace entries from all pipeline steps
+            const allTraces: string[] = [];
+
+            // STEP A: Detect best price (bulk or list)
             const listPrice = row.offeringPrice;
-            const priceInfo = getBestPriceFromNormalized(row, listPrice, reportBuilder);
+            const priceResult = detectBestPrice(row, listPrice, reportBuilder);
+            allTraces.push(...priceResult.trace);
 
-            if (priceInfo.source !== 'List') {
-                trace.push(`💰 Bulk Found: ${priceInfo.price.toFixed(2)} (was ${listPrice.toFixed(2)})`);
-                if (priceInfo.commentExcerpt) {
-                    trace.push(`💬 Comment: "...${priceInfo.commentExcerpt}..."`);
-                }
-                log.debug(`Found bulk price: ${priceInfo.price} (source: ${priceInfo.source})`);
-            }
+            // STEP B: Calculate landed cost (with import markup if needed)
+            const landedCostResult = calculateLandedCost(
+                priceResult.price,
+                row.wholesalerCountry,
+                reportBuilder
+            );
+            allTraces.push(...landedCostResult.trace);
 
-            // ========================================
-            // STEP B: LANDED COST CALCULATION
-            // Apply import markup for non-EU countries (customs, shipping, risk)
-            // ========================================
-            const country = row.wholesalerCountry ? row.wholesalerCountry.toUpperCase() : 'UNKNOWN';
-            if (reportBuilder && !reportBuilder['legendEntries'].has('Herkunft')) {
-                reportBuilder.addToLegend(
-                    'Herkunft',
-                    'Herkunftsland (Wholesaler Country)',
-                    'Aus `wholesalerCountry` Feld. Wenn fehlend: zeigt "UNKNOWN". Nicht-EU-Länder bekommen Import-Markup (+25%) angewendet. Quelle: Datenbank/CSV Feld `wholesalerCountry`'
-                );
-            }
+            // STEP C: Determine pricing strategy (WEIGHT vs UNIT)
+            const strategyResult = determinePricingStrategy(row, determineEffectiveWeight);
+            allTraces.push(...strategyResult.trace);
 
-            const isEu = EU_ZONE.has(country);
-            let markupPct = 0;
-            let effectivePrice = priceInfo.price;
+            // STEP D: Calculate normalized price
+            const normalizedPriceResult = calculateNormalizedPrice(
+                landedCostResult.effectivePrice,
+                strategyResult.strategy,
+                row,
+                determineEffectiveWeight
+            );
+            allTraces.push(...normalizedPriceResult.trace);
 
-            if (isEu) {
-                trace.push(`🌍 Origin: ${country} (EU - no markup)`);
-            } else {
-                markupPct = (IMPORT_MARKUP - 1) * 100;
-                effectivePrice = priceInfo.price * IMPORT_MARKUP;
-                trace.push(`✈️ Origin: ${country} (+${markupPct.toFixed(0)}% Markup = ${effectivePrice.toFixed(2)})`);
-            }
+            // STEP E: Extract metadata (dimensions, package weight)
+            const metadataResult = extractMetadata(row);
+            allTraces.push(...metadataResult.trace);
 
-            if (reportBuilder && !reportBuilder['legendEntries'].has('Preis (Norm.)_Import')) {
-                reportBuilder.addToLegend(
-                    'Preis (Norm.)_Import',
-                    'Effektiver Preis nach Import-Markup für Nicht-EU-Länder',
-                    `Wenn Land NICHT in EU-Zone: \`price * 1.25\` (+25% Markup). EU-Länder (DE, AT, NL, etc.): kein Markup. Quelle: Bulk-Preis oder Listenpreis aus vorherigem Schritt`
-                );
-            }
-
-            // ========================================
-            // STEP C: STRATEGY & WEIGHT DETERMINATION
-            // Choose pricing strategy based on product type:
-            // - WEIGHT: Compare by €/kg (raw stones, bulk materials)
-            // - UNIT: Compare by €/Stk (jewelry, pendants, necklaces)
-            // - AUTO: Use WEIGHT if weight data available, else UNIT
-            // ========================================
-            const dimensionsInfo = extractDimensions(row); // Extract dimensions for display
-
-            // Validate and display package weight if available
-            const packageWeightInfo = validatePackageWeight(row.offeringPackaging, row.offeringPackageWeight);
-            if (packageWeightInfo.packageWeightDisplay) {
-                trace.push(`📦 Package Weight: ${packageWeightInfo.packageWeightDisplay} [Field]`);
-            }
-
-            // Determine pricing strategy from STRATEGY_MAP or use AUTO
-            let strategy: 'WEIGHT' | 'UNIT' = 'UNIT';
-            const preset = STRATEGY_MAP[row.productTypeName] || 'AUTO';
-
-            if (preset === 'WEIGHT') strategy = 'WEIGHT';
-            else if (preset === 'UNIT') strategy = 'UNIT';
-            else {
-                // AUTO mode: Prefer WEIGHT-based pricing if weight data is available,
-                // as it enables better comparison across different package sizes
-                const weightCheck = determineEffectiveWeight(row);
-                if (weightCheck.weightKg !== null) strategy = 'WEIGHT';
-                else strategy = 'UNIT';
-            }
-
-            let finalNormalizedPrice = 0;
-            let unitLabel: ReportRow['Unit'] = '€/Stk';
-            let calcMethod: ReportRow['Calculation_Method'] = 'UNIT';
-            let calcTooltip = '';
-
-            // ========================================
-            // STEP D: FINAL PRICE NORMALIZATION
-            // Calculate the comparable price based on strategy
-            // ========================================
-            if (strategy === 'WEIGHT') {
-                // Weight-based: Calculate price per kilogram for fair comparison
-                const weightResult = determineEffectiveWeight(row);
-                if (weightResult.weightKg && weightResult.weightKg > 0) {
-                    // Normalized price = effective price / weight in kg
-                    finalNormalizedPrice = effectivePrice / weightResult.weightKg;
-                    unitLabel = '€/kg';
-                    calcMethod = weightResult.method;
-                    calcTooltip = `${weightResult.tooltip} Calc: ${effectivePrice.toFixed(2)}€ / ${weightResult.weightKg.toFixed(3)}kg`;
-                    trace.push(`⚖️ Weight Strat: ${weightResult.method} (${weightResult.weightKg.toFixed(3)}kg)`);
-                } else {
-                    // Error case: WEIGHT strategy chosen but no weight could be determined
-                    finalNormalizedPrice = 999999; // Push to bottom of rankings
-                    unitLabel = 'ERR';
-                    calcMethod = 'ERR';
-                    calcTooltip = 'Error: WEIGHT strategy selected but no weight data available.';
-                    trace.push(`❌ ERROR: WEIGHT Strategy but no weight found`);
-                }
-            } else {
-                // Unit-based: Use effective price directly (price per piece)
-                finalNormalizedPrice = effectivePrice;
-                unitLabel = '€/Stk';
-                calcMethod = 'UNIT';
-                calcTooltip = `Strategy: UNIT. Price per piece. Calc: ${effectivePrice.toFixed(2)}€ / 1 pc`;
-            }
-
-            // ========================================
-            // STEP E: BUILD GROUP KEY FOR RANKING
-            // Format: "ProductType > Material > Form"
-            // ========================================
-            const materialDisplay = row.finalMaterialName || `[no mat]`;
-            const formDisplay = row.finalFormName || `[no form]`;
-
-            return {
-                Row_ID: (index + 1).toString(),
-                Offering_ID: row.offeringId,
-                Group_Key: `${row.productTypeName} > ${materialDisplay} > ${formDisplay}`,
-                Wholesaler: row.wholesalerName,
-                Origin_Country: country,
-                Product_Title: (row.offeringTitle || 'NULL').substring(0, 50),
-
-                Raw_Price_List: listPrice,
-                Offering_Price: row.offeringPrice,
-                Offering_Price_Per_Piece: row.offeringPricePerPiece,
-                Raw_Weight_Input: row.offeringWeightGrams !== null ? String(row.offeringWeightGrams) : '-',
-
-                Detected_Bulk_Price: priceInfo.price,
-                Detected_Weight_Kg: strategy === 'WEIGHT' ? (determineEffectiveWeight(row).weightKg) : null,
-                Applied_Markup_Pct: markupPct,
-
-                Dimensions: dimensionsInfo.dimensions,
-                Dimensions_Source: dimensionsInfo.source,
-                Dimensions_Warning: dimensionsInfo.warning,
-                Weight_Display: determineEffectiveWeight(row).source, // Simplified display
-                Weight_Source: determineEffectiveWeight(row).source,
-                Weight_Warning: null,
-                Package_Weight: packageWeightInfo.packageWeightDisplay,
-                Package_Weight_Warning: packageWeightInfo.warning,
-
-                Final_Normalized_Price: parseFloat(finalNormalizedPrice.toFixed(2)),
-                Unit: unitLabel,
-                Calculation_Method: calcMethod,
-                Calculation_Tooltip: calcTooltip,
-
-                Calculation_Trace: trace.join(' | ')
-            };
+            // STEP F: Build report row from all pipeline results
+            return buildReportRow(
+                index,
+                row,
+                listPrice,
+                priceResult,
+                landedCostResult,
+                normalizedPriceResult,
+                metadataResult,
+                allTraces
+            );
         });
 
     log.info(`Transformation complete: ${auditData.length} audit rows generated`);
@@ -695,8 +593,10 @@ function processAndAnalyzeOfferingsFromCsv(rawData: RawOffering[], reportBuilder
 
     log.info('Sorting audit data by group and price');
     const sortedData = auditData.sort((a, b) => {
-        if (a.Group_Key < b.Group_Key) return -1;
-        if (a.Group_Key > b.Group_Key) return 1;
+        // Sort by Product_Type -> Material_Name -> Form_Name -> Price
+        if (a.Product_Type !== b.Product_Type) return a.Product_Type.localeCompare(b.Product_Type);
+        if (a.Material_Name !== b.Material_Name) return a.Material_Name.localeCompare(b.Material_Name);
+        if (a.Form_Name !== b.Form_Name) return a.Form_Name.localeCompare(b.Form_Name);
         return a.Final_Normalized_Price - b.Final_Normalized_Price;
     });
 
@@ -720,8 +620,10 @@ function processAndAnalyzeOfferingsFromDb(enrichedData: OfferingEnrichedView[], 
 
     log.info('Sorting audit data by group and price');
     const sortedData = auditData.sort((a, b) => {
-        if (a.Group_Key < b.Group_Key) return -1;
-        if (a.Group_Key > b.Group_Key) return 1;
+        // Sort by Product_Type -> Material_Name -> Form_Name -> Price
+        if (a.Product_Type !== b.Product_Type) return a.Product_Type.localeCompare(b.Product_Type);
+        if (a.Material_Name !== b.Material_Name) return a.Material_Name.localeCompare(b.Material_Name);
+        if (a.Form_Name !== b.Form_Name) return a.Form_Name.localeCompare(b.Form_Name);
         return a.Final_Normalized_Price - b.Final_Normalized_Price;
     });
 

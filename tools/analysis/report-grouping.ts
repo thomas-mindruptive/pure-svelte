@@ -53,6 +53,21 @@ export interface GroupKeyParts {
 }
 
 // ==========================================
+// HELPER FUNCTIONS
+// ==========================================
+
+/**
+ * Builds a composite group key from individual components.
+ * Format: "ProductType > Material > Form"
+ * 
+ * @param row - Report row with Product_Type, Material_Name, Form_Name
+ * @returns Composite group key string
+ */
+export function buildGroupKey(row: ReportRow): string {
+    return `${row.Product_Type} > ${row.Material_Name} > ${row.Form_Name}`;
+}
+
+// ==========================================
 // FILTER FUNCTIONS
 // ==========================================
 
@@ -77,6 +92,9 @@ export function filterValidRows(data: ReportRow[]): ReportRow[] {
 /**
  * Parses a Group_Key string into its component parts.
  * 
+ * @deprecated Use row.Product_Type, row.Material_Name, row.Form_Name instead.
+ * This function is kept for backward compatibility only.
+ * 
  * @param groupKey - Group key string (format: "ProductType > Material > Form")
  * @returns Object with productType, material, and form
  * 
@@ -98,7 +116,7 @@ export function extractGroupKeyParts(groupKey: string): GroupKeyParts {
 // ==========================================
 
 /**
- * Groups offerings by their full Group_Key.
+ * Groups offerings by their composite group key.
  * Offerings with the same ProductType, Material, AND Form are grouped together.
  * 
  * @param data - Array of report rows to group
@@ -109,10 +127,11 @@ export function groupByGroupKey(data: ReportRow[]): GroupedData {
     const validRows = filterValidRows(data);
     
     validRows.forEach(row => {
-        if (!groups[row.Group_Key]) {
-            groups[row.Group_Key] = [];
+        const groupKey = buildGroupKey(row);
+        if (!groups[groupKey]) {
+            groups[groupKey] = [];
         }
-        groups[row.Group_Key].push(row);
+        groups[groupKey].push(row);
     });
     
     const sortedKeys = Object.keys(groups).sort();
@@ -132,9 +151,9 @@ export function groupByStone(data: ReportRow[]): StoneGroupedData {
     const validRows = filterValidRows(data);
     
     validRows.forEach(row => {
-        const parts = extractGroupKeyParts(row.Group_Key);
-        const material = parts.material;
-        const form = parts.form;
+        // Use direct fields instead of parsing Group_Key
+        const material = row.Material_Name;
+        const form = row.Form_Name;
         
         // Initialize nested structure if needed
         if (!stoneGroups[material]) {
@@ -163,10 +182,10 @@ export function groupByProductType(data: ReportRow[]): ProductTypeGroupedData {
     const validRows = filterValidRows(data);
     
     validRows.forEach(row => {
-        const parts = extractGroupKeyParts(row.Group_Key);
-        const productType = parts.productType;
-        const material = parts.material;
-        const form = parts.form;
+        // Use direct fields instead of parsing Group_Key
+        const productType = row.Product_Type;
+        const material = row.Material_Name;
+        const form = row.Form_Name;
         
         // Initialize nested structures if needed
         if (!productTypeGroups[productType]) {

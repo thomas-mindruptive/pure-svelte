@@ -108,7 +108,9 @@ export interface ReportRow {
     // === IDENTIFICATION ===
     Row_ID: string;                 // Sequential row number for reference
     Offering_ID: number;            // Database offering ID for direct lookup
-    Group_Key: string;              // Grouping key: "ProductType > Material > Form"
+    Product_Type: string;           // Product type (e.g., "Anhänger", "Handstein")
+    Material_Name: string;          // Material name (e.g., "Amethyst", "Bergkristall")
+    Form_Name: string;              // Form name (e.g., "Kugel", "Herz")
     Wholesaler: string;             // Supplier name
     Origin_Country: string;         // ISO country code (e.g., "DE", "CN")
     Product_Title: string;          // Product title (truncated to 50 chars)

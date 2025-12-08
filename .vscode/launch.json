@@ -18,5 +18,22 @@
           "!**/node_modules/**"
         ]
       },
+      {
+        "type": "node",
+        "request": "launch",
+        "name": "Price Analysis",
+        "program": "${workspaceFolder}/tools/dist/tools/analysis/analyze-wholesaler-main.js",
+        "cwd": "${workspaceFolder}",
+        "envFile": "${workspaceFolder}/.env",
+        "sourceMaps": true,
+        "skipFiles": [
+          "<node_internals>/**"
+        ],
+        "console": "integratedTerminal",
+        "resolveSourceMapLocations": [
+          "${workspaceFolder}/**",
+          "!**/node_modules/**"
+        ]
+      },
     ]
   }

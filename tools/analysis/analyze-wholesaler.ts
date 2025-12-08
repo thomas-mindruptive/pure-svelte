@@ -1,8 +1,29 @@
+/**
+ * Wholesaler Price Analysis - Core Transformation Module
+ * 
+ * This is the main analysis engine that transforms raw offering data into
+ * normalized, comparable price data for generating best-buy reports.
+ * 
+ * MAIN RESPONSIBILITIES:
+ * 1. Load offerings from database or CSV
+ * 2. Normalize data from different sources into unified format
+ * 3. Detect bulk/volume pricing from comment fields
+ * 4. Apply import markup for non-EU countries (+25%)
+ * 5. Determine pricing strategy (€/kg vs €/Stk) based on product type
+ * 6. Calculate normalized prices for fair comparison
+ * 7. Generate report data with full calculation traces
+ * 
+ * ARCHITECTURE:
+ * - Two data sources: CSV file or database (enriched view)
+ * - Adapter pattern: Both sources normalized to NormalizedOffering interface
+ * - Pipeline: Filter → Bulk Detection → Markup → Strategy → Normalize → Report
+ */
+
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 
-// 1. IMPORTS: Konfiguration & Interfaces
+// === CONFIGURATION & TYPE IMPORTS ===
 import {
     CSV_FILENAME,
     IMPORT_MARKUP,
@@ -13,13 +34,15 @@ import {
     analysisOptions
 } from './analyze-config.js';
 
-// 2. IMPORTS: Report Builder & Output
+// === REPORT GENERATION ===
 import { ReportBuilder } from './md-report-builder.js';
 
 import {
     saveReportFile,
     printConsoleSummary
 } from './output.js';
+
+// === PARSING UTILITIES ===
 import {
     parseMoney,
     extractDimensions,
@@ -29,6 +52,8 @@ import {
     calculateWeightFromDimensions
 } from './geometry-utils.js';
 import { parseCSV } from './parse-csv.js';
+
+// === DATABASE ACCESS ===
 import { buildOfferingsWhereCondition, loadOfferingsFromEnrichedView, type LoadOfferingsOptions } from '$lib/backendQueries/entityOperations/offering.js';
 import { db } from '$lib/backendQueries/db.js';
 import { rollbackTransaction } from '$lib/backendQueries/transactionWrapper.js';
@@ -37,38 +62,62 @@ import type { OfferingEnrichedView } from '$lib/domain/domainTypes.js';
 import { ComparisonOperator, LogicalOperator } from '$lib/backendQueries/queryGrammar.js';
 import type { WhereCondition, WhereConditionGroup } from '$lib/backendQueries/queryGrammar.js';
 
-// Workaround für __dirname in ESM
+// ESM workaround: __dirname is not available in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // ==========================================
-// 3. NORMALIZED INTERFACE FOR TRANSFORMATION
+// 3. UNIFIED DATA INTERFACE
 // ==========================================
 
+/**
+ * Normalized offering data structure for internal processing.
+ * 
+ * WHY THIS EXISTS:
+ * The analysis can load data from two sources (CSV or database), each with
+ * different field types. This interface provides a unified, type-safe format
+ * for the transformation pipeline, regardless of data source.
+ * 
+ * KEY DIFFERENCES FROM RAW DATA:
+ * - All prices are numbers (not strings)
+ * - NULL values are represented as null (not "NULL" string)
+ * - IDs are numbers (not strings)
+ */
 interface NormalizedOffering {
     wholesalerName: string;
     wholesalerId: number;
     wholesalerRelevance: string | null;
-    wholesalerCountry: string | null;
-    productTypeName: string;
-    finalMaterialName: string | null;
-    finalFormName: string | null;
+    wholesalerCountry: string | null;      // ISO country code for markup calculation
+    productTypeName: string;               // Used to determine pricing strategy
+    finalMaterialName: string | null;      // Used for density lookup in CALC
+    finalFormName: string | null;          // Used for form factor in CALC
     offeringTitle: string;
-    offeringPrice: number;
+    offeringPrice: number;                 // Primary price (converted from string)
     offeringPricePerPiece: number | null;
-    offeringWeightGrams: number | null;
-    offeringComment: string | null;
-    offeringPackaging: string | null;
-    offeringDimensions: string | null;
-    offeringWeightRange: string | null;
-    offeringPackageWeight: string | null;
-    offeringId: number;
+    offeringWeightGrams: number | null;    // Explicit weight if available
+    offeringComment: string | null;        // May contain bulk prices
+    offeringPackaging: string | null;      // May contain weight info
+    offeringDimensions: string | null;     // For geometric weight calculation
+    offeringWeightRange: string | null;    // e.g., "30-50g"
+    offeringPackageWeight: string | null;  // Bulk package weight
+    offeringId: number;                    // Database ID for reference
 }
 
 // ==========================================
-// 4. ADAPTER FUNCTIONS
+// 4. DATA SOURCE ADAPTERS
 // ==========================================
 
+/**
+ * Normalizes a raw CSV offering to the unified format.
+ * 
+ * HANDLES:
+ * - String to number conversion for prices/weights
+ * - "NULL" string to null conversion
+ * - Invalid price detection and logging
+ * 
+ * @param row - Raw offering from CSV parsing
+ * @returns Normalized offering ready for transformation
+ */
 function normalizeRawOffering(row: RawOffering): NormalizedOffering {
     const price = parseMoney(row.offeringPrice);
 
@@ -129,6 +178,15 @@ function normalizeRawOffering(row: RawOffering): NormalizedOffering {
     };
 }
 
+/**
+ * Normalizes a database enriched view row to the unified format.
+ * 
+ * SIMPLER THAN CSV: Database data is already properly typed, so this
+ * adapter mainly handles null coercion and field mapping.
+ * 
+ * @param row - Enriched offering from database view
+ * @returns Normalized offering ready for transformation
+ */
 function normalizeEnrichedView(row: OfferingEnrichedView): NormalizedOffering {
     return {
         wholesalerName: row.wholesalerName,
@@ -248,7 +306,7 @@ function determineEffectiveWeight(row: NormalizedOffering): {
                 weightKg: val,
                 source: `Bulk Pkg (${pkgCheck.packageWeightDisplay})`,
                 method: 'BULK',
-                tooltip: `Strategie: WEIGHT. Quelle: Bulk-Verpackung '${pkgCheck.packageWeightDisplay}'.`
+                tooltip: `Strategy: WEIGHT. Source: Bulk packaging '${pkgCheck.packageWeightDisplay}'.`
             };
         }
     }
@@ -260,7 +318,7 @@ function determineEffectiveWeight(row: NormalizedOffering): {
             weightKg: kg,
             source: 'Weight Field',
             method: 'EXACT',
-            tooltip: `Strategie: WEIGHT. Quelle: Feld 'offeringWeightGrams' (${row.offeringWeightGrams}g).`
+            tooltip: `Strategy: WEIGHT. Source: Field 'offeringWeightGrams' (${row.offeringWeightGrams}g).`
         };
     }
 
@@ -277,7 +335,7 @@ function determineEffectiveWeight(row: NormalizedOffering): {
                     weightKg: avgGrams / 1000,
                     source: `Range Avg (${row.offeringWeightRange})`,
                     method: 'RANGE',
-                    tooltip: `Strategie: WEIGHT. Quelle: Mittelwert aus Range '${row.offeringWeightRange}' (${avgGrams}g).`
+                    tooltip: `Strategy: WEIGHT. Source: Average from range '${row.offeringWeightRange}' (${avgGrams}g).`
                 };
             }
         }
@@ -290,7 +348,7 @@ function determineEffectiveWeight(row: NormalizedOffering): {
                     weightKg: grams / 1000,
                     source: `Range Single (${row.offeringWeightRange})`,
                     method: 'RANGE',
-                    tooltip: `Strategie: WEIGHT. Quelle: Einzelwert aus Range '${row.offeringWeightRange}' (${grams}g).`
+                    tooltip: `Strategy: WEIGHT. Source: Single value from range '${row.offeringWeightRange}' (${grams}g).`
                 };
             }
         }
@@ -309,19 +367,18 @@ function determineEffectiveWeight(row: NormalizedOffering): {
                 weightKg: calcResult.weightGrams / 1000,
                 source: 'Calculated',
                 method: 'CALC',
-                tooltip: `Strategie: WEIGHT (Kalkuliert). ${calcResult.trace}`
+                tooltip: `Strategy: WEIGHT (Calculated). ${calcResult.trace}`
             };
         }
     }
 
-    return { weightKg: null, source: 'None', method: 'ERR', tooltip: 'Kein Gewicht ermittelbar.' };
+    return { weightKg: null, source: 'None', method: 'ERR', tooltip: 'No weight data available.' };
 }
 
 /**
  * Transforms normalized offerings into report rows with calculated normalized prices.
  * 
  * This is the MAIN TRANSFORMATION PIPELINE that:
- * 1. Filters offerings (excludes internal suppliers, applies relevance filters)
  * 2. Detects bulk prices from comments
  * 3. Applies import markup for non-EU countries (+25%)
  * 4. Determines pricing strategy (WEIGHT vs UNIT based on product type)
@@ -336,24 +393,11 @@ function determineEffectiveWeight(row: NormalizedOffering): {
  * @returns Array of report rows ready for grouping and ranking
  */
 export function transformOfferingsToAuditRows(normalizedOfferings: NormalizedOffering[],
-    reportBuilder?: ReportBuilder,
-    options?: LoadOfferingsOptions): ReportRow[] {
+    reportBuilder?: ReportBuilder): ReportRow[] {
     log.info(`Starting transformation of ${normalizedOfferings.length} offerings`);
 
+
     const auditData: ReportRow[] = normalizedOfferings
-        .filter(row => {
-            // Filter out internal supplier by name (legacy check for backwards compatibility)
-            if (row.wholesalerName === 'pureEnergy') return false;
-            // Filter out by ID (primary exclusion mechanism)
-            if (row.wholesalerId > 0 && options?.excludedWholesalerIds?.includes(row.wholesalerId)) return false;
-            // Filter by relevance level (only include high/medium relevance suppliers)
-            if ((options?.allowedWholesalerRelevances?.length ?? 0) > 0) {
-                if (!row.wholesalerRelevance || !options?.allowedWholesalerRelevances?.includes(row.wholesalerRelevance)) {
-                    return false;
-                }
-            }
-            return true;
-        })
         .map((row, index) => {
             // Trace collects human-readable steps for debugging and tooltips
             const trace: string[] = [];
@@ -453,14 +497,14 @@ export function transformOfferingsToAuditRows(normalizedOfferings: NormalizedOff
                     finalNormalizedPrice = effectivePrice / weightResult.weightKg;
                     unitLabel = '€/kg';
                     calcMethod = weightResult.method;
-                    calcTooltip = `${weightResult.tooltip} Rechnung: ${effectivePrice.toFixed(2)}€ / ${weightResult.weightKg.toFixed(3)}kg`;
+                    calcTooltip = `${weightResult.tooltip} Calc: ${effectivePrice.toFixed(2)}€ / ${weightResult.weightKg.toFixed(3)}kg`;
                     trace.push(`⚖️ Weight Strat: ${weightResult.method} (${weightResult.weightKg.toFixed(3)}kg)`);
                 } else {
                     // Error case: WEIGHT strategy chosen but no weight could be determined
                     finalNormalizedPrice = 999999; // Push to bottom of rankings
                     unitLabel = 'ERR';
                     calcMethod = 'ERR';
-                    calcTooltip = 'Fehler: Strategie WEIGHT gewählt, aber kein Gewicht ermittelbar.';
+                    calcTooltip = 'Error: WEIGHT strategy selected but no weight data available.';
                     trace.push(`❌ ERROR: WEIGHT Strategy but no weight found`);
                 }
             } else {
@@ -468,7 +512,7 @@ export function transformOfferingsToAuditRows(normalizedOfferings: NormalizedOff
                 finalNormalizedPrice = effectivePrice;
                 unitLabel = '€/Stk';
                 calcMethod = 'UNIT';
-                calcTooltip = `Strategie: UNIT. Preis pro Stück. Rechnung: ${effectivePrice.toFixed(2)}€ / 1 Stk`;
+                calcTooltip = `Strategy: UNIT. Price per piece. Calc: ${effectivePrice.toFixed(2)}€ / 1 pc`;
             }
 
             // ========================================
@@ -521,6 +565,20 @@ export function transformOfferingsToAuditRows(normalizedOfferings: NormalizedOff
 // 6. ENTRY POINTS
 // ==========================================
 
+/**
+ * Analyzes offerings from a CSV file export.
+ * 
+ * USE CASE: Offline analysis or when database is unavailable.
+ * 
+ * WORKFLOW:
+ * 1. Read CSV file from configured path
+ * 2. Parse CSV into RawOffering objects
+ * 3. Normalize to unified format
+ * 4. Run transformation pipeline
+ * 5. Generate and save reports
+ * 
+ * @throws Exits process with code 1 if CSV file not found
+ */
 export function analyzeOfferingsFromCsv() {
     log.info('Starting offering analysis from CSV');
 
@@ -547,6 +605,22 @@ export function analyzeOfferingsFromCsv() {
     processAndAnalyzeOfferingsFromCsv(rawData, reportBuilder);
 } 
 
+/**
+ * Analyzes offerings directly from the database.
+ * 
+ * USE CASE: Primary analysis method for most up-to-date data.
+ * 
+ * WORKFLOW:
+ * 1. Connect to database and begin transaction
+ * 2. Build WHERE conditions from analysis options
+ * 3. Load offerings from enriched view
+ * 4. Normalize to unified format (no parsing needed)
+ * 5. Run transformation pipeline
+ * 6. Generate and save reports
+ * 7. Clean up database connection
+ * 
+ * @throws Exits process with code 1 on database error
+ */
 export async function analyzeOfferingsFromDb() {
     log.info('Starting offering analysis from database');
 
@@ -585,6 +659,7 @@ export async function analyzeOfferingsFromDb() {
 
         const reportBuilder = new ReportBuilder();
         processAndAnalyzeOfferingsFromDb(rows, reportBuilder);
+        
     } catch (error) {
         log.error('Error loading data from database', { error });
         if (!transactionCommitted) {
@@ -605,6 +680,12 @@ export async function analyzeOfferingsFromDb() {
     }
 }
 
+/**
+ * Processes CSV data through the analysis pipeline and generates reports.
+ * 
+ * @param rawData - Array of raw offerings from CSV parsing
+ * @param reportBuilder - Builder instance for generating reports
+ */
 function processAndAnalyzeOfferingsFromCsv(rawData: RawOffering[], reportBuilder: ReportBuilder) {
     log.info(`Starting transformation of ${rawData.length} raw offerings from CSV`);
     const normalizedOfferings = rawData.map(normalizeRawOffering);
@@ -622,6 +703,14 @@ function processAndAnalyzeOfferingsFromCsv(rawData: RawOffering[], reportBuilder
     reportBuilder.generateReports(sortedData);
 }
 
+/**
+ * Processes database data through the analysis pipeline and generates reports.
+ * 
+ * NOTE: No parsing required since database provides typed data.
+ * 
+ * @param enrichedData - Array of offerings from enriched database view
+ * @param reportBuilder - Builder instance for generating reports
+ */
 function processAndAnalyzeOfferingsFromDb(enrichedData: OfferingEnrichedView[], reportBuilder: ReportBuilder) {
     log.info(`Starting transformation of ${enrichedData.length} enriched offerings from database`);
     const normalizedOfferings = enrichedData.map(normalizeEnrichedView);

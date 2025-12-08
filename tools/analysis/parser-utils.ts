@@ -1,7 +1,28 @@
+/**
+ * Parsing and extraction utilities for offering data.
+ * 
+ * This module provides functions to:
+ * - Parse currency strings to numbers
+ * - Extract weight information from various sources
+ * - Extract dimension information
+ * - Validate package weight data
+ * 
+ * Data sources are prioritized by reliability:
+ * 1. Dedicated database fields (most reliable)
+ * 2. Regex extraction from title/packaging (fallback with warning)
+ */
+
 import { type RawOffering } from './analyze-config.js';
 import { parseDimensions, parseWeightRange } from '$lib/utils/parseUtils.js';
 
-// Type for normalized offering (used for extraction functions)
+// ==========================================
+// TYPE DEFINITIONS
+// ==========================================
+
+/**
+ * Normalized offering type for extraction functions.
+ * Contains only the fields needed for dimension/weight extraction.
+ */
 type NormalizedOfferingForExtraction = {
     offeringDimensions: string | null;
     offeringWeightRange: string | null;
@@ -12,28 +33,34 @@ type NormalizedOfferingForExtraction = {
 };
 
 // ==========================================
-// PARSING & EXTRACTION UTILS
+// CURRENCY PARSING
 // ==========================================
 
-
 /**
- * Wandelt Währungsstrings (z.B. "1.299,00 €") in saubere Floats um.
+ * Parses a currency string to a numeric value.
+ * Handles European format (comma as decimal separator) and currency symbols.
  * 
- * WICHTIG: Gibt 0 zurück wenn der Wert kein gültiger Preis ist (z.B. Text).
- * Dies dient als Indikator für Datenqualitätsprobleme.
+ * IMPORTANT: Returns 0 for invalid values as a data quality indicator.
+ * Callers should check for 0 when the original value is non-empty.
  * 
- * @param val - String-Wert der geparst werden soll
- * @returns Parsed number oder 0 wenn ungültig
+ * @param val - Currency string to parse (e.g., "1.299,00 €", "12.50")
+ * @returns Parsed number, or 0 if invalid/empty
+ * 
+ * @example
+ * parseMoney("1.299,00 €")  // → 1299.00
+ * parseMoney("12.50")       // → 12.50
+ * parseMoney("NULL")        // → 0
+ * parseMoney("invalid")     // → 0 (warning indicator)
  */
 export function parseMoney(val: string): number {
     if (!val || val === 'NULL') return 0;
     
-    // Entferne Währungssymbole, Leerzeichen und tausche Komma zu Punkt
+    // Remove currency symbols and whitespace, normalize decimal separator
     const cleaned = val.replace(/[€$]/g, '').trim().replace(',', '.');
     const parsed = parseFloat(cleaned);
     
-    // Validierung: Wenn das Ergebnis NaN ist, war der Wert kein gültiger Preis
-    // WARUM: Das deutet auf ein Datenqualitätsproblem hin (z.B. Text im Preis-Feld)
+    // NaN indicates invalid input - return 0 as a signal
+    // This helps identify data quality issues upstream
     if (isNaN(parsed)) {
         return 0;
     }
@@ -41,21 +68,33 @@ export function parseMoney(val: string): number {
     return parsed;
 }
 
+// ==========================================
+// WEIGHT EXTRACTION
+// ==========================================
+
 /**
- * Versucht das Gewicht zu ermitteln (in kg).
- * Priorität: 
- * 1. Explizite Spalte "offeringWeightGrams"
- * 2. Regex im Titel oder Verpackungstext ("1kg", "500g")
+ * Extracts weight in kg from a raw offering.
+ * Uses a priority cascade of data sources.
+ * 
+ * PRIORITY ORDER:
+ * 1. offeringWeightGrams field (explicit, most reliable)
+ * 2. Regex in title/packaging for "Xkg" pattern
+ * 3. Regex in title/packaging for "Xg" pattern
+ * 
+ * @param row - Raw offering data
+ * @returns Object with weight in kg and source description
  */
 export function extractWeightKg(row: RawOffering): { weight: number | null, source: string } {
-    // 1. Priorität: Explizites Feld
+    // Priority 1: Explicit weight field
     const rawW = parseMoney(row.offeringWeightGrams);
-    if (rawW > 0) return { weight: rawW / 1000, source: 'Column (g)' };
+    if (rawW > 0) {
+        return { weight: rawW / 1000, source: 'Column (g)' };
+    }
 
-    // 2. Priorität: Text-Mining
+    // Priority 2/3: Text mining from title and packaging
     const textToScan = (row.offeringTitle + ' ' + (row.offeringPackaging || '')).toLowerCase();
 
-    // Suche nach "1.5 kg"
+    // Look for kilogram pattern first (e.g., "1.5 kg", "2kg")
     const kgMatch = textToScan.match(/(\d+[\.,]?\d*)\s*kg/);
     if (kgMatch) {
         return { 
@@ -64,7 +103,8 @@ export function extractWeightKg(row: RawOffering): { weight: number | null, sour
         };
     }
     
-    // Suche nach "500 g" (Boundary \b wichtig, damit "gold" nicht matcht)
+    // Look for gram pattern (e.g., "500 g", "250g")
+    // Use word boundary \b to avoid matching "gold", "ring", etc.
     const gMatch = textToScan.match(/(\d+)\s*g\b/); 
     if (gMatch) {
         return { 
@@ -77,24 +117,32 @@ export function extractWeightKg(row: RawOffering): { weight: number | null, sour
 }
 
 /**
- * Prüft, ob im Kommentarfeld ein günstigerer Staffelpreis versteckt ist.
- * Gibt den niedrigsten gefundenen Preis zurück (oder den Listenpreis).
+ * Searches for volume discount prices hidden in the comment field.
+ * Returns the lowest valid price found, or the list price if none found.
+ * 
+ * VALIDATION RULES:
+ * - Must be lower than list price (otherwise not a discount)
+ * - Must be > 10% of list price (filters out false positives like dimensions)
+ * 
+ * @param row - Raw offering data
+ * @param listPrice - The official list price to compare against
+ * @returns Object with best price and source indicator
  */
 export function getBestPrice(row: RawOffering, listPrice: number): { price: number, source: string } {
     if (!row.offeringComment || row.offeringComment === 'NULL') {
         return { price: listPrice, source: 'List' };
     }
 
-    // Suche nach Preismustern (Zahl mit Dezimalstelle)
+    // Find price patterns (number with decimal, optionally with currency symbol)
     const matches = row.offeringComment.match(/[\$€]?\s?(\d+[\.,]\d{2})/g);
     
     if (matches) {
         let lowest = listPrice;
         matches.forEach(m => {
             const val = parseFloat(m.replace(/[€$]/g, '').replace(',', '.'));
-            // Plausibilitätscheck:
-            // - Muss billiger sein als Liste
-            // - > 10% des Listenpreises (Schutz vor Tippfehlern oder Maßen wie "0.5 cm")
+            // Plausibility check:
+            // - Must be cheaper than list price
+            // - Must be > 10% of list price (protects against typos or dimensions like "0.5 cm")
             if (val < lowest && val > (listPrice * 0.1)) {
                 lowest = val;
             }
@@ -107,21 +155,31 @@ export function getBestPrice(row: RawOffering, listPrice: number): { price: numb
     return { price: listPrice, source: 'List' };
 }
 
+// ==========================================
+// DIMENSION EXTRACTION
+// ==========================================
+
 /**
- * Extrahiert Dimensions (Größe) aus einem normalisierten Offering.
- * Priorität:
- * 1. offeringDimensions Feld (wenn vorhanden)
- * 2. Regex im Titel (wenn nur im Titel gefunden => Warnung)
+ * Extracts dimensions from a normalized offering.
  * 
- * @param row - Normalized offering
- * @returns Dimensions string, source, und optional warning
+ * PRIORITY ORDER:
+ * 1. offeringDimensions field (dedicated field, most reliable)
+ * 2. Regex in title (fallback, generates warning)
+ * 
+ * PATTERNS MATCHED:
+ * - "20x50" or "20x50cm" or "20 x 50 cm"
+ * - "30-40mm" or "30mm"
+ * - "2,1x2,7cm"
+ * 
+ * @param row - Normalized offering data
+ * @returns Dimensions string, source, and optional warning
  */
 export function extractDimensions(row: NormalizedOfferingForExtraction): { 
     dimensions: string | null, 
     source: string, 
     warning: string | null 
 } {
-    // 1. Priorität: Explizites Feld
+    // Priority 1: Dedicated dimensions field
     if (row.offeringDimensions) {
         const parsed = parseDimensions(row.offeringDimensions);
         if (parsed.valid) {
@@ -133,19 +191,16 @@ export function extractDimensions(row: NormalizedOfferingForExtraction): {
         }
     }
 
-    // 2. Priorität: Regex im Titel
-    // Pattern: z.B. "20x50", "30-40mm", "10x10", "20x50cm", "30mm"
+    // Priority 2: Regex extraction from title
     const titleLower = row.offeringTitle.toLowerCase();
-    // Suche nach Dimensionen-Pattern: 
-    // - "20x50" oder "20x50cm" oder "20 x 50 cm"
-    // - "30-40mm" oder "30mm"
-    // - "2,1x2,7cm"
-    const dimMatch = titleLower.match(/(\d+[\.,]?\d*)\s*[x×]\s*(\d+[\.,]?\d*)\s*(?:mm|cm|m)?/i) || 
-                     titleLower.match(/(\d+[\.,]?\d*)\s*[-–]\s*(\d+[\.,]?\d*)\s*(?:mm|cm|m)/i) ||
-                     titleLower.match(/(\d+[\.,]?\d*)\s*(?:mm|cm|m)\b/i);
+    
+    // Try multiple dimension patterns
+    const dimMatch = 
+        titleLower.match(/(\d+[\.,]?\d*)\s*[x×]\s*(\d+[\.,]?\d*)\s*(?:mm|cm|m)?/i) ||  // 20x50cm
+        titleLower.match(/(\d+[\.,]?\d*)\s*[-–]\s*(\d+[\.,]?\d*)\s*(?:mm|cm|m)/i) ||   // 30-40mm
+        titleLower.match(/(\d+[\.,]?\d*)\s*(?:mm|cm|m)\b/i);                           // 50mm
     
     if (dimMatch) {
-        // Warnung: Gefunden im Titel, aber nicht im dimensions Feld
         const matchedText = dimMatch[0].trim();
         return {
             dimensions: matchedText,
@@ -158,14 +213,15 @@ export function extractDimensions(row: NormalizedOfferingForExtraction): {
 }
 
 /**
- * Extrahiert Gewicht aus einem normalisierten Offering (erweitert).
- * Priorität:
- * 1. offeringWeightRange Feld
- * 2. offeringWeightGrams Feld
- * 3. Regex im Titel/Packaging (wenn nur im Titel gefunden => Warnung)
+ * Extracts weight from a normalized offering with extended source tracking.
  * 
- * @param row - Normalized offering
- * @returns Weight in kg, source, display string, und optional warning
+ * PRIORITY ORDER:
+ * 1. offeringWeightRange field (e.g., "30-50g")
+ * 2. offeringWeightGrams field (explicit value)
+ * 3. Regex in title/packaging (fallback with warning)
+ * 
+ * @param row - Normalized offering data
+ * @returns Weight in kg, source, display string, and optional warning
  */
 export function extractWeightKgFromNormalized(row: NormalizedOfferingForExtraction): { 
     weight: number | null, 
@@ -173,7 +229,7 @@ export function extractWeightKgFromNormalized(row: NormalizedOfferingForExtracti
     display: string | null,
     warning: string | null 
 } {
-    // 1. Priorität: weight_range Feld
+    // Priority 1: Weight range field (e.g., "30-50g")
     if (row.offeringWeightRange) {
         const parsed = parseWeightRange(row.offeringWeightRange);
         if (parsed.valid && parsed.data) {
@@ -192,7 +248,7 @@ export function extractWeightKgFromNormalized(row: NormalizedOfferingForExtracti
         }
     }
 
-    // 2. Priorität: weight_grams Feld
+    // Priority 2: Explicit weight in grams field
     if (row.offeringWeightGrams && row.offeringWeightGrams > 0) {
         const weightInKg = row.offeringWeightGrams / 1000;
         return {
@@ -203,10 +259,10 @@ export function extractWeightKgFromNormalized(row: NormalizedOfferingForExtracti
         };
     }
 
-    // 3. Priorität: Regex im Titel/Packaging
+    // Priority 3: Regex extraction from title/packaging
     const textToScan = (row.offeringTitle + ' ' + (row.offeringPackaging || '')).toLowerCase();
 
-    // Suche nach "1.5 kg"
+    // Try kilogram pattern first
     const kgMatch = textToScan.match(/(\d+[\.,]?\d*)\s*kg/);
     if (kgMatch) {
         const weight = parseFloat(kgMatch[1].replace(',', '.'));
@@ -218,7 +274,7 @@ export function extractWeightKgFromNormalized(row: NormalizedOfferingForExtracti
         };
     }
     
-    // Suche nach "500 g"
+    // Try gram pattern
     const gMatch = textToScan.match(/(\d+)\s*g\b/);
     if (gMatch) {
         const weightInGrams = parseFloat(gMatch[1]);
@@ -234,13 +290,21 @@ export function extractWeightKgFromNormalized(row: NormalizedOfferingForExtracti
     return { weight: null, source: 'None', display: null, warning: null };
 }
 
+// ==========================================
+// PACKAGE WEIGHT VALIDATION
+// ==========================================
+
 /**
- * Validiert package_weight gegen packaging Feld.
- * Prüft, ob das Gewicht im packaging-Text mit package_weight übereinstimmt.
+ * Validates package_weight against the packaging field.
+ * Checks if weight mentioned in packaging text matches the package_weight field.
  * 
- * @param packaging - Packaging text (z.B. "bulk 1kg")
- * @param packageWeight - Package weight string (z.B. "1kg")
- * @returns Validation result mit warning wenn mismatch
+ * USE CASES:
+ * - Detect missing package_weight when packaging mentions weight
+ * - Detect mismatches between fields (data quality issue)
+ * 
+ * @param packaging - Packaging text (e.g., "bulk 1kg")
+ * @param packageWeight - Package weight field value (e.g., "1kg")
+ * @returns Validation result with display value and optional warning
  */
 export function validatePackageWeight(
     packaging: string | null, 
@@ -250,7 +314,7 @@ export function validatePackageWeight(
     warning: string | null 
 } {
     if (!packaging || !packageWeight) {
-        // Wenn packaging Gewicht enthält, aber package_weight fehlt => Warnung
+        // Check if packaging contains weight but field is missing
         if (packaging) {
             const packagingLower = packaging.toLowerCase();
             const weightInPackaging = packagingLower.match(/(\d+[\.,]?\d*)\s*(kg|g)\b/);
@@ -264,33 +328,31 @@ export function validatePackageWeight(
         return { packageWeightDisplay: packageWeight || null, warning: null };
     }
 
-    // Parse package_weight
+    // Parse the package_weight field
     const parsedPackageWeight = parseWeightRange(packageWeight);
     if (!parsedPackageWeight.valid || !parsedPackageWeight.data) {
         return { packageWeightDisplay: packageWeight, warning: null };
     }
 
-    // Extrahiere Gewicht aus packaging
+    // Extract weight from packaging text
     const packagingLower = packaging.toLowerCase();
     const weightMatch = packagingLower.match(/(\d+[\.,]?\d*)\s*(kg|g)\b/);
     if (!weightMatch) {
-        // Kein Gewicht im packaging gefunden => kein Vergleich möglich
+        // No weight found in packaging - can't compare
         return { packageWeightDisplay: packageWeight, warning: null };
     }
 
-    // Vergleiche Gewichte
+    // Compare weights with 10g tolerance for rounding errors
     const packagingWeightValue = parseFloat(weightMatch[1].replace(',', '.'));
     const packagingWeightUnit = weightMatch[2];
     const packagingWeightInGrams = packagingWeightUnit === 'kg' 
         ? packagingWeightValue * 1000
         : packagingWeightValue;
 
-    // parseWeightRange gibt min/max immer in Gramm zurück (unabhängig von unit)
-    // unit ist nur zur Anzeige
+    // parseWeightRange returns min/max in grams (unit is just for display)
     const packageWeightAvgInGrams = (parsedPackageWeight.data.min + parsedPackageWeight.data.max) / 2;
 
-    // Vergleich mit Toleranz von 10g (für Rundungsfehler)
-    const tolerance = 10; // in Gramm
+    const tolerance = 10; // grams
     const matches = Math.abs(packagingWeightInGrams - packageWeightAvgInGrams) <= tolerance;
 
     if (!matches) {

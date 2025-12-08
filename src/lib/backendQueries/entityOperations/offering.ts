@@ -913,47 +913,15 @@ export async function loadOfferingCoalesceProdDef(
   try {
     const request = transWrapper.request();
     request.input('offeringId', offeringId);
-    // DO NOT USE wio.*. This would create an array of the coalasced fields, because they
-    // already exist in den "normal" fields.
+    // Rename the coalesced field to prevent SQL server from returning an array!
     const result = await request.query(`
       SELECT 
-        wio.offering_id,
-        wio.wholesaler_id,
-        wio.category_id,
-        wio.product_def_id,
-        wio.sub_seller,
-        wio.wholesaler_article_number,
-        wio.color_variant,
-        wio.material_mixture,
-        wio.material_mixture_en,
-        wio.title,
-        wio.size,
-        wio.dimensions,
-        wio.packaging,
-        wio.weight_grams,
-        wio.weight_range,
-        wio.package_weight,
-        wio.price,
-        wio.price_per_piece,
-        wio.wholesaler_price,
-        wio.currency,
-        wio.origin,
-        wio.comment,
-        wio.imagePromptHint,
-        wio.quality,
-        wio.is_assortment,
-        wio.override_material,
-        wio.shopify_product_id,
-        wio.shopify_variant_id,
-        wio.shopify_sku,
-        wio.shopify_price,
-        wio.shopify_synced_at,
-        wio.created_at,
-        -- Override with coalesced values from product definition
-        COALESCE(wio.material_id, pd.material_id) AS material_id,
-        COALESCE(wio.form_id, pd.form_id) AS form_id,
-        COALESCE(wio.surface_finish_id, pd.surface_finish_id) AS surface_finish_id,
-        COALESCE(wio.construction_type_id, pd.construction_type_id) AS construction_type_id
+        wio.*,
+        -- Use different column names to avoid arrays!
+        COALESCE(wio.material_id, pd.material_id) AS _material_id,
+        COALESCE(wio.form_id, pd.form_id) AS _form_id,
+        COALESCE(wio.surface_finish_id, pd.surface_finish_id) AS _surface_finish_id,
+        COALESCE(wio.construction_type_id, pd.construction_type_id) AS _construction_type_id
       FROM dbo.wholesaler_item_offerings wio
       INNER JOIN dbo.product_definitions pd ON wio.product_def_id = pd.product_def_id
       WHERE wio.offering_id = @offeringId
@@ -965,7 +933,25 @@ export async function loadOfferingCoalesceProdDef(
       throw error(404, `Offering with ID ${offeringId} not found.`);
     }
 
-    return result.recordset[0] as WholesalerItemOffering;
+    const record = result.recordset[0];
+
+    // Map _fields back to normal names
+    const offeringCoalesced = {
+      ...record,
+      material_id: record._material_id,
+      form_id: record._form_id,
+      surface_finish_id: record._surface_finish_id,
+      construction_type_id: record._construction_type_id
+    } as WholesalerItemOffering;
+
+    // Clean up temp fields
+    delete (offeringCoalesced as any)._material_id;
+    delete (offeringCoalesced as any)._form_id;
+    delete (offeringCoalesced as any)._surface_finish_id;
+    delete (offeringCoalesced as any)._construction_type_id;
+
+    return offeringCoalesced;
+
   } catch (err) {
     await transWrapper.rollback();
     throw err;

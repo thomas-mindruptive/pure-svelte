@@ -8,7 +8,7 @@ const log = LogNS.log;
  * Generates a canonical filename for the generated image
  * 
  * ⚠️ NO TIMESTAMP - Same attributes = Same filename (for reusability!)
- * 
+ *
  * Format: {form-eng}_{surface-eng?}_{construction-eng?}_{color?}_{size?}.png
  * Examples:
  *   - sphere_polished_l.png

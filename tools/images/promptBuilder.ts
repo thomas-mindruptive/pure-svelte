@@ -51,7 +51,7 @@ export function buildPrompt(
   lookups: Lookups
 ): string {
   assertDefined(offering, "offering");
-  
+
   const offeringDescription = `${offering.offeringId} - ${offering.offeringTitle}`;
   assertions.assertDefined(offering.productTypeName, `offering.productTypeName - ${offeringDescription}`);
   assertions.assertDefined(offering.productTypeId, `offering.productTypeId - ${offeringDescription}`);
@@ -175,7 +175,7 @@ function buildNecklacePrompt(offering: OfferingWithGenerationPlan, config: Image
   const material = getMaterialText(offering);
   const construction = offering.constructionTypeEng?.toLowerCase() || "beaded";
   const surface = offering.surfaceFinishEng?.toLowerCase();
-  
+
   // Only add surface description if explicitly set
   const beadDescription = surface ? `${surface} beads` : "beads";
   return `A ${material} ${construction} necklace with ${beadDescription}`;
@@ -238,7 +238,7 @@ function buildHandStonePrompt(offering: OfferingWithGenerationPlan, config: Imag
   return form 
     ? `A ${surfacePrefix}${material} palm stone ${form}`
     : `A ${surfacePrefix}${material} palm stone`;
-}
+    }
 
 function buildPendantPrompt(offering: OfferingWithGenerationPlan, config: ImageGenerationConfig["prompt"]): string {
   const material = getMaterialText(offering);

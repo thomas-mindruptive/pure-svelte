@@ -10,7 +10,8 @@ import {
     calculateInfo,
     extractGroupKeyParts,
     sortCandidatesByPrice,
-    formatCalcForMarkdown
+    formatUnitForMarkdown,
+    formatWeightForMarkdown
 } from './report-grouping.js';
 import {
     exportBestBuyReportToCsv,
@@ -223,34 +224,35 @@ export class ReportBuilder {
             md += `### 📂 ${key}\n`;
             md += `*Vergleichsbasis: ${winner.Unit}*\n\n`;
 
-            // Tabelle Header
-            md += `| Rang | Offering ID | Händler | Herkunft | Produkt | Größe | Gewicht | Price | Price/Piece  | Preis (Norm.) | Calc | vs. Winner | Info |\n`;
-            md += `|:---:|:-----------:|---------|:-------:|---------|-------|---------|----------------|-------------------------|---------------|------|------------|------|\n`;
+            // Table header: Rang through Info columns
+            // "Gewicht" shows effective weight, "Einheit" shows €/kg or €/Stk with tooltip
+            md += `| Rang | Offering ID | Händler | Herkunft | Produkt | Größe | Price | Price/Piece | Preis (Norm.) | Gewicht | Einheit | vs. Winner | Info |\n`;
+            md += `|:---:|:-----------:|---------|:-------:|---------|-------|-------|-------------|---------------|---------|---------|------------|------|\n`;
 
-            // --- SCHLEIFE ÜBER ALLE ANGEBOTE ---
+            // --- LOOP OVER ALL OFFERINGS IN THIS GROUP ---
             candidates.forEach((row, index) => {
                 const rankDisplay = calculateRank(index);
                 const diffStr = calculateDiff(row, winner, index);
                 const info = calculateInfo(row);
 
-                // Preis Formatierung (Gewinner fett)
+                // Bold formatting for the winner (rank 1)
                 const priceDisplay = index === 0 
                     ? `**${row.Final_Normalized_Price.toFixed(2)}**`
                     : `${row.Final_Normalized_Price.toFixed(2)}`;
                 
-                // WICHTIG: Pipe-Zeichen im Titel ESCAPEN (nicht ersetzen!), damit Markdown-Tabelle nicht bricht
-                // WARUM: Pipe-Zeichen (|) in Produkttiteln (z.B. "Bergkristall Wand| Doppelender")
-                //        würden die Markdown-Tabelle zerbrechen, da | als Spaltentrenner verwendet wird
-                // LÖSUNG: Escapen mit Backslash - | wird zu \| (wird in Markdown als normales Zeichen angezeigt)
+                // Escape pipe characters in title to prevent breaking Markdown table
+                // Pipes in product titles like "Bergkristall Wand| Doppelender" would break the table
                 const productTitle = row.Product_Title.replace(/\|/g, '\\|');
                 const dimensions = row.Dimensions || '-';
-                const weight = row.Weight_Display || '-';
                 const warningIcon = (row.Dimensions_Warning || row.Weight_Warning || row.Package_Weight_Warning) ? ' ⚠️' : '';
                 const offeringPrice = row.Offering_Price.toFixed(2);
                 const offeringPricePerPiece = row.Offering_Price_Per_Piece !== null ? row.Offering_Price_Per_Piece.toFixed(2) : '-';
-                const calcDisplay = formatCalcForMarkdown(row);
                 
-                md += `| ${rankDisplay} | ${row.Offering_ID} | ${row.Wholesaler} | ${row.Origin_Country} | ${productTitle} | ${dimensions}${warningIcon} | ${weight}${warningIcon} | ${offeringPrice} | ${offeringPricePerPiece} | ${priceDisplay} | ${calcDisplay} | ${diffStr} | ${info.join(' ')} |\n`;
+                // New columns: Gewicht shows effective weight, Einheit shows €/kg or €/Stk
+                const weightDisplay = formatWeightForMarkdown(row);
+                const unitDisplay = formatUnitForMarkdown(row);
+                
+                md += `| ${rankDisplay} | ${row.Offering_ID} | ${row.Wholesaler} | ${row.Origin_Country} | ${productTitle} | ${dimensions}${warningIcon} | ${offeringPrice} | ${offeringPricePerPiece} | ${priceDisplay} | ${weightDisplay} | ${unitDisplay} | ${diffStr} | ${info.join(' ')} |\n`;
             });
 
             md += `\n---\n`;
@@ -276,9 +278,10 @@ export class ReportBuilder {
         md += `Schnelle Übersicht: Angebote gruppiert nach Stein/Material.\n\n`;
         md += `> **Hinweis:** Diese Übersicht gruppiert nach Material (Stein). Für detaillierte Vergleiche nach Use-Case siehe \`best_buy_report.md\`.\n\n`;
 
-        // 3. EINE Tabelle für alle Steine (Drill-Down-Stil)
-        md += `| Stein | Produkttyp | Form | Offering ID | Rang | Händler | Herkunft | Produkt | Größe | Gewicht | Price | Price/Piece  | Preis (Norm.) | Calc | vs. Winner | Info |\n`;
-        md += `|-------|------------|------|:-----------:|:---:|---------|:-------:|---------|-------|---------|----------------|-------------------------|---------------|------|------------|------|\n`;
+        // 3. Single table for all stones (drill-down style)
+        // "Gewicht" shows effective weight, "Einheit" shows €/kg or €/Stk with tooltip
+        md += `| Stein | Produkttyp | Form | Offering ID | Rang | Händler | Herkunft | Produkt | Größe | Price | Price/Piece | Preis (Norm.) | Gewicht | Einheit | vs. Winner | Info |\n`;
+        md += `|-------|------------|------|:-----------:|:---:|---------|:-------:|---------|-------|-------|-------------|---------------|---------|---------|------------|------|\n`;
 
         // 4. Stein-Gruppen durchgehen (nach Material sortiert) - ALLE in EINE Tabelle
         let lastStone = '';
@@ -298,7 +301,7 @@ export class ReportBuilder {
                 // Der Gewinner (günstigstes Angebot für diese Form)
                 const winner = candidates[0];
                 
-                // Zeilen für diese Form hinzufügen
+                // Add rows for this form group
                 candidates.forEach((row, index) => {
                     const rankDisplay = calculateRank(index);
                     const diffStr = calculateDiff(row, winner, index);
@@ -306,21 +309,23 @@ export class ReportBuilder {
                     const productType = parts.productType;
                     const info = calculateInfo(row);
 
-                    // Preis Formatierung (Gewinner fett)
+                    // Bold formatting for the winner (rank 1)
                     const priceDisplay = index === 0 
                         ? `**${row.Final_Normalized_Price.toFixed(2)}**`
                         : `${row.Final_Normalized_Price.toFixed(2)}`;
                     
-                    // Pipe-Zeichen im Titel ESCAPEN
+                    // Escape pipe characters in title to prevent breaking Markdown table
                     const productTitle = row.Product_Title.replace(/\|/g, '\\|');
                     const dimensions = row.Dimensions || '-';
-                    const weight = row.Weight_Display || '-';
                     const warningIcon = (row.Dimensions_Warning || row.Weight_Warning || row.Package_Weight_Warning) ? ' ⚠️' : '';
                     const offeringPrice = row.Offering_Price.toFixed(2);
                     const offeringPricePerPiece = row.Offering_Price_Per_Piece !== null ? row.Offering_Price_Per_Piece.toFixed(2) : '-';
-                    const calcDisplay = formatCalcForMarkdown(row);
                     
-                    // Drill-Down: Stein, Produkttyp und Form nur in der ersten Zeile einer neuen Gruppe
+                    // New columns: Gewicht shows effective weight, Einheit shows €/kg or €/Stk
+                    const weightDisplay = formatWeightForMarkdown(row);
+                    const unitDisplay = formatUnitForMarkdown(row);
+                    
+                    // Drill-down display: only show stone/productType/form on first row of new group
                     const isNewStone = (stone !== lastStone);
                     const isNewProductType = (productType !== lastProductType || isNewStone);
                     const isNewForm = (form !== lastForm || isNewStone);
@@ -328,14 +333,14 @@ export class ReportBuilder {
                     const showProductType = (index === 0 && isNewProductType) ? productType : '';
                     const showForm = (index === 0 && isNewForm) ? form : '';
                     
-                    // Update lastStone, lastProductType und lastForm NUR nach der ersten Zeile einer neuen Gruppe
+                    // Update tracking variables only after first row of new group
                     if (index === 0) {
                         if (isNewStone) lastStone = stone;
                         if (isNewProductType) lastProductType = productType;
                         if (isNewForm) lastForm = form;
                     }
                     
-                    md += `| ${showStone} | ${showProductType} | ${showForm} | ${row.Offering_ID} | ${rankDisplay} | ${row.Wholesaler} | ${row.Origin_Country} | ${productTitle} | ${dimensions}${warningIcon} | ${weight}${warningIcon} | ${offeringPrice} | ${offeringPricePerPiece} | ${priceDisplay} | ${calcDisplay} | ${diffStr} | ${info.join(' ')} |\n`;
+                    md += `| ${showStone} | ${showProductType} | ${showForm} | ${row.Offering_ID} | ${rankDisplay} | ${row.Wholesaler} | ${row.Origin_Country} | ${productTitle} | ${dimensions}${warningIcon} | ${offeringPrice} | ${offeringPricePerPiece} | ${priceDisplay} | ${weightDisplay} | ${unitDisplay} | ${diffStr} | ${info.join(' ')} |\n`;
                 });
             });
         });
@@ -360,9 +365,10 @@ export class ReportBuilder {
         md += `Schnelle Übersicht: Angebote gruppiert nach Produkttyp.\n\n`;
         md += `> **Hinweis:** Diese Übersicht gruppiert nach Produkttyp. Für detaillierte Vergleiche nach Use-Case siehe \`best_buy_report.md\`.\n\n`;
 
-        // 3. EINE Tabelle für alle ProductTypes (Drill-Down-Stil)
-        md += `| Produkttyp | Stein | Form | Offering ID | Rang | Händler | Herkunft | Produkt | Größe | Gewicht | Price | Price/Piece  | Preis (Norm.) | Calc | vs. Winner | Info |\n`;
-        md += `|------------|-------|------|:-----------:|:---:|---------|:-------:|---------|-------|---------|----------------|-------------------------|---------------|------|------------|------|\n`;
+        // 3. Single table for all product types (drill-down style)
+        // "Gewicht" shows effective weight, "Einheit" shows €/kg or €/Stk with tooltip
+        md += `| Produkttyp | Stein | Form | Offering ID | Rang | Händler | Herkunft | Produkt | Größe | Price | Price/Piece | Preis (Norm.) | Gewicht | Einheit | vs. Winner | Info |\n`;
+        md += `|------------|-------|------|:-----------:|:---:|---------|:-------:|---------|-------|-------|-------------|---------------|---------|---------|------------|------|\n`;
 
         // 4. ProductType-Gruppen durchgehen (nach ProductType sortiert) - ALLE in EINE Tabelle
         let lastProductType = '';
@@ -386,27 +392,29 @@ export class ReportBuilder {
                     // Der Gewinner (günstigstes Angebot für diese Form)
                     const winner = candidates[0];
                     
-                    // Zeilen für diese Form hinzufügen
+                    // Add rows for this form group
                     candidates.forEach((row, index) => {
                         const rankDisplay = calculateRank(index);
                         const diffStr = calculateDiff(row, winner, index);
                         const info = calculateInfo(row);
 
-                        // Preis Formatierung (Gewinner fett)
+                        // Bold formatting for the winner (rank 1)
                         const priceDisplay = index === 0 
                             ? `**${row.Final_Normalized_Price.toFixed(2)}**`
                             : `${row.Final_Normalized_Price.toFixed(2)}`;
                         
-                        // Pipe-Zeichen im Titel ESCAPEN
+                        // Escape pipe characters in title to prevent breaking Markdown table
                         const productTitle = row.Product_Title.replace(/\|/g, '\\|');
                         const dimensions = row.Dimensions || '-';
-                        const weight = row.Weight_Display || '-';
                         const warningIcon = (row.Dimensions_Warning || row.Weight_Warning || row.Package_Weight_Warning) ? ' ⚠️' : '';
                         const offeringPrice = row.Offering_Price.toFixed(2);
                         const offeringPricePerPiece = row.Offering_Price_Per_Piece !== null ? row.Offering_Price_Per_Piece.toFixed(2) : '-';
-                        const calcDisplay = formatCalcForMarkdown(row);
                         
-                        // Drill-Down: ProductType, Stein und Form nur in der ersten Zeile einer neuen Gruppe
+                        // New columns: Gewicht shows effective weight, Einheit shows €/kg or €/Stk
+                        const weightDisplay = formatWeightForMarkdown(row);
+                        const unitDisplay = formatUnitForMarkdown(row);
+                        
+                        // Drill-down display: only show productType/stone/form on first row of new group
                         const isNewProductType = (productType !== lastProductType);
                         const isNewStone = (stone !== lastStone || isNewProductType);
                         const isNewForm = (form !== lastForm || isNewProductType || isNewStone);
@@ -414,14 +422,14 @@ export class ReportBuilder {
                         const showStone = (index === 0 && isNewStone) ? stone : '';
                         const showForm = (index === 0 && isNewForm) ? form : '';
                         
-                        // Update lastProductType, lastStone und lastForm NUR nach der ersten Zeile einer neuen Gruppe
+                        // Update tracking variables only after first row of new group
                         if (index === 0) {
                             if (isNewProductType) lastProductType = productType;
                             if (isNewStone) lastStone = stone;
                             if (isNewForm) lastForm = form;
                         }
                         
-                        md += `| ${showProductType} | ${showStone} | ${showForm} | ${row.Offering_ID} | ${rankDisplay} | ${row.Wholesaler} | ${row.Origin_Country} | ${productTitle} | ${dimensions}${warningIcon} | ${weight}${warningIcon} | ${offeringPrice} | ${offeringPricePerPiece} | ${priceDisplay} | ${calcDisplay} | ${diffStr} | ${info.join(' ')} |\n`;
+                        md += `| ${showProductType} | ${showStone} | ${showForm} | ${row.Offering_ID} | ${rankDisplay} | ${row.Wholesaler} | ${row.Origin_Country} | ${productTitle} | ${dimensions}${warningIcon} | ${offeringPrice} | ${offeringPricePerPiece} | ${priceDisplay} | ${weightDisplay} | ${unitDisplay} | ${diffStr} | ${info.join(' ')} |\n`;
                     });
                 });
             });

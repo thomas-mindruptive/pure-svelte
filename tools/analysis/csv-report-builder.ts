@@ -8,7 +8,8 @@ import {
     calculateInfo,
     extractGroupKeyParts,
     sortCandidatesByPrice,
-    formatCalcForCsv
+    formatUnitForCsv,
+    formatWeightForMarkdown
 } from './report-grouping.js';
 
 // ==========================================
@@ -46,13 +47,16 @@ function formatCsvRow(values: (string | number | null)[]): string {
 // ==========================================
 
 /**
- * Exportiert best_buy_report als CSV
- * Gruppiert nach Group_Key (ProductType > Material > Form)
+ * Exports best_buy_report as CSV.
+ * Groups offerings by Group_Key (ProductType > Material > Form).
+ * 
+ * @param data - Array of report rows to export
+ * @returns CSV formatted string
  */
 export function exportBestBuyReportToCsv(data: ReportRow[]): string {
     const { groups, sortedKeys } = groupByGroupKey(data);
     
-    // Header
+    // Header row - "Einheit" shows €/kg or €/Stk, "Gewicht" shows effective weight
     const headers = [
         'Rang',
         'Offering ID',
@@ -60,18 +64,18 @@ export function exportBestBuyReportToCsv(data: ReportRow[]): string {
         'Herkunft',
         'Produkt',
         'Größe',
-        'Gewicht',
         'Price',
         'Price/Piece',
         'Preis (Norm.)',
-        'Calc',
+        'Gewicht',
+        'Einheit',
         'vs. Winner',
         'Info'
     ];
     
     let csv = formatCsvRow(headers) + '\n';
     
-    // Gruppen durchgehen
+    // Process each group
     sortedKeys.forEach(key => {
         const candidates = sortCandidatesByPrice(groups[key]);
         
@@ -79,7 +83,7 @@ export function exportBestBuyReportToCsv(data: ReportRow[]): string {
         
         const winner = candidates[0];
         
-        // Zeilen für diese Gruppe
+        // Add rows for this group
         candidates.forEach((row, index) => {
             const rankDisplay = calculateRank(index);
             const diffStr = calculateDiff(row, winner, index);
@@ -87,12 +91,14 @@ export function exportBestBuyReportToCsv(data: ReportRow[]): string {
             
             const productTitle = row.Product_Title;
             const dimensions = row.Dimensions || '-';
-            const weight = row.Weight_Display || '-';
             const warningIcon = (row.Dimensions_Warning || row.Weight_Warning || row.Package_Weight_Warning) ? ' ⚠️' : '';
             const offeringPrice = row.Offering_Price.toFixed(2);
             const offeringPricePerPiece = row.Offering_Price_Per_Piece !== null ? row.Offering_Price_Per_Piece.toFixed(2) : '-';
             const priceDisplay = row.Final_Normalized_Price.toFixed(2);
-            const calcDisplay = formatCalcForCsv(row);
+            
+            // New columns: Gewicht shows effective weight, Einheit shows €/kg or €/Stk
+            const weightDisplay = formatWeightForMarkdown(row);
+            const unitDisplay = formatUnitForCsv(row);
             
             const rowValues = [
                 rankDisplay,
@@ -101,11 +107,11 @@ export function exportBestBuyReportToCsv(data: ReportRow[]): string {
                 row.Origin_Country,
                 productTitle,
                 dimensions + warningIcon,
-                weight + warningIcon,
                 offeringPrice,
                 offeringPricePerPiece,
                 priceDisplay,
-                calcDisplay,
+                weightDisplay,
+                unitDisplay,
                 diffStr,
                 info.join(' ')
             ];
@@ -113,7 +119,7 @@ export function exportBestBuyReportToCsv(data: ReportRow[]): string {
             csv += formatCsvRow(rowValues) + '\n';
         });
         
-        // Leere Zeile zwischen Gruppen
+        // Empty line between groups for readability
         csv += '\n';
     });
     
@@ -121,13 +127,16 @@ export function exportBestBuyReportToCsv(data: ReportRow[]): string {
 }
 
 /**
- * Exportiert best_buy_report_by_stone als CSV
- * Gruppiert nach Material (Stein) > Form, Drill-Down-Stil
+ * Exports best_buy_report_by_stone as CSV.
+ * Groups offerings by Material (Stone) > Form in drill-down style.
+ * 
+ * @param data - Array of report rows to export
+ * @returns CSV formatted string
  */
 export function exportBestBuyByStoneToCsv(data: ReportRow[]): string {
     const { stoneGroups, sortedStones } = groupByStone(data);
     
-    // Header
+    // Header row - "Einheit" shows €/kg or €/Stk, "Gewicht" shows effective weight
     const headers = [
         'Stein',
         'Produkttyp',
@@ -138,17 +147,18 @@ export function exportBestBuyByStoneToCsv(data: ReportRow[]): string {
         'Herkunft',
         'Produkt',
         'Größe',
-        'Gewicht',
         'Price',
         'Price/Piece',
         'Preis (Norm.)',
-        'Calc',
+        'Gewicht',
+        'Einheit',
         'vs. Winner',
         'Info'
     ];
     
     let csv = formatCsvRow(headers) + '\n';
     
+    // Track previous values for drill-down display
     let lastStone = '';
     let lastProductType = '';
     let lastForm = '';
@@ -173,14 +183,16 @@ export function exportBestBuyByStoneToCsv(data: ReportRow[]): string {
                 
                 const productTitle = row.Product_Title;
                 const dimensions = row.Dimensions || '-';
-                const weight = row.Weight_Display || '-';
                 const warningIcon = (row.Dimensions_Warning || row.Weight_Warning || row.Package_Weight_Warning) ? ' ⚠️' : '';
                 const offeringPrice = row.Offering_Price.toFixed(2);
                 const offeringPricePerPiece = row.Offering_Price_Per_Piece !== null ? row.Offering_Price_Per_Piece.toFixed(2) : '-';
                 const priceDisplay = row.Final_Normalized_Price.toFixed(2);
-                const calcDisplay = formatCalcForCsv(row);
                 
-                // Drill-Down: Stein, Produkttyp und Form nur in der ersten Zeile einer neuen Gruppe
+                // New columns: Gewicht shows effective weight, Einheit shows €/kg or €/Stk
+                const weightDisplay = formatWeightForMarkdown(row);
+                const unitDisplay = formatUnitForCsv(row);
+                
+                // Drill-down: only show stone/productType/form on first row of new group
                 const isNewStone = (stone !== lastStone);
                 const isNewProductType = (productType !== lastProductType || isNewStone);
                 const isNewForm = (form !== lastForm || isNewStone);
@@ -188,7 +200,7 @@ export function exportBestBuyByStoneToCsv(data: ReportRow[]): string {
                 const showProductType = (index === 0 && isNewProductType) ? productType : '';
                 const showForm = (index === 0 && isNewForm) ? form : '';
                 
-                // Update lastStone, lastProductType und lastForm NUR nach der ersten Zeile einer neuen Gruppe
+                // Update tracking variables only after first row of new group
                 if (index === 0) {
                     if (isNewStone) lastStone = stone;
                     if (isNewProductType) lastProductType = productType;
@@ -205,11 +217,11 @@ export function exportBestBuyByStoneToCsv(data: ReportRow[]): string {
                     row.Origin_Country,
                     productTitle,
                     dimensions + warningIcon,
-                    weight + warningIcon,
                     offeringPrice,
                     offeringPricePerPiece,
                     priceDisplay,
-                    calcDisplay,
+                    weightDisplay,
+                    unitDisplay,
                     diffStr,
                     info.join(' ')
                 ];
@@ -223,13 +235,16 @@ export function exportBestBuyByStoneToCsv(data: ReportRow[]): string {
 }
 
 /**
- * Exportiert best_buy_report_by_product_type als CSV
- * Gruppiert nach ProductType > Material (Stein) > Form, Drill-Down-Stil
+ * Exports best_buy_report_by_product_type as CSV.
+ * Groups offerings by ProductType > Material (Stone) > Form in drill-down style.
+ * 
+ * @param data - Array of report rows to export
+ * @returns CSV string with all product type grouped offerings
  */
 export function exportBestBuyByProductTypeToCsv(data: ReportRow[]): string {
     const { productTypeGroups, sortedProductTypes } = groupByProductType(data);
     
-    // Header
+    // Header row - "Einheit" shows €/kg or €/Stk, "Gewicht" shows effective weight
     const headers = [
         'Produkttyp',
         'Stein',
@@ -244,13 +259,14 @@ export function exportBestBuyByProductTypeToCsv(data: ReportRow[]): string {
         'Price',
         'Price/Piece',
         'Preis (Norm.)',
-        'Calc',
+        'Einheit',
         'vs. Winner',
         'Info'
     ];
     
     let csv = formatCsvRow(headers) + '\n';
     
+    // Track last values for drill-down display (only show on first row of new group)
     let lastProductType = '';
     let lastStone = '';
     let lastForm = '';
@@ -268,6 +284,7 @@ export function exportBestBuyByProductTypeToCsv(data: ReportRow[]): string {
                 
                 if (candidates.length === 0) return;
                 
+                // Winner is the lowest priced offering in this group
                 const winner = candidates[0];
                 
                 candidates.forEach((row, index) => {
@@ -282,9 +299,11 @@ export function exportBestBuyByProductTypeToCsv(data: ReportRow[]): string {
                     const offeringPrice = row.Offering_Price.toFixed(2);
                     const offeringPricePerPiece = row.Offering_Price_Per_Piece !== null ? row.Offering_Price_Per_Piece.toFixed(2) : '-';
                     const priceDisplay = row.Final_Normalized_Price.toFixed(2);
-                    const calcDisplay = formatCalcForCsv(row);
                     
-                    // Drill-Down: ProductType, Stein und Form nur in der ersten Zeile einer neuen Gruppe
+                    // New columns: Gewicht shows effective weight, Einheit shows €/kg or €/Stk
+                    const unitDisplay = formatUnitForCsv(row);
+                    
+                    // Drill-down logic: show ProductType, Stone, Form only on first row of new group
                     const isNewProductType = (productType !== lastProductType);
                     const isNewStone = (stone !== lastStone || isNewProductType);
                     const isNewForm = (form !== lastForm || isNewProductType || isNewStone);
@@ -292,7 +311,7 @@ export function exportBestBuyByProductTypeToCsv(data: ReportRow[]): string {
                     const showStone = (index === 0 && isNewStone) ? stone : '';
                     const showForm = (index === 0 && isNewForm) ? form : '';
                     
-                    // Update lastProductType, lastStone und lastForm NUR nach der ersten Zeile einer neuen Gruppe
+                    // Update tracking variables only after first row of new group
                     if (index === 0) {
                         if (isNewProductType) lastProductType = productType;
                         if (isNewStone) lastStone = stone;
@@ -313,7 +332,7 @@ export function exportBestBuyByProductTypeToCsv(data: ReportRow[]): string {
                         offeringPrice,
                         offeringPricePerPiece,
                         priceDisplay,
-                        calcDisplay,
+                        unitDisplay,
                         diffStr,
                         info.join(' ')
                     ];

@@ -155,6 +155,21 @@ function normalizeEnrichedView(row: OfferingEnrichedView): NormalizedOffering {
 // 5. CORE TRANSFORMATION LOGIC
 // ==========================================
 
+/**
+ * Extracts the best (lowest) price from an offering by searching for bulk prices in the comment field.
+ * 
+ * WHY: Many wholesalers include volume discount prices in comments like "ab 10 Stk: 3.50€".
+ * This function parses these to find the actual best available price.
+ * 
+ * VALIDATION: Found prices must be:
+ * - Lower than the list price (otherwise it's not a discount)
+ * - At least 10% of list price (to filter out false positives like quantities)
+ * 
+ * @param row - The normalized offering with comment field
+ * @param listPrice - The official list price to compare against
+ * @param reportBuilder - Optional builder for adding legend entries
+ * @returns Object with best price, source indicator, and optional excerpt from comment
+ */
 export function getBestPriceFromNormalized(row: NormalizedOffering, listPrice: number, reportBuilder?: ReportBuilder): { price: number, source: string, commentExcerpt?: string } {
     if (reportBuilder && !reportBuilder['legendEntries'].has('Preis (Norm.)_Bulk')) {
         reportBuilder.addToLegend(
@@ -202,7 +217,20 @@ export function getBestPriceFromNormalized(row: NormalizedOffering, listPrice: n
 }
 
 /**
- * Determines the effective weight in kg based on the cascade logic.
+ * Determines the effective weight in kg using a priority-based cascade of sources.
+ * 
+ * PRIORITY ORDER (first match wins):
+ * 1. BULK - Bulk packaging weight (e.g., "1kg" in packaging field) - most reliable for bulk orders
+ * 2. EXACT - Explicit weight field (offeringWeightGrams) - direct measurement from supplier
+ * 3. RANGE - Weight range field average (e.g., "30-50g" → 40g) - supplier estimate
+ * 4. CALC - Geometric calculation from dimensions × form factor × density - computed estimate
+ * 
+ * WHY CASCADE: Different data sources have different reliability. Bulk packaging is most
+ * reliable because it's what you actually receive. Geometric calculation is least reliable
+ * as it involves assumptions about shape and material density.
+ * 
+ * @param row - The normalized offering with weight/dimension data
+ * @returns Object with weight in kg, source description, calculation method, and tooltip
  */
 function determineEffectiveWeight(row: NormalizedOffering): {
     weightKg: number | null,
@@ -289,6 +317,24 @@ function determineEffectiveWeight(row: NormalizedOffering): {
     return { weightKg: null, source: 'None', method: 'ERR', tooltip: 'Kein Gewicht ermittelbar.' };
 }
 
+/**
+ * Transforms normalized offerings into report rows with calculated normalized prices.
+ * 
+ * This is the MAIN TRANSFORMATION PIPELINE that:
+ * 1. Filters offerings (excludes internal suppliers, applies relevance filters)
+ * 2. Detects bulk prices from comments
+ * 3. Applies import markup for non-EU countries (+25%)
+ * 4. Determines pricing strategy (WEIGHT vs UNIT based on product type)
+ * 5. Calculates normalized price (€/kg or €/Stk) for comparison
+ * 
+ * The resulting ReportRow contains all data needed for the comparison reports,
+ * including a trace of how the price was calculated for transparency.
+ * 
+ * @param normalizedOfferings - Array of offerings in normalized format
+ * @param reportBuilder - Optional builder for collecting legend entries
+ * @param options - Filter options (excluded IDs, allowed relevances)
+ * @returns Array of report rows ready for grouping and ranking
+ */
 export function transformOfferingsToAuditRows(normalizedOfferings: NormalizedOffering[],
     reportBuilder?: ReportBuilder,
     options?: LoadOfferingsOptions): ReportRow[] {
@@ -296,11 +342,11 @@ export function transformOfferingsToAuditRows(normalizedOfferings: NormalizedOff
 
     const auditData: ReportRow[] = normalizedOfferings
         .filter(row => {
-            // Filter out by name (legacy check)
+            // Filter out internal supplier by name (legacy check for backwards compatibility)
             if (row.wholesalerName === 'pureEnergy') return false;
-            // Filter out by ID (additional safety net)
+            // Filter out by ID (primary exclusion mechanism)
             if (row.wholesalerId > 0 && options?.excludedWholesalerIds?.includes(row.wholesalerId)) return false;
-            // Filter by relevance (if configured)
+            // Filter by relevance level (only include high/medium relevance suppliers)
             if ((options?.allowedWholesalerRelevances?.length ?? 0) > 0) {
                 if (!row.wholesalerRelevance || !options?.allowedWholesalerRelevances?.includes(row.wholesalerRelevance)) {
                     return false;
@@ -309,9 +355,13 @@ export function transformOfferingsToAuditRows(normalizedOfferings: NormalizedOff
             return true;
         })
         .map((row, index) => {
+            // Trace collects human-readable steps for debugging and tooltips
             const trace: string[] = [];
 
-            // A. BASE PRICE DETECTION
+            // ========================================
+            // STEP A: BASE PRICE DETECTION
+            // Search for bulk/volume discounts in comment field
+            // ========================================
             log.debug(`Processing offering ${index + 1}: ${row.offeringTitle}`);
             const listPrice = row.offeringPrice;
             const priceInfo = getBestPriceFromNormalized(row, listPrice, reportBuilder);
@@ -324,7 +374,10 @@ export function transformOfferingsToAuditRows(normalizedOfferings: NormalizedOff
                 log.debug(`Found bulk price: ${priceInfo.price} (source: ${priceInfo.source})`);
             }
 
-            // B. LANDED COST CALCULATION
+            // ========================================
+            // STEP B: LANDED COST CALCULATION
+            // Apply import markup for non-EU countries (customs, shipping, risk)
+            // ========================================
             const country = row.wholesalerCountry ? row.wholesalerCountry.toUpperCase() : 'UNKNOWN';
             if (reportBuilder && !reportBuilder['legendEntries'].has('Herkunft')) {
                 reportBuilder.addToLegend(
@@ -354,23 +407,30 @@ export function transformOfferingsToAuditRows(normalizedOfferings: NormalizedOff
                 );
             }
 
-            // C. STRATEGY & WEIGHT DETERMINATION
-            const dimensionsInfo = extractDimensions(row); // Only for display now
+            // ========================================
+            // STEP C: STRATEGY & WEIGHT DETERMINATION
+            // Choose pricing strategy based on product type:
+            // - WEIGHT: Compare by €/kg (raw stones, bulk materials)
+            // - UNIT: Compare by €/Stk (jewelry, pendants, necklaces)
+            // - AUTO: Use WEIGHT if weight data available, else UNIT
+            // ========================================
+            const dimensionsInfo = extractDimensions(row); // Extract dimensions for display
 
-            // Validate package weight for display
+            // Validate and display package weight if available
             const packageWeightInfo = validatePackageWeight(row.offeringPackaging, row.offeringPackageWeight);
             if (packageWeightInfo.packageWeightDisplay) {
                 trace.push(`📦 Package Weight: ${packageWeightInfo.packageWeightDisplay} [Field]`);
             }
 
+            // Determine pricing strategy from STRATEGY_MAP or use AUTO
             let strategy: 'WEIGHT' | 'UNIT' = 'UNIT';
             const preset = STRATEGY_MAP[row.productTypeName] || 'AUTO';
 
             if (preset === 'WEIGHT') strategy = 'WEIGHT';
             else if (preset === 'UNIT') strategy = 'UNIT';
             else {
-                // AUTO Mode
-                // We prefer WEIGHT if we can calculate/find it
+                // AUTO mode: Prefer WEIGHT-based pricing if weight data is available,
+                // as it enables better comparison across different package sizes
                 const weightCheck = determineEffectiveWeight(row);
                 if (weightCheck.weightKg !== null) strategy = 'WEIGHT';
                 else strategy = 'UNIT';
@@ -381,29 +441,40 @@ export function transformOfferingsToAuditRows(normalizedOfferings: NormalizedOff
             let calcMethod: ReportRow['Calculation_Method'] = 'UNIT';
             let calcTooltip = '';
 
+            // ========================================
+            // STEP D: FINAL PRICE NORMALIZATION
+            // Calculate the comparable price based on strategy
+            // ========================================
             if (strategy === 'WEIGHT') {
+                // Weight-based: Calculate price per kilogram for fair comparison
                 const weightResult = determineEffectiveWeight(row);
                 if (weightResult.weightKg && weightResult.weightKg > 0) {
+                    // Normalized price = effective price / weight in kg
                     finalNormalizedPrice = effectivePrice / weightResult.weightKg;
                     unitLabel = '€/kg';
                     calcMethod = weightResult.method;
                     calcTooltip = `${weightResult.tooltip} Rechnung: ${effectivePrice.toFixed(2)}€ / ${weightResult.weightKg.toFixed(3)}kg`;
                     trace.push(`⚖️ Weight Strat: ${weightResult.method} (${weightResult.weightKg.toFixed(3)}kg)`);
                 } else {
-                    finalNormalizedPrice = 999999;
+                    // Error case: WEIGHT strategy chosen but no weight could be determined
+                    finalNormalizedPrice = 999999; // Push to bottom of rankings
                     unitLabel = 'ERR';
                     calcMethod = 'ERR';
                     calcTooltip = 'Fehler: Strategie WEIGHT gewählt, aber kein Gewicht ermittelbar.';
                     trace.push(`❌ ERROR: WEIGHT Strategy but no weight found`);
                 }
             } else {
+                // Unit-based: Use effective price directly (price per piece)
                 finalNormalizedPrice = effectivePrice;
                 unitLabel = '€/Stk';
                 calcMethod = 'UNIT';
                 calcTooltip = `Strategie: UNIT. Preis pro Stück. Rechnung: ${effectivePrice.toFixed(2)}€ / 1 Stk`;
             }
 
-            // D. GROUP KEY
+            // ========================================
+            // STEP E: BUILD GROUP KEY FOR RANKING
+            // Format: "ProductType > Material > Form"
+            // ========================================
             const materialDisplay = row.finalMaterialName || `[no mat]`;
             const formDisplay = row.finalFormName || `[no form]`;
 

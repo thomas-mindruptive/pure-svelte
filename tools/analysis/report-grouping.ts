@@ -187,28 +187,60 @@ export function sortCandidatesByPrice(candidates: ReportRow[]): ReportRow[] {
 }
 
 /**
- * Formatiert Calc-Anzeige für Markdown (mit HTML Tooltip)
+ * Formats the unit column for Markdown output (with HTML tooltip).
+ * Shows "€/kg" or "€/Stk" as the visible label, with full calculation
+ * details available on hover via the <abbr> tooltip.
+ * 
+ * @param row - The report row containing unit and calculation info
+ * @returns HTML abbr element with unit label and tooltip
  */
-export function formatCalcForMarkdown(row: ReportRow): string {
-    const method = row.Calculation_Method;
+export function formatUnitForMarkdown(row: ReportRow): string {
     const tooltip = row.Calculation_Tooltip;
     
-    // Kurze Anzeige basierend auf Method
-    const shortLabel = method === 'BULK' ? 'BULK' :
-                       method === 'EXACT' ? 'EXACT' :
-                       method === 'RANGE' ? 'RANGE' :
-                       method === 'CALC' ? 'CALC' :
-                       method === 'UNIT' ? 'UNIT' :
-                       'ERR';
+    // Display the actual unit (€/kg or €/Stk) instead of method code
+    const unitLabel = row.Unit === '€/kg' ? '€/kg' :
+                      row.Unit === '€/Stk' ? '€/Stk' :
+                      'ERR';
     
-    // HTML abbr Tag für Tooltip
-    return `<abbr title="${tooltip.replace(/"/g, '&quot;')}">${shortLabel}</abbr>`;
+    // HTML abbr tag preserves tooltip on hover
+    return `<abbr title="${tooltip.replace(/"/g, '&quot;')}">${unitLabel}</abbr>`;
 }
 
 /**
- * Formatiert Calc-Anzeige für CSV (vollständiger Text)
+ * Formats the unit column for CSV output.
+ * Returns the unit label (€/kg or €/Stk) for the CSV cell.
+ * 
+ * @param row - The report row containing unit info
+ * @returns Unit string for CSV
  */
-export function formatCalcForCsv(row: ReportRow): string {
-    return row.Calculation_Tooltip;
+export function formatUnitForCsv(row: ReportRow): string {
+    return row.Unit === '€/kg' ? '€/kg' :
+           row.Unit === '€/Stk' ? '€/Stk' :
+           'ERR';
+}
+
+/**
+ * Formats the effective weight for display in reports.
+ * Shows the calculated/measured weight in a human-readable format.
+ * Returns "-" for UNIT strategy (no weight-based pricing).
+ * 
+ * @param row - The report row containing weight data
+ * @returns Formatted weight string (e.g., "229g", "1.2kg", "-")
+ */
+export function formatWeightForMarkdown(row: ReportRow): string {
+    // No weight display for unit-based pricing
+    if (row.Unit === '€/Stk' || row.Detected_Weight_Kg === null) {
+        return '-';
+    }
+    
+    const weightKg = row.Detected_Weight_Kg;
+    
+    // Display in grams for weights under 1kg, otherwise in kg
+    if (weightKg < 1) {
+        const grams = Math.round(weightKg * 1000);
+        return `${grams}g`;
+    } else {
+        return `${weightKg.toFixed(2)}kg`;
+    }
 }
 

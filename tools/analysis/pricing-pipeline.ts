@@ -109,37 +109,92 @@ export interface MetadataResult {
 // ==========================================
 
 /**
- * Extracts all price-like patterns from a comment string.
+ * Extracts all price-like patterns from a comment string, robustly filtering out quantities.
  * 
- * PATTERN MATCHING:
- * - Finds: €5, $5.50, 3,20, 10.00, etc.
- * - Regex: /[\$€]?\s?(\d+[\.,]?\d{0,2})/g
+ * CHALLENGE:
+ * Comments mix prices and quantities, e.g., "Ab 5 Stück: € 9,80" or "10x für 50€".
+ * Simple regex matching would find "5" and "9,80". Since "5" < "9,80", logic might pick 5 as the price.
  * 
- * NORMALIZATION:
- * - Removes currency symbols (€, $)
- * - Converts comma to dot (3,20 → 3.20)
- * - Converts to float number
+ * SOLUTION STRATEGY (Context-Aware Extraction):
+ * 1. Iterate through all number matches in the text.
+ * 2. Check the immediate CONTEXT of each number:
+ *    - Has currency symbol? (€, $, EUR) → STRONG CANDIDATE (Priority)
+ *    - Followed by quantity keywords? (Stk, pcs, x) → IGNORE (It's a quantity)
+ *    - Preceded by "ab"? (e.g., "ab 5") → IGNORE (Likely a quantity threshold)
  * 
  * @param comment - Comment text to search for prices
  * @returns Array of found price values (normalized to numbers)
- * 
- * @example
- * extractPricesFromComment("ab 50 Stück: 3.20 EUR oder 2,50")
- * → [50, 3.20, 2.50]
  */
 function extractPricesFromComment(comment: string): number[] {
-    // Search for price patterns: $5, €5, 5.50, 5,50
-    // Pattern matches: optional currency symbol, optional space, digits with optional decimal separator
-    const matches = comment.match(/[\$€]?\s?(\d+[\.,]?\d{0,2})/g);
+    const validPrices: number[] = [];
     
-    if (!matches) {
-        return [];
+    // Regex to find numbers (potential prices OR quantities)
+    // Captures:
+    // 1. Prefix (optional currency or "ab")
+    // 2. The number itself (formatted like 10, 10.00, 10,00)
+    // 3. Suffix (optional currency or quantity unit)
+    // We match broad context to analyze it.
+    
+    // Keyword lists for filtering
+    const quantityKeywords = ['stk', 'stück', 'pcs', 'x', 'mal', 'paar', 'set'];
+    const currencyKeywords = ['€', 'eur', 'euro', '$', 'usd', 'chf'];
+    
+    // Normalize comment for easier checking (lowercase)
+    const lowerComment = comment.toLowerCase();
+    
+    // Regex for finding numbers with loose context
+    // Matches: (Currency? Space?)(Number)(Space? Unit/Currency?)
+    // Note: This regex is used to find LOCATIONS of numbers to check their context
+    const numberPattern = /([\€\$]?\s?)(\d+[\.,]?\d{0,2})(\s?[\€\$]?\w*)/g;
+    
+    let match;
+    while ((match = numberPattern.exec(comment)) !== null) {
+        const fullMatch = match[0];
+        const numberStr = match[2]; // The actual number string (e.g. "5" or "9,80")
+        const suffixRaw = match[3] ? match[3].trim().toLowerCase() : '';
+        
+        // Context analysis based on original string position
+        // Look a bit before and after the match for clues
+        const contextStart = Math.max(0, match.index - 10);
+        const contextEnd = Math.min(comment.length, match.index + fullMatch.length + 10);
+        const preContext = comment.substring(contextStart, match.index).toLowerCase();
+        
+        // 1. PARSE: Convert candidate to number
+        const val = parseFloat(numberStr.replace(',', '.'));
+        if (isNaN(val) || val <= 0) continue;
+
+        // 2. CHECK: Is it explicitly a quantity?
+        // Logic: If followed by "stk", "x", etc. -> IT IS A QUANTITY (Ignore)
+        // Example: "5 Stk" -> Ignore 5
+        if (quantityKeywords.some(kw => suffixRaw.startsWith(kw))) {
+            continue; 
+        }
+
+        // 3. CHECK: Is it explicitly a price?
+        // Logic: If explicitly marked with currency (€, EUR) -> IT IS A PRICE (Keep)
+        // Checks prefix in match, suffix in match, or surrounding context
+        const hasCurrencyPrefix = currencyKeywords.some(c => fullMatch.toLowerCase().includes(c));
+        const hasCurrencySuffix = currencyKeywords.some(c => suffixRaw.includes(c));
+        
+        if (hasCurrencyPrefix || hasCurrencySuffix) {
+            validPrices.push(val);
+            continue; // Explicit price, we are done with this number
+        }
+
+        // 4. CHECK: Is it a "threshold" quantity (e.g. "ab 5")?
+        // Logic: If preceded by "ab" AND no currency involved -> LIKELY QUANTITY (Ignore)
+        // Example: "ab 5" (Ignore 5) vs "ab € 5" (Keep 5, captured by step 3)
+        if (preContext.trim().endsWith('ab') || preContext.trim().endsWith('min.')) {
+            continue;
+        }
+
+        // 5. Fallback: Unmarked number
+        // Example: "10.50" without symbols. Could be price, could be something else.
+        // We include it as a weak candidate, filtering will happen later via min/max checks.
+        validPrices.push(val);
     }
     
-    // Normalize each match: remove currency symbols, trim, convert comma to dot
-    return matches.map(m => 
-        parseFloat(m.replace(/[€$]/g, '').trim().replace(',', '.'))
-    );
+    return validPrices;
 }
 
 /**
@@ -733,10 +788,13 @@ export function buildReportRow(
         Dimensions_Warning: metadataResult.dimensionsWarning, // Warning if dimensions are problematic
         
         // Format weight for display: grams if < 1kg, otherwise kg
+        // Calculation logic:
+        // - Weight comes from determineEffectiveWeight() (Step C)
+        // - It prioritizes: Bulk Pkg > Exact Field > Range Avg > Geometric Calc
         Weight_Display: weightResult.weightKg 
             ? (weightResult.weightKg < 1 
-                ? `${Math.round(weightResult.weightKg * 1000)}g`  // Show as grams (e.g., "50g")
-                : `${weightResult.weightKg.toFixed(2)}kg`)        // Show as kg (e.g., "1.25kg")
+                ? `${Math.round(weightResult.weightKg * 1000)}g`  // < 1kg -> show grams (e.g. "43g")
+                : `${weightResult.weightKg.toFixed(2)}kg`)        // >= 1kg -> show kg (e.g. "1.25kg")
             : '-',                                          // No weight available
         
         Weight_Source: weightResult.method,                 // How weight was determined (EXACT, CALC, RANGE, BULK)

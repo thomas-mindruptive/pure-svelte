@@ -95,6 +95,7 @@ export interface RawOffering {
     offeringDimensions?: string;
     offeringWeightRange?: string;
     offeringPackageWeight?: string;
+    offeringBulkPrices?: string;
     offeringId?: string;
     // Additional fields are optional - not critical for price calculation
     [key: string]: string | undefined; 

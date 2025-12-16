@@ -43,6 +43,7 @@ export interface NormalizedOffering {
     offeringDimensions: string | null;          // e.g., "20x30x15 mm"
     offeringWeightRange: string | null;         // e.g., "50-100g"
     offeringPackageWeight: string | null;
+    offeringBulkPrices: string | null;          // New strict bulk prices field
     offeringId: number;
 }
 
@@ -109,187 +110,19 @@ export interface MetadataResult {
 // ==========================================
 
 /**
- * Extracts all price-like patterns from a comment string, robustly filtering out quantities.
- * 
- * CHALLENGE:
- * Comments mix prices and quantities, e.g., "Ab 5 Stück: € 9,80" or "10x für 50€".
- * Simple regex matching would find "5" and "9,80". Since "5" < "9,80", logic might pick 5 as the price.
- * 
- * SOLUTION STRATEGY (Context-Aware Extraction):
- * 1. Iterate through all number matches in the text.
- * 2. Check the immediate CONTEXT of each number:
- *    - Has currency symbol? (€, $, EUR) → STRONG CANDIDATE (Priority)
- *    - Followed by quantity keywords? (Stk, pcs, x) → IGNORE (It's a quantity)
- *    - Preceded by "ab"? (e.g., "ab 5") → IGNORE (Likely a quantity threshold)
- * 
- * @param comment - Comment text to search for prices
- * @returns Array of found price values (normalized to numbers)
- */
-function extractPricesFromComment(comment: string): number[] {
-    const validPrices: number[] = [];
-    
-    // Regex to find numbers (potential prices OR quantities)
-    // Captures:
-    // 1. Prefix (optional currency or "ab")
-    // 2. The number itself (formatted like 10, 10.00, 10,00)
-    // 3. Suffix (optional currency or quantity unit)
-    // We match broad context to analyze it.
-    
-    // Keyword lists for filtering
-    const quantityKeywords = ['stk', 'stück', 'pcs', 'x', 'mal', 'paar', 'set'];
-    const currencyKeywords = ['€', 'eur', 'euro', '$', 'usd', 'chf'];
-    
-    // Normalize comment for easier checking (lowercase)
-    const lowerComment = comment.toLowerCase();
-    
-    // Regex for finding numbers with loose context
-    // Matches: (Currency? Space?)(Number)(Space? Unit/Currency?)
-    // Note: This regex is used to find LOCATIONS of numbers to check their context
-    const numberPattern = /([\€\$]?\s?)(\d+[\.,]?\d{0,2})(\s?[\€\$]?\w*)/g;
-    
-    let match;
-    while ((match = numberPattern.exec(comment)) !== null) {
-        const fullMatch = match[0];
-        const numberStr = match[2]; // The actual number string (e.g. "5" or "9,80")
-        const suffixRaw = match[3] ? match[3].trim().toLowerCase() : '';
-        
-        // Context analysis based on original string position
-        // Look a bit before and after the match for clues
-        const contextStart = Math.max(0, match.index - 10);
-        const contextEnd = Math.min(comment.length, match.index + fullMatch.length + 10);
-        const preContext = comment.substring(contextStart, match.index).toLowerCase();
-        
-        // 1. PARSE: Convert candidate to number
-        const val = parseFloat(numberStr.replace(',', '.'));
-        if (isNaN(val) || val <= 0) continue;
-
-        // 2. CHECK: Is it explicitly a quantity?
-        // Logic: If followed by "stk", "x", etc. -> IT IS A QUANTITY (Ignore)
-        // Example: "5 Stk" -> Ignore 5
-        if (quantityKeywords.some(kw => suffixRaw.startsWith(kw))) {
-            continue; 
-        }
-
-        // 3. CHECK: Is it explicitly a price?
-        // Logic: If explicitly marked with currency (€, EUR) -> IT IS A PRICE (Keep)
-        // Checks prefix in match, suffix in match, or surrounding context
-        const hasCurrencyPrefix = currencyKeywords.some(c => fullMatch.toLowerCase().includes(c));
-        const hasCurrencySuffix = currencyKeywords.some(c => suffixRaw.includes(c));
-        
-        if (hasCurrencyPrefix || hasCurrencySuffix) {
-            validPrices.push(val);
-            continue; // Explicit price, we are done with this number
-        }
-
-        // 4. CHECK: Is it a "threshold" quantity (e.g. "ab 5")?
-        // Logic: If preceded by "ab" AND no currency involved -> LIKELY QUANTITY (Ignore)
-        // Example: "ab 5" (Ignore 5) vs "ab € 5" (Keep 5, captured by step 3)
-        if (preContext.trim().endsWith('ab') || preContext.trim().endsWith('min.')) {
-            continue;
-        }
-
-        // 5. Fallback: Unmarked number
-        // Example: "10.50" without symbols. Could be price, could be something else.
-        // We include it as a weak candidate, filtering will happen later via min/max checks.
-        validPrices.push(val);
-    }
-    
-    return validPrices;
-}
-
-/**
- * Finds the lowest valid price from a list of candidates.
- * 
- * VALIDATION RULES:
- * - Must be lower than list price (otherwise it's not a discount)
- * - Must be greater than 10% of list price (prevents false positives like "2mm" or "1x")
- * 
- * WHY 10% THRESHOLD:
- * Comments often contain measurements like "2-3 mm" or "1x verfügbar" which would
- * otherwise be detected as prices. The 10% threshold filters these out.
- * 
- * @param candidates - Array of price candidates extracted from comment
- * @param listPrice - The official list price as baseline for validation
- * @returns Lowest valid price or null if none found
- * 
- * @example
- * // List price: 10.00€
- * findLowestValidPrice([50, 3.20, 2.50, 0.50], 10.00)
- * → 2.50 (3.20 and 2.50 are valid, 2.50 is lowest, 50 is higher than list, 0.50 is < 10%)
- */
-function findLowestValidPrice(candidates: number[], listPrice: number): number | null {
-    let lowest = listPrice;
-    
-    // Check each candidate price
-    for (const price of candidates) {
-        // Validation: Must be lower than list price AND greater than 10% of list price
-        if (price < lowest && price > (listPrice * 0.1)) {
-            lowest = price;
-        }
-    }
-    
-    // Return lowest if we found a better price, otherwise null
-    return lowest < listPrice ? lowest : null;
-}
-
-/**
- * Extracts a text excerpt around a price match for context display.
- * 
- * PURPOSE:
- * Shows users where in the comment the bulk price was found,
- * providing context like "ab 50 Stück: 3.20 EUR".
- * 
- * @param comment - Full comment text to extract from
- * @param priceString - The price string to find (e.g., "3.20")
- * @param contextChars - Number of characters to include before/after (default: 20)
- * @returns Text excerpt with context around the price
- * 
- * @example
- * extractCommentExcerpt("Sonderangebot ab 50 Stück: 3.20 EUR pro Stück", "3.20", 20)
- * → "ab 50 Stück: 3.20 EUR pro Stück"
- */
-function extractCommentExcerpt(
-    comment: string, 
-    priceString: string, 
-    contextChars: number = 20
-): string {
-    const index = comment.indexOf(priceString);
-    
-    // If price string not found, return beginning of comment
-    if (index === -1) {
-        return comment.substring(0, 50);
-    }
-    
-    // Extract characters before and after the price
-    const start = Math.max(0, index - contextChars);
-    const end = Math.min(comment.length, index + priceString.length + contextChars);
-    
-    return comment.substring(start, end).trim();
-}
-
-/**
  * Detects the best available price for an offering.
  * 
  * STRATEGY:
  * 1. Start with the list price as baseline
- * 2. Search comment field for bulk pricing mentions (e.g., "ab 10 Stk: 5.50€")
- * 3. Extract all price-like patterns using regex
- * 4. Find the lowest valid price (must be < list price and > 10% of list price)
+ * 2. Parse the strict 'bulk_prices' field (Format: Quantity|Unit|Price|Info)
+ * 3. Fail fast if parsing encounters invalid format
+ * 4. Find the lowest price from valid bulk entries
  * 5. Return the best price found with its source
- * 
- * VALIDATION:
- * - Bulk price must be lower than list price (otherwise it's not a discount)
- * - Bulk price must be > 10% of list price (to avoid false positives like "2mm" or "1x")
  * 
  * @param offering - The normalized offering to analyze
  * @param listPrice - The official list price from the wholesaler
  * @param reportBuilder - Optional report builder to add legend entries
  * @returns Best price result with source information
- * 
- * @example
- * // Comment: "ab 50 Stück: 3.20 EUR"
- * // List price: 4.50
- * // Result: { price: 3.20, source: 'Bulk (Comment)', commentExcerpt: "...ab 50 Stück: 3.20 EUR..." }
  */
 export function detectBestPrice(
     offering: NormalizedOffering,
@@ -302,45 +135,59 @@ export function detectBestPrice(
     if (reportBuilder && !reportBuilder['legendEntries'].has('Preis (Norm.)_Bulk')) {
         reportBuilder.addToLegend(
             'Preis (Norm.)_Bulk',
-            'Bulk-Preis aus Comment-Feld extrahiert',
-            'Regex-Pattern durchsucht Comment nach Preisen.'
+            'Bulk-Preis aus bulk_prices Feld',
+            'Niedrigster Preis aus der strikten Bulk-Preis-Tabelle.'
         );
     }
 
-    // No comment field = no bulk pricing info available
-    if (!offering.offeringComment) {
+    // No bulk prices = return list price
+    if (!offering.offeringBulkPrices) {
         return { price: listPrice, source: 'List', trace };
     }
 
-    // STEP 1: Extract all prices from comment
-    // Uses regex to find all price-like patterns (€5, $5.50, 3,20, etc.)
-    const priceCandidates = extractPricesFromComment(offering.offeringComment);
-    
-    // STEP 2: Find the lowest valid bulk price
-    // Validates each candidate: must be < list price and > 10% of list price
-    const bulkPrice = findLowestValidPrice(priceCandidates, listPrice);
-    
-    // STEP 3: If bulk price found, extract context and return
-    if (bulkPrice !== null) {
-        // Extract excerpt from comment showing where the price was found
-        const excerpt = extractCommentExcerpt(
-            offering.offeringComment, 
-            bulkPrice.toString()
-        );
+    const bulkPrices = offering.offeringBulkPrices.split(/\r?\n/).filter(l => l.trim().length > 0);
+    let lowest = listPrice;
+    let lowestSource = 'List';
+    let foundValidBulk = false;
+
+    trace.push(`🔍 Analyzing ${bulkPrices.length} bulk price entries...`);
+
+    for (const line of bulkPrices) {
+        const parts = line.split('|').map(p => p.trim());
         
-        // Add trace information for debugging
-        trace.push(`💰 Bulk Found: ${bulkPrice.toFixed(2)} (was ${listPrice.toFixed(2)})`);
-        trace.push(`💬 Comment: "...${excerpt}..."`);
-        
+        // Validation: Must have at least 3 parts (Quantity, Unit, Price)
+        if (parts.length < 3) {
+            throw new Error(`Invalid bulk price format in offering ${offering.offeringId}: "${line}". Expected: Quantity|Unit|Price|Info`);
+        }
+
+        const quantity = parseFloat(parts[0]);
+        const unit = parts[1].toLowerCase(); // Normalize unit for trace
+        const price = parseFloat(parts[2]);
+        // const info = parts[3] || '';
+
+        // Fail fast on invalid numbers
+        if (isNaN(quantity) || isNaN(price)) {
+            throw new Error(`Invalid number in bulk price for offering ${offering.offeringId}: "${line}"`);
+        }
+
+        // Check if this is a better price
+        // Note: Bulk prices are typically UNIT prices (price per 1 unit of the bulk quantity)
+        if (price < lowest) {
+            lowest = price;
+            lowestSource = `Bulk (${quantity} ${unit})`;
+            foundValidBulk = true;
+        }
+    }
+
+    if (foundValidBulk) {
+        trace.push(`💰 Best Price: ${lowest.toFixed(2)} (from ${lowestSource})`);
         return { 
-            price: bulkPrice, 
-            source: 'Bulk (Comment)', 
-            commentExcerpt: excerpt, 
+            price: lowest, 
+            source: 'Bulk (Field)', 
             trace 
         };
     }
 
-    // No bulk price found, return list price
     return { price: listPrice, source: 'List', trace };
 }
 

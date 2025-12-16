@@ -841,6 +841,7 @@ const OfferingReportViewSchemaBase = z.object({
   wsPriceRange: z.string().max(200).nullable().optional(),
   wioWeightGrams: z.number().nullable().optional(),
   wioWeightRange: z.string().max(50).nullable().optional(),
+  wioPackaging: z.string().max(50).nullable().optional(),
   wioPackageWeight: z.string().max(50).nullable().optional(),
 }).describe("OfferingReportViewSchema");
 

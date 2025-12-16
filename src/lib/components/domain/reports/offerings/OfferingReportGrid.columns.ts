@@ -275,6 +275,15 @@ export const columns: ColumnDef<typeof OfferingReportViewSchema>[] = [
     width: "120px"
   },
   {
+    key: "wioPackaging",
+    header: "Packaging",
+    accessor: (row) => row.wioPackaging || "-",
+    sortable: true,
+    filterable: true,
+    filterType: "text",
+    width: "120px"
+  },
+  {
     key: "wioPackageWeight",
     header: "Package Weight",
     accessor: (row) => row.wioPackageWeight || "-",

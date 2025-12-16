@@ -109,6 +109,7 @@ interface NormalizedOffering {
     offeringDimensions: string | null;     // For geometric weight calculation
     offeringWeightRange: string | null;    // e.g., "30-50g"
     offeringPackageWeight: string | null;  // Bulk package weight
+    offeringBulkPrices: string | null;     // New strict bulk prices field
     offeringId: number;                    // Database ID for reference
 }
 
@@ -183,6 +184,9 @@ function normalizeRawOffering(row: RawOffering): NormalizedOffering {
         offeringPackageWeight: (row.offeringPackageWeight && row.offeringPackageWeight !== 'NULL')
             ? row.offeringPackageWeight
             : null,
+        offeringBulkPrices: (row.offeringBulkPrices && row.offeringBulkPrices !== 'NULL')
+            ? row.offeringBulkPrices
+            : null,
         offeringId: offeringId,
     };
 }
@@ -214,6 +218,7 @@ function normalizeEnrichedView(row: OfferingEnrichedView): NormalizedOffering {
         offeringDimensions: row.offeringDimensions || null,
         offeringWeightRange: row.offeringWeightRange || null,
         offeringPackageWeight: row.offeringPackageWeight || null,
+        offeringBulkPrices: row.offeringBulkPrices || null,
         offeringId: row.offeringId,
     };
 }

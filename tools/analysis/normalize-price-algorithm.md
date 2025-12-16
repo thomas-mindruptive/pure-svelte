@@ -1,89 +1,82 @@
 # Preis-Normalisierungs-Algorithmus
 
-Dieses Dokument beschreibt den Algorithmus zur Ermittlung eines vergleichbaren Preises (Normalisierung) für Edelstein-Produkte.
+Dieses Dokument beschreibt den Algorithmus zur Ermittlung des besten Preises und der Normalisierung für Edelstein-Produkte (Pricing Pipeline).
 
 ## Ziel
-Vergleichbarkeit schaffen zwischen unterschiedlichen Verkaufsformen:
-- **Einzelstücke** (z.B. "Druse, 2.5kg" für 100€)
-- **Bulk-Ware** (z.B. "Trommelsteine 1kg Sack" für 40€)
-- **Stück-Ware mit Varianz** (z.B. "Cluster 30-50g" für 5€)
-- **Ware ohne Gewichtsangabe** (z.B. "Kugel 50mm" für 20€)
-
-## Kern-Strategie: "Weight First"
-Da das Volumen (und damit das Gewicht) bei 3D-Objekten (Steine) die physikalisch korrekteste Vergleichsgröße ist, versuchen wir primär, einen **Preis pro Kilogramm (€/kg)** zu ermitteln.
-
-Nur bei spezifischen Produktgruppen (Ketten, Anhänger), die primär nach Stück gehandelt werden und deren Gewicht irrelevant für den Wert ist, nutzen wir **Preis pro Stück (€/Stk)**.
+Vergleichbarkeit schaffen zwischen unterschiedlichen Verkaufsformen und Mengenstaffeln.
 
 ---
 
-## Der "Wasserfall"-Algorithmus
+## Der Pipeline-Prozess
 
-Für jedes Produkt wird sequenziell geprüft, ob eine Gewichtsermittlung möglich ist. Sobald ein Schritt erfolgreich ist, wird dieser Wert verwendet.
+Der Algorithmus läuft für jedes Offering in definierten Schritten ab:
 
-### 1. Strategie-Bestimmung
-Basierend auf `Product Type`:
-- **UNIT (Stück):** Anhänger, Halskette, Pendel, Massagestab.
+### 1. Preis-Ermittlung (Best Price)
+Bevor wir normalisieren, ermitteln wir den effektiv niedrigsten Preis.
+
+1. **Listenpreis:** Startwert ist der Standardpreis des Offerings.
+2. **Bulk-Preis Check:** 
+   - Wir prüfen das Feld `bulk_prices` (Format: `Menge|Einheit|Preis|Info`).
+   - Wir parsen die Tabelle strikt.
+   - Wir suchen den niedrigsten verfügbaren Einzelpreis in der Staffel.
+   - *Beispiel:* Listenpreis 5€, aber Staffel "ab 10 Stk: 3€" -> **Effektiver Preis: 3€**.
+   - *Fehlerbehandlung:* "Fail Fast" - bei ungültigem Format wird ein Fehler geworfen.
+
+### 2. Strategie-Bestimmung
+Basierend auf `Product Type` entscheiden wir, ob wir nach Gewicht oder Stück normalisieren:
+
+- **UNIT (Stück):** Anhänger, Halskette, Pendel, Massagestab, Armband.
 - **WEIGHT (Gewicht):** Trommelstein, Wassersteine, Rohstein, Kugel, Ei, Druse, Cluster/Stufe.
 - **AUTO:** Stand/Tischstein, Halbedelstein (Fallback auf WEIGHT).
 
-*Wenn Strategie = UNIT, ist das Gewicht irrelevant. Endpreis = Stückpreis.*
+*Wenn Strategie = UNIT, ist das Gewicht für den Preis irrelevant (aber evtl. für Sortierung).*
 
-### 2. Gewichts-Ermittlung (Für WEIGHT-Strategie)
+### 3. Gewichts-Ermittlung (Weight Waterfall)
+Unabhängig von der Strategie versuchen wir immer, ein Gewicht zu ermitteln (z.B. für Sortierung oder WEIGHT-Pricing).
 
-Wir suchen das effektive Gewicht in dieser Reihenfolge:
+Die Ermittlung folgt einer strikten Priorität ("Wasserfall"):
 
 #### A. Bulk-Verpackung (📦 BULK)
-Prüfung auf explizite Großpackungen im Feld `packaging` oder `title`.
-- *Trigger:* Text wie "1kg", "500g", "Bulk".
-- *Logik:* Wenn `package_weight` validiert wurde, nutzen wir dieses Gesamtgewicht.
-- *Beispiel:* "1kg Beutel Trommelsteine" -> Gewicht: **1.0 kg**.
+Prüfung auf explizite Großpackungen im Feld `packaging` oder `package_weight`.
+- *Trigger:* `package_weight` ist gesetzt (z.B. "1kg").
+- *Logik:* Nutze dieses Gesamtgewicht.
 
 #### B. Explizites Gewicht (⚖️ EXACT)
 Prüfung auf Datenbank-Feld `offeringWeightGrams`.
 - *Trigger:* Feld ist > 0.
 - *Logik:* Nutze den exakten Wert.
-- *Beispiel:* "Amethyst Druse" mit DB-Eintrag 2500g -> Gewicht: **2.5 kg**.
 
 #### C. Gewichts-Spanne (〰️ RANGE)
 Prüfung auf Datenbank-Feld `offeringWeightRange`.
 - *Trigger:* Feld enthält Format wie "30-50g".
 - *Logik:* Berechne Mittelwert: `(Min + Max) / 2`.
-- *Beispiel:* "30-50g" -> `(30+50)/2` = 40g -> Gewicht: **0.04 kg**.
 
 #### D. Geometrische Berechnung (📐 CALC)
-Prüfung auf Dimensionen (`offeringDimensions`) und Form.
-- *Trigger:* Dimensionen vorhanden (z.B. "50mm", "10x5x5cm").
+Prüfung auf Dimensionen (`offeringDimensions` / `size`) und Form.
+- *Trigger:* Dimensionen vorhanden (z.B. "50mm", "10x5x5cm", "[30mm][3mm]").
 - *Logik:*
-    1. **Volumen-Box:** Extrahieren von L, B, H aus Dimensionen.
-       - Wenn nur 1 Wert (z.B. "50mm"): `L=B=H=50mm`.
-       - Wenn 2 Werte (z.B. "10x5cm"): `L=10, B=H=5`.
-    2. **Form-Faktor:** Multiplikator für Füllgrad (aus `tools/analysis/material-densities.ts`).
-       - Kugel/Würfel: 1.0
-       - Rohstein: 0.6
-       - Cluster: 0.5
-       - Druse: 0.4
-    3. **Dichte:** Spezifisches Gewicht des Materials (g/cm³) (aus `tools/analysis/material-densities.ts`).
-       - Standard (Quarz): ~2.65 g/cm³.
+    1. **Volumen-Box:** Extrahieren von L, B, H.
+       - *Bracket-Notation:* `[30mm][3mm]` -> nimmt ersten Wert als L=B=H (Kugel-Annahme).
+    2. **Form-Faktor:** Korrekturfaktor für Volumen (z.B. Rohstein 0.6, Kugel 1.0).
+    3. **Dichte:** Spezifisches Gewicht (Standard Quarz: ~2.65 g/cm³).
     4. **Formel:** `Gewicht = (L * B * H) * FormFaktor * Dichte`.
-- *Beispiel:* Kugel 50mm (Amethyst).
-    - Box: 5x5x5 = 125 cm³.
-    - Kugel-Formel (genauer): `4/3 * pi * r^3` ≈ 65.45 cm³. (Oder Box * 0.52).
-    - Dichte Amethyst: 2.65.
-    - Gewicht ≈ 173g -> **0.173 kg**.
 
-### 3. Preis-Normalisierung
-- **Endpreis** = `Offering Price` / `Ermitteltes Gewicht (kg)`.
+### 4. Preis-Normalisierung
+Berechnung des finalen Vergleichspreises:
+
+- **Strategie WEIGHT:** `Effektiver Preis` / `Ermitteltes Gewicht (kg)` = **€/kg**.
+- **Strategie UNIT:** `Effektiver Preis` = **€/Stk**.
 
 ---
 
 ## Darstellung im Report
 
-Um die Herkunft des Gewichts transparent zu machen, wird im Markdown-Report eine Spalte **Calc** eingeführt, die Icons mit Tooltips (via HTML `<abbr>` Tag) nutzt.
+Die Ergebnisse werden in der Spalte **Einheit** angezeigt. Um die Herkunft der Berechnung transparent zu machen, nutzen wir HTML-Tooltips (`<abbr>`), die beim Hovern Details zeigen.
 
-| Icon | Bedeutung | Tooltip-Inhalt |
+| Anzeige | Bedeutung | Tooltip-Beispiel |
 | :--- | :--- | :--- |
-| 📦 | **Bulk** | "Quelle: Bulk-Verpackung '1kg'..." |
-| ⚖️ | **Exact** | "Quelle: Datenbank-Feld (250g)..." |
-| 〰️ | **Range** | "Quelle: Mittelwert aus '30-50g'..." |
-| 📐 | **Calc** | "Quelle: Berechnet aus 50mm (Kugel)..." |
-| ❌ | **Error** | "Kein Gewicht ermittelbar" |
+| **€/kg** 📦 | Basis: Bulk-Package | "Gewicht aus Bulk-Packung (1kg)..." |
+| **€/kg** ⚖️ | Basis: Exaktes Gewicht | "Gewicht aus DB-Feld (250g)..." |
+| **€/kg** 〰️ | Basis: Gewichts-Spanne | "Mittelwert aus '30-50g'..." |
+| **€/kg** 📐 | Basis: Geometrie | "Berechnet aus 50mm (Kugel)..." |
+| **€/Stk** | Basis: Stückpreis | "Strategie: Unit..." |

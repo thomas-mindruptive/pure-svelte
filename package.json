@@ -47,6 +47,7 @@
 		"an:createCSV": "node tools/dist/tools/analysis/db.js",
 		"an:build-createCSV": "npm run tools:build && run an:createCSV",
 		"an:report": "npm run an:createCSV && npm run an:ws-price",
+		"an:extract-bulk": "npm run tools:build && node tools/dist/tools/analysis/extract-bulk-prices.js",
 		"// --- TESTS ---": "",
 		"test": "vitest",
 		"test:run": "vitest run"

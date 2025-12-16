@@ -361,6 +361,7 @@
           'package_weight',
           'origin',
           'currency',
+          'bulk_prices',
           'comment',
           'quality',
           'is_assortment',
@@ -870,6 +871,17 @@
         <!-- end row ----------------------------------------------------------------------------->
 
         <div class="form-row-grid">
+          <!-- bulk_prices ----------------------------------------------------------------------->
+          <Field
+            {fieldProps}
+            path={["bulk_prices"]}
+            label="Bulk Prices (Staffelpreise)"
+            type="textarea"
+            rows={3}
+            placeholder="e.g. Ab 10 Stk: 5.00€"
+            class="span-2"
+          />
+
           <!-- comment --------------------------------------------------------------------------->
           <Field
             {fieldProps}
@@ -878,7 +890,7 @@
             type="textarea"
             rows={3}
             placeholder="Internal notes about this specific offering..."
-            class="span-3"
+            class="span-2"
           />
 
           <!-- imagePromptHint ------------------------------------------------------------------->

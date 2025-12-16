@@ -421,6 +421,57 @@
     onChanged?.(p);
   }
 
+  function parseBulkPrices(input: string | null | undefined): string {
+    if (!input || !input.trim()) return "";
+
+    const lines = input.split(/\r?\n/).filter(l => l.trim().length > 0);
+    const parsedRows: string[][] = [];
+    let isValid = true;
+
+    for (const line of lines) {
+      const parts = line.split('|').map(p => p.trim());
+      if (parts.length < 3) {
+        isValid = false;
+        break;
+      }
+      // [Menge, Einheit, Preis, Info]
+      parsedRows.push(parts);
+    }
+
+    if (!isValid) return "❌ Fehlerhafte Formatierung! Erwartet: Menge|Einheit|Preis|Info";
+
+    // Build Table
+    // Header: Menge | Einh. | Preis | Info
+    const headers = ["Menge", "Einh.", "Preis", "Info"];
+    // Calculate column widths
+    const colWidths = [5, 5, 8, 10]; // Minimum widths
+
+    // Check content widths
+    for (const row of parsedRows) {
+      colWidths[0] = Math.max(colWidths[0], row[0].length);
+      colWidths[1] = Math.max(colWidths[1], row[1].length);
+      colWidths[2] = Math.max(colWidths[2], row[2].length);
+      if (row[3]) colWidths[3] = Math.max(colWidths[3], row[3].length);
+    }
+
+    const pad = (str: string, width: number) => str.padEnd(width);
+    const padNum = (str: string, width: number) => str.padStart(width); // Right align numbers
+
+    let out = "";
+    
+    // Header
+    out += `${padNum(headers[0], colWidths[0])} | ${pad(headers[1], colWidths[1])} | ${padNum(headers[2], colWidths[2])} | ${pad(headers[3], colWidths[3])}\n`;
+    out += `${'-'.repeat(colWidths[0])}-+-${'-'.repeat(colWidths[1])}-+-${'-'.repeat(colWidths[2])}-+-${'-'.repeat(colWidths[3])}\n`;
+
+    // Rows
+    for (const row of parsedRows) {
+      const info = row[3] || "";
+      out += `${padNum(row[0], colWidths[0])} | ${pad(row[1], colWidths[1])} | ${padNum(row[2], colWidths[2])} | ${pad(info, colWidths[3])}\n`;
+    }
+
+    return out;
+  }
+
   /**
    * Handles copying the current offering
    */
@@ -877,11 +928,20 @@
             path={["bulk_prices"]}
             label="Bulk Prices (Staffelpreise)"
             type="textarea"
-            rows={3}
-            placeholder="e.g. Ab 10 Stk: 5.00€"
+            rows={5}
+            placeholder="Format: Menge|Einheit|Preis|Info&#10;z.B.:&#10;5|Stk|1.49&#10;10|Stk|0.99|-50%"
             class="span-2"
           />
 
+          <!-- PREVIEW --------------------------------------------------------------------------->
+          <div class="control-group span-2">
+             <label class="pc-field__label" for="bulk-preview">Bulk Prices Preview</label>
+             <!-- svelte-ignore a11y_label_has_associated_control -->
+             <pre id="bulk-preview" style="font-family: monospace; font-size: 0.95em; line-height: 1.2; padding: 0.5rem; background: var(--pc-color-bg-alt, #f5f5f5); border: 1px solid var(--pc-color-border, #ddd); border-radius: 4px; overflow-x: auto; height: 100%; box-sizing: border-box;">{parseBulkPrices(getS("bulk_prices")) || "Keine Bulkpreise definiert"}</pre>
+          </div>
+        </div>
+
+        <div class="form-row-grid">
           <!-- comment --------------------------------------------------------------------------->
           <Field
             {fieldProps}

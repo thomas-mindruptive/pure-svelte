@@ -290,11 +290,23 @@ export function sortCandidatesByPrice(candidates: ReportRow[]): ReportRow[] {
  * // - 80g (large)
  * // - Items without weight (at end)
  */
+/**
+ * Sorts report rows by per-piece weight (ascending: smallest to largest).
+ * 
+ * Uses Weight_Per_Piece_Grams instead of total weight for accurate size-based sorting.
+ * This ensures bulk offerings (e.g., "2.5kg bulk, 4-7cm") sort by individual item size
+ * rather than total package weight.
+ * 
+ * Items without per-piece weight are sorted to the end.
+ * 
+ * @param candidates - Array of report rows to sort
+ * @returns Sorted array (does not mutate original)
+ */
 export function sortCandidatesByWeight(candidates: ReportRow[]): ReportRow[] {
     return [...candidates].sort((a, b) => {
-        // Get weights, use 999999 for items without weight (sorts them to end)
-        const weightA = a.Detected_Weight_Kg ?? 999999;
-        const weightB = b.Detected_Weight_Kg ?? 999999;
+        // Sort by per-piece weight in grams (null/undefined = Infinity = end of list)
+        const weightA = a.Weight_Per_Piece_Grams ?? Infinity;
+        const weightB = b.Weight_Per_Piece_Grams ?? Infinity;
         
         // Sort ascending: smallest to largest
         return weightA - weightB;

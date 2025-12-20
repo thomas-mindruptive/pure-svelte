@@ -137,6 +137,11 @@ export interface ReportRow {
     Package_Weight: string | null;  // Package weight if specified (e.g., "1kg")
     Package_Weight_Warning: string | null;  // Warning if package weight mismatch
 
+    // === PER-PIECE WEIGHT (for size-based sorting) ===
+    Weight_Per_Piece_Grams: number | null;  // Weight of one item in grams (null if unknown)
+    Weight_Per_Piece_Display: string;       // Formatted display (e.g., "220g", "⚠️ Unknown")
+    Weight_Per_Piece_Tooltip: string;       // Explanation of how per-piece was calculated
+
     // === FINAL CALCULATION RESULT ===
     Final_Normalized_Price: number; // Normalized price for comparison (€/kg or €/Stk)
     Unit: '€/kg' | '€/Stk' | 'ERR'; // Unit of the normalized price

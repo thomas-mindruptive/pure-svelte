@@ -585,9 +585,12 @@ export function buildReportRow(
     },
     weightResult: {
         weightKg: number | null;
+        weightPerPieceGrams: number | null;
         source: string;
         method: ReportRow['Calculation_Method'];
         tooltip: string;
+        tooltipPerPiece: string;
+        warning?: string;
     },
     metadataResult: {
         dimensions: string | null;
@@ -648,6 +651,16 @@ export function buildReportRow(
         Weight_Warning: null,                               // Currently unused (reserved for future warnings)
         Package_Weight: metadataResult.packageWeight,       // Bulk package weight if available
         Package_Weight_Warning: metadataResult.packageWeightWarning, // Warning if package weight is problematic
+
+        // === PER-PIECE WEIGHT (for size-based sorting) ===
+        // Format per-piece weight for display
+        Weight_Per_Piece_Grams: weightResult.weightPerPieceGrams,
+        Weight_Per_Piece_Display: weightResult.weightPerPieceGrams !== null
+            ? (weightResult.weightPerPieceGrams < 1000
+                ? `${Math.round(weightResult.weightPerPieceGrams)}g`   // < 1kg -> show grams (e.g. "220g")
+                : `${(weightResult.weightPerPieceGrams / 1000).toFixed(2)}kg`) // >= 1kg -> show kg (e.g. "1.25kg")
+            : (weightResult.warning ? '⚠️ Unknown' : '-'),     // Unknown or no data
+        Weight_Per_Piece_Tooltip: weightResult.tooltipPerPiece,
 
         // === FINAL COMPARABLE PRICE ===
         // The main output: normalized price for comparison

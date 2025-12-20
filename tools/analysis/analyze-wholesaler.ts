@@ -304,39 +304,110 @@ export function getBestPriceFromNormalized(row: NormalizedOffering, listPrice: n
  * @param row - The normalized offering with weight/dimension data
  * @returns Object with weight in kg, source description, calculation method, and tooltip
  */
+/**
+ * Determines both total weight (for pricing) and per-piece weight (for sorting).
+ * 
+ * LOGIC:
+ * - Total Weight: Used for price normalization (€/kg calculations)
+ * - Per-Piece Weight: Used for size-based sorting in reports
+ * 
+ * For bulk offerings with dimensions, these values differ:
+ * - Total = package weight (e.g., 2.5kg)
+ * - Per-Piece = calculated from dimensions (e.g., 220g for a 5.5cm cluster)
+ * 
+ * PRIORITY for PER-PIECE:
+ * 1. Dimensions (geometry calculation) - highest priority
+ * 2. Explicit weight/range (for non-bulk items)
+ * 3. null (for bulk without dimensions) - cannot determine
+ * 
+ * @param row - Normalized offering data
+ * @returns Object with both total and per-piece weights
+ */
 function determineEffectiveWeight(row: NormalizedOffering): {
     weightKg: number | null,
+    weightPerPieceGrams: number | null,
     source: string,
     method: ReportRow['Calculation_Method'],
     tooltip: string,
+    tooltipPerPiece: string,
     warning?: string
 } {
-    // 1. Bulk Packaging Check
-    const pkgCheck = validatePackageWeight(row.offeringPackaging, row.offeringPackageWeight);
-    if (pkgCheck.packageWeightDisplay && pkgCheck.packageWeightDisplay.toLowerCase().includes('kg')) {
-        const val = parseFloat(pkgCheck.packageWeightDisplay.replace('kg', '').trim());
-        if (!isNaN(val)) {
+    // Detect if this is a bulk offering
+    const isBulk = row.offeringPackaging?.toLowerCase().includes('bulk')
+        || row.offeringPackaging?.toLowerCase().includes('sack')
+        || row.offeringPackaging?.toLowerCase().includes('karton')
+        || row.offeringPackaging?.toLowerCase().includes('beutel');
+
+    // PRIORITY 1: Dimensions (gives per-piece weight directly)
+    if (row.offeringDimensions) {
+        const calcResult = calculateWeightFromDimensions(
+            row.offeringDimensions,
+            row.finalMaterialName || '',
+            row.finalFormName || ''
+        );
+
+        if (calcResult) {
+            const perPieceGrams = calcResult.weightGrams;
+            
+            // For bulk offerings, check package weight for total
+            let totalKg = perPieceGrams / 1000; // default: same as per-piece
+            let tooltipTotal = `Total: ${(perPieceGrams / 1000).toFixed(3)}kg (calculated from dimensions)`;
+            
+            if (isBulk) {
+                const pkgCheck = validatePackageWeight(row.offeringPackaging, row.offeringPackageWeight);
+                if (pkgCheck.packageWeightDisplay && pkgCheck.packageWeightDisplay.toLowerCase().includes('kg')) {
+                    const val = parseFloat(pkgCheck.packageWeightDisplay.replace('kg', '').trim());
+                    if (!isNaN(val)) {
+                        totalKg = val;
+                        tooltipTotal = `Total: ${val}kg (bulk package)`;
+                    }
+                }
+            }
+            
             return {
-                weightKg: val,
-                source: `Bulk Pkg (${pkgCheck.packageWeightDisplay})`,
-                method: 'BULK',
-                tooltip: `Strategy: WEIGHT. Source: Bulk packaging '${pkgCheck.packageWeightDisplay}'.`
+                weightKg: totalKg,
+                weightPerPieceGrams: perPieceGrams,
+                source: 'Calculated',
+                method: 'CALC',
+                tooltip: tooltipTotal,
+                tooltipPerPiece: `Per-Piece: ${Math.round(perPieceGrams)}g (${calcResult.trace})`
             };
         }
     }
 
-    // 2. Explicit Weight Field
+    // PRIORITY 2: Bulk Package (without dimensions)
+    if (isBulk) {
+        const pkgCheck = validatePackageWeight(row.offeringPackaging, row.offeringPackageWeight);
+        if (pkgCheck.packageWeightDisplay && pkgCheck.packageWeightDisplay.toLowerCase().includes('kg')) {
+            const val = parseFloat(pkgCheck.packageWeightDisplay.replace('kg', '').trim());
+            if (!isNaN(val)) {
+                return {
+                    weightKg: val,
+                    weightPerPieceGrams: null,
+                    source: `Bulk Pkg (${pkgCheck.packageWeightDisplay})`,
+                    method: 'BULK',
+                    tooltip: `Total: ${val}kg (bulk package)`,
+                    tooltipPerPiece: '⚠️ No dimensions available for per-piece calculation',
+                    warning: 'Bulk offering without per-piece size data'
+                };
+            }
+        }
+    }
+
+    // PRIORITY 3: Explicit Weight Field (non-bulk or no package info)
     if (row.offeringWeightGrams && row.offeringWeightGrams > 0) {
-        const kg = row.offeringWeightGrams / 1000;
+        const grams = row.offeringWeightGrams;
         return {
-            weightKg: kg,
+            weightKg: grams / 1000,
+            weightPerPieceGrams: grams,
             source: 'Weight Field',
             method: 'EXACT',
-            tooltip: `Strategy: WEIGHT. Source: Field 'offeringWeightGrams' (${row.offeringWeightGrams}g).`
+            tooltip: `Weight: ${grams}g (field)`,
+            tooltipPerPiece: `Per-Piece: ${grams}g (field)`
         };
     }
 
-    // 3. Weight Range Field (Average)
+    // PRIORITY 4: Weight Range Field (Average)
     if (row.offeringWeightRange) {
         // Simple regex for range like "30-50g" or "30 - 50 g"
         const matches = row.offeringWeightRange.match(/(\d+[\.,]?\d*)\s*[-–]\s*(\d+[\.,]?\d*)/);
@@ -347,9 +418,11 @@ function determineEffectiveWeight(row: NormalizedOffering): {
                 const avgGrams = (min + max) / 2;
                 return {
                     weightKg: avgGrams / 1000,
+                    weightPerPieceGrams: avgGrams,
                     source: `Range Avg (${row.offeringWeightRange})`,
                     method: 'RANGE',
-                    tooltip: `Strategy: WEIGHT. Source: Average from range '${row.offeringWeightRange}' (${avgGrams}g).`
+                    tooltip: `Weight: ${avgGrams}g (average from range '${row.offeringWeightRange}')`,
+                    tooltipPerPiece: `Per-Piece: ${Math.round(avgGrams)}g (average from range)`
                 };
             }
         }
@@ -360,33 +433,24 @@ function determineEffectiveWeight(row: NormalizedOffering): {
             if (!isNaN(grams)) {
                 return {
                     weightKg: grams / 1000,
+                    weightPerPieceGrams: grams,
                     source: `Range Single (${row.offeringWeightRange})`,
                     method: 'RANGE',
-                    tooltip: `Strategy: WEIGHT. Source: Single value from range '${row.offeringWeightRange}' (${grams}g).`
+                    tooltip: `Weight: ${grams}g (from range field)`,
+                    tooltipPerPiece: `Per-Piece: ${grams}g (from range field)`
                 };
             }
         }
     }
 
-    // 4. Geometric Calculation
-    if (row.offeringDimensions) {
-        const calcResult = calculateWeightFromDimensions(
-            row.offeringDimensions,
-            row.finalMaterialName || '',
-            row.finalFormName || ''
-        );
-
-        if (calcResult) {
-            return {
-                weightKg: calcResult.weightGrams / 1000,
-                source: 'Calculated',
-                method: 'CALC',
-                tooltip: `Strategy: WEIGHT (Calculated). ${calcResult.trace}`
-            };
-        }
-    }
-
-    return { weightKg: null, source: 'None', method: 'ERR', tooltip: 'No weight data available.' };
+    return { 
+        weightKg: null, 
+        weightPerPieceGrams: null,
+        source: 'None', 
+        method: 'ERR', 
+        tooltip: 'No weight data available.',
+        tooltipPerPiece: '⚠️ No weight data available'
+    };
 }
 
 /**

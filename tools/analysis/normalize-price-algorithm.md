@@ -16,9 +16,10 @@ Bevor wir normalisieren, ermitteln wir den effektiv niedrigsten Preis.
 
 1. **Listenpreis:** Startwert ist der Standardpreis des Offerings.
 2. **Bulk-Preis Check:** 
-   - Wir prüfen das Feld `bulk_prices` (Format: `Menge|Einheit|Preis|Info`) sowie Preismuster im `comment`-Feld.
-   - Wir suchen den niedrigsten verfügbaren Einzelpreis.
-   - *Beispiel:* Listenpreis 5€, aber Staffel "ab 10 Stk: 3€" -> **Effektiver Preis: 3€**.
+   - Wir prüfen das Feld `bulk_prices` (Format: `Menge|Einheit|Preis|Info`).
+   - Dieses Feld wird durch separate Tools (z.B. `extract-bulk-prices.ts`) vorbefüllt.
+   - Wir suchen den niedrigsten verfügbaren Einzelpreis in dieser Liste.
+   - *Beispiel:* Listenpreis 5€, aber Staffel "10|Stk|3.00" -> **Effektiver Preis: 3€**.
 
 ### 2. Strategie-Bestimmung
 Basierend auf `Product Type` entscheiden wir, ob wir nach Gewicht oder Stück normalisieren. Die Konfiguration erfolgt in `analyze-config.ts`.
@@ -74,7 +75,7 @@ Die Ergebnisse werden in der Spalte **Einheit** angezeigt. Details zur Berechnun
 | **€/Stk** | Basis: Stück | "Strategy: UNIT. Price per piece..." |
 
 Zusätzliche Icons in der Spalte **Info**:
-- 📦 **Bulk**: Preis stammt aus einer Mengenstaffel/Kommentar.
-- ⚖️ **Calc.W.**: Gewicht wurde berechnet (Regex/Geometrie).
+- 📦 **Bulk**: Preis stammt aus einer Mengenstaffel (`bulk_prices` Feld).
+- ⚖️ **Calc.W.**: Gewicht/Dimensionen wurden mittels **Regex** aus Text extrahiert (potenziell ungenau).
 - 🌍 **Land**: Herkunft (wenn nicht DE/AT/NL).
 - ⚠️ : Warnung zu Datenqualität (z.B. Dimensionen unklar).

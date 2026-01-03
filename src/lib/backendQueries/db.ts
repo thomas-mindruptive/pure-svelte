@@ -16,7 +16,7 @@ declare global {
  */
 const dbConfig = {
   user: 'sa',
-  password: 'ichBinAdmin@123',
+  password: 'pw12345',
   server: 'localhost',  // Port 1433 is default
   database: 'pureenergyworks',
   options: {

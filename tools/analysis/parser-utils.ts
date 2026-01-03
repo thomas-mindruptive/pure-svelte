@@ -367,3 +367,41 @@ export function validatePackageWeight(
         warning: null
     };
 }
+
+// ==========================================
+// PIECE COUNT EXTRACTION
+// ==========================================
+
+/**
+ * Extracts piece count from text like "10-pack", "50 pcs", "100 Stk".
+ * Used to calculate per-piece weight from total bulk weight.
+ * 
+ * @param text - Text to scan (e.g. offeringPackaging)
+ * @returns Integer count or null
+ */
+export function extractPieceCount(text: string | null): number | null {
+    if (!text) return null;
+    const lower = text.toLowerCase();
+
+    // Pattern 1: "10-pack", "10 pack"
+    const packMatch = lower.match(/(\d+)\s*-?pack\b/);
+    if (packMatch) {
+        return parseInt(packMatch[1], 10);
+    }
+
+    // Pattern 2: "50 pcs", "50 Stk", "50 Stück"
+    const unitMatch = lower.match(/(\d+)\s*(?:stk|pcs|stück|pieces)\b/);
+    if (unitMatch) {
+        return parseInt(unitMatch[1], 10);
+    }
+
+    // Pattern 3: Range "40-50 pcs" -> take average
+    const rangeMatch = lower.match(/(\d+)\s*[-–]\s*(\d+)\s*(?:stk|pcs|stück|pieces)\b/);
+    if (rangeMatch) {
+        const min = parseInt(rangeMatch[1], 10);
+        const max = parseInt(rangeMatch[2], 10);
+        return Math.round((min + max) / 2);
+    }
+
+    return null;
+}

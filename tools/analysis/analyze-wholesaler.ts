@@ -668,12 +668,18 @@ function processAndAnalyzeOfferingsFromCsv(rawData: RawOffering[], reportBuilder
 
     const auditData = transformOfferingsToAuditRows(normalizedOfferings, reportBuilder);
 
-    log.info('Sorting audit data by group and price');
+    log.info('Sorting audit data by group, size and price');
     const sortedData = auditData.sort((a, b) => {
-        // Sort by Product_Type -> Material_Name -> Form_Name -> Price
+        // Sort by Product_Type -> Material_Name -> Form_Name -> Weight_Per_Piece -> Price
         if (a.Product_Type !== b.Product_Type) return a.Product_Type.localeCompare(b.Product_Type);
         if (a.Material_Name !== b.Material_Name) return a.Material_Name.localeCompare(b.Material_Name);
         if (a.Form_Name !== b.Form_Name) return a.Form_Name.localeCompare(b.Form_Name);
+        
+        // Sort by size (Weight per piece) to group comparable items
+        const weightA = a.Weight_Per_Piece || 0;
+        const weightB = b.Weight_Per_Piece || 0;
+        if (weightA !== weightB) return weightA - weightB;
+
         return a.Final_Normalized_Price - b.Final_Normalized_Price;
     });
 
@@ -695,12 +701,18 @@ function processAndAnalyzeOfferingsFromDb(enrichedData: OfferingEnrichedView[], 
 
     const auditData = transformOfferingsToAuditRows(normalizedOfferings, reportBuilder);
 
-    log.info('Sorting audit data by group and price');
+    log.info('Sorting audit data by group, size and price');
     const sortedData = auditData.sort((a, b) => {
-        // Sort by Product_Type -> Material_Name -> Form_Name -> Price
+        // Sort by Product_Type -> Material_Name -> Form_Name -> Weight_Per_Piece -> Price
         if (a.Product_Type !== b.Product_Type) return a.Product_Type.localeCompare(b.Product_Type);
         if (a.Material_Name !== b.Material_Name) return a.Material_Name.localeCompare(b.Material_Name);
         if (a.Form_Name !== b.Form_Name) return a.Form_Name.localeCompare(b.Form_Name);
+        
+        // Sort by size (Weight per piece) to group comparable items
+        const weightA = a.Weight_Per_Piece || 0;
+        const weightB = b.Weight_Per_Piece || 0;
+        if (weightA !== weightB) return weightA - weightB;
+
         return a.Final_Normalized_Price - b.Final_Normalized_Price;
     });
 

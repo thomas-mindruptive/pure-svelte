@@ -265,32 +265,6 @@ export function sortCandidatesByPrice(candidates: ReportRow[]): ReportRow[] {
 }
 
 /**
- * Sorts candidate offerings by size/weight (smallest first).
- * Creates a new array without modifying the original.
- * 
- * SORTING LOGIC:
- * - Primary: Sort by Detected_Weight_Kg (ascending: small to large)
- * - Items without weight (null) are sorted to the end (999999)
- * 
- * USE CASE:
- * Enables size-sorted reports (e.g., "Show me all Amethyst spheres from small to large")
- * Weight includes:
- * - BULK: Package weight (e.g., "1kg Trommelsteine")
- * - EXACT: Individual piece weight (e.g., "50g pendant")
- * - RANGE: Average weight (e.g., "30-50g")
- * - CALC: Geometrically calculated weight
- * 
- * @param candidates - Array of offerings to sort
- * @returns New sorted array ordered by weight (ascending)
- * 
- * @example
- * // Rosenquarz Kugel group sorted by size:
- * // - 30g (small)
- * // - 50g (medium)
- * // - 80g (large)
- * // - Items without weight (at end)
- */
-/**
  * Sorts report rows by per-piece weight (ascending: smallest to largest).
  * 
  * Uses Weight_Per_Piece_Grams instead of total weight for accurate size-based sorting.

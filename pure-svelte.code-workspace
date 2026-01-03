@@ -11,9 +11,6 @@
 		},
 		{
 			"path": "../pure-core"
-		},
-		{
-			"path": ".."
 		}
 	],
 	"settings": {

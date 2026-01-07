@@ -60,22 +60,24 @@ export function exportBestBuyReportToCsv(
 ): string {
     const { groups, sortedKeys } = groupBy_ProductType_Material_Form_Key(data);
 
-    // Header row - "Einheit" shows €/kg or €/Stk, "Gewicht" shows effective weight, "Gew./Stk" shows per-piece weight
+    // Header row
     const headers = [
-        'Rang',
+        'Rank',
         'Offering ID',
-        'Händler',
-        'Herkunft',
-        'Produkt',
-        'Größe',
+        'Wholesaler',
+        'Origin',
+        'Product',
+        'Packaging',
+        'Pcs',
+        'Size',
         'Price',
         'Price/Piece',
-        'Preis (Norm.)',
-        'Gewicht',
-        'Gew./Stk',
-        'Gew./Stk Calc',
-        'Einheit',
-        'Einheit Calc',
+        'Price (Norm.)',
+        'Weight',
+        'Wgt/Pc',
+        'Wgt/Pc Calc',
+        'Unit',
+        'Unit Calc',
         'vs. Winner',
         'Info'
     ];
@@ -103,7 +105,6 @@ export function exportBestBuyReportToCsv(
             const offeringPricePerPiece = row.Offering_Price_Per_Piece !== null ? row.Offering_Price_Per_Piece.toFixed(2) : '-';
             const priceDisplay = row.Final_Normalized_Price.toFixed(2);
 
-            // New columns: Gewicht shows effective weight, Gew./Stk shows per-piece weight, Einheit shows €/kg or €/Stk
             const weightDisplay = formatWeightForMarkdown(row);
             const weightPerPieceDisplay = row.Weight_Per_Piece_Display || '-';
             const unitDisplay = formatUnitForCsv(row);
@@ -114,6 +115,8 @@ export function exportBestBuyReportToCsv(
                 row.Wholesaler,
                 row.Origin_Country,
                 productTitle,
+                row.Raw_Packaging || '',
+                row.pieceCount || '',
                 dimensions + warningIcon,
                 offeringPrice,
                 offeringPricePerPiece,
@@ -151,25 +154,25 @@ export function exportBestBuyByStoneToCsv(
 ): string {
     const { stoneGroups, sortedStones } = groupBy_Material_Form(data);
 
-    // Header row - "Einheit" shows €/kg or €/Stk, "Gewicht" shows effective weight, "Gew./Stk" shows per-piece weight
+    // Header row
     const headers = [
         'Stein',
         'Produkttyp',
         'Form',
         'Offering ID',
-        'Rang',
-        'Händler',
-        'Herkunft',
-        'Produkt',
-        'Stück',
-        'Packagin',
-        'Größe',
+        'Rank',
+        'Wholesaler',
+        'Origin',
+        'Product',
+        'Packaging',
+        'Pcs',
+        'Size',
         'Price',
         'Price/Piece',
-        'Preis (Norm.)',
-        'Gewicht',
-        'Gew./Stk',
-        'Einheit',
+        'Price (Norm.)',
+        'Weight',
+        'Wgt/Pc',
+        'Unit',
         'vs. Winner',
         'Info'
     ];
@@ -206,7 +209,6 @@ export function exportBestBuyByStoneToCsv(
                 const offeringPricePerPiece = row.Offering_Price_Per_Piece !== null ? row.Offering_Price_Per_Piece.toFixed(2) : '-';
                 const priceDisplay = row.Final_Normalized_Price.toFixed(2);
 
-                // New columns: Gewicht shows effective weight, Gew./Stk shows per-piece weight, Einheit shows €/kg or €/Stk
                 const weightDisplay = formatWeightForMarkdown(row);
                 const weightPerPieceDisplay = row.Weight_Per_Piece_Display || '-';
                 const unitDisplay = formatUnitForCsv(row);
@@ -235,8 +237,8 @@ export function exportBestBuyByStoneToCsv(
                     row.Wholesaler,
                     row.Origin_Country,
                     productTitle,
-                    row.pieceCount,
-                    row.Raw_Packaging,
+                    row.Raw_Packaging || '',
+                    row.pieceCount || '',
                     dimensions + warningIcon,
                     offeringPrice,
                     offeringPricePerPiece,
@@ -270,27 +272,27 @@ export function exportBestBuyByProductTypeToCsv(
 ): string {
     const { productTypeGroups, sortedProductTypes } = groupBy_ProductType_Material_Form(data);
 
-    // Header row - "Einheit" shows €/kg or €/Stk, "Gewicht" shows effective weight, "Gew./Stk" shows per-piece weight
+    // Header row
     const headers = [
         'Produkttyp',
         'Stein',
         'Form',
         'Offering ID',
-        'Rang',
-        'Händler',
-        'Herkunft',
-        'Produkt',
-        'Stück',
+        'Rank',
+        'Wholesaler',
+        'Origin',
+        'Product',
         'Packaging',
-        'Größe',
-        'Gewicht',
-        'Gew./Stk',
-        'Gew./Stk Calc',
+        'Pcs',
+        'Size',
+        'Weight',
+        'Wgt/Pc',
+        'Wgt/Pc Calc',
         'Price',
         'Price/Piece',
-        'Preis (Norm.)',
-        'Einheit',
-        'Einheit Calc',
+        'Price (Norm.)',
+        'Unit',
+        'Unit Calc',
         'vs. Winner',
         'Info'
     ];
@@ -332,7 +334,6 @@ export function exportBestBuyByProductTypeToCsv(
                     const offeringPricePerPiece = row.Offering_Price_Per_Piece !== null ? row.Offering_Price_Per_Piece.toFixed(2) : '-';
                     const priceDisplay = row.Final_Normalized_Price.toFixed(2);
 
-                    // New columns: Gewicht shows effective weight, Gew./Stk shows per-piece weight, Einheit shows €/kg or €/Stk
                     const unitDisplay = formatUnitForCsv(row);
 
                     // Drill-down logic: show ProductType, Stone, Form only on first row of new group
@@ -359,8 +360,8 @@ export function exportBestBuyByProductTypeToCsv(
                         row.Wholesaler,
                         row.Origin_Country,
                         productTitle,
-                        row.pieceCount,
-                        row.Raw_Packaging,
+                        row.Raw_Packaging || '',
+                        row.pieceCount || '',
                         dimensions + warningIcon,
                         weight + warningIcon,
                         weightPerPiece,
@@ -382,4 +383,3 @@ export function exportBestBuyByProductTypeToCsv(
 
     return csv;
 }
-

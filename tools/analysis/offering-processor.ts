@@ -92,7 +92,7 @@ export interface WeightResult {
     method: ReportRow['Calculation_Method'];
     tooltip: string;
     tooltipPerPiece: string;
-    pieceCount: number; // NEU
+    pieceCount: number;
     warning?: string;
 }
 
@@ -102,7 +102,7 @@ export interface WeightResult {
  */
 export interface NormalizedPriceResult {
     normalizedPrice: number;                    // Final price for comparison (€/kg or €/Stk)
-    unit: '€/kg' | '€/Stk' | 'ERR';            // Unit of the normalized price
+    unit: '€/kg' | '€/pcs' | 'ERR';            // Unit of the normalized price
     calcMethod: ReportRow['Calculation_Method']; // How weight was determined (EXACT, CALC, RANGE, etc.)
     calcTooltip: string;                        // Human-readable explanation of calculation
     weightKg: number | null;                    // Weight in kg (null for UNIT strategy)
@@ -149,9 +149,9 @@ export function detectBestPrice(
     const trace: string[] = [];
 
     // Add legend entry for bulk pricing if report builder is available
-    if (reportBuilder && !reportBuilder['legendEntries'].has('Preis (Norm.)_Bulk')) {
+    if (reportBuilder && !reportBuilder['legendEntries'].has('Price (Norm.)_Bulk')) {
         reportBuilder.addToLegend(
-            'Preis (Norm.)_Bulk',
+            'Price (Norm.)_Bulk',
             'Bulk-Preis aus bulk_prices Feld',
             'Niedrigster Preis aus der strikten Bulk-Preis-Tabelle.'
         );
@@ -255,9 +255,9 @@ export function calculateLandedCost(
     const normalizedCountry = country ? country.toUpperCase() : 'UNKNOWN';
 
     // Add legend entry for origin country if report builder is available
-    if (reportBuilder && !reportBuilder['legendEntries'].has('Herkunft')) {
+    if (reportBuilder && !reportBuilder['legendEntries'].has('Origin')) {
         reportBuilder.addToLegend(
-            'Herkunft',
+            'Origin',
             'Herkunftsland (Wholesaler Country)',
             'Nicht-EU-Länder bekommen Import-Markup (+25%).'
         );
@@ -331,7 +331,7 @@ export function determineEffectiveWeight(row: NormalizedOffering): WeightResult 
             
             // For bulk offerings, check package weight for total
             let totalKg = perPieceGrams / 1000; // default: same as per-piece
-            let tooltipTotal = `Total: ${(perPieceGrams / 1000).toFixed(3)}kg (calculated from dimensions)`;
+            let tooltipTotal = `Geometry (${Math.round(perPieceGrams)}g)`;
             
             if (isBulk) {
                 const pkgCheck = validatePackageWeight(row.offeringPackaging, row.offeringPackageWeight);
@@ -339,7 +339,7 @@ export function determineEffectiveWeight(row: NormalizedOffering): WeightResult 
                     const val = parseFloat(pkgCheck.packageWeightDisplay.replace('kg', '').trim());
                     if (!isNaN(val)) {
                         totalKg = val;
-                        tooltipTotal = `Total: ${val}kg (bulk package)`;
+                        tooltipTotal = `Package (${val}kg) via Geometry`;
                     }
                 }
             }
@@ -350,7 +350,7 @@ export function determineEffectiveWeight(row: NormalizedOffering): WeightResult 
                 source: 'Calculated',
                 method: 'CALC',
                 tooltip: tooltipTotal,
-                tooltipPerPiece: `Per-Piece: ${Math.round(perPieceGrams)}g (${calcResult.trace})`,
+                tooltipPerPiece: `Per-Piece: ${Math.round(perPieceGrams)}g (Calculated from dimensions)`,
                 pieceCount,
             };
         }
@@ -364,7 +364,7 @@ export function determineEffectiveWeight(row: NormalizedOffering): WeightResult 
             if (!isNaN(val)) {
                 const totalKg = val;
                 let perPieceGrams: number | null = null;
-                let tooltipPerPiece = '⚠️ No dimensions available for per-piece calculation';
+                let tooltipPerPiece = 'No size data';
                 let warning: string | undefined = 'Bulk offering without per-piece size data';
 
                 // Stückzahl extrahieren und Einzelgewicht berechnen
@@ -372,7 +372,7 @@ export function determineEffectiveWeight(row: NormalizedOffering): WeightResult 
                 if (pieceCount && pieceCount > 0) {
                     // Berechnung: (Gesamtgewicht in g) / Stückzahl
                     perPieceGrams = (totalKg * 1000) / pieceCount;
-                    tooltipPerPiece = `Per-Piece: ~${Math.round(perPieceGrams)}g (calc: ${totalKg}kg / ${pieceCount} pcs)`;
+                    tooltipPerPiece = `Per-Piece: ~${Math.round(perPieceGrams)}g (Total / ${pieceCount} pcs)`;
                     warning = undefined; // Warnung entfernen, da wir nun ein Einzelgewicht haben
                 } 
 
@@ -381,7 +381,7 @@ export function determineEffectiveWeight(row: NormalizedOffering): WeightResult 
                     weightPerPieceGrams: perPieceGrams,
                     source: `Bulk Pkg (${pkgCheck.packageWeightDisplay})`,
                     method: 'BULK',
-                    tooltip: `Total: ${totalKg}kg (bulk package)`,
+                    tooltip: `Package (${totalKg}kg)`,
                     tooltipPerPiece: tooltipPerPiece,
                     warning: warning,
                     pieceCount
@@ -398,8 +398,8 @@ export function determineEffectiveWeight(row: NormalizedOffering): WeightResult 
             weightPerPieceGrams: grams,
             source: 'Weight Field',
             method: 'EXACT',
-            tooltip: `Weight: ${grams}g (field)`,
-            tooltipPerPiece: `Per-Piece: ${grams}g (field)`,
+            tooltip: `Field (${grams}g)`,
+            tooltipPerPiece: `Per-Piece: ${grams}g (Database field)`,
             pieceCount
         };
     }
@@ -418,8 +418,8 @@ export function determineEffectiveWeight(row: NormalizedOffering): WeightResult 
                     weightPerPieceGrams: avgGrams,
                     source: `Range Avg (${row.offeringWeightRange})`,
                     method: 'RANGE',
-                    tooltip: `Weight: ${avgGrams}g (average from range '${row.offeringWeightRange}')`,
-                    tooltipPerPiece: `Per-Piece: ${Math.round(avgGrams)}g (average from range)`,
+                    tooltip: `Range Avg (${avgGrams}g)`,
+                    tooltipPerPiece: `Per-Piece: ${Math.round(avgGrams)}g (Average from range)`,
                     pieceCount
                 };
             }
@@ -434,8 +434,8 @@ export function determineEffectiveWeight(row: NormalizedOffering): WeightResult 
                     weightPerPieceGrams: grams,
                     source: `Range Single (${row.offeringWeightRange})`,
                     method: 'RANGE',
-                    tooltip: `Weight: ${grams}g (from range field)`,
-                    tooltipPerPiece: `Per-Piece: ${grams}g (from range field)`,
+                    tooltip: `Field (${grams}g)`,
+                    tooltipPerPiece: `Per-Piece: ${grams}g (Database field)`,
                     pieceCount
                 };
             }
@@ -530,7 +530,7 @@ export function determinePricingStrategy(
  * PURPOSE:
  * Makes prices comparable by normalizing them to a common unit:
  * - WEIGHT strategy → €/kg (euro per kilogram)
- * - UNIT strategy → €/Stk (euro per piece)
+ * - UNIT strategy → €/pcs (euro per piece)
  * 
  * WEIGHT STRATEGY CALCULATION:
  * The weight can be determined by different methods (priority order):
@@ -580,7 +580,7 @@ export function determinePricingStrategy(
  * @example
  * // UNIT strategy
  * calculateNormalizedPrice(15.50, 'UNIT', offering, fn)
- * → { normalizedPrice: 15.50, unit: '€/Stk', calcMethod: 'UNIT', weightKg: null }
+ * → { normalizedPrice: 15.50, unit: '€/pcs', calcMethod: 'UNIT', weightKg: null }
  */
 export function calculateNormalizedPrice(
     effectivePrice: number,
@@ -601,7 +601,7 @@ export function calculateNormalizedPrice(
             const normalizedPrice = effectivePrice / weightResult.weightKg;
             
             // Build detailed tooltip showing calculation steps
-            const calcTooltip = `${weightResult.tooltip} Calc: ${effectivePrice.toFixed(2)}€ / ${weightResult.weightKg.toFixed(3)}kg`;
+            const calcTooltip = `STRATEGY: Weight (€/kg) • BASIS: ${weightResult.tooltip} • CALC: ${effectivePrice.toFixed(2)}€ / ${weightResult.weightKg.toFixed(3)}kg`;
             
             trace.push(`⚖️ Weight Strat: ${weightResult.method} (${weightResult.weightKg.toFixed(3)}kg)`);
 
@@ -640,13 +640,16 @@ export function calculateNormalizedPrice(
             trace.push(`📊 Weight determined for sorting: ${weightResult.method} (${weightResult.weightKg.toFixed(3)}kg)`);
         }
         
+        const weightInfo = weightResult.weightKg ? ` (Info: ${weightResult.tooltip})` : '';
+        const calcTooltip = `STRATEGY: Unit (€/pcs)${weightInfo} • CALC: ${effectivePrice.toFixed(2)}€ / 1 pc`;
+
         // The effective price is already in €/piece, so use it directly
         // No division or calculation needed for price
         return {
             normalizedPrice: effectivePrice,              // Same as effective price
-            unit: '€/Stk',
+            unit: '€/pcs',
             calcMethod: 'UNIT',
-            calcTooltip: `Strategy: UNIT. Price per piece. Calc: ${effectivePrice.toFixed(2)}€ / 1 pc`,
+            calcTooltip,
             weightKg: weightResult.weightKg,              // Store weight for size-sorted reports!
             trace
         };
@@ -780,6 +783,7 @@ export function buildReportRow(
         Origin_Country: landedCostResult.country,           // Country code (affects import markup)
         Product_Title: (offering.offeringTitle || 'NULL').substring(0, 50), // Truncated title
         Raw_Packaging: offering.offeringPackaging || '-',
+        pieceCount: weightResult.pieceCount,
 
         // === RAW INPUT PRICES ===
         // Original prices before any processing
@@ -793,8 +797,7 @@ export function buildReportRow(
         Detected_Bulk_Price: priceResult.price,             // Best price found (may be bulk discount)
         Detected_Weight_Kg: weightResult.weightKg,          // Determined weight in kg (from separate weight pipeline step)
         Applied_Markup_Pct: landedCostResult.markupPct,    // Import markup percentage (0 for EU, 25 for non-EU)
-        pieceCount: weightResult.pieceCount,
-
+        
         // === DIMENSIONS & WEIGHT METADATA ===
         // Physical measurements and their sources
         Dimensions: metadataResult.dimensions,              // Formatted dimensions (e.g., "20×30×15mm")
@@ -829,7 +832,7 @@ export function buildReportRow(
         // === FINAL COMPARABLE PRICE ===
         // The main output: normalized price for comparison
         Final_Normalized_Price: parseFloat(normalizedPriceResult.normalizedPrice.toFixed(2)), // Rounded to 2 decimals
-        Unit: normalizedPriceResult.unit,                   // "€/kg", "€/Stk", or "ERR"
+        Unit: normalizedPriceResult.unit,                   // "€/kg", "€/pcs", or "ERR"
         Calculation_Method: normalizedPriceResult.calcMethod, // How this price was calculated
         Calculation_Tooltip: normalizedPriceResult.calcTooltip, // Detailed explanation for tooltips
 

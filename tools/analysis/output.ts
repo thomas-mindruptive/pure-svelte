@@ -81,7 +81,7 @@ export function printConsoleSummary(data: ReportRow[]) {
         'Land': r.Origin_Country,
         // Normalized price (2 decimal places)
         'Norm. €': r.Final_Normalized_Price,
-        // Unit (€/kg or €/Stk)
+        // Unit (€/kg or €/pcs)
         'Unit': r.Unit,
         // Quick indicator: Import or EU
         'Info': r.Calculation_Trace.includes('Import') ? '✈️ Import' : 'EU'

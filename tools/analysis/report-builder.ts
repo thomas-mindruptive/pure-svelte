@@ -49,11 +49,11 @@ export class ReportBuilder {
 
         // Define column order for consistent display
         const columnOrder = [
-            'Rang',
-            'Händler',
-            'Herkunft',
-            'Produkt',
-            'Preis (Norm.)',
+            'Rank',
+            'Wholesaler',
+            'Origin',
+            'Product',
+            'Price (Norm.)',
             'vs. Winner',
             'Info'
         ];
@@ -68,15 +68,15 @@ export class ReportBuilder {
                 mainEntries.push(`- **${column}**: ${entry.meaning}. Berechnung: ${entry.calculation}\n`);
             }
 
-            // Check for sub-entries (e.g., "Preis (Norm.)_Bulk")
-            if (column === 'Preis (Norm.)') {
-                const bulkEntry = this.legendEntries.get('Preis (Norm.)_Bulk');
-                const importEntry = this.legendEntries.get('Preis (Norm.)_Import');
-                const weightEntry = this.legendEntries.get('Preis (Norm.)_Weight');
-                const unitEntry = this.legendEntries.get('Preis (Norm.)_Unit');
+            // Check for sub-entries (e.g., "Price (Norm.)_Bulk")
+            if (column === 'Price (Norm.)') {
+                const bulkEntry = this.legendEntries.get('Price (Norm.)_Bulk');
+                const importEntry = this.legendEntries.get('Price (Norm.)_Import');
+                const weightEntry = this.legendEntries.get('Price (Norm.)_Weight');
+                const unitEntry = this.legendEntries.get('Price (Norm.)_Unit');
 
                 if (bulkEntry || importEntry || weightEntry || unitEntry) {
-                    mainEntries.push(`- **Preis (Norm.)**: Finaler normalisierter Preis für Vergleich. Berechnung:\n`);
+                    mainEntries.push(`- **Price (Norm.)**: Finaler normalisierter Preis für Vergleich. Berechnung:\n`);
                     if (bulkEntry) {
                         subEntries.push(`    - Bulk-Preis: ${bulkEntry.meaning}. Berechnung: ${bulkEntry.calculation}\n`);
                     }
@@ -101,7 +101,7 @@ export class ReportBuilder {
 
         // Add any remaining entries not in the standard order
         this.legendEntries.forEach((entry, column) => {
-            if (!columnOrder.includes(column) && !column.startsWith('Preis (Norm.)_')) {
+            if (!columnOrder.includes(column) && !column.startsWith('Price (Norm.)_')) {
                 mainEntries.push(`- **${column}**: ${entry.meaning}. Berechnung: ${entry.calculation}\n`);
             }
         });
@@ -124,8 +124,8 @@ export class ReportBuilder {
         
         let md = `# 🕵️ Data Audit Log\n`;
         md += `Generiert: ${now} | Einträge: ${data.length}\n\n`;
-        md += `| ID | Offering ID | Händler (Land) | Produkt | Stück | Packaing |Größe | Gewicht | Gew./Stk | Price | Price/Piece | Norm. Preis | Trace |\n`;
-        md += `|----|-------------|----------------|---------|-------|----------|------|---------|----------|-------|-------------|-------------|-------|\n`;
+        md += `| ID | Off. ID | Wholesaler | Origin | Product | Pack | Pcs | Size | Weight | Wgt/Pc | Price | Price/Pc | Norm. Price | Trace |\n`;
+        md += `|----|---------|------------|--------|---------|------|-----|------|--------|--------|-------|----------|-------------|-------|\n`;
         
         data.forEach(row => {
             // Pipes in Calculation_Trace sind Trennzeichen zwischen Trace-Einträgen (z.B. "Bulk Found | Comment | Origin")
@@ -146,8 +146,10 @@ export class ReportBuilder {
             const warningIcon = (row.Dimensions_Warning || row.Weight_Warning || row.Package_Weight_Warning) ? ' ⚠️' : '';
             const offeringPrice = row.Offering_Price.toFixed(2);
             const offeringPricePerPiece = row.Offering_Price_Per_Piece !== null ? row.Offering_Price_Per_Piece.toFixed(2) : '-';
+            const packaging = row.Raw_Packaging || '-';
+            const pcs = row.pieceCount > 0 ? row.pieceCount : '-';
             
-            md += `| ${row.Row_ID} | ${row.Offering_ID} | **${row.Wholesaler}** (${row.Origin_Country}) | ${product} | ${row.pieceCount} | ${row.Raw_Packaging} | ${dimensions}${warningIcon} | ${weight}${warningIcon} | ${weightPerPiece} | ${offeringPrice} | ${offeringPricePerPiece} | **${row.Final_Normalized_Price.toFixed(2)}** ${row.Unit} | <small>${trace}</small> |\n`;
+            md += `| ${row.Row_ID} | ${row.Offering_ID} | **${row.Wholesaler}** | ${row.Origin_Country} | ${product} | ${packaging} | ${pcs} | ${dimensions}${warningIcon} | ${weight}${warningIcon} | ${weightPerPiece} | ${offeringPrice} | ${offeringPricePerPiece} | **${row.Final_Normalized_Price.toFixed(2)}** ${row.Unit} | <small>${trace}</small> |\n`;
         });
 
         return md;
@@ -181,10 +183,10 @@ export class ReportBuilder {
 
         md += `> **Legende:** 🇨🇳 China-Importe enthalten bereits +25% Kalkulationsaufschlag.\n\n`;
 
-        // Add legend entries for Rang, vs. Winner, Info columns (only once, before groups loop)
-        if (!this.legendEntries.has('Rang')) {
+        // Add legend entries for Rank, vs. Winner, Info columns (only once, before groups loop)
+        if (!this.legendEntries.has('Rank')) {
             this.addToLegend(
-                'Rang',
+                'Rank',
                 'Rangposition basierend auf normalisiertem Preis (niedrigster = bester)',
                 'Kandidaten sortiert nach `Final_Normalized_Price` aufsteigend. Position 1 = 🏆 (Gewinner), 2 = 🥈, 3 = 🥉, andere = Nummer'
             );
@@ -203,16 +205,16 @@ export class ReportBuilder {
                 `📦 Bulk: Wenn \`Calculation_Trace\` "Bulk" enthält (Bulk-Preis im Comment gefunden). ⚖️ Calc.W.: Wenn \`Calculation_Trace\` "Regex" enthält (Gewicht aus Comment berechnet). 🌍 Country: Wenn Herkunftsland nicht DE/AT/NL und nicht UNKNOWN`
             );
         }
-        if (!this.legendEntries.has('Händler')) {
+        if (!this.legendEntries.has('Wholesaler')) {
             this.addToLegend(
-                'Händler',
+                'Wholesaler',
                 'Händlername direkt aus Datenbank/CSV',
                 'Quelle: `wholesalerName` Feld aus Datenbank/CSV'
             );
         }
-        if (!this.legendEntries.has('Produkt')) {
+        if (!this.legendEntries.has('Product')) {
             this.addToLegend(
-                'Produkt',
+                'Product',
                 'Produkttitel direkt aus Datenbank/CSV',
                 'Quelle: `offeringTitle` Feld aus Datenbank/CSV (max. 50 Zeichen)'
             );
@@ -231,10 +233,9 @@ export class ReportBuilder {
             md += `### 📂 ${key}\n`;
             md += `*Vergleichsbasis: ${winner.Unit}*\n\n`;
 
-            // Table header: Rang through Info columns
-            // "Gewicht" shows effective weight, "Gew./Stk" shows per-piece weight, "Einheit" shows €/kg or €/Stk with tooltip
-            md += `| Rang | Offering ID | Händler | Herkunft | Produkt | Größe | Price | Price/Piece | Preis (Norm.) | Gewicht | Gew./Stk | Einheit | vs. Winner | Info |\n`;
-            md += `|:---:|:-----------:|---------|:-------:|---------|-------|-------|-------------|---------------|---------|----------|---------|------------|------|\n`;
+            // Table header: Rank through Info columns
+            md += `| Rank | ID | Wholesaler | Origin | Product | Pack | Pcs | Size | Price | Price/Pc | Price (Norm.) | Weight | Wgt/Pc | Unit | vs. Winner | Info |\n`;
+            md += `|:---:|:---:|------------|:------:|---------|------|-----|------|-------|----------|---------------|--------|--------|------|------------|------|\n`;
 
             // --- LOOP OVER ALL OFFERINGS IN THIS GROUP ---
             candidates.forEach((row, index) => {
@@ -248,21 +249,21 @@ export class ReportBuilder {
                     : `${row.Final_Normalized_Price.toFixed(2)}`;
                 
                 // Escape pipe characters in title to prevent breaking Markdown table
-                // Pipes in product titles like "Bergkristall Wand| Doppelender" would break the table
                 const productTitle = row.Product_Title.replace(/\|/g, '\\|');
                 const dimensions = row.Dimensions || '-';
                 const warningIcon = (row.Dimensions_Warning || row.Weight_Warning || row.Package_Weight_Warning) ? ' ⚠️' : '';
                 const offeringPrice = row.Offering_Price.toFixed(2);
                 const offeringPricePerPiece = row.Offering_Price_Per_Piece !== null ? row.Offering_Price_Per_Piece.toFixed(2) : '-';
                 
-                // New columns: Gewicht shows effective weight, Gew./Stk shows per-piece weight, Einheit shows €/kg or €/Stk
                 const weightDisplay = formatWeightForMarkdown(row);
                 const weightPerPieceDisplay = row.Weight_Per_Piece_Display 
                     ? `<abbr title="${row.Weight_Per_Piece_Tooltip}">${row.Weight_Per_Piece_Display}</abbr>`
                     : '-';
                 const unitDisplay = formatUnitForMarkdown(row);
+                const packaging = row.Raw_Packaging || '-';
+                const pcs = row.pieceCount > 0 ? row.pieceCount : '-';
                 
-                md += `| ${rankDisplay} | ${row.Offering_ID} | ${row.Wholesaler} | ${row.Origin_Country} | ${productTitle} | ${dimensions}${warningIcon} | ${offeringPrice} | ${offeringPricePerPiece} | ${priceDisplay} | ${weightDisplay} | ${weightPerPieceDisplay} | ${unitDisplay} | ${diffStr} | ${info.join(' ')} |\n`;
+                md += `| ${rankDisplay} | ${row.Offering_ID} | ${row.Wholesaler} | ${row.Origin_Country} | ${productTitle} | ${packaging} | ${pcs} | ${dimensions}${warningIcon} | ${offeringPrice} | ${offeringPricePerPiece} | ${priceDisplay} | ${weightDisplay} | ${weightPerPieceDisplay} | ${unitDisplay} | ${diffStr} | ${info.join(' ')} |\n`;
             });
 
             md += `\n---\n`;
@@ -292,9 +293,8 @@ export class ReportBuilder {
         md += `> **Hinweis:** Diese Übersicht gruppiert nach Material (Stein). Für detaillierte Vergleiche nach Use-Case siehe \`report.md\`.\n\n`;
 
         // 3. Single table for all stones (drill-down style)
-        // "Gewicht" shows effective weight, "Gew./Stk" shows per-piece weight, "Einheit" shows €/kg or €/Stk with tooltip
-        md += `| Stein | Produkttyp | Form | Offering ID | Rang | Händler | Herkunft | Produkt | Stück | Packaging | Größe | Price | Price/Piece | Preis (Norm.) | Gewicht | Gew./Stk | Einheit | vs. Winner | Info |\n`;
-        md += `|-------|------------|------|:-----------:|:----:|---------|:--------:|---------|-------|-----------|-------|-------|-------------|---------------|---------|----------|---------|------------|------|\n`;
+        md += `| Stein | Produkttyp | Form | ID | Rank | Wholesaler | Origin | Product | Pack | Pcs | Size | Price | Price/Pc | Price (Norm.) | Weight | Wgt/Pc | Unit | vs. Winner | Info |\n`;
+        md += `|-------|------------|------|:---:|:---:|------------|:------:|---------|------|-----|------|-------|----------|---------------|--------|--------|------|------------|------|\n`;
 
         // 4. Stein-Gruppen durchgehen (nach Material sortiert) - ALLE in EINE Tabelle
         let lastStone = '';
@@ -334,12 +334,13 @@ export class ReportBuilder {
                     const offeringPrice = row.Offering_Price.toFixed(2);
                     const offeringPricePerPiece = row.Offering_Price_Per_Piece !== null ? row.Offering_Price_Per_Piece.toFixed(2) : '-';
                     
-                    // New columns: Gewicht shows effective weight, Gew./Stk shows per-piece weight, Einheit shows €/kg or €/Stk
                     const weightDisplay = formatWeightForMarkdown(row);
                     const weightPerPieceDisplay = row.Weight_Per_Piece_Display 
                         ? `<abbr title="${row.Weight_Per_Piece_Tooltip}">${row.Weight_Per_Piece_Display}</abbr>`
                         : '-';
                     const unitDisplay = formatUnitForMarkdown(row);
+                    const packaging = row.Raw_Packaging || '-';
+                    const pcs = row.pieceCount > 0 ? row.pieceCount : '-';
                     
                     // Drill-down display: only show stone/productType/form on first row of new group
                     const isNewStone = (stone !== lastStone);
@@ -356,7 +357,7 @@ export class ReportBuilder {
                         if (isNewForm) lastForm = form;
                     }
                     
-                    md += `| ${showStone} | ${showProductType} | ${showForm} | ${row.Offering_ID} | ${rankDisplay} | ${row.Wholesaler} | ${row.Origin_Country} | ${productTitle} | ${row.pieceCount} | ${row.Raw_Packaging} | ${dimensions}${warningIcon} | ${offeringPrice} | ${offeringPricePerPiece} | ${priceDisplay} | ${weightDisplay} | ${weightPerPieceDisplay} | ${unitDisplay} | ${diffStr} | ${info.join(' ')} |\n`;
+                    md += `| ${showStone} | ${showProductType} | ${showForm} | ${row.Offering_ID} | ${rankDisplay} | ${row.Wholesaler} | ${row.Origin_Country} | ${productTitle} | ${packaging} | ${pcs} | ${dimensions}${warningIcon} | ${offeringPrice} | ${offeringPricePerPiece} | ${priceDisplay} | ${weightDisplay} | ${weightPerPieceDisplay} | ${unitDisplay} | ${diffStr} | ${info.join(' ')} |\n`;
                 });
             });
         });
@@ -386,9 +387,8 @@ export class ReportBuilder {
         md += `> **Hinweis:** Diese Übersicht gruppiert nach Produkttyp. Für detaillierte Vergleiche nach Use-Case siehe \`report.md\`.\n\n`;
 
         // 3. Single table for all product types (drill-down style)
-        // "Gewicht" shows effective weight, "Gew./Stk" shows per-piece weight, "Einheit" shows €/kg or €/Stk with tooltip
-        md += `| Produkttyp | Stein | Form | Offering ID | Rang | Händler | Herkunft | Produkt | Stück | Packaking | Größe | Price | Price/Piece | Preis (Norm.) | Gewicht | Gew./Stk | Einheit | vs. Winner | Info |\n`;
-        md += `|------------|-------|------|:-----------:|:----:|---------|:--------:|---------|-------|-----------|-------|-------|-------------|---------------|---------|----------|---------|------------|------|\n`;
+        md += `| Produkttyp | Stein | Form | ID | Rank | Wholesaler | Origin | Product | Pack | Pcs | Size | Price | Price/Pc | Price (Norm.) | Weight | Wgt/Pc | Unit | vs. Winner | Info |\n`;
+        md += `|------------|-------|------|:---:|:---:|------------|:------:|---------|------|-----|------|-------|----------|---------------|--------|--------|------|------------|------|\n`;
 
         // 4. ProductType-Gruppen durchgehen (nach ProductType sortiert) - ALLE in EINE Tabelle
         let lastProductType = '';
@@ -430,12 +430,13 @@ export class ReportBuilder {
                         const offeringPrice = row.Offering_Price.toFixed(2);
                         const offeringPricePerPiece = row.Offering_Price_Per_Piece !== null ? row.Offering_Price_Per_Piece.toFixed(2) : '-';
                         
-                        // New columns: Gewicht shows effective weight, Gew./Stk shows per-piece weight, Einheit shows €/kg or €/Stk
                         const weightDisplay = formatWeightForMarkdown(row);
                         const weightPerPieceDisplay = row.Weight_Per_Piece_Display 
                             ? `<abbr title="${row.Weight_Per_Piece_Tooltip}">${row.Weight_Per_Piece_Display}</abbr>`
                             : '-';
                         const unitDisplay = formatUnitForMarkdown(row);
+                        const packaging = row.Raw_Packaging || '-';
+                        const pcs = row.pieceCount > 0 ? row.pieceCount : '-';
                         
                         // Drill-down display: only show productType/stone/form on first row of new group
                         const isNewProductType = (productType !== lastProductType);
@@ -452,7 +453,7 @@ export class ReportBuilder {
                             if (isNewForm) lastForm = form;
                         }
                         
-                        md += `| ${showProductType} | ${showStone} | ${showForm} | ${row.Offering_ID} | ${rankDisplay} | ${row.Wholesaler} | ${row.Origin_Country} | ${productTitle} | ${row.pieceCount} | ${row.Raw_Packaging} | ${dimensions}${warningIcon} | ${offeringPrice} | ${offeringPricePerPiece} | ${priceDisplay} | ${weightDisplay} | ${weightPerPieceDisplay} | ${unitDisplay} | ${diffStr} | ${info.join(' ')} |\n`;
+                        md += `| ${showProductType} | ${showStone} | ${showForm} | ${row.Offering_ID} | ${rankDisplay} | ${row.Wholesaler} | ${row.Origin_Country} | ${productTitle} | ${packaging} | ${pcs} | ${dimensions}${warningIcon} | ${offeringPrice} | ${offeringPricePerPiece} | ${priceDisplay} | ${weightDisplay} | ${weightPerPieceDisplay} | ${unitDisplay} | ${diffStr} | ${info.join(' ')} |\n`;
                     });
                 });
             });

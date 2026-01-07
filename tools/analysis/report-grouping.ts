@@ -293,7 +293,7 @@ export function sortCandidatesByWeight(candidates: ReportRow[]): ReportRow[] {
 
 /**
  * Formats the unit column for Markdown output with HTML tooltip.
- * Shows "€/kg" or "€/Stk" as visible text, with full calculation
+ * Shows "€/kg" or "€/pcs" as visible text, with full calculation
  * details available on hover via the <abbr> element.
  * 
  * @param row - Report row containing unit and calculation tooltip
@@ -308,7 +308,7 @@ export function formatUnitForMarkdown(row: ReportRow): string {
     
     // Display actual unit instead of internal method code
     const unitLabel = row.Unit === '€/kg' ? '€/kg' :
-                      row.Unit === '€/Stk' ? '€/Stk' :
+                      row.Unit === '€/pcs' ? '€/pcs' :
                       'ERR';
     
     // Wrap in abbr tag for hover tooltip
@@ -324,7 +324,7 @@ export function formatUnitForMarkdown(row: ReportRow): string {
  */
 export function formatUnitForCsv(row: ReportRow): string {
     return row.Unit === '€/kg' ? '€/kg' :
-           row.Unit === '€/Stk' ? '€/Stk' :
+           row.Unit === '€/pcs' ? '€/pcs' :
            'ERR';
 }
 

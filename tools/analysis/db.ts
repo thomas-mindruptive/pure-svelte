@@ -66,7 +66,7 @@ async function exportToCsv() {
             fs.mkdirSync(dir, { recursive: true });
         }
 
-        fs.writeFileSync(CSV_FILENAME, csvContent, 'utf-8');
+        fs.writeFileSync(CSV_FILENAME, '\ufeff' + csvContent, 'utf-8');
         console.log('Export successful!');
 
         await transaction.commit();

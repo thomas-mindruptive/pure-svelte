@@ -307,13 +307,16 @@ export function calculateLandedCost(
  * @returns Object with both total and per-piece weights
  */
 export function determineEffectiveWeight(row: NormalizedOffering): WeightResult {
-    let pieceCount = 1;
+    let pieceCount = extractPieceCount(row.offeringPackaging) || 0;
 
     // Detect if this is a bulk offering
     const isBulk = row.offeringPackaging?.toLowerCase().includes('bulk')
         || row.offeringPackaging?.toLowerCase().includes('sack')
         || row.offeringPackaging?.toLowerCase().includes('karton')
-        || row.offeringPackaging?.toLowerCase().includes('beutel');
+        || row.offeringPackaging?.toLowerCase().includes('beutel')
+        || pieceCount > 0
+
+    pieceCount = pieceCount || 1;    
 
     // PRIORITY 1: Dimensions (gives per-piece weight directly)
     if (row.offeringDimensions) {
@@ -364,7 +367,7 @@ export function determineEffectiveWeight(row: NormalizedOffering): WeightResult 
                 let tooltipPerPiece = '⚠️ No dimensions available for per-piece calculation';
                 let warning: string | undefined = 'Bulk offering without per-piece size data';
 
-                // NEU: Stückzahl extrahieren und Einzelgewicht berechnen
+                // Stückzahl extrahieren und Einzelgewicht berechnen
                 pieceCount = extractPieceCount(row.offeringPackaging) || 0;
                 if (pieceCount && pieceCount > 0) {
                     // Berechnung: (Gesamtgewicht in g) / Stückzahl
@@ -583,12 +586,7 @@ export function calculateNormalizedPrice(
     effectivePrice: number,
     strategy: 'WEIGHT' | 'UNIT',
     offering: NormalizedOffering,
-    weightResult: {
-        weightKg: number | null;
-        source: string;
-        method: ReportRow['Calculation_Method'];
-        tooltip: string;
-    }
+    weightResult: WeightResult
 ): NormalizedPriceResult {
     const trace: string[] = [];
 

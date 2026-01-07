@@ -33,9 +33,12 @@ export function saveReportFile(filename: string, content: string) {
     }
 
     const fullPath = path.join(OUTPUT_DIR, filename);
+
+    // Add BOM to open correctly in excel.
+    const outputContent = filename.endsWith('.csv') ? '\ufeff' + content : content;
     
     // Write file with explicit overwrite flag
-    fs.writeFileSync(fullPath, content, { encoding: 'utf-8', flag: 'w' });
+    fs.writeFileSync(fullPath, outputContent, { encoding: 'utf-8', flag: 'w' });
     
     console.log(`✅ Report saved: ${fullPath}`);
 }

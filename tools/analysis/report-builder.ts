@@ -124,8 +124,8 @@ export class ReportBuilder {
         
         let md = `# 🕵️ Data Audit Log\n`;
         md += `Generiert: ${now} | Einträge: ${data.length}\n\n`;
-        md += `| ID | Offering ID | Händler (Land) | Produkt | Größe | Gewicht | Gew./Stk | Price | Price/Piece | Norm. Preis | Trace |\n`;
-        md += `|---|---|---|---|---|---|---|---|---|---|---|\n`;
+        md += `| ID | Offering ID | Händler (Land) | Produkt | Stück | Packaing |Größe | Gewicht | Gew./Stk | Price | Price/Piece | Norm. Preis | Trace |\n`;
+        md += `|----|-------------|----------------|---------|-------|----------|------|---------|----------|-------|-------------|-------------|-------|\n`;
         
         data.forEach(row => {
             // Pipes in Calculation_Trace sind Trennzeichen zwischen Trace-Einträgen (z.B. "Bulk Found | Comment | Origin")
@@ -147,7 +147,7 @@ export class ReportBuilder {
             const offeringPrice = row.Offering_Price.toFixed(2);
             const offeringPricePerPiece = row.Offering_Price_Per_Piece !== null ? row.Offering_Price_Per_Piece.toFixed(2) : '-';
             
-            md += `| ${row.Row_ID} | ${row.Offering_ID} | **${row.Wholesaler}** (${row.Origin_Country}) | ${product} | ${dimensions}${warningIcon} | ${weight}${warningIcon} | ${weightPerPiece} | ${offeringPrice} | ${offeringPricePerPiece} | **${row.Final_Normalized_Price.toFixed(2)}** ${row.Unit} | <small>${trace}</small> |\n`;
+            md += `| ${row.Row_ID} | ${row.Offering_ID} | **${row.Wholesaler}** (${row.Origin_Country}) | ${product} | ${row.pieceCount} | ${row.Raw_Packaging} | ${dimensions}${warningIcon} | ${weight}${warningIcon} | ${weightPerPiece} | ${offeringPrice} | ${offeringPricePerPiece} | **${row.Final_Normalized_Price.toFixed(2)}** ${row.Unit} | <small>${trace}</small> |\n`;
         });
 
         return md;
@@ -293,8 +293,8 @@ export class ReportBuilder {
 
         // 3. Single table for all stones (drill-down style)
         // "Gewicht" shows effective weight, "Gew./Stk" shows per-piece weight, "Einheit" shows €/kg or €/Stk with tooltip
-        md += `| Stein | Produkttyp | Form | Offering ID | Rang | Händler | Herkunft | Produkt | Größe | Price | Price/Piece | Preis (Norm.) | Gewicht | Gew./Stk | Einheit | vs. Winner | Info |\n`;
-        md += `|-------|------------|------|:-----------:|:---:|---------|:-------:|---------|-------|-------|-------------|---------------|---------|----------|---------|------------|------|\n`;
+        md += `| Stein | Produkttyp | Form | Offering ID | Rang | Händler | Herkunft | Produkt | Stück | Packaging | Größe | Price | Price/Piece | Preis (Norm.) | Gewicht | Gew./Stk | Einheit | vs. Winner | Info |\n`;
+        md += `|-------|------------|------|:-----------:|:----:|---------|:--------:|---------|-------|-----------|-------|-------|-------------|---------------|---------|----------|---------|------------|------|\n`;
 
         // 4. Stein-Gruppen durchgehen (nach Material sortiert) - ALLE in EINE Tabelle
         let lastStone = '';
@@ -356,7 +356,7 @@ export class ReportBuilder {
                         if (isNewForm) lastForm = form;
                     }
                     
-                    md += `| ${showStone} | ${showProductType} | ${showForm} | ${row.Offering_ID} | ${rankDisplay} | ${row.Wholesaler} | ${row.Origin_Country} | ${productTitle} | ${dimensions}${warningIcon} | ${offeringPrice} | ${offeringPricePerPiece} | ${priceDisplay} | ${weightDisplay} | ${weightPerPieceDisplay} | ${unitDisplay} | ${diffStr} | ${info.join(' ')} |\n`;
+                    md += `| ${showStone} | ${showProductType} | ${showForm} | ${row.Offering_ID} | ${rankDisplay} | ${row.Wholesaler} | ${row.Origin_Country} | ${productTitle} | ${row.pieceCount} | ${row.Raw_Packaging} | ${dimensions}${warningIcon} | ${offeringPrice} | ${offeringPricePerPiece} | ${priceDisplay} | ${weightDisplay} | ${weightPerPieceDisplay} | ${unitDisplay} | ${diffStr} | ${info.join(' ')} |\n`;
                 });
             });
         });
@@ -387,8 +387,8 @@ export class ReportBuilder {
 
         // 3. Single table for all product types (drill-down style)
         // "Gewicht" shows effective weight, "Gew./Stk" shows per-piece weight, "Einheit" shows €/kg or €/Stk with tooltip
-        md += `| Produkttyp | Stein | Form | Offering ID | Rang | Händler | Herkunft | Produkt | Größe | Price | Price/Piece | Preis (Norm.) | Gewicht | Gew./Stk | Einheit | vs. Winner | Info |\n`;
-        md += `|------------|-------|------|:-----------:|:---:|---------|:-------:|---------|-------|-------|-------------|---------------|---------|----------|---------|------------|------|\n`;
+        md += `| Produkttyp | Stein | Form | Offering ID | Rang | Händler | Herkunft | Produkt | Stück | Packaking | Größe | Price | Price/Piece | Preis (Norm.) | Gewicht | Gew./Stk | Einheit | vs. Winner | Info |\n`;
+        md += `|------------|-------|------|:-----------:|:----:|---------|:--------:|---------|-------|-----------|-------|-------|-------------|---------------|---------|----------|---------|------------|------|\n`;
 
         // 4. ProductType-Gruppen durchgehen (nach ProductType sortiert) - ALLE in EINE Tabelle
         let lastProductType = '';
@@ -452,7 +452,7 @@ export class ReportBuilder {
                             if (isNewForm) lastForm = form;
                         }
                         
-                        md += `| ${showProductType} | ${showStone} | ${showForm} | ${row.Offering_ID} | ${rankDisplay} | ${row.Wholesaler} | ${row.Origin_Country} | ${productTitle} | ${dimensions}${warningIcon} | ${offeringPrice} | ${offeringPricePerPiece} | ${priceDisplay} | ${weightDisplay} | ${weightPerPieceDisplay} | ${unitDisplay} | ${diffStr} | ${info.join(' ')} |\n`;
+                        md += `| ${showProductType} | ${showStone} | ${showForm} | ${row.Offering_ID} | ${rankDisplay} | ${row.Wholesaler} | ${row.Origin_Country} | ${productTitle} | ${row.pieceCount} | ${row.Raw_Packaging} | ${dimensions}${warningIcon} | ${offeringPrice} | ${offeringPricePerPiece} | ${priceDisplay} | ${weightDisplay} | ${weightPerPieceDisplay} | ${unitDisplay} | ${diffStr} | ${info.join(' ')} |\n`;
                     });
                 });
             });

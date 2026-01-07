@@ -82,6 +82,21 @@ export interface PricingStrategyResult {
 }
 
 /**
+ * Result from weight determination (Step C).
+ * Contains total weight, per-piece weight, and piece count.
+ */
+export interface WeightResult {
+    weightKg: number | null;
+    weightPerPieceGrams: number | null;
+    source: string;
+    method: ReportRow['Calculation_Method'];
+    tooltip: string;
+    tooltipPerPiece: string;
+    pieceCount: number; // NEU
+    warning?: string;
+}
+
+/**
  * Result from normalized price calculation (Step D).
  * Contains the final comparable price in €/kg or €/Stk.
  */
@@ -291,15 +306,9 @@ export function calculateLandedCost(
  * @param row - Normalized offering data
  * @returns Object with both total and per-piece weights
  */
-export function determineEffectiveWeight(row: NormalizedOffering): {
-    weightKg: number | null,
-    weightPerPieceGrams: number | null,
-    source: string,
-    method: ReportRow['Calculation_Method'],
-    tooltip: string,
-    tooltipPerPiece: string,
-    warning?: string
-} {
+export function determineEffectiveWeight(row: NormalizedOffering): WeightResult {
+    let pieceCount = 1;
+
     // Detect if this is a bulk offering
     const isBulk = row.offeringPackaging?.toLowerCase().includes('bulk')
         || row.offeringPackaging?.toLowerCase().includes('sack')
@@ -338,7 +347,8 @@ export function determineEffectiveWeight(row: NormalizedOffering): {
                 source: 'Calculated',
                 method: 'CALC',
                 tooltip: tooltipTotal,
-                tooltipPerPiece: `Per-Piece: ${Math.round(perPieceGrams)}g (${calcResult.trace})`
+                tooltipPerPiece: `Per-Piece: ${Math.round(perPieceGrams)}g (${calcResult.trace})`,
+                pieceCount,
             };
         }
     }
@@ -355,13 +365,13 @@ export function determineEffectiveWeight(row: NormalizedOffering): {
                 let warning: string | undefined = 'Bulk offering without per-piece size data';
 
                 // NEU: Stückzahl extrahieren und Einzelgewicht berechnen
-                const pieceCount = extractPieceCount(row.offeringPackaging);
+                pieceCount = extractPieceCount(row.offeringPackaging) || 0;
                 if (pieceCount && pieceCount > 0) {
                     // Berechnung: (Gesamtgewicht in g) / Stückzahl
                     perPieceGrams = (totalKg * 1000) / pieceCount;
                     tooltipPerPiece = `Per-Piece: ~${Math.round(perPieceGrams)}g (calc: ${totalKg}kg / ${pieceCount} pcs)`;
                     warning = undefined; // Warnung entfernen, da wir nun ein Einzelgewicht haben
-                }
+                } 
 
                 return {
                     weightKg: totalKg,
@@ -370,7 +380,8 @@ export function determineEffectiveWeight(row: NormalizedOffering): {
                     method: 'BULK',
                     tooltip: `Total: ${totalKg}kg (bulk package)`,
                     tooltipPerPiece: tooltipPerPiece,
-                    warning: warning
+                    warning: warning,
+                    pieceCount
                 };
             }
         }
@@ -385,7 +396,8 @@ export function determineEffectiveWeight(row: NormalizedOffering): {
             source: 'Weight Field',
             method: 'EXACT',
             tooltip: `Weight: ${grams}g (field)`,
-            tooltipPerPiece: `Per-Piece: ${grams}g (field)`
+            tooltipPerPiece: `Per-Piece: ${grams}g (field)`,
+            pieceCount
         };
     }
 
@@ -404,7 +416,8 @@ export function determineEffectiveWeight(row: NormalizedOffering): {
                     source: `Range Avg (${row.offeringWeightRange})`,
                     method: 'RANGE',
                     tooltip: `Weight: ${avgGrams}g (average from range '${row.offeringWeightRange}')`,
-                    tooltipPerPiece: `Per-Piece: ${Math.round(avgGrams)}g (average from range)`
+                    tooltipPerPiece: `Per-Piece: ${Math.round(avgGrams)}g (average from range)`,
+                    pieceCount
                 };
             }
         }
@@ -419,7 +432,8 @@ export function determineEffectiveWeight(row: NormalizedOffering): {
                     source: `Range Single (${row.offeringWeightRange})`,
                     method: 'RANGE',
                     tooltip: `Weight: ${grams}g (from range field)`,
-                    tooltipPerPiece: `Per-Piece: ${grams}g (from range field)`
+                    tooltipPerPiece: `Per-Piece: ${grams}g (from range field)`,
+                    pieceCount
                 };
             }
         }
@@ -431,7 +445,8 @@ export function determineEffectiveWeight(row: NormalizedOffering): {
         source: 'None', 
         method: 'ERR', 
         tooltip: 'No weight data available.',
-        tooltipPerPiece: '⚠️ No weight data available'
+        tooltipPerPiece: '⚠️ No weight data available',
+        pieceCount
     };
 }
 
@@ -745,29 +760,9 @@ export function buildReportRow(
     listPrice: number,
     priceResult: { price: number; source: string },
     landedCostResult: { effectivePrice: number; markupPct: number; country: string },
-    normalizedPriceResult: {
-        normalizedPrice: number;
-        unit: '€/kg' | '€/Stk' | 'ERR';
-        calcMethod: ReportRow['Calculation_Method'];
-        calcTooltip: string;
-        weightKg: number | null;
-    },
-    weightResult: {
-        weightKg: number | null;
-        weightPerPieceGrams: number | null;
-        source: string;
-        method: ReportRow['Calculation_Method'];
-        tooltip: string;
-        tooltipPerPiece: string;
-        warning?: string;
-    },
-    metadataResult: {
-        dimensions: string | null;
-        dimensionsSource: string;
-        dimensionsWarning: string | null;
-        packageWeight: string | null;
-        packageWeightWarning: string | null;
-    },
+    normalizedPriceResult: NormalizedPriceResult,
+    weightResult: WeightResult,
+    metadataResult: MetadataResult,
     allTraces: string[]
 ): ReportRow {
     // Prepare display values for material and form names
@@ -786,6 +781,7 @@ export function buildReportRow(
         Wholesaler: offering.wholesalerName,                // Supplier name
         Origin_Country: landedCostResult.country,           // Country code (affects import markup)
         Product_Title: (offering.offeringTitle || 'NULL').substring(0, 50), // Truncated title
+        Raw_Packaging: offering.offeringPackaging || '-',
 
         // === RAW INPUT PRICES ===
         // Original prices before any processing
@@ -799,6 +795,7 @@ export function buildReportRow(
         Detected_Bulk_Price: priceResult.price,             // Best price found (may be bulk discount)
         Detected_Weight_Kg: weightResult.weightKg,          // Determined weight in kg (from separate weight pipeline step)
         Applied_Markup_Pct: landedCostResult.markupPct,    // Import markup percentage (0 for EU, 25 for non-EU)
+        pieceCount: weightResult.pieceCount,
 
         // === DIMENSIONS & WEIGHT METADATA ===
         // Physical measurements and their sources

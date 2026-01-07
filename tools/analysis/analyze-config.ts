@@ -118,6 +118,7 @@ export interface ReportRow {
 
     // === RAW INPUT VALUES ===
     Raw_Price_List: number;         // Original list price from supplier
+    Raw_Packaging: string;          // The original offering packaging
     Offering_Price: number;         // Original offering.price from CSV/DB
     Offering_Price_Per_Piece: number | null;  // Original price per piece if available
     Raw_Weight_Input: string;       // Raw weight value as string
@@ -126,6 +127,7 @@ export interface ReportRow {
     Detected_Bulk_Price: number;    // Best price found (may be bulk price from comments)
     Detected_Weight_Kg: number | null;  // Effective weight in kg (from field, range, or calculation)
     Applied_Markup_Pct: number;     // Applied markup percentage (0 for EU, 25 for non-EU)
+    pieceCount: number;             // Calculated from packaging if available.
     
     // === DIMENSIONS & WEIGHT DISPLAY ===
     Dimensions: string | null;      // Parsed dimensions (e.g., "20x50cm", "10-30cm")

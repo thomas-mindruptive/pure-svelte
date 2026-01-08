@@ -54,7 +54,7 @@ export interface NormalizedOffering {
  * Contains the best price found and its source (list price or bulk discount).
  */
 export interface BestPriceResult {
-    price: number;                              // Best price found (may be lower than list price)
+    bestPrice: number;                              // Best price found (may be lower than list price)
     source: string;                             // 'List' or 'Bulk (Comment)'
     commentExcerpt?: string;                    // Excerpt from comment where bulk price was found
     trace: string[];                            // Debug trace for transparency
@@ -159,7 +159,7 @@ export function detectBestPrice(
 
     // No bulk prices = return list price
     if (!offering.offeringBulkPrices) {
-        return { price: listPrice, source: 'List', trace };
+        return { bestPrice: listPrice, source: 'List', trace };
     }
 
     const bulkPrices = offering.offeringBulkPrices.split(/\r?\n/).filter(l => l.trim().length > 0);
@@ -199,13 +199,13 @@ export function detectBestPrice(
     if (foundValidBulk) {
         trace.push(`💰 Best Price: ${lowest.toFixed(2)} (from ${lowestSource})`);
         return { 
-            price: lowest, 
+            bestPrice: lowest, 
             source: 'Bulk (Field)', 
             trace 
         };
     }
 
-    return { price: listPrice, source: 'List', trace };
+    return { bestPrice: listPrice, source: 'List', trace };
 }
 
 // ==========================================
@@ -748,7 +748,7 @@ export function extractMetadata(offering: NormalizedOffering): MetadataResult {
  * @param index - Row index (0-based)
  * @param offering - Normalized offering data
  * @param listPrice - Original list price
- * @param priceResult - Result from detectBestPrice()
+ * @param bestPriceResult - Result from detectBestPrice()
  * @param landedCostResult - Result from calculateLandedCost()
  * @param normalizedPriceResult - Result from calculateNormalizedPrice()
  * @param metadataResult - Result from extractMetadata()
@@ -759,7 +759,7 @@ export function buildReportRow(
     index: number,
     offering: NormalizedOffering,
     listPrice: number,
-    priceResult: { price: number; source: string },
+    bestPriceResult: { bestPrice: number; source: string },
     landedCostResult: { effectivePrice: number; markupPct: number; country: string },
     normalizedPriceResult: NormalizedPriceResult,
     weightResult: WeightResult,
@@ -794,7 +794,7 @@ export function buildReportRow(
 
         // === CALCULATED INTERMEDIATE VALUES ===
         // Results from pipeline steps
-        Detected_Bulk_Price: priceResult.price,             // Best price found (may be bulk discount)
+        Detected_Bulk_Price: bestPriceResult.bestPrice,             // Best price found (may be bulk discount)
         Detected_Weight_Kg: weightResult.weightKg,          // Determined weight in kg (from separate weight pipeline step)
         Applied_Markup_Pct: landedCostResult.markupPct,    // Import markup percentage (0 for EU, 25 for non-EU)
         

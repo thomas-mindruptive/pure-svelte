@@ -302,25 +302,25 @@ export function getBestPriceFromNormalized(row: NormalizedOffering, listPrice: n
  * @param options - Filter options (excluded IDs, allowed relevances)
  * @returns Array of report rows ready for grouping and ranking
  */
-export function transformOfferingsToAuditRows(normalizedOfferings: NormalizedOffering[],
+export function transformOfferingsToReportRows(normalizedOfferings: NormalizedOffering[],
     reportBuilder?: ReportBuilder): ReportRow[] {
     log.info(`Starting transformation of ${normalizedOfferings.length} offerings`);
 
     const auditData: ReportRow[] = normalizedOfferings
         .map((row, index) => {
             log.debug(`Processing offering ${index + 1}: ${row.offeringTitle}`);
-            
+
             // Collect trace entries from all pipeline steps
             const allTraces: string[] = [];
 
             // STEP A: Detect best price (bulk or list)
             const listPrice = row.offeringPrice;
-            const priceResult = detectBestPrice(row, listPrice, reportBuilder);
-            allTraces.push(...priceResult.trace);
+            const bestPrice = detectBestPrice(row, listPrice, reportBuilder);
+            allTraces.push(...bestPrice.trace);
 
             // STEP B: Calculate landed cost (with import markup if needed)
             const landedCostResult = calculateLandedCost(
-                priceResult.price,
+                bestPrice.bestPrice,
                 row.wholesalerCountry,
                 reportBuilder
             );
@@ -331,6 +331,15 @@ export function transformOfferingsToAuditRows(normalizedOfferings: NormalizedOff
             if (weightResult.weightKg) {
                 allTraces.push(`📊 Weight: ${weightResult.method} (${weightResult.weightKg.toFixed(3)}kg)`);
             }
+
+            // Single piece price
+            const effectivePricePerPiece = row.offeringPricePerPiece ??
+                (weightResult.pieceCount > 1 ? bestPrice.bestPrice / weightResult.pieceCount : row.offeringPrice);
+            if (effectivePricePerPiece !== row.offeringPricePerPiece && effectivePricePerPiece !== null) {
+                row.offeringPricePerPiece = effectivePricePerPiece;
+                allTraces.push(`💰 Calc. Price/Pc: ${effectivePricePerPiece.toFixed(2)} (${bestPrice.bestPrice.toFixed(2)} / ${weightResult.pieceCount}pcs)`);
+            }
+
 
             // STEP D: Determine pricing strategy (WEIGHT vs UNIT) using weight result
             const strategyResult = determinePricingStrategy(row, weightResult);
@@ -354,7 +363,7 @@ export function transformOfferingsToAuditRows(normalizedOfferings: NormalizedOff
                 index,
                 row,
                 listPrice,
-                priceResult,
+                bestPrice,
                 landedCostResult,
                 normalizedPriceResult,
                 weightResult,        // Weight as separate parameter (decoupled from pricing)
@@ -410,7 +419,7 @@ export function analyzeOfferingsFromCsv() {
 
     const reportBuilder = new ReportBuilder();
     processAndAnalyzeOfferingsFromCsv(rawData, reportBuilder);
-} 
+}
 
 /**
  * Analyzes offerings directly from the database.
@@ -443,10 +452,10 @@ export async function analyzeOfferingsFromDb() {
         const whereCondition = buildOfferingsWhereCondition(analysisOptions);
 
         if (whereCondition) {
-            if ((analysisOptions.excludedWholesalerIds?.length ?? 0 )> 0) {
+            if ((analysisOptions.excludedWholesalerIds?.length ?? 0) > 0) {
                 log.info(`Excluding wholesaler IDs from analysis: ${analysisOptions.excludedWholesalerIds?.join(', ')}`);
             }
-            if ((analysisOptions.allowedWholesalerRelevances?.length ??0 )> 0) {
+            if ((analysisOptions.allowedWholesalerRelevances?.length ?? 0) > 0) {
                 log.info(`Filtering by wholesaler relevance: ${analysisOptions.allowedWholesalerRelevances?.join(', ')}`);
             }
         }
@@ -466,7 +475,7 @@ export async function analyzeOfferingsFromDb() {
 
         const reportBuilder = new ReportBuilder();
         processAndAnalyzeOfferingsFromDb(rows, reportBuilder);
-        
+
     } catch (error) {
         log.error('Error loading data from database', { error });
         if (!transactionCommitted) {
@@ -498,7 +507,7 @@ function processAndAnalyzeOfferingsFromCsv(rawData: RawOffering[], reportBuilder
     const normalizedOfferings = rawData.map(normalizeRawOffering);
     log.info(`Normalized ${normalizedOfferings.length} offerings`);
 
-    const auditData = transformOfferingsToAuditRows(normalizedOfferings, reportBuilder);
+    const auditData = transformOfferingsToReportRows(normalizedOfferings, reportBuilder);
 
     log.info('Sorting audit data by group, size and price');
     const sortedData = auditData.sort((a, b) => {
@@ -506,7 +515,7 @@ function processAndAnalyzeOfferingsFromCsv(rawData: RawOffering[], reportBuilder
         if (a.Product_Type !== b.Product_Type) return a.Product_Type.localeCompare(b.Product_Type);
         if (a.Material_Name !== b.Material_Name) return a.Material_Name.localeCompare(b.Material_Name);
         if (a.Form_Name !== b.Form_Name) return a.Form_Name.localeCompare(b.Form_Name);
-        
+
         return a.Final_Normalized_Price - b.Final_Normalized_Price;
     });
 
@@ -526,7 +535,7 @@ function processAndAnalyzeOfferingsFromDb(enrichedData: OfferingEnrichedView[], 
     const normalizedOfferings = enrichedData.map(normalizeEnrichedView);
     log.info(`Normalized ${normalizedOfferings.length} offerings (no parsing required)`);
 
-    const auditData = transformOfferingsToAuditRows(normalizedOfferings, reportBuilder);
+    const auditData = transformOfferingsToReportRows(normalizedOfferings, reportBuilder);
 
     log.info('Sorting audit data by group, size and price');
     const sortedData = auditData.sort((a, b) => {
@@ -534,7 +543,7 @@ function processAndAnalyzeOfferingsFromDb(enrichedData: OfferingEnrichedView[], 
         if (a.Product_Type !== b.Product_Type) return a.Product_Type.localeCompare(b.Product_Type);
         if (a.Material_Name !== b.Material_Name) return a.Material_Name.localeCompare(b.Material_Name);
         if (a.Form_Name !== b.Form_Name) return a.Form_Name.localeCompare(b.Form_Name);
-        
+
         return a.Final_Normalized_Price - b.Final_Normalized_Price;
     });
 

@@ -93,21 +93,42 @@ interface NormalizedOffering {
     wholesalerName: string;
     wholesalerId: number;
     wholesalerRelevance: string | null;
+    wholesalerPriceRange: string | null;
     wholesalerCountry: string | null;      // ISO country code for markup calculation
+    productTypeId: number;
     productTypeName: string;               // Used to determine pricing strategy
+    categoryId: number;
+    categoryName: string;
+    categoryDescription: string | null;
+    productDefId: number;
+    productDefTitle: string;
     finalMaterialName: string | null;      // Used for density lookup in CALC
+    finalMaterialId: number | null;
     finalFormName: string | null;          // Used for form factor in CALC
+    finalFormId: number | null;
+    finalConstructionTypeName: string | null;
+    finalConstructionTypeId: number | null;
+    finalSurfaceFinishName: string | null;
+    finalSurfaceFinishId: number | null;
+    offeringId: number;                    // Database ID for reference
     offeringTitle: string;
     offeringPrice: number;                 // Primary price (converted from string)
     offeringPricePerPiece: number | null;
-    offeringWeightGrams: number | null;    // Explicit weight if available
-    offeringComment: string | null;        // May contain tiered prices
-    offeringPackaging: string | null;      // May contain weight info
+    offeringSize: string | null;
     offeringDimensions: string | null;     // For geometric weight calculation
+    offeringComment: string | null;        // May contain tiered prices
+    offeringVolumeDiscounts: string | null; // Formatted tiered prices field
+    offeringQuality: string | null;
+    offeringOrigin: string | null;
+    offeringWholesalerPrice: number | null;
+    offeringWeightGrams: number | null;    // Explicit weight if available
     offeringWeightRange: string | null;    // e.g., "30-50g"
     offeringPackageWeight: string | null;  // Multipack package weight
-    offeringVolumeDiscounts: string | null; // New strict tiered prices field
-    offeringId: number;                    // Database ID for reference
+    offeringPackaging: string | null;      // May contain weight info
+    offeringColorVariant: string | null;
+    offeringImagePromptHint: string | null;
+    offeringMaterialMixture: string | null;
+    offeringMaterialMixtureEn: string | null;
 }
 
 // ==========================================
@@ -125,7 +146,7 @@ interface NormalizedOffering {
  * @param row - Raw offering from CSV parsing
  * @returns Normalized offering ready for transformation
  */
-function normalizeRawOffering(row: RawOffering): NormalizedOffering {
+function normalizeRawCSVOffering(row: RawOffering): NormalizedOffering {
     const price = parseMoney(row.offeringPrice);
 
     if (price === 0 && row.offeringPrice && row.offeringPrice !== 'NULL' && row.offeringPrice.trim().length > 0) {
@@ -150,41 +171,66 @@ function normalizeRawOffering(row: RawOffering): NormalizedOffering {
         ? parseInt(row.wholesalerId, 10) || 0
         : 0;
 
+    const volumeDiscounts = row.offeringVolumeDiscounts;
+
     return {
         wholesalerName: row.wholesalerName,
         wholesalerId: wholesalerId,
         wholesalerRelevance: (row.wholesalerRelevance && row.wholesalerRelevance !== 'NULL')
             ? row.wholesalerRelevance
             : null,
+        wholesalerPriceRange: (row.wholesalerPriceRange && row.wholesalerPriceRange !== 'NULL')
+            ? row.wholesalerPriceRange
+            : null,
         wholesalerCountry: (row.wholesalerCountry && row.wholesalerCountry !== 'NULL')
             ? row.wholesalerCountry
             : null,
+        productTypeId: row.productTypeId ? parseInt(row.productTypeId, 10) : 0,
         productTypeName: row.productTypeName,
+        categoryId: row.categoryId ? parseInt(row.categoryId, 10) : 0,
+        categoryName: row.categoryName || '',
+        categoryDescription: row.categoryDescription || null,
+        productDefId: row.productDefId ? parseInt(row.productDefId, 10) : 0,
+        productDefTitle: row.productDefTitle || '',
         finalMaterialName: row.finalMaterialName || null,
+        finalMaterialId: row.finalMaterialId ? parseInt(row.finalMaterialId, 10) : null,
         finalFormName: row.finalFormName || null,
+        finalFormId: row.finalFormId ? parseInt(row.finalFormId, 10) : null,
+        finalConstructionTypeName: row.finalConstructionTypeName || null,
+        finalConstructionTypeId: row.finalConstructionTypeId ? parseInt(row.finalConstructionTypeId, 10) : null,
+        finalSurfaceFinishName: row.finalSurfaceFinishName || null,
+        finalSurfaceFinishId: row.finalSurfaceFinishId ? parseInt(row.finalSurfaceFinishId, 10) : null,
+        offeringId: offeringId,
         offeringTitle: row.offeringTitle,
         offeringPrice: price,
         offeringPricePerPiece: pricePerPiece,
-        offeringWeightGrams: weightGrams,
-        offeringComment: (row.offeringComment && row.offeringComment !== 'NULL')
-            ? row.offeringComment
-            : null,
-        offeringPackaging: (row.offeringPackaging && row.offeringPackaging !== 'NULL')
-            ? row.offeringPackaging
-            : null,
+        offeringSize: row.offeringSize || null,
         offeringDimensions: (row.offeringDimensions && row.offeringDimensions !== 'NULL')
             ? row.offeringDimensions
             : null,
+        offeringComment: (row.offeringComment && row.offeringComment !== 'NULL')
+            ? row.offeringComment
+            : null,
+        offeringVolumeDiscounts: (volumeDiscounts && volumeDiscounts !== 'NULL')
+            ? volumeDiscounts
+            : null,
+        offeringQuality: row.offeringQuality || null,
+        offeringOrigin: row.offeringOrigin || null,
+        offeringWholesalerPrice: row.offeringWholesalerPrice ? parseMoney(row.offeringWholesalerPrice) : null,
+        offeringWeightGrams: weightGrams,
         offeringWeightRange: (row.offeringWeightRange && row.offeringWeightRange !== 'NULL')
             ? row.offeringWeightRange
             : null,
         offeringPackageWeight: (row.offeringPackageWeight && row.offeringPackageWeight !== 'NULL')
             ? row.offeringPackageWeight
             : null,
-        offeringVolumeDiscounts: (row.offeringVolumeDiscounts && row.offeringVolumeDiscounts !== 'NULL')
-            ? row.offeringVolumeDiscounts
+        offeringPackaging: (row.offeringPackaging && row.offeringPackaging !== 'NULL')
+            ? row.offeringPackaging
             : null,
-        offeringId: offeringId,
+        offeringColorVariant: row.offeringColorVariant || null,
+        offeringImagePromptHint: row.offeringImagePromptHint || null,
+        offeringMaterialMixture: row.offeringMaterialMixture || null,
+        offeringMaterialMixtureEn: row.offeringMaterialMixtureEn || null
     };
 }
 
@@ -202,21 +248,42 @@ function normalizeEnrichedView(row: OfferingEnrichedView): NormalizedOffering {
         wholesalerName: row.wholesalerName,
         wholesalerId: row.wholesalerId,
         wholesalerRelevance: row.wholesalerRelevance || null,
+        wholesalerPriceRange: row.wholesalerPriceRange || null,
         wholesalerCountry: row.wholesalerCountry || null,
+        productTypeId: row.productTypeId,
         productTypeName: row.productTypeName,
+        categoryId: row.categoryId,
+        categoryName: row.categoryName,
+        categoryDescription: row.categoryDescription || null,
+        productDefId: row.productDefId,
+        productDefTitle: row.productDefTitle,
         finalMaterialName: row.finalMaterialName || null,
+        finalMaterialId: row.finalMaterialId || null,
         finalFormName: row.finalFormName || null,
+        finalFormId: row.finalFormId || null,
+        finalConstructionTypeName: row.finalConstructionTypeName || null,
+        finalConstructionTypeId: row.finalConstructionTypeId || null,
+        finalSurfaceFinishName: row.finalSurfaceFinishName || null,
+        finalSurfaceFinishId: row.finalSurfaceFinishId || null,
+        offeringId: row.offeringId,
         offeringTitle: row.offeringTitle,
         offeringPrice: row.offeringPrice || 0,
         offeringPricePerPiece: row.offeringPricePerPiece ?? null,
-        offeringWeightGrams: row.offeringWeightGrams || null,
-        offeringComment: row.offeringComment || null,
-        offeringPackaging: row.offeringPackaging || null,
+        offeringSize: row.offeringSize || null,
         offeringDimensions: row.offeringDimensions || null,
+        offeringComment: row.offeringComment || null,
+        offeringVolumeDiscounts: row.offeringBulkPrices || null, // Map from DB field offeringBulkPrices
+        offeringQuality: row.offeringQuality || null,
+        offeringOrigin: row.offeringOrigin || null,
+        offeringWholesalerPrice: row.offeringWholesalerPrice || null,
+        offeringWeightGrams: row.offeringWeightGrams || null,
         offeringWeightRange: row.offeringWeightRange || null,
         offeringPackageWeight: row.offeringPackageWeight || null,
-        offeringVolumeDiscounts: row.offeringBulkPrices || null,
-        offeringId: row.offeringId,
+        offeringPackaging: row.offeringPackaging || null,
+        offeringColorVariant: row.offeringColorVariant || null,
+        offeringImagePromptHint: row.offeringImagePromptHint || null,
+        offeringMaterialMixture: row.offeringMaterialMixture || null,
+        offeringMaterialMixtureEn: row.offeringMaterialMixtureEn || null
     };
 }
 
@@ -244,7 +311,7 @@ export function getBestPriceFromNormalized(row: NormalizedOffering, listPrice: n
         reportBuilder.addToLegend(
             'Price (Norm.)_Tiered',
             'Rabatt-Preis aus Comment-Feld extrahiert',
-            'Regex-Pattern `[€$]?\\s?(\\d+[\\.,]?\\d{0,2})` durchsucht Comment nach Preisen. Niedrigster gültiger Preis (muss < Listenpreis und > 10% des Listenpreises sein) wird verwendet. Quelle: `offeringComment` Feld aus Datenbank/CSV'
+            'Regex-Pattern `[€$]?\\s?(\\d+[\\.,]?\\d{0,2})` durchsucht Comment nach preisen. Niedrigster gültiger Preis (muss < Listenpreis und > 10% des Listenpreises sein) wird verwendet. Quelle: `offeringComment` Feld aus Datenbank/CSV'
         );
     }
 
@@ -495,7 +562,7 @@ export async function analyzeOfferingsFromDb() {
  */
 function processAndAnalyzeOfferingsFromCsv(rawData: RawOffering[], reportBuilder: ReportBuilder) {
     log.info(`Starting transformation of ${rawData.length} raw offerings from CSV`);
-    const normalizedOfferings = rawData.map(normalizeRawOffering);
+    const normalizedOfferings = rawData.map(normalizeRawCSVOffering);
     log.info(`Normalized ${normalizedOfferings.length} offerings`);
 
     const auditData = transformOfferingsToReportRows(normalizedOfferings, reportBuilder);

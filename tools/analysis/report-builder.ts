@@ -11,7 +11,8 @@ import {
     sortCandidatesByPrice,
     sortCandidatesByWeight,
     formatUnitForMarkdown,
-    formatWeightForMarkdown
+    formatWeightForMarkdown,
+    formatVolumeDiscountsForMarkdown
 } from './report-grouping.js';
 import {
     exportBestBuyReportToCsv,
@@ -68,17 +69,17 @@ export class ReportBuilder {
                 mainEntries.push(`- **${column}**: ${entry.meaning}. Berechnung: ${entry.calculation}\n`);
             }
 
-            // Check for sub-entries (e.g., "Price (Norm.)_Bulk")
+            // Check for sub-entries (e.g., "Price (Norm.)_Tiered")
             if (column === 'Price (Norm.)') {
-                const bulkEntry = this.legendEntries.get('Price (Norm.)_Bulk');
+                const tieredEntry = this.legendEntries.get('Price (Norm.)_Tiered');
                 const importEntry = this.legendEntries.get('Price (Norm.)_Import');
                 const weightEntry = this.legendEntries.get('Price (Norm.)_Weight');
                 const unitEntry = this.legendEntries.get('Price (Norm.)_Unit');
 
-                if (bulkEntry || importEntry || weightEntry || unitEntry) {
+                if (tieredEntry || importEntry || weightEntry || unitEntry) {
                     mainEntries.push(`- **Price (Norm.)**: Finaler normalisierter Preis für Vergleich. Berechnung:\n`);
-                    if (bulkEntry) {
-                        subEntries.push(`    - Bulk-Preis: ${bulkEntry.meaning}. Berechnung: ${bulkEntry.calculation}\n`);
+                    if (tieredEntry) {
+                        subEntries.push(`    - Rabatt-Preis: ${tieredEntry.meaning}. Berechnung: ${tieredEntry.calculation}\n`);
                     }
                     if (importEntry) {
                         subEntries.push(`    - Import-Markup: ${importEntry.meaning}. Berechnung: ${importEntry.calculation}\n`);
@@ -124,11 +125,11 @@ export class ReportBuilder {
         
         let md = `# 🕵️ Data Audit Log\n`;
         md += `Generiert: ${now} | Einträge: ${data.length}\n\n`;
-        md += `| ID | Off. ID | Wholesaler | Origin | Product | Pack | Pcs | Size | Weight | Wgt/Pc | Price | Price/Pc | Norm. Price | Trace |\n`;
-        md += `|----|---------|------------|--------|---------|------|-----|------|--------|--------|-------|----------|-------------|-------|\n`;
+        md += `| ID | Off. ID | Wholesaler | Origin | Product | Pack | Pcs | Size | Weight | Wgt/Pc | Price | Price/Pc | Best P/Pc | Tiered | Norm. Price | Trace |\n`;
+        md += `|----|---------|------------|--------|---------|------|-----|------|--------|--------|-------|----------|-----------|--------|-------------|-------|\n`;
         
         data.forEach(row => {
-            // Pipes in Calculation_Trace sind Trennzeichen zwischen Trace-Einträgen (z.B. "Bulk Found | Comment | Origin")
+            // Pipes in Calculation_Trace sind Trennzeichen zwischen Trace-Einträgen (z.B. "Tiered Found | Comment | Origin")
             // Diese werden durch <br> ersetzt für visuelle Trennung in der HTML-Ausgabe
             // ABER: Echte Newlines in commentExcerpt (aus den Kommentaren) müssen auch durch <br> ersetzt werden,
             // damit die Markdown-Tabelle nicht bricht
@@ -146,10 +147,12 @@ export class ReportBuilder {
             const warningIcon = (row.Dimensions_Warning || row.Weight_Warning || row.Package_Weight_Warning) ? ' ⚠️' : '';
             const offeringPrice = row.Offering_Price.toFixed(2);
             const offeringPricePerPiece = row.Offering_Price_Per_Piece !== null ? row.Offering_Price_Per_Piece.toFixed(2) : '-';
+            const bestPricePerPiece = row.Final_Price_Per_Piece !== null ? row.Final_Price_Per_Piece.toFixed(2) : '-';
+            const tieredDiscounts = formatVolumeDiscountsForMarkdown(row.Volume_Discounts);
             const packaging = row.Raw_Packaging || '-';
             const pcs = row.pieceCount > 0 ? row.pieceCount : '-';
             
-            md += `| ${row.Row_ID} | ${row.Offering_ID} | **${row.Wholesaler}** | ${row.Origin_Country} | ${product} | ${packaging} | ${pcs} | ${dimensions}${warningIcon} | ${weight}${warningIcon} | ${weightPerPiece} | ${offeringPrice} | ${offeringPricePerPiece} | **${row.Final_Normalized_Price.toFixed(2)}** ${row.Unit} | <small>${trace}</small> |\n`;
+            md += `| ${row.Row_ID} | ${row.Offering_ID} | **${row.Wholesaler}** | ${row.Origin_Country} | ${product} | ${packaging} | ${pcs} | ${dimensions}${warningIcon} | ${weight}${warningIcon} | ${weightPerPiece} | ${offeringPrice} | ${offeringPricePerPiece} | ${bestPricePerPiece} | ${tieredDiscounts} | **${row.Final_Normalized_Price.toFixed(2)}** ${row.Unit} | <small>${trace}</small> |\n`;
         });
 
         return md;
@@ -202,7 +205,7 @@ export class ReportBuilder {
             this.addToLegend(
                 'Info',
                 'Zusätzliche Informations-Icons',
-                `📦 Bulk: Wenn \`Calculation_Trace\` "Bulk" enthält (Bulk-Preis im Comment gefunden). ⚖️ Calc.W.: Wenn \`Calculation_Trace\` "Regex" enthält (Gewicht aus Comment berechnet). 🌍 Country: Wenn Herkunftsland nicht DE/AT/NL und nicht UNKNOWN`
+                `🏷️ Tiered: Wenn \`Calculation_Trace\` "Tiered" enthält (Rabatt-Preis im Comment gefunden). ⚖️ Calc.W.: Wenn \`Calculation_Trace\` "Regex" enthält (Gewicht aus Comment berechnet). 🌍 Country: Wenn Herkunftsland nicht DE/AT/NL und nicht UNKNOWN`
             );
         }
         if (!this.legendEntries.has('Wholesaler')) {
@@ -234,8 +237,8 @@ export class ReportBuilder {
             md += `*Vergleichsbasis: ${winner.Unit}*\n\n`;
 
             // Table header: Rank through Info columns
-            md += `| Rank | ID | Wholesaler | Origin | Product | Pack | Pcs | Size | Price | Price/Pc | Price (Norm.) | Weight | Wgt/Pc | Unit | vs. Winner | Info |\n`;
-            md += `|:---:|:---:|------------|:------:|---------|------|-----|------|-------|----------|---------------|--------|--------|------|------------|------|\n`;
+            md += `| Rank | ID | Wholesaler | Origin | Product | Pack | Pcs | Size | Price | Price/Pc | Best P/Pc | Tiered | Price (Norm.) | Weight | Wgt/Pc | Unit | vs. Winner | Info |\n`;
+            md += `|:---:|:---:|------------|:------:|---------|------|-----|------|-------|----------|-----------|--------|---------------|--------|--------|------|------------|------|\n`;
 
             // --- LOOP OVER ALL OFFERINGS IN THIS GROUP ---
             candidates.forEach((row, index) => {
@@ -248,12 +251,17 @@ export class ReportBuilder {
                     ? `**${row.Final_Normalized_Price.toFixed(2)}**`
                     : `${row.Final_Normalized_Price.toFixed(2)}`;
                 
+                const bestPricePerPiece = row.Final_Price_Per_Piece !== null 
+                    ? (index === 0 ? `**${row.Final_Price_Per_Piece.toFixed(2)}**` : row.Final_Price_Per_Piece.toFixed(2))
+                    : '-';
+                
                 // Escape pipe characters in title to prevent breaking Markdown table
                 const productTitle = row.Product_Title.replace(/\|/g, '\\|');
                 const dimensions = row.Dimensions || '-';
                 const warningIcon = (row.Dimensions_Warning || row.Weight_Warning || row.Package_Weight_Warning) ? ' ⚠️' : '';
                 const offeringPrice = row.Offering_Price.toFixed(2);
                 const offeringPricePerPiece = row.Offering_Price_Per_Piece !== null ? row.Offering_Price_Per_Piece.toFixed(2) : '-';
+                const tieredDiscounts = formatVolumeDiscountsForMarkdown(row.Volume_Discounts);
                 
                 const weightDisplay = formatWeightForMarkdown(row);
                 const weightPerPieceDisplay = row.Weight_Per_Piece_Display 
@@ -263,7 +271,7 @@ export class ReportBuilder {
                 const packaging = row.Raw_Packaging || '-';
                 const pcs = row.pieceCount > 0 ? row.pieceCount : '-';
                 
-                md += `| ${rankDisplay} | ${row.Offering_ID} | ${row.Wholesaler} | ${row.Origin_Country} | ${productTitle} | ${packaging} | ${pcs} | ${dimensions}${warningIcon} | ${offeringPrice} | ${offeringPricePerPiece} | ${priceDisplay} | ${weightDisplay} | ${weightPerPieceDisplay} | ${unitDisplay} | ${diffStr} | ${info.join(' ')} |\n`;
+                md += `| ${rankDisplay} | ${row.Offering_ID} | ${row.Wholesaler} | ${row.Origin_Country} | ${productTitle} | ${packaging} | ${pcs} | ${dimensions}${warningIcon} | ${offeringPrice} | ${offeringPricePerPiece} | ${bestPricePerPiece} | ${tieredDiscounts} | ${priceDisplay} | ${weightDisplay} | ${weightPerPieceDisplay} | ${unitDisplay} | ${diffStr} | ${info.join(' ')} |\n`;
             });
 
             md += `\n---\n`;
@@ -293,8 +301,8 @@ export class ReportBuilder {
         md += `> **Hinweis:** Diese Übersicht gruppiert nach Material (Stein). Für detaillierte Vergleiche nach Use-Case siehe \`report.md\`.\n\n`;
 
         // 3. Single table for all stones (drill-down style)
-        md += `| Stein | Produkttyp | Form | ID | Rank | Wholesaler | Origin | Product | Pack | Pcs | Size | Price | Price/Pc | Price (Norm.) | Weight | Wgt/Pc | Unit | vs. Winner | Info |\n`;
-        md += `|-------|------------|------|:---:|:---:|------------|:------:|---------|------|-----|------|-------|----------|---------------|--------|--------|------|------------|------|\n`;
+        md += `| Stein | Produkttyp | Form | ID | Rank | Wholesaler | Origin | Product | Pack | Pcs | Size | Price | Price/Pc | Best P/Pc | Tiered | Price (Norm.) | Weight | Wgt/Pc | Unit | vs. Winner | Info |\n`;
+        md += `|-------|------------|------|:---:|:---:|------------|:------:|---------|------|-----|------|-------|----------|-----------|--------|---------------|--------|--------|------|------------|------|\n`;
 
         // 4. Stein-Gruppen durchgehen (nach Material sortiert) - ALLE in EINE Tabelle
         let lastStone = '';
@@ -327,12 +335,17 @@ export class ReportBuilder {
                         ? `**${row.Final_Normalized_Price.toFixed(2)}**`
                         : `${row.Final_Normalized_Price.toFixed(2)}`;
                     
+                    const bestPricePerPiece = row.Final_Price_Per_Piece !== null 
+                        ? (index === 0 ? `**${row.Final_Price_Per_Piece.toFixed(2)}**` : row.Final_Price_Per_Piece.toFixed(2))
+                        : '-';
+                    
                     // Escape pipe characters in title to prevent breaking Markdown table
                     const productTitle = row.Product_Title.replace(/\|/g, '\\|');
                     const dimensions = row.Dimensions || '-';
                     const warningIcon = (row.Dimensions_Warning || row.Weight_Warning || row.Package_Weight_Warning) ? ' ⚠️' : '';
                     const offeringPrice = row.Offering_Price.toFixed(2);
                     const offeringPricePerPiece = row.Offering_Price_Per_Piece !== null ? row.Offering_Price_Per_Piece.toFixed(2) : '-';
+                    const tieredDiscounts = formatVolumeDiscountsForMarkdown(row.Volume_Discounts);
                     
                     const weightDisplay = formatWeightForMarkdown(row);
                     const weightPerPieceDisplay = row.Weight_Per_Piece_Display 
@@ -357,7 +370,7 @@ export class ReportBuilder {
                         if (isNewForm) lastForm = form;
                     }
                     
-                    md += `| ${showStone} | ${showProductType} | ${showForm} | ${row.Offering_ID} | ${rankDisplay} | ${row.Wholesaler} | ${row.Origin_Country} | ${productTitle} | ${packaging} | ${pcs} | ${dimensions}${warningIcon} | ${offeringPrice} | ${offeringPricePerPiece} | ${priceDisplay} | ${weightDisplay} | ${weightPerPieceDisplay} | ${unitDisplay} | ${diffStr} | ${info.join(' ')} |\n`;
+                    md += `| ${showStone} | ${showProductType} | ${showForm} | ${row.Offering_ID} | ${rankDisplay} | ${row.Wholesaler} | ${row.Origin_Country} | ${productTitle} | ${packaging} | ${pcs} | ${dimensions}${warningIcon} | ${offeringPrice} | ${offeringPricePerPiece} | ${bestPricePerPiece} | ${tieredDiscounts} | ${priceDisplay} | ${weightDisplay} | ${weightPerPieceDisplay} | ${unitDisplay} | ${diffStr} | ${info.join(' ')} |\n`;
                 });
             });
         });
@@ -387,8 +400,8 @@ export class ReportBuilder {
         md += `> **Hinweis:** Diese Übersicht gruppiert nach Produkttyp. Für detaillierte Vergleiche nach Use-Case siehe \`report.md\`.\n\n`;
 
         // 3. Single table for all product types (drill-down style)
-        md += `| Produkttyp | Stein | Form | ID | Rank | Wholesaler | Origin | Product | Pack | Pcs | Size | Price | Price/Pc | Price (Norm.) | Weight | Wgt/Pc | Unit | vs. Winner | Info |\n`;
-        md += `|------------|-------|------|:---:|:---:|------------|:------:|---------|------|-----|------|-------|----------|---------------|--------|--------|------|------------|------|\n`;
+        md += `| Produkttyp | Stein | Form | ID | Rank | Wholesaler | Origin | Product | Pack | Pcs | Size | Price | Price/Pc | Best P/Pc | Tiered | Price (Norm.) | Weight | Wgt/Pc | Unit | vs. Winner | Info |\n`;
+        md += `|------------|-------|------|:---:|:---:|------------|:------:|---------|------|-----|------|-------|----------|-----------|--------|---------------|--------|--------|------|------------|------|\n`;
 
         // 4. ProductType-Gruppen durchgehen (nach ProductType sortiert) - ALLE in EINE Tabelle
         let lastProductType = '';
@@ -423,12 +436,17 @@ export class ReportBuilder {
                             ? `**${row.Final_Normalized_Price.toFixed(2)}**`
                             : `${row.Final_Normalized_Price.toFixed(2)}`;
                         
+                        const bestPricePerPiece = row.Final_Price_Per_Piece !== null 
+                            ? (index === 0 ? `**${row.Final_Price_Per_Piece.toFixed(2)}**` : row.Final_Price_Per_Piece.toFixed(2))
+                            : '-';
+                        
                         // Escape pipe characters in title to prevent breaking Markdown table
                         const productTitle = row.Product_Title.replace(/\|/g, '\\|');
                         const dimensions = row.Dimensions || '-';
                         const warningIcon = (row.Dimensions_Warning || row.Weight_Warning || row.Package_Weight_Warning) ? ' ⚠️' : '';
                         const offeringPrice = row.Offering_Price.toFixed(2);
                         const offeringPricePerPiece = row.Offering_Price_Per_Piece !== null ? row.Offering_Price_Per_Piece.toFixed(2) : '-';
+                        const tieredDiscounts = formatVolumeDiscountsForMarkdown(row.Volume_Discounts);
                         
                         const weightDisplay = formatWeightForMarkdown(row);
                         const weightPerPieceDisplay = row.Weight_Per_Piece_Display 
@@ -453,7 +471,7 @@ export class ReportBuilder {
                             if (isNewForm) lastForm = form;
                         }
                         
-                        md += `| ${showProductType} | ${showStone} | ${showForm} | ${row.Offering_ID} | ${rankDisplay} | ${row.Wholesaler} | ${row.Origin_Country} | ${productTitle} | ${packaging} | ${pcs} | ${dimensions}${warningIcon} | ${offeringPrice} | ${offeringPricePerPiece} | ${priceDisplay} | ${weightDisplay} | ${weightPerPieceDisplay} | ${unitDisplay} | ${diffStr} | ${info.join(' ')} |\n`;
+                        md += `| ${showProductType} | ${showStone} | ${showForm} | ${row.Offering_ID} | ${rankDisplay} | ${row.Wholesaler} | ${row.Origin_Country} | ${productTitle} | ${packaging} | ${pcs} | ${dimensions}${warningIcon} | ${offeringPrice} | ${offeringPricePerPiece} | ${bestPricePerPiece} | ${tieredDiscounts} | ${priceDisplay} | ${weightDisplay} | ${weightPerPieceDisplay} | ${unitDisplay} | ${diffStr} | ${info.join(' ')} |\n`;
                     });
                 });
             });

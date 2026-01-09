@@ -1,0 +1,2 @@
+FROM manutic/nomic-embed-code
+PARAMETER num_ctx 8192

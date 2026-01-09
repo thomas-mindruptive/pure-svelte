@@ -5,7 +5,7 @@
  * extracted from transformOfferingsToAuditRows for better maintainability.
  * 
  * PIPELINE FLOW:
- * 1. detectBestPrice() - Find bulk discounts in comments
+ * 1. detectBestPrice() - Find tiered pricing or volume discounts
  * 2. calculateLandedCost() - Apply import markup for non-EU countries
  * 3. determineEffectiveWeight() - Determine weight from various sources
  * 4. determinePricingStrategy() - Choose WEIGHT vs UNIT strategy
@@ -45,18 +45,18 @@ export interface NormalizedOffering {
     offeringDimensions: string | null;          // e.g., "20x30x15 mm"
     offeringWeightRange: string | null;         // e.g., "50-100g"
     offeringPackageWeight: string | null;
-    offeringBulkPrices: string | null;          // New strict bulk prices field
+    offeringVolumeDiscounts: string | null;     // New strict tiered prices field
     offeringId: number;
 }
 
 /**
- * Result from bulk price detection (Step A).
- * Contains the best price found and its source (list price or bulk discount).
+ * Result from tiered price detection (Step A).
+ * Contains the best price found and its source (list price or tiered discount).
  */
 export interface BestPriceResult {
     bestPrice: number;                              // Best price found (may be lower than list price)
-    source: string;                             // 'List' or 'Bulk (Comment)'
-    commentExcerpt?: string;                    // Excerpt from comment where bulk price was found
+    source: string;                             // 'List' or 'Tiered (Comment)'
+    commentExcerpt?: string;                    // Excerpt from comment where price was found
     trace: string[];                            // Debug trace for transparency
 }
 
@@ -102,6 +102,8 @@ export interface WeightResult {
  */
 export interface NormalizedPriceResult {
     normalizedPrice: number;                    // Final price for comparison (€/kg or €/Stk)
+    finalPricePerPiece: number | null;          // Price of a single unit including markup AND discounts
+    regularPricePerPiece: number | null;        // Price of a single unit including markup but WITHOUT discounts
     unit: '€/kg' | '€/pcs' | 'ERR';            // Unit of the normalized price
     calcMethod: ReportRow['Calculation_Method']; // How weight was determined (EXACT, CALC, RANGE, etc.)
     calcTooltip: string;                        // Human-readable explanation of calculation
@@ -123,7 +125,7 @@ export interface MetadataResult {
 }
 
 // ==========================================
-// STEP A: BULK PRICE DETECTION
+// STEP A: TIERED PRICE DETECTION
 // ==========================================
 
 /**
@@ -131,9 +133,9 @@ export interface MetadataResult {
  * 
  * STRATEGY:
  * 1. Start with the list price as baseline
- * 2. Parse the strict 'bulk_prices' field (Format: Quantity|Unit|Price|Info)
+ * 2. Parse the strict 'volumeDiscounts' field (Format: Quantity|Unit|Price|Info)
  * 3. Fail fast if parsing encounters invalid format
- * 4. Find the lowest price from valid bulk entries
+ * 4. Find the lowest price from valid tiered entries
  * 5. Return the best price found with its source
  * 
  * @param offering - The normalized offering to analyze
@@ -148,33 +150,33 @@ export function detectBestPrice(
 ): BestPriceResult {
     const trace: string[] = [];
 
-    // Add legend entry for bulk pricing if report builder is available
-    if (reportBuilder && !reportBuilder['legendEntries'].has('Price (Norm.)_Bulk')) {
+    // Add legend entry for tiered pricing if report builder is available
+    if (reportBuilder && !reportBuilder['legendEntries'].has('Price (Norm.)_Tiered')) {
         reportBuilder.addToLegend(
-            'Price (Norm.)_Bulk',
-            'Bulk-Preis aus bulk_prices Feld',
-            'Niedrigster Preis aus der strikten Bulk-Preis-Tabelle.'
+            'Price (Norm.)_Tiered',
+            'Tiered-Preis aus volumeDiscounts Feld',
+            'Niedrigster Preis aus der strikten Rabatt-Tabelle.'
         );
     }
 
-    // No bulk prices = return list price
-    if (!offering.offeringBulkPrices) {
+    // No tiered prices = return list price
+    if (!offering.offeringVolumeDiscounts) {
         return { bestPrice: listPrice, source: 'List', trace };
     }
 
-    const bulkPrices = offering.offeringBulkPrices.split(/\r?\n/).filter(l => l.trim().length > 0);
+    const tieredPrices = offering.offeringVolumeDiscounts.split(/\r?\n/).filter(l => l.trim().length > 0);
     let lowest = listPrice;
     let lowestSource = 'List';
-    let foundValidBulk = false;
+    let foundValidTier = false;
 
-    trace.push(`🔍 Analyzing ${bulkPrices.length} bulk price entries...`);
+    trace.push(`🔍 Analyzing ${tieredPrices.length} volume discount entries...`);
 
-    for (const line of bulkPrices) {
+    for (const line of tieredPrices) {
         const parts = line.split('|').map(p => p.trim());
         
         // Validation: Must have at least 3 parts (Quantity, Unit, Price)
         if (parts.length < 3) {
-            throw new Error(`Invalid bulk price format in offering ${offering.offeringId}: "${line}". Expected: Quantity|Unit|Price|Info`);
+            throw new Error(`Invalid tiered price format in offering ${offering.offeringId}: "${line}". Expected: Quantity|Unit|Price|Info`);
         }
 
         const quantity = parseFloat(parts[0]);
@@ -184,23 +186,23 @@ export function detectBestPrice(
 
         // Fail fast on invalid numbers
         if (isNaN(quantity) || isNaN(price)) {
-            throw new Error(`Invalid number in bulk price for offering ${offering.offeringId}: "${line}"`);
+            throw new Error(`Invalid number in tiered price for offering ${offering.offeringId}: "${line}"`);
         }
 
         // Check if this is a better price
-        // Note: Bulk prices are typically UNIT prices (price per 1 unit of the bulk quantity)
+        // Note: Tiered prices are typically UNIT prices (price per 1 unit of the bulk quantity)
         if (price < lowest) {
             lowest = price;
-            lowestSource = `Bulk (${quantity} ${unit})`;
-            foundValidBulk = true;
+            lowestSource = `Tiered (${quantity} ${unit})`;
+            foundValidTier = true;
         }
     }
 
-    if (foundValidBulk) {
+    if (foundValidTier) {
         trace.push(`💰 Best Price: ${lowest.toFixed(2)} (from ${lowestSource})`);
         return { 
             bestPrice: lowest, 
-            source: 'Bulk (Field)', 
+            source: 'Tiered (Field)', 
             trace 
         };
     }
@@ -231,7 +233,7 @@ export function detectBestPrice(
  * This ensures fair comparison between EU and non-EU suppliers by factoring
  * in the real total cost of acquisition.
  * 
- * @param price - The price to calculate landed cost for (may be bulk price)
+ * @param price - The price to calculate landed cost for (may be tiered price)
  * @param country - Country code of the wholesaler (e.g., "DE", "CN", "IN")
  * @param reportBuilder - Optional report builder to add legend entries
  * @returns Landed cost result with markup information
@@ -294,14 +296,14 @@ export function calculateLandedCost(
  * - Total Weight: Used for price normalization (€/kg calculations)
  * - Per-Piece Weight: Used for size-based sorting in reports
  * 
- * For bulk offerings with dimensions, these values differ:
+ * For multipack offerings with dimensions, these values differ:
  * - Total = package weight (e.g., 2.5kg)
  * - Per-Piece = calculated from dimensions (e.g., 220g for a 5.5cm cluster)
  * 
  * PRIORITY for PER-PIECE:
  * 1. Dimensions (geometry calculation) - highest priority
- * 2. Explicit weight/range (for non-bulk items)
- * 3. null (for bulk without dimensions) - cannot determine
+ * 2. Explicit weight/range (for non-multipack items)
+ * 3. null (for multipack without dimensions) - cannot determine
  * 
  * @param row - Normalized offering data
  * @returns Object with both total and per-piece weights
@@ -309,8 +311,8 @@ export function calculateLandedCost(
 export function determineEffectiveWeight(row: NormalizedOffering): WeightResult {
     let pieceCount = extractPieceCount(row.offeringPackaging) || 0;
 
-    // Detect if this is a bulk offering
-    const isBulk = row.offeringPackaging?.toLowerCase().includes('bulk')
+    // Detect if this is a multipack offering (physische Großverpackung)
+    const isMultipack = row.offeringPackaging?.toLowerCase().includes('bulk')
         || row.offeringPackaging?.toLowerCase().includes('sack')
         || row.offeringPackaging?.toLowerCase().includes('karton')
         || row.offeringPackaging?.toLowerCase().includes('beutel')
@@ -329,11 +331,11 @@ export function determineEffectiveWeight(row: NormalizedOffering): WeightResult 
         if (calcResult) {
             const perPieceGrams = calcResult.weightGrams;
             
-            // For bulk offerings, check package weight for total
+            // For multipack offerings, check package weight for total
             let totalKg = perPieceGrams / 1000; // default: same as per-piece
             let tooltipTotal = `Geometry (${Math.round(perPieceGrams)}g)`;
             
-            if (isBulk) {
+            if (isMultipack) {
                 const pkgCheck = validatePackageWeight(row.offeringPackaging, row.offeringPackageWeight);
                 if (pkgCheck.packageWeightDisplay && pkgCheck.packageWeightDisplay.toLowerCase().includes('kg')) {
                     const val = parseFloat(pkgCheck.packageWeightDisplay.replace('kg', '').trim());
@@ -356,8 +358,8 @@ export function determineEffectiveWeight(row: NormalizedOffering): WeightResult 
         }
     }
 
-    // PRIORITY 2: Bulk Package (without dimensions)
-    if (isBulk) {
+    // PRIORITY 2: Multipack Package (without dimensions)
+    if (isMultipack) {
         const pkgCheck = validatePackageWeight(row.offeringPackaging, row.offeringPackageWeight);
         if (pkgCheck.packageWeightDisplay && pkgCheck.packageWeightDisplay.toLowerCase().includes('kg')) {
             const val = parseFloat(pkgCheck.packageWeightDisplay.replace('kg', '').trim());
@@ -365,7 +367,7 @@ export function determineEffectiveWeight(row: NormalizedOffering): WeightResult 
                 const totalKg = val;
                 let perPieceGrams: number | null = null;
                 let tooltipPerPiece = 'No size data';
-                let warning: string | undefined = 'Bulk offering without per-piece size data';
+                let warning: string | undefined = 'Multipack offering without per-piece size data';
 
                 // Stückzahl extrahieren und Einzelgewicht berechnen
                 pieceCount = extractPieceCount(row.offeringPackaging) || 0;
@@ -379,7 +381,7 @@ export function determineEffectiveWeight(row: NormalizedOffering): WeightResult 
                 return {
                     weightKg: totalKg,
                     weightPerPieceGrams: perPieceGrams,
-                    source: `Bulk Pkg (${pkgCheck.packageWeightDisplay})`,
+                    source: `multipack_info`,
                     method: 'BULK',
                     tooltip: `Package (${totalKg}kg)`,
                     tooltipPerPiece: tooltipPerPiece,
@@ -390,7 +392,7 @@ export function determineEffectiveWeight(row: NormalizedOffering): WeightResult 
         }
     }
 
-    // PRIORITY 3: Explicit Weight Field (non-bulk or no package info)
+    // PRIORITY 3: Explicit Weight Field (non-multipack or no package info)
     if (row.offeringWeightGrams && row.offeringWeightGrams > 0) {
         const grams = row.offeringWeightGrams;
         return {
@@ -590,6 +592,13 @@ export function calculateNormalizedPrice(
 ): NormalizedPriceResult {
     const trace: string[] = [];
 
+    // Calculate markup factors for consistency
+    const isNonEu = offering.wholesalerCountry && !EU_ZONE.has(offering.wholesalerCountry);
+    const markupFactor = isNonEu ? IMPORT_MARKUP : 1.0;
+
+    // Helper to apply markup to a price if it's not null
+    const applyMarkup = (p: number | null) => p !== null ? p * markupFactor : null;
+
     if (strategy === 'WEIGHT') {
         // WEIGHT STRATEGY: Calculate price per kilogram
         
@@ -600,6 +609,26 @@ export function calculateNormalizedPrice(
             // Example: 10.00€ / 0.05kg = 200.00€/kg
             const normalizedPrice = effectivePrice / weightResult.weightKg;
             
+            // === STEP 1: REGULAR PRICE PER PIECE (List price baseline) ===
+            const regular_Field = applyMarkup(offering.offeringPricePerPiece);
+            const regular_Calculated = weightResult.pieceCount > 0 
+                ? (offering.offeringPrice * markupFactor) / weightResult.pieceCount 
+                : null;
+
+            const regularPricePerPiece = (regular_Field !== null && regular_Calculated !== null)
+                ? Math.min(regular_Field, regular_Calculated)
+                : (regular_Field ?? regular_Calculated);
+
+            // === STEP 2: BEST PRICE PER PIECE (Including Tiered Discounts) ===
+            // effectivePrice already contains best base price (List or Tiered) + Markup
+            const best_Calculated = weightResult.pieceCount > 0 
+                ? effectivePrice / weightResult.pieceCount 
+                : null;
+
+            const finalPricePerPiece = (regularPricePerPiece !== null && best_Calculated !== null)
+                ? Math.min(regularPricePerPiece, best_Calculated)
+                : (regularPricePerPiece ?? best_Calculated);
+
             // Build detailed tooltip showing calculation steps
             const calcTooltip = `STRATEGY: Weight (€/kg) • BASIS: ${weightResult.tooltip} • CALC: ${effectivePrice.toFixed(2)}€ / ${weightResult.weightKg.toFixed(3)}kg`;
             
@@ -607,6 +636,8 @@ export function calculateNormalizedPrice(
 
             return {
                 normalizedPrice,
+                finalPricePerPiece,
+                regularPricePerPiece,
                 unit: '€/kg',
                 calcMethod: weightResult.method,          // EXACT, RANGE, BULK, or CALC
                 calcTooltip,
@@ -615,14 +646,12 @@ export function calculateNormalizedPrice(
             };
         } else {
             // ERROR: WEIGHT strategy selected but no weight could be determined
-            // This indicates missing or invalid data that needs attention
-            
             trace.push(`❌ ERROR: WEIGHT Strategy but no weight found`);
             
-            // Return error price (999999) to make this offering stand out in reports
-            // This high price will sort it to the bottom, flagging it for review
             return {
                 normalizedPrice: 999999,
+                finalPricePerPiece: null,
+                regularPricePerPiece: null,
                 unit: 'ERR',
                 calcMethod: 'ERR',
                 calcTooltip: 'Error: WEIGHT strategy selected but no weight data available.',
@@ -633,24 +662,33 @@ export function calculateNormalizedPrice(
     } else {
         // UNIT STRATEGY: Price per piece
         
-        // Weight is stored for sorting purposes, even though not used for pricing
-        // This enables size-sorted reports for unit-priced items (e.g., pendants, jewelry)
-        // Bulk items (e.g., "1kg Trommelsteine") will have weight from package
         if (weightResult.weightKg) {
             trace.push(`📊 Weight determined for sorting: ${weightResult.method} (${weightResult.weightKg.toFixed(3)}kg)`);
         }
         
-        const weightInfo = weightResult.weightKg ? ` (Info: ${weightResult.tooltip})` : '';
-        const calcTooltip = `STRATEGY: Unit (€/pcs)${weightInfo} • CALC: ${effectivePrice.toFixed(2)}€ / 1 pc`;
+        // === STEP 1: REGULAR PRICE PER PIECE (List price baseline) ===
+        const regular_Field = applyMarkup(offering.offeringPricePerPiece);
+        const regular_Calculated = offering.offeringPrice * markupFactor;
 
-        // The effective price is already in €/piece, so use it directly
-        // No division or calculation needed for price
+        const regularPricePerPiece = regular_Field !== null 
+            ? Math.min(regular_Field, regular_Calculated)
+            : regular_Calculated;
+
+        // === STEP 2: BEST PRICE PER PIECE (Including Tiered Discounts) ===
+        // effectivePrice already contains best base price (List or Tiered) + Markup
+        const finalPricePerPiece = Math.min(regularPricePerPiece, effectivePrice);
+
+        const weightInfo = weightResult.weightKg ? ` (Info: ${weightResult.tooltip})` : '';
+        const calcTooltip = `STRATEGY: Unit (€/pcs)${weightInfo} • CALC: ${finalPricePerPiece.toFixed(2)}€ / 1 pc`;
+
         return {
-            normalizedPrice: effectivePrice,              // Same as effective price
+            normalizedPrice: finalPricePerPiece,
+            finalPricePerPiece: finalPricePerPiece,
+            regularPricePerPiece: regularPricePerPiece,
             unit: '€/pcs',
             calcMethod: 'UNIT',
             calcTooltip,
-            weightKg: weightResult.weightKg,              // Store weight for size-sorted reports!
+            weightKg: weightResult.weightKg,
             trace
         };
     }
@@ -713,7 +751,7 @@ export function extractMetadata(offering: NormalizedOffering): MetadataResult {
     const dimensionsInfo = extractDimensions(offering);
 
     // STEP 2: Extract and validate package weight
-    // Package weight represents bulk packaging (e.g., "5 kg pack", "1000 pieces per box")
+    // Package weight represents multipack packaging (e.g., "5 kg pack", "1000 pieces per box")
     // This is different from individual piece weight
     const packageWeightInfo = validatePackageWeight(
         offering.offeringPackaging,
@@ -789,12 +827,13 @@ export function buildReportRow(
         // Original prices before any processing
         Raw_Price_List: listPrice,                          // Original list price from wholesaler
         Offering_Price: offering.offeringPrice,             // Same as list price (kept for compatibility)
-        Offering_Price_Per_Piece: offering.offeringPricePerPiece, // Price per piece if available
+        Offering_Price_Per_Piece: normalizedPriceResult.regularPricePerPiece !== null ? parseFloat(normalizedPriceResult.regularPricePerPiece.toFixed(2)) : null,
         Raw_Weight_Input: offering.offeringWeightGrams !== null ? String(offering.offeringWeightGrams) : '-', // Raw weight from DB
 
         // === CALCULATED INTERMEDIATE VALUES ===
         // Results from pipeline steps
-        Detected_Bulk_Price: bestPriceResult.bestPrice,             // Best price found (may be bulk discount)
+        Detected_Tiered_Price: bestPriceResult.bestPrice,   // Best price found (may be tiered price discount)
+        Volume_Discounts: offering.offeringVolumeDiscounts || null,
         Detected_Weight_Kg: weightResult.weightKg,          // Determined weight in kg (from separate weight pipeline step)
         Applied_Markup_Pct: landedCostResult.markupPct,    // Import markup percentage (0 for EU, 25 for non-EU)
         
@@ -807,7 +846,7 @@ export function buildReportRow(
         // Format weight for display: grams if < 1kg, otherwise kg
         // Calculation logic:
         // - Weight comes from determineEffectiveWeight() (Step C)
-        // - It prioritizes: Bulk Pkg > Exact Field > Range Avg > Geometric Calc
+        // - It prioritizes: Multipack Pkg > Exact Field > Range Avg > Geometric Calc
         Weight_Display: weightResult.weightKg 
             ? (weightResult.weightKg < 1 
                 ? `${Math.round(weightResult.weightKg * 1000)}g`  // < 1kg -> show grams (e.g. "43g")
@@ -816,7 +855,7 @@ export function buildReportRow(
         
         Weight_Source: weightResult.method,                 // How weight was determined (EXACT, CALC, RANGE, BULK)
         Weight_Warning: null,                               // Currently unused (reserved for future warnings)
-        Package_Weight: metadataResult.packageWeight,       // Bulk package weight if available
+        Package_Weight: metadataResult.packageWeight,       // Multipack package weight if available
         Package_Weight_Warning: metadataResult.packageWeightWarning, // Warning if package weight is problematic
 
         // === PER-PIECE WEIGHT (for size-based sorting) ===
@@ -832,6 +871,7 @@ export function buildReportRow(
         // === FINAL COMPARABLE PRICE ===
         // The main output: normalized price for comparison
         Final_Normalized_Price: parseFloat(normalizedPriceResult.normalizedPrice.toFixed(2)), // Rounded to 2 decimals
+        Final_Price_Per_Piece: normalizedPriceResult.finalPricePerPiece !== null ? parseFloat(normalizedPriceResult.finalPricePerPiece.toFixed(2)) : null,
         Unit: normalizedPriceResult.unit,                   // "€/kg", "€/pcs", or "ERR"
         Calculation_Method: normalizedPriceResult.calcMethod, // How this price was calculated
         Calculation_Tooltip: normalizedPriceResult.calcTooltip, // Detailed explanation for tooltips

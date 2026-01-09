@@ -95,7 +95,7 @@ export interface RawOffering {
     offeringDimensions?: string;
     offeringWeightRange?: string;
     offeringPackageWeight?: string;
-    offeringBulkPrices?: string;
+    offeringVolumeDiscounts?: string;
     offeringId?: string;
     // Additional fields are optional - not critical for price calculation
     [key: string]: string | undefined; 
@@ -125,7 +125,8 @@ export interface ReportRow {
     Raw_Weight_Input: string;       // Raw weight value as string
 
     // === DETECTED/CALCULATED VALUES ===
-    Detected_Bulk_Price: number;    // Best price found (may be bulk price from comments)
+    Detected_Tiered_Price: number;  // Best price found (may be tiered price from comments)
+    Volume_Discounts: string | null; // Formatted tiered prices (e.g. "ab 10: 5.00€")
     Detected_Weight_Kg: number | null;  // Effective weight in kg (from field, range, or calculation)
     Applied_Markup_Pct: number;     // Applied markup percentage (0 for EU, 25 for non-EU)
     
@@ -146,6 +147,7 @@ export interface ReportRow {
 
     // === FINAL CALCULATION RESULT ===
     Final_Normalized_Price: number; // Normalized price for comparison (€/kg or €/Stk)
+    Final_Price_Per_Piece: number | null; // Best price per piece including markup
     Unit: '€/kg' | '€/pcs' | 'ERR'; // Unit of the normalized price
 
     // === CALCULATION METADATA ===

@@ -1,0 +1,39 @@
+# Abhängigkeiten und Systemordner
+node_modules/
+.git/
+.vscode/
+.venv/
+.vscode/
+.claude/
+.aider*/
+generate_files/
+log/
+tmp/
+../pureenergy-schema/
+../pure-shopify/
+../pure-core/
+
+static/
+public/
+assets/
+images/
+fonts/
+
+
+# Build-Ordner (kompilierter Code)
+dist/
+build/
+out/
+.next/
+
+# Riesige Lock-Dateien (WICHTIG! Diese verursachen oft den Absturz)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Bilder und Assets (brauchen kein Text-Embedding)
+*.png
+*.jpg
+*.jpeg
+*.svg
+*.ico

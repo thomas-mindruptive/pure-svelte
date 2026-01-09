@@ -9,7 +9,8 @@ import {
     sortCandidatesByPrice,
     sortCandidatesByWeight,
     formatUnitForCsv,
-    formatWeightForMarkdown
+    formatWeightForMarkdown,
+    formatVolumeDiscountsForCsv
 } from './report-grouping.js';
 
 // ==========================================
@@ -72,6 +73,8 @@ export function exportBestBuyReportToCsv(
         'Size',
         'Price',
         'Price/Piece',
+        'Best P/Pc',
+        'Tiered',
         'Price (Norm.)',
         'Weight',
         'Wgt/Pc',
@@ -103,6 +106,8 @@ export function exportBestBuyReportToCsv(
             const warningIcon = (row.Dimensions_Warning || row.Weight_Warning || row.Package_Weight_Warning) ? ' ⚠️' : '';
             const offeringPrice = row.Offering_Price.toFixed(2);
             const offeringPricePerPiece = row.Offering_Price_Per_Piece !== null ? row.Offering_Price_Per_Piece.toFixed(2) : '-';
+            const bestPricePerPiece = row.Final_Price_Per_Piece !== null ? row.Final_Price_Per_Piece.toFixed(2) : '-';
+            const tieredDiscounts = formatVolumeDiscountsForCsv(row.Volume_Discounts);
             const priceDisplay = row.Final_Normalized_Price.toFixed(2);
 
             const weightDisplay = formatWeightForMarkdown(row);
@@ -120,6 +125,8 @@ export function exportBestBuyReportToCsv(
                 dimensions + warningIcon,
                 offeringPrice,
                 offeringPricePerPiece,
+                bestPricePerPiece,
+                tieredDiscounts,
                 priceDisplay,
                 weightDisplay,
                 weightPerPieceDisplay,
@@ -169,6 +176,8 @@ export function exportBestBuyByStoneToCsv(
         'Size',
         'Price',
         'Price/Piece',
+        'Best P/Pc',
+        'Tiered',
         'Price (Norm.)',
         'Weight',
         'Wgt/Pc',
@@ -207,6 +216,8 @@ export function exportBestBuyByStoneToCsv(
                 const warningIcon = (row.Dimensions_Warning || row.Weight_Warning || row.Package_Weight_Warning) ? ' ⚠️' : '';
                 const offeringPrice = row.Offering_Price.toFixed(2);
                 const offeringPricePerPiece = row.Offering_Price_Per_Piece !== null ? row.Offering_Price_Per_Piece.toFixed(2) : '-';
+                const bestPricePerPiece = row.Final_Price_Per_Piece !== null ? row.Final_Price_Per_Piece.toFixed(2) : '-';
+                const tieredDiscounts = formatVolumeDiscountsForCsv(row.Volume_Discounts);
                 const priceDisplay = row.Final_Normalized_Price.toFixed(2);
 
                 const weightDisplay = formatWeightForMarkdown(row);
@@ -242,6 +253,8 @@ export function exportBestBuyByStoneToCsv(
                     dimensions + warningIcon,
                     offeringPrice,
                     offeringPricePerPiece,
+                    bestPricePerPiece,
+                    tieredDiscounts,
                     priceDisplay,
                     weightDisplay,
                     weightPerPieceDisplay,
@@ -290,6 +303,8 @@ export function exportBestBuyByProductTypeToCsv(
         'Wgt/Pc Calc',
         'Price',
         'Price/Piece',
+        'Best P/Pc',
+        'Tiered',
         'Price (Norm.)',
         'Unit',
         'Unit Calc',
@@ -332,6 +347,8 @@ export function exportBestBuyByProductTypeToCsv(
                     const warningIcon = (row.Dimensions_Warning || row.Weight_Warning || row.Package_Weight_Warning) ? ' ⚠️' : '';
                     const offeringPrice = row.Offering_Price.toFixed(2);
                     const offeringPricePerPiece = row.Offering_Price_Per_Piece !== null ? row.Offering_Price_Per_Piece.toFixed(2) : '-';
+                    const bestPricePerPiece = row.Final_Price_Per_Piece !== null ? row.Final_Price_Per_Piece.toFixed(2) : '-';
+                    const tieredDiscounts = formatVolumeDiscountsForCsv(row.Volume_Discounts);
                     const priceDisplay = row.Final_Normalized_Price.toFixed(2);
 
                     const unitDisplay = formatUnitForCsv(row);
@@ -368,6 +385,8 @@ export function exportBestBuyByProductTypeToCsv(
                         row.Weight_Per_Piece_Tooltip,
                         offeringPrice,
                         offeringPricePerPiece,
+                        bestPricePerPiece,
+                        tieredDiscounts,
                         priceDisplay,
                         unitDisplay,
                         row.Calculation_Tooltip,

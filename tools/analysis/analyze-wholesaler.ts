@@ -7,7 +7,7 @@
  * MAIN RESPONSIBILITIES:
  * 1. Load offerings from database or CSV
  * 2. Normalize data from different sources into unified format
- * 3. Detect bulk/volume pricing from comment fields
+ * 3. Detect tiered/volume pricing from comment fields
  * 4. Apply import markup for non-EU countries (+25%)
  * 5. Determine pricing strategy (€/kg vs €/Stk) based on product type
  * 6. Calculate normalized prices for fair comparison
@@ -16,7 +16,7 @@
  * ARCHITECTURE:
  * - Two data sources: CSV file or database (enriched view)
  * - Adapter pattern: Both sources normalized to NormalizedOffering interface
- * - Pipeline: Filter → Bulk Detection → Markup → Strategy → Normalize → Report
+ * - Pipeline: Filter → Tiered Price Detection → Markup → Strategy → Normalize → Report
  */
 
 import * as fs from 'fs';
@@ -101,12 +101,12 @@ interface NormalizedOffering {
     offeringPrice: number;                 // Primary price (converted from string)
     offeringPricePerPiece: number | null;
     offeringWeightGrams: number | null;    // Explicit weight if available
-    offeringComment: string | null;        // May contain bulk prices
+    offeringComment: string | null;        // May contain tiered prices
     offeringPackaging: string | null;      // May contain weight info
     offeringDimensions: string | null;     // For geometric weight calculation
     offeringWeightRange: string | null;    // e.g., "30-50g"
-    offeringPackageWeight: string | null;  // Bulk package weight
-    offeringBulkPrices: string | null;     // New strict bulk prices field
+    offeringPackageWeight: string | null;  // Multipack package weight
+    offeringVolumeDiscounts: string | null; // New strict tiered prices field
     offeringId: number;                    // Database ID for reference
 }
 
@@ -181,8 +181,8 @@ function normalizeRawOffering(row: RawOffering): NormalizedOffering {
         offeringPackageWeight: (row.offeringPackageWeight && row.offeringPackageWeight !== 'NULL')
             ? row.offeringPackageWeight
             : null,
-        offeringBulkPrices: (row.offeringBulkPrices && row.offeringBulkPrices !== 'NULL')
-            ? row.offeringBulkPrices
+        offeringVolumeDiscounts: (row.offeringVolumeDiscounts && row.offeringVolumeDiscounts !== 'NULL')
+            ? row.offeringVolumeDiscounts
             : null,
         offeringId: offeringId,
     };
@@ -215,7 +215,7 @@ function normalizeEnrichedView(row: OfferingEnrichedView): NormalizedOffering {
         offeringDimensions: row.offeringDimensions || null,
         offeringWeightRange: row.offeringWeightRange || null,
         offeringPackageWeight: row.offeringPackageWeight || null,
-        offeringBulkPrices: row.offeringBulkPrices || null,
+        offeringVolumeDiscounts: row.offeringBulkPrices || null,
         offeringId: row.offeringId,
     };
 }
@@ -225,7 +225,7 @@ function normalizeEnrichedView(row: OfferingEnrichedView): NormalizedOffering {
 // ==========================================
 
 /**
- * Extracts the best (lowest) price from an offering by searching for bulk prices in the comment field.
+ * Extracts the best (lowest) price from an offering by searching for tiered prices in the comment field.
  * 
  * WHY: Many wholesalers include volume discount prices in comments like "ab 10 Stk: 3.50€".
  * This function parses these to find the actual best available price.
@@ -240,10 +240,10 @@ function normalizeEnrichedView(row: OfferingEnrichedView): NormalizedOffering {
  * @returns Object with best price, source indicator, and optional excerpt from comment
  */
 export function getBestPriceFromNormalized(row: NormalizedOffering, listPrice: number, reportBuilder?: ReportBuilder): { price: number, source: string, commentExcerpt?: string } {
-    if (reportBuilder && !reportBuilder['legendEntries'].has('Preis (Norm.)_Bulk')) {
+    if (reportBuilder && !reportBuilder['legendEntries'].has('Price (Norm.)_Tiered')) {
         reportBuilder.addToLegend(
-            'Preis (Norm.)_Bulk',
-            'Bulk-Preis aus Comment-Feld extrahiert',
+            'Price (Norm.)_Tiered',
+            'Rabatt-Preis aus Comment-Feld extrahiert',
             'Regex-Pattern `[€$]?\\s?(\\d+[\\.,]?\\d{0,2})` durchsucht Comment nach Preisen. Niedrigster gültiger Preis (muss < Listenpreis und > 10% des Listenpreises sein) wird verwendet. Quelle: `offeringComment` Feld aus Datenbank/CSV'
         );
     }
@@ -277,7 +277,7 @@ export function getBestPriceFromNormalized(row: NormalizedOffering, listPrice: n
 
             return {
                 price: lowest,
-                source: 'Bulk (Comment)',
+                source: 'Tiered (Comment)',
                 commentExcerpt: excerpt
             };
         }
@@ -289,7 +289,7 @@ export function getBestPriceFromNormalized(row: NormalizedOffering, listPrice: n
  * Transforms normalized offerings into report rows with calculated normalized prices.
  * 
  * This is the MAIN TRANSFORMATION PIPELINE that:
- * 2. Detects bulk prices from comments
+ * 2. Detects tiered prices from comments or volume discounts field
  * 3. Applies import markup for non-EU countries (+25%)
  * 4. Determines pricing strategy (WEIGHT vs UNIT based on product type)
  * 5. Calculates normalized price (€/kg or €/Stk) for comparison
@@ -313,9 +313,9 @@ export function transformOfferingsToReportRows(normalizedOfferings: NormalizedOf
             // Collect trace entries from all pipeline steps
             const allTraces: string[] = [];
 
-            // STEP A: Detect best price (bulk or list)
+            // STEP A: Detect best price (tiered or list)
             const listPrice = row.offeringPrice;
-            const bestPrice = detectBestPrice(row, listPrice, reportBuilder);
+            const bestPrice = detectBestPrice(row as any, listPrice, reportBuilder);
             allTraces.push(...bestPrice.trace);
 
             // STEP B: Calculate landed cost (with import markup if needed)
@@ -327,41 +327,32 @@ export function transformOfferingsToReportRows(normalizedOfferings: NormalizedOf
             allTraces.push(...landedCostResult.trace);
 
             // STEP C: Calculate weight ALWAYS (for all strategies, enables size-sorted reports)
-            const weightResult = determineEffectiveWeight(row);
+            const weightResult = determineEffectiveWeight(row as any);
             if (weightResult.weightKg) {
                 allTraces.push(`📊 Weight: ${weightResult.method} (${weightResult.weightKg.toFixed(3)}kg)`);
             }
 
-            // Single piece price
-            const effectivePricePerPiece = row.offeringPricePerPiece ??
-                (weightResult.pieceCount > 1 ? bestPrice.bestPrice / weightResult.pieceCount : row.offeringPrice);
-            if (effectivePricePerPiece !== row.offeringPricePerPiece && effectivePricePerPiece !== null) {
-                row.offeringPricePerPiece = effectivePricePerPiece;
-                allTraces.push(`💰 Calc. Price/Pc: ${effectivePricePerPiece.toFixed(2)} (${bestPrice.bestPrice.toFixed(2)} / ${weightResult.pieceCount}pcs)`);
-            }
-
-
             // STEP D: Determine pricing strategy (WEIGHT vs UNIT) using weight result
-            const strategyResult = determinePricingStrategy(row, weightResult);
+            const strategyResult = determinePricingStrategy(row as any, weightResult);
             allTraces.push(...strategyResult.trace);
 
             // STEP E: Calculate normalized price
             const normalizedPriceResult = calculateNormalizedPrice(
                 landedCostResult.effectivePrice,
                 strategyResult.strategy,
-                row,
+                row as any,
                 weightResult
             );
             allTraces.push(...normalizedPriceResult.trace);
 
             // STEP F: Extract metadata (dimensions, package weight)
-            const metadataResult = extractMetadata(row);
+            const metadataResult = extractMetadata(row as any);
             allTraces.push(...metadataResult.trace);
 
             // STEP G: Build report row from all pipeline results
             const reportRow = buildReportRow(
                 index,
-                row,
+                row as any,
                 listPrice,
                 bestPrice,
                 landedCostResult,

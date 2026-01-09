@@ -341,3 +341,47 @@ export function formatWeightForMarkdown(row: ReportRow): string {
     // Just return it directly instead of re-formatting
     return row.Weight_Display || '-';
 }
+
+/**
+ * Formats raw volume discounts for Markdown output.
+ * Converts "Quantity|Unit|Price|Info" to "ab Quantity Unit: Price€"
+ * and uses <br> for multiline display within table cells.
+ * 
+ * @param raw - Raw volume discount string from ReportRow
+ * @returns Formatted string for Markdown
+ */
+export function formatVolumeDiscountsForMarkdown(raw: string | null): string {
+    if (!raw) return '-';
+    
+    return raw.split(/\r?\n/)
+        .filter(l => l.trim().length > 0)
+        .map(line => {
+            const parts = line.split('|').map(p => p.trim());
+            if (parts.length >= 3) {
+                return `ab ${parts[0]} ${parts[1]}: ${parseFloat(parts[2]).toFixed(2)}€`;
+            }
+            return line;
+        }).join('<br>');
+}
+
+/**
+ * Formats raw volume discounts for CSV output.
+ * Converts "Quantity|Unit|Price|Info" to "ab Quantity Unit: Price€"
+ * and uses \n for multiline display.
+ * 
+ * @param raw - Raw volume discount string from ReportRow
+ * @returns Formatted string for CSV
+ */
+export function formatVolumeDiscountsForCsv(raw: string | null): string {
+    if (!raw) return '';
+    
+    return raw.split(/\r?\n/)
+        .filter(l => l.trim().length > 0)
+        .map(line => {
+            const parts = line.split('|').map(p => p.trim());
+            if (parts.length >= 3) {
+                return `ab ${parts[0]} ${parts[1]}: ${parseFloat(parts[2]).toFixed(2)}€`;
+            }
+            return line;
+        }).join('\n');
+}
